@@ -286,7 +286,28 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  register: async (username, email, phone, password, firebaseToken = null) => {
+  sendRegistrationOtp: async (username, email, phone) => {
+    try {
+      set({ authError: null });
+      const res = await fetch(`${API}/api/auth/send-registration-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, phone })
+      });
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, message: data.message };
+      } else {
+        set({ authError: data.error });
+        return { success: false, error: data.error };
+      }
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  register: async (username, email, phone, password, firebaseToken = null, otp = null) => {
     try {
       set({ authError: null });
       const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
@@ -295,6 +316,7 @@ export const useStore = create(persist((set, get) => ({
         email,
         phone,
         password,
+        otp: otp || undefined,
         firebase_token: firebaseToken || undefined,
         referral_code: localStorage.getItem('referral_code'),
         client_ip: publicInfo?.ip || undefined,
@@ -314,11 +336,14 @@ export const useStore = create(persist((set, get) => ({
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
+        return { success: true };
       } else {
         set({ authError: data.error });
+        return { success: false, error: data.error };
       }
     } catch (err) {
       set({ authError: err.message });
+      return { success: false, error: err.message };
     }
   },
 

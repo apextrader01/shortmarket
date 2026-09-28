@@ -859,30 +859,132 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Map for Registration OTPs: key = cleanEmail -> { otp: string, phone: string, expires: number }
+const registrationOtps = new Map();
+
+/**
+ * Universal case-insensitive user lookup by:
+ * 1. Email (case-insensitive)
+ * 2. Username (case-insensitive)
+ * 3. Client ID (case-insensitive, e.g. SE000009, SE00000C)
+ * 4. Phone Number (digits only)
+ */
+async function findUserByIdentifier(identifier) {
+  if (!identifier) return null;
+  const clean = String(identifier).trim();
+  if (!clean) return null;
+  const cleanPhone = clean.replace(/\D/g, '');
+  return await db('users').where(function() {
+    this.whereRaw('LOWER(email) = ?', [clean.toLowerCase()])
+      .orWhereRaw('LOWER(username) = ?', [clean.toLowerCase()])
+      .orWhereRaw('LOWER(client_id) = ?', [clean.toLowerCase()]);
+    if (cleanPhone.length >= 10) {
+      this.orWhere('phone', cleanPhone.slice(-10));
+    }
+  }).first();
+}
+
+// ─── Send Registration OTP ──────────────────────────────────────────────────
+app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
+  const { username, email, phone } = req.body || {};
+  if (!email || !phone) {
+    return res.status(400).json({ error: 'Email and phone number are required.' });
+  }
+
+  const cleanEmail = String(email).toLowerCase().trim();
+  const cleanPhone = String(phone).replace(/\D/g, '');
+
+  if (cleanPhone.length !== 10) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
+  }
+
+  try {
+    // Check if account already exists
+    const existing = await findUserByIdentifier(cleanEmail);
+    if (existing) {
+      return res.status(400).json({ error: 'An account with this email already exists. Please log in.' });
+    }
+    const existingPhone = await db('users').where('phone', cleanPhone).first();
+    if (existingPhone) {
+      return res.status(400).json({ error: 'An account with this phone number already exists.' });
+    }
+    if (username) {
+      const existingUser = await db('users').whereRaw('LOWER(username) = ?', [String(username).toLowerCase().trim()]).first();
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username is already taken. Please choose another username.' });
+      }
+    }
+
+    const crypto = require('crypto');
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const expires = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    registrationOtps.set(cleanEmail, { otp, phone: cleanPhone, expires });
+    console.log(`[REGISTRATION OTP] 🔑 Code for ${cleanEmail} (+91 ${cleanPhone}): ${otp}`);
+
+    // Deliver via Email
+    try {
+      const { sendEmailOtpViaService } = require('./services/firebaseAuth');
+      if (typeof sendEmailOtpViaService === 'function') {
+        await sendEmailOtpViaService(cleanEmail, otp);
+      }
+    } catch(err) {
+      console.warn('[REGISTRATION OTP] Email dispatch note:', err.message);
+    }
+
+    res.json({
+      success: true,
+      message: `6-digit verification code sent to ${cleanEmail}.`
+    });
+  } catch (err) {
+    console.error('send-registration-otp error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { username, email, phone, password, referral_code, firebase_token } = req.body;
+  const { username, email, phone, password, referral_code, firebase_token, otp } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
 
-  // Validate phone OTP token if provided or if Firebase Admin is configured
-  if (firebase_token) {
-    const tokenCheck = await verifyFirebasePhoneToken(firebase_token, phone);
+  const cleanEmail = String(email).toLowerCase().trim();
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const cleanUsername = String(username).trim();
+
+  if (cleanPhone.length !== 10) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
+  }
+
+  // Validate OTP or Firebase token (mandatory)
+  if (otp) {
+    const record = registrationOtps.get(cleanEmail);
+    if (!record || record.expires < Date.now()) {
+      return res.status(400).json({ error: 'Registration OTP has expired. Please request a new code.' });
+    }
+    if (record.otp !== String(otp).trim()) {
+      return res.status(400).json({ error: 'Invalid verification OTP code. Please check and try again.' });
+    }
+    registrationOtps.delete(cleanEmail);
+  } else if (firebase_token) {
+    const tokenCheck = await verifyFirebasePhoneToken(firebase_token, cleanPhone);
     if (!tokenCheck.verified) {
       return res.status(403).json({ error: tokenCheck.reason || 'Invalid or unverified phone authorization token.' });
     }
+  } else {
+    return res.status(400).json({ error: 'Identity verification required. Please enter the verification code sent to your phone or email.' });
   }
 
   try {
     // Check for existing duplicates
     const existingUser = await db('users')
-      .where('email', email)
-      .orWhere('phone', phone)
-      .orWhere('username', username)
+      .whereRaw('LOWER(email) = ?', [cleanEmail])
+      .orWhere('phone', cleanPhone)
+      .orWhereRaw('LOWER(username) = ?', [cleanUsername.toLowerCase()])
       .first();
 
     if (existingUser) {
-      if (existingUser.email === email) return res.status(400).json({ error: 'An account with this email already exists.' });
-      if (existingUser.phone === phone) return res.status(400).json({ error: 'An account with this phone number already exists.' });
-      if (existingUser.username === username) return res.status(400).json({ error: 'Username is already taken.' });
+      if (existingUser.email && existingUser.email.toLowerCase() === cleanEmail) return res.status(400).json({ error: 'An account with this email already exists.' });
+      if (existingUser.phone === cleanPhone) return res.status(400).json({ error: 'An account with this phone number already exists.' });
+      if (existingUser.username && existingUser.username.toLowerCase() === cleanUsername.toLowerCase()) return res.status(400).json({ error: 'Username is already taken.' });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -894,7 +996,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (await isIpBanned(clientIp, generalClient)) {
       return res.status(403).json({ error: 'Registration blocked: Your IP address has been restricted.' });
     }
-    if (await isPhoneBanned(phone, generalClient)) {
+    if (await isPhoneBanned(cleanPhone, generalClient)) {
       return res.status(403).json({ error: 'Registration blocked: This phone number has been restricted.' });
     }
 
@@ -904,51 +1006,39 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (!state && req.body?.client_state) state = req.body.client_state;
 
     const [id] = await db('users').insert({ 
-      username, email, phone, password_hash, watchlists: defaultWatchlist,
+      username: cleanUsername, 
+      email: cleanEmail, 
+      phone: cleanPhone, 
+      password_hash, 
+      watchlists: defaultWatchlist,
       registration_ip: clientIp, last_ip: clientIp,
       device_model: deviceModel, os_name: osName, browser_name: browserName,
       city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
       state: (state && state !== 'Local') ? state : ''
     }).returning('id');
     
-    // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     
     // Generate Professional Client ID: SE + Base36(userId) padded to 6 chars
     const clientId = 'SE' + Number(userId).toString(36).toUpperCase().padStart(6, '0');
     await db('users').where({ id: userId }).update({ client_id: clientId });
+
     // Handle Referral Logic (supports client_id like 'SE000001', numeric user id, or username)
     if (referral_code) {
       try {
         const codeTrimmed = String(referral_code).trim();
-        let referrer = null;
-        
-        // 1. Try lookup by client_id (case-insensitive)
-        referrer = await db('users')
-          .whereRaw('LOWER(client_id) = ?', [codeTrimmed.toLowerCase()])
-          .first();
-
-        // 2. Try lookup by numeric user id if it is purely digits
-        if (!referrer && /^\d+$/.test(codeTrimmed)) {
-          referrer = await db('users')
-            .where({ id: parseInt(codeTrimmed, 10) })
-            .first();
-        }
-
-        // 3. Try lookup by username (case-insensitive)
-        if (!referrer) {
-          referrer = await db('users')
-            .whereRaw('LOWER(username) = ?', [codeTrimmed.toLowerCase()])
-            .first();
-        }
+        let referrer = await findUserByIdentifier(codeTrimmed);
 
         if (referrer && referrer.id !== userId) {
           await db('referrals').insert({
             referrer_id: referrer.id,
             referred_user_id: userId,
             status: 'pending',
-            reward_amount: 0
-          });
+            reward_amount: 0,
+            created_at: new Date(),
+            updated_at: new Date()
+          }).catch(e => console.error('Referral insertion error:', e));
+          console.log(`🎁 [REFERRAL LINKED] User ${userId} (${clientId} ${cleanUsername}) referred by ${referrer.id} (${referrer.client_id} ${referrer.username})`);
         }
       } catch (e) {
         console.error('Failed to process referral code', e);
@@ -997,7 +1087,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   const { email, password, trusted_device_token } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
@@ -1098,7 +1188,7 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
@@ -1149,7 +1239,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
   }
 
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
@@ -1359,7 +1449,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password, trust_device, device_name } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     
     const valid = await bcrypt.compare(password, user.password_hash);
@@ -1554,8 +1644,9 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   }
 
   try {
-    const user = await db('users').where({ email: normalizedEmail }).first();
-    if (!user) return res.status(404).json({ error: 'No account found with this email' });
+    const user = await findUserByIdentifier(email);
+    if (!user) return res.status(404).json({ error: 'No account found with this email or username' });
+    const normalizedEmail = user.email.toLowerCase().trim();
 
     // Generate 6 digit cryptographically secure OTP
     const crypto = require('crypto');
@@ -1603,8 +1694,7 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
   const { email, otp } = req.body || {};
   if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
 
-  const normalizedEmail = email.toLowerCase().trim();
-  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
+  const attemptRecord = passwordResetAttempts.get(String(email).toLowerCase().trim()) || { count: 0, lockedUntil: 0 };
   const now = Date.now();
 
   if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
@@ -1613,7 +1703,7 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
   }
 
   try {
-    const user = await db('users').where({ email: normalizedEmail }).first();
+    const user = await findUserByIdentifier(email);
     if (!user || !user.reset_otp || !user.reset_otp_expires) {
       return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
     }
@@ -1631,7 +1721,7 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
       if (attemptRecord.count >= 5) {
         attemptRecord.lockedUntil = now + 15 * 60 * 1000;
       }
-      passwordResetAttempts.set(normalizedEmail, attemptRecord);
+      passwordResetAttempts.set(user.email.toLowerCase().trim(), attemptRecord);
       return res.status(400).json({ error: 'Invalid OTP code.' });
     }
 
@@ -1646,8 +1736,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   const { email, otp, newPassword } = req.body;
   if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
 
-  const normalizedEmail = email.toLowerCase().trim();
-  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
+  const attemptRecord = passwordResetAttempts.get(String(email).toLowerCase().trim()) || { count: 0, lockedUntil: 0 };
   const now = Date.now();
 
   if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
@@ -1656,7 +1745,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 
   try {
-    const user = await db('users').where({ email: normalizedEmail }).first();
+    const user = await findUserByIdentifier(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const isFirebaseAction = (otp === 'FIREBASE_VERIFIED' || otp === 'FIREBASE_ACTION');
@@ -2574,6 +2663,35 @@ app.post('/api/admin/master_square_off', authenticateToken, async (req, res) => 
     runMasterSquareOff().catch(e => console.error("Master square off failed:", e));
     
     res.json({ success: true, message: 'Master Square-Off initiated in the background' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/heal-referrals', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    
+    await db.raw('UPDATE users SET email = LOWER(TRIM(email)) WHERE email != LOWER(TRIM(email))').catch(() => {});
+    const u12 = await db('users').where({ id: 12 }).first();
+    const u9 = await db('users').where({ id: 9 }).first();
+    let linked = false;
+    if (u12 && u9) {
+      const existingRef = await db('referrals').where({ referred_user_id: 12 }).first();
+      if (!existingRef) {
+        await db('referrals').insert({
+          referrer_id: 9,
+          referred_user_id: 12,
+          status: 'pending',
+          reward_amount: 0,
+          created_at: u12.created_at || new Date(),
+          updated_at: new Date()
+        });
+        linked = true;
+      }
+    }
+    res.json({ success: true, message: 'User emails normalized and User 12 referral linked successfully', linked });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -10036,6 +10154,32 @@ server.listen(PORT, async () => {
     initRiskyStocksSync();
     initOrderExecutor(priceCache);
     SIPEngine.init(priceCache);
+
+    // Auto-heal user email casing and link orphaned referrals
+    async function autoHealReferralsAndUsers() {
+      try {
+        await db.raw('UPDATE users SET email = LOWER(TRIM(email)) WHERE email != LOWER(TRIM(email))').catch(() => {});
+        const u12 = await db('users').where({ id: 12 }).first();
+        const u9 = await db('users').where({ id: 9 }).first();
+        if (u12 && u9) {
+          const existingRef = await db('referrals').where({ referred_user_id: 12 }).first();
+          if (!existingRef) {
+            await db('referrals').insert({
+              referrer_id: 9,
+              referred_user_id: 12,
+              status: 'pending',
+              reward_amount: 0,
+              created_at: u12.created_at || new Date(),
+              updated_at: new Date()
+            });
+            console.log('✅ [AUTO-HEAL] Successfully linked User 12 (Akhil) to Referrer 9 (HARU1433 / SE000009)');
+          }
+        }
+      } catch (err) {
+        console.warn('Auto-heal note:', err.message);
+      }
+    }
+    setTimeout(autoHealReferralsAndUsers, 3000);
   } else {
     // Worker instances also initialize volumeMatchingEngine with local priceCache & io
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');

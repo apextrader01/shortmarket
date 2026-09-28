@@ -5,12 +5,13 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function LoginView() {
-  const { login, preLogin, sendLoginEmailOtp, verify2FA, register, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ 
+  const { login, preLogin, sendLoginEmailOtp, verify2FA, register, sendRegistrationOtp, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ 
     login: state.login, 
     preLogin: state.preLogin, 
     sendLoginEmailOtp: state.sendLoginEmailOtp,
     verify2FA: state.verify2FA,
     register: state.register, 
+    sendRegistrationOtp: state.sendRegistrationOtp,
     forgotPassword: state.forgotPassword, 
     verifyResetOtp: state.verifyResetOtp, 
     resetPassword: state.resetPassword, 
@@ -66,6 +67,8 @@ export default function LoginView() {
   const [otp,      setOtp]      = useState('');
   const [phoneOtp, setPhoneOtp] = useState('');
   const [confirmationResult, setConfirmationResult] = useState(null);
+  const [registerOtpMethod,  setRegisterOtpMethod]  = useState('phone'); // 'phone' | 'email'
+  const [sendingRegOtp,     setSendingRegOtp]     = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [message,  setMessage]  = useState('');
 
@@ -246,41 +249,72 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
+      if (!username.trim()) {
+        useStore.setState({ authError: 'Please enter your full name.' });
+        setLoading(false);
+        return;
+      }
+      if (!email.trim()) {
+        useStore.setState({ authError: 'Please enter a valid email address.' });
+        setLoading(false);
+        return;
+      }
+      if (!password || password.length < 6) {
+        useStore.setState({ authError: 'Password must be at least 6 characters long.' });
+        setLoading(false);
+        return;
+      }
+
+      // Try Phone SMS first via Firebase, fallback to high-reliability Email OTP
       try {
         const verifier = setupRecaptchaVerifier();
         const formattedPhone = '+91' + cleanPhone;
         const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
         setConfirmationResult(confirmation);
+        setRegisterOtpMethod('phone');
         setView('register_otp');
-        setMessage(`6-digit SMS code dispatched to +91 ${cleanPhone}.`);
+        setMessage(`6-digit SMS verification code dispatched to +91 ${cleanPhone}.`);
       } catch (error) {
-        console.error('Phone SMS registration error:', error);
-        const isFirebaseSmsUnavailable = 
-          error?.code === 'auth/unauthorized-domain' || 
-          error?.code === 'auth/api-key-not-valid' ||
-          error?.code === 'auth/invalid-api-key' ||
-          String(error?.message || '').toLowerCase().includes('api-key') ||
-          String(error?.message || '').includes('reCAPTCHA');
-
-        if (isFirebaseSmsUnavailable) {
-          // On web browsers without native SMS: complete direct registration with mandatory phone number!
-          await register(username, email, cleanPhone, password, null);
+        console.warn('Phone SMS registration error, falling back to Email OTP:', error);
+        const res = await sendRegistrationOtp(username.trim(), email.trim().toLowerCase(), cleanPhone);
+        if (res && res.success) {
+          setRegisterOtpMethod('email');
+          setView('register_otp');
+          setMessage(res.message || `Verification code sent to ${email.trim().toLowerCase()}. Check your email inbox!`);
         } else {
-          useStore.setState({ authError: error.message });
+          useStore.setState({ authError: res?.error || 'Failed to dispatch verification code. Please check your details.' });
         }
       }
     }
     else if (view === 'register_otp') {
-      try {
-        if (!confirmationResult) {
-          throw new Error('No pending OTP verification session. Please register again.');
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      const cleanOtp = String(phoneOtp || '').trim();
+      if (!cleanOtp || cleanOtp.length !== 6) {
+        useStore.setState({ authError: 'Please enter a valid 6-digit verification code.' });
+        setLoading(false);
+        return;
+      }
+
+      if (registerOtpMethod === 'phone' && confirmationResult) {
+        try {
+          const userCredential = await confirmationResult.confirm(cleanOtp);
+          const firebaseToken = await userCredential?.user?.getIdToken().catch(() => null);
+          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, firebaseToken, null);
+          if (res && !res.success) {
+            useStore.setState({ authError: res.error || 'Registration failed' });
+          }
+        } catch (error) {
+          console.warn('Firebase SMS confirm failed, attempting Email OTP validation:', error);
+          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp);
+          if (res && !res.success) {
+            useStore.setState({ authError: error.message?.includes('invalid') ? 'Invalid verification code. Please check and try again.' : (res.error || 'Verification failed') });
+          }
         }
-        const userCredential = await confirmationResult.confirm(phoneOtp);
-        const firebaseToken = await userCredential?.user?.getIdToken().catch(() => null);
-        const cleanPhone = String(phone || '').replace(/\D/g, '');
-        await register(username, email, cleanPhone, password, firebaseToken);
-      } catch (error) {
-        useStore.setState({ authError: 'Invalid OTP code. Please check and try again.' });
+      } else {
+        const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp);
+        if (res && !res.success) {
+          useStore.setState({ authError: res.error || 'Invalid or expired verification code. Please request a new code.' });
+        }
       }
     }
     else if (view === 'forgot') {
@@ -397,7 +431,7 @@ export default function LoginView() {
             alignItems: 'center',
             gap: '8px'
           }}>
-            🎁 <span>Special Partner Invite active (<b>{localStorage.getItem('referral_code')}</b>)! You qualify for a 20% platform discount.</span>
+            🎁 <span>Special Partner Invite active (<b>{localStorage.getItem('referral_code')}</b>)! You qualify for a 10% platform discount.</span>
           </div>
         )}
         <div style={{ marginBottom: '32px' }}>
@@ -407,7 +441,7 @@ export default function LoginView() {
             {view === 'forgot' && 'Reset password'}
             {view === 'otp' && 'Verify identity'}
             {view === 'login_otp' && 'Two-Factor Authentication'}
-            {view === 'register_otp' && 'Verify your phone'}
+            {view === 'register_otp' && 'Verify your account'}
             {view === 'reset' && 'Secure your account'}
           </h2>
           <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
@@ -416,7 +450,7 @@ export default function LoginView() {
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
             {view === 'login_otp' && (twoFactorMethod === 'totp' ? 'Enter the dynamic 6-digit code from Google Authenticator.' : (twoFactorMethod === 'email' ? 'Enter the 6-digit verification code sent to your email.' : 'Enter the 6-digit code sent to your registered phone number.'))}
-            {view === 'register_otp' && 'Enter the 6-digit code sent to your phone via SMS.'}
+            {view === 'register_otp' && (registerOtpMethod === 'phone' ? 'Enter the 6-digit verification code sent to your phone.' : 'Enter the 6-digit verification code sent to your registered email.')}
             {view === 'reset' && 'Choose a strong, unique password.'}
           </div>
         </div>
@@ -477,8 +511,17 @@ export default function LoginView() {
 
           {(view === 'login' || view === 'register' || view === 'forgot') && (
             <div>
-              <label style={labelStyle}>Email ID</label>
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" placeholder="john@example.com" />
+              <label style={labelStyle}>
+                {(view === 'login' || view === 'forgot') ? 'Email, Username or Client ID' : 'Email ID'}
+              </label>
+              <input 
+                type={(view === 'login' || view === 'forgot') ? 'text' : 'email'} 
+                required 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                className="premium-input" 
+                placeholder={(view === 'login' || view === 'forgot') ? 'Email, username, or SE00000C' : 'john@example.com'} 
+              />
             </div>
           )}
 
@@ -491,8 +534,39 @@ export default function LoginView() {
 
           {view === 'register_otp' && (
             <div>
-              <label style={labelStyle}>6-Digit Phone OTP</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>
+                  {registerOtpMethod === 'phone' ? '6-Digit SMS Verification Code' : '6-Digit Email Verification Code'}
+                </label>
+                <button
+                  type="button"
+                  disabled={sendingRegOtp}
+                  onClick={async () => {
+                    setSendingRegOtp(true);
+                    useStore.setState({ authError: null });
+                    const cleanPhone = String(phone || '').replace(/\D/g, '');
+                    const res = await sendRegistrationOtp(username.trim(), email.trim().toLowerCase(), cleanPhone);
+                    setSendingRegOtp(false);
+                    if (res && res.success) {
+                      setRegisterOtpMethod('email');
+                      setMessage(`A fresh 6-digit code has been dispatched to ${email.trim().toLowerCase()}.`);
+                    } else {
+                      useStore.setState({ authError: res?.error || 'Failed to dispatch verification code.' });
+                    }
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '11.5px', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  {sendingRegOtp ? 'Sending...' : 'Resend Code via Email'}
+                </button>
+              </div>
               <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                {registerOtpMethod === 'phone' ? (
+                  <>Enter the 6-digit SMS code sent to <strong>+91 {phone}</strong>. If SMS is delayed, click &quot;Resend Code via Email&quot; above.</>
+                ) : (
+                  <>Enter the 6-digit code sent to <strong>{email}</strong>. Check your inbox and spam folder.</>
+                )}
+              </div>
             </div>
           )}
 
