@@ -425,16 +425,15 @@ export default function PositionsView() {
       if (Number(p.qty) === 0 || Number(p.unencumberedQty) <= 0) return false;
       if (p.product_type === 'BO' || p.product_type === 'CO') return false;
 
-      // 🛡️ STRICT SHIELD (Option 1): Never exit Delivery / CNC / Holdings / Portfolio items from Open tab
-      const prod = String(p.product_type || p.productLabel || '').toUpperCase();
-      if (prod === 'DEL' || prod === 'CNC' || prod === 'DELIVERY' || p.isDbHolding || p.isOvernightPos) {
+      // Safeguard: Never exit long-term database holdings or overnight positions from Open tab
+      if (p.isDbHolding || p.isOvernightPos) {
         return false;
       }
       return true;
     });
 
     if (openPositions.length === 0) {
-      alert('No valid open intraday positions to exit. Delivery, CNC, and Holdings are protected.');
+      alert('No valid open positions to exit.');
       return;
     }
 
@@ -466,7 +465,7 @@ export default function PositionsView() {
       return;
     }
 
-    if (!window.confirm(`Exit ALL ${openPositions.length} open intraday position(s) at market price? Delivery, CNC, and Holdings will NOT be touched.`)) return;
+    if (!window.confirm(`Exit ALL ${openPositions.length} open position(s) at market price?`)) return;
     let failed = 0;
     let lastError = '';
     const results = await Promise.allSettled(openPositions.map(async (pos) => {
@@ -484,12 +483,14 @@ export default function PositionsView() {
 
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
-      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type === 'INT' || pos.product_type === 'MIS' ? pos.product_type : 'INT');
+      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type || 'DEL');
+      const isMfPos = (pos.symbol || '').endsWith('-MF') || (pos.symbol || '').includes(':MF');
+      const qtyToExit = isMfPos ? parseFloat(Math.abs(Number(pos.unencumberedQty)).toFixed(4)) : Math.round(Math.abs(Number(pos.unencumberedQty)));
       const payload = {
         symbol: pos.symbol,
         type: 'MARKET',
         side: exitSide,
-        quantity: Math.abs(Number(pos.unencumberedQty)),
+        quantity: qtyToExit,
         price: liveLtp,
         sl_price: null,
         tgt_price: null,
