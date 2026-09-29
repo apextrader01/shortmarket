@@ -524,9 +524,13 @@ export default function OrderModal() {
       return;
     }
     if (!isAmo && !marketSession.open) {
-      const hoursText = isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM";
-      const marketName = isCommodity ? "MCX Commodity Market" : "Market";
-      alert(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
+      if (marketSession.reason) {
+        alert(marketSession.reason);
+      } else {
+        const hoursText = isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM";
+        const marketName = isCommodity ? "MCX Commodity Market" : "Market";
+        alert(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
+      }
       return;
     }
     if (isIntradayBlocked && !isAmo) {
