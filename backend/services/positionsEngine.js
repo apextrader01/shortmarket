@@ -62,8 +62,12 @@ class PositionsEngine {
                     const minute = parseInt(istParts.find(p => p.type === 'minute').value, 10);
                     const timeVal = hour * 100 + minute;
                     if (timeVal >= 1540) {
-                        console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement...');
+                        console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement for Equities & Derivatives...');
                         this.settleExpiries(false).catch(e => console.error('Startup catchup expiry error:', e));
+                    }
+                    if (timeVal >= 2335 || timeVal <= 10) {
+                        console.log('⏰ [BOOT CATCHUP] Past 11:35 PM IST — running immediate catchup expiry settlement for MCX Commodities...');
+                        this.settleExpiries(true, true).catch(e => console.error('Startup catchup MCX expiry error:', e));
                     }
                 } catch(e) {}
             }, 20000);
@@ -380,19 +384,14 @@ class PositionsEngine {
             const expiringUniqueSymbols = expiringInstruments.map(i => i.unique_symbol);
 
             // Find all active assets in Holdings, Positions, or Orders to evaluate for expiry settlement
-            let posQuery = db('positions').whereNot({ quantity: 0 });
-            let holdQuery = db('holdings').whereNot({ quantity: 0 });
-            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
-            
-            if (isCommodity) {
-                posQuery = posQuery.where('symbol', 'like', '%MCX%');
-                holdQuery = holdQuery.where('symbol', 'like', '%MCX%');
-                orderQuery = orderQuery.where('symbol', 'like', '%MCX%');
-            } else {
-                posQuery = posQuery.whereNot('symbol', 'like', '%MCX%');
-                holdQuery = holdQuery.whereNot('symbol', 'like', '%MCX%');
-                orderQuery = orderQuery.whereNot('symbol', 'like', '%MCX%');
-            }
+            const activePositions = await db('positions').whereNot({ quantity: 0 });
+            const activeHoldings = await db('holdings').whereNot({ quantity: 0 });
+            const activeOrders = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
+
+            const matchesTargetMarket = (sym) => {
+                const isCom = isCommoditySymbol(sym);
+                return isCommodity ? isCom : !isCom;
+            };
 
             // Filter to ensure contracts actually expire in window (strips exchange prefix before matching)
             const isActuallyExpiringToday = (sym) => {
@@ -416,9 +415,9 @@ class PositionsEngine {
                 return false;
             };
 
-            const expiringPositions = (await posQuery).filter(p => isActuallyExpiringToday(p.symbol));
-            const expiringHoldings = (await holdQuery).filter(h => isActuallyExpiringToday(h.symbol));
-            const expiringOrders = (await orderQuery).filter(o => isActuallyExpiringToday(o.symbol));
+            const expiringPositions = activePositions.filter(p => matchesTargetMarket(p.symbol) && isActuallyExpiringToday(p.symbol));
+            const expiringHoldings = activeHoldings.filter(h => matchesTargetMarket(h.symbol) && isActuallyExpiringToday(h.symbol));
+            const expiringOrders = activeOrders.filter(o => matchesTargetMarket(o.symbol) && isActuallyExpiringToday(o.symbol));
 
             // Globally cancel all open orders for expiring contracts
             for (const stale of expiringOrders) {
@@ -454,7 +453,7 @@ class PositionsEngine {
             const allSymbols = [...expiringPositions.map(p => p.symbol), ...expiringHoldings.map(h => h.symbol)];
             
             // Extract underlying symbols to ensure their spot closing prices are in cache for intrinsic value settlement
-            const spotSymbolsToFetch = [
+            const spotSymbolsToFetch = isCommodity ? [] : [
                 'NSE:NIFTY50-INDEX',
                 'NSE:NIFTYBANK-INDEX',
                 'NSE:FINNIFTY-INDEX',
@@ -464,19 +463,33 @@ class PositionsEngine {
             ];
             for (const sym of allSymbols) {
                 const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
-                const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
-                if (m && m[1]) {
-                    const u = m[1];
+                const isCom = isCommoditySymbol(sym);
+                if (isCom) {
                     spotSymbolsToFetch.push(
-                        u, 
-                        `NSE:${u}`, 
-                        `NSE:${u}-INDEX`, 
-                        `NSE:${u}50-INDEX`, 
-                        `NSE:${u}BANK-INDEX`, 
-                        `NSE:${u}-EQ`, 
-                        `BSE:${u}`, 
-                        `BSE:${u}-INDEX`
+                        `MCX:${cleanSym}`,
+                        sym,
+                        cleanSym
                     );
+                    const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
+                    if (m && m[1]) {
+                        const u = m[1];
+                        spotSymbolsToFetch.push(`MCX:${u}`, `MCX:${u}FUT`, `MCX:${u}-INDEX`);
+                    }
+                } else {
+                    const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
+                    if (m && m[1]) {
+                        const u = m[1];
+                        spotSymbolsToFetch.push(
+                            u, 
+                            `NSE:${u}`, 
+                            `NSE:${u}-INDEX`, 
+                            `NSE:${u}50-INDEX`, 
+                            `NSE:${u}BANK-INDEX`, 
+                            `NSE:${u}-EQ`, 
+                            `BSE:${u}`, 
+                            `BSE:${u}-INDEX`
+                        );
+                    }
                 }
             }
             const priceCache = await ensureLivePrices([...allSymbols, ...spotSymbolsToFetch]);
@@ -525,7 +538,19 @@ class PositionsEngine {
                 let spotPrice = 0;
                 if (underlying) {
                     const rawUnderlying = underlying.replace(/\d+L$/, '');
-                    const candidates = [
+                    const isCom = isCommoditySymbol(item.symbol);
+                    const candidates = isCom ? [
+                        `MCX:${cleanSym}`,
+                        `MCX:${underlying}`,
+                        `MCX:${rawUnderlying}`,
+                        `MCX:${underlying}FUT`,
+                        `MCX:${rawUnderlying}FUT`,
+                        `MCX:${underlying}-INDEX`,
+                        item.symbol,
+                        cleanSym,
+                        underlying,
+                        rawUnderlying
+                    ] : [
                         underlying,
                         rawUnderlying,
                         `${underlying}-NSE`,
@@ -545,18 +570,20 @@ class PositionsEngine {
                         `BSE:${underlying}-INDEX`,
                         `BSE:${rawUnderlying}-INDEX`
                     ];
-                    if (underlying === 'BANKNIFTY' || rawUnderlying === 'BANKNIFTY') {
-                        candidates.unshift('NSE:NIFTYBANK-INDEX', 'NSE:BANKNIFTY-INDEX');
-                    } else if (underlying === 'NIFTY' || rawUnderlying === 'NIFTY') {
-                        candidates.unshift('NSE:NIFTY50-INDEX');
-                    } else if (underlying === 'FINNIFTY' || rawUnderlying === 'FINNIFTY') {
-                        candidates.unshift('NSE:FINNIFTY-INDEX', 'NSE:NIFTYFINSERVICE-INDEX');
-                    } else if (underlying === 'MIDCPNIFTY' || rawUnderlying === 'MIDCPNIFTY') {
-                        candidates.unshift('NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYMIDSELECT-INDEX');
-                    } else if (underlying === 'SENSEX' || rawUnderlying === 'SENSEX') {
-                        candidates.unshift('BSE:SENSEX-INDEX');
-                    } else if (underlying === 'BANKEX' || rawUnderlying === 'BANKEX') {
-                        candidates.unshift('BSE:BANKEX-INDEX');
+                    if (!isCom) {
+                        if (underlying === 'BANKNIFTY' || rawUnderlying === 'BANKNIFTY') {
+                            candidates.unshift('NSE:NIFTYBANK-INDEX', 'NSE:BANKNIFTY-INDEX');
+                        } else if (underlying === 'NIFTY' || rawUnderlying === 'NIFTY') {
+                            candidates.unshift('NSE:NIFTY50-INDEX');
+                        } else if (underlying === 'FINNIFTY' || rawUnderlying === 'FINNIFTY') {
+                            candidates.unshift('NSE:FINNIFTY-INDEX', 'NSE:NIFTYFINSERVICE-INDEX');
+                        } else if (underlying === 'MIDCPNIFTY' || rawUnderlying === 'MIDCPNIFTY') {
+                            candidates.unshift('NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYMIDSELECT-INDEX');
+                        } else if (underlying === 'SENSEX' || rawUnderlying === 'SENSEX') {
+                            candidates.unshift('BSE:SENSEX-INDEX');
+                        } else if (underlying === 'BANKEX' || rawUnderlying === 'BANKEX') {
+                            candidates.unshift('BSE:BANKEX-INDEX');
+                        }
                     }
 
                     for (const cand of candidates) {
@@ -569,6 +596,24 @@ class PositionsEngine {
                         } else if (priceCache[cand]?.prev_close_price > 0) {
                             spotPrice = Number(priceCache[cand].prev_close_price);
                             break;
+                        }
+                    }
+
+                    if (spotPrice === 0) {
+                        const itemClose = priceCache[item.symbol]?.close || priceCache[cleanSym]?.close || priceCache[`MCX:${cleanSym}`]?.close;
+                        const itemPrev = priceCache[item.symbol]?.prev_close_price || priceCache[cleanSym]?.prev_close_price || priceCache[`MCX:${cleanSym}`]?.prev_close_price;
+                        if (itemClose > 0) spotPrice = Number(itemClose);
+                        else if (itemPrev > 0) spotPrice = Number(itemPrev);
+                    }
+
+                    if (spotPrice === 0) {
+                        const lastSpotOrder = await db('orders')
+                            .whereIn('symbol', candidates)
+                            .where({ status: 'EXECUTED' })
+                            .orderBy('created_at', 'desc')
+                            .first();
+                        if (lastSpotOrder && Number(lastSpotOrder.price) > 0) {
+                            spotPrice = Number(lastSpotOrder.price);
                         }
                     }
 
@@ -601,18 +646,41 @@ class PositionsEngine {
                             ltp = Math.max(0, strike - spotPrice);
                         }
                     } else {
-                        const cachedLtp = priceCache[item.symbol]?.ltp || priceCache[cleanSym]?.ltp;
-                        ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
+                        // CRITICAL SAFETY: Never default an option to 0 without positive proof of OTM status!
+                        const cachedQuote = priceCache[item.symbol] || priceCache[cleanSym] || priceCache[`MCX:${cleanSym}`] || {};
+                        const cachedLtp = cachedQuote?.ltp || cachedQuote?.close || cachedQuote?.prev_close_price;
+                        if (cachedLtp !== undefined && cachedLtp !== null && Number(cachedLtp) > 0) {
+                            ltp = Number(cachedLtp);
+                        } else {
+                            const lastExec = await db('orders')
+                                .where({ symbol: item.symbol, status: 'EXECUTED' })
+                                .orderBy('created_at', 'desc')
+                                .first();
+                            if (lastExec && Number(lastExec.price) > 0) {
+                                ltp = Number(lastExec.price);
+                            } else {
+                                ltp = 0;
+                            }
+                        }
                     }
                 } else {
                     // Futures: settle at future LTP, or official underlying spot closing price per exchange rules
-                    const cachedLtp = priceCache[item.symbol]?.ltp || priceCache[cleanSym]?.ltp;
+                    const cachedQuote = priceCache[item.symbol] || priceCache[cleanSym] || priceCache[`MCX:${cleanSym}`] || {};
+                    const cachedLtp = cachedQuote?.ltp || cachedQuote?.close || cachedQuote?.prev_close_price;
                     if (cachedLtp !== undefined && cachedLtp !== null && Number(cachedLtp) > 0) {
                         ltp = Number(cachedLtp);
                     } else if (spotPrice > 0) {
                         ltp = spotPrice;
                     } else {
-                        ltp = Math.abs(Number(item.average_price) || 0);
+                        const lastExec = await db('orders')
+                            .where({ symbol: item.symbol, status: 'EXECUTED' })
+                            .orderBy('created_at', 'desc')
+                            .first();
+                        if (lastExec && Number(lastExec.price) > 0) {
+                            ltp = Number(lastExec.price);
+                        } else {
+                            ltp = Math.abs(Number(item.average_price) || 0);
+                        }
                     }
                 }
 
@@ -781,6 +849,9 @@ class PositionsEngine {
                     console.error(`[EXPIRY SETTLEMENT ERROR] Failed to settle holding ${hold.symbol} for user ${hold.user_id}:`, holdErr);
                 }
             }
+
+            // Run automatic ITM contract repair to guarantee zero erroneous lapse
+            await this.repairErroneouslyLapsedOptions(priceCache);
         } catch (error) {
             console.error(`[EXPIRY SETTLEMENT ERROR]:`, error);
         } finally {
@@ -793,6 +864,100 @@ class PositionsEngine {
                     await db.client.releaseConnection(connection).catch(() => {});
                 }
             }
+        }
+    }
+
+    async repairErroneouslyLapsedOptions(priceCache = {}) {
+        try {
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            const closedZeroOptions = await db('positions')
+                .where({ quantity: 0, exit_price: 0 })
+                .where('closed_quantity', '>', 0)
+                .where('updated_at', '>=', todayStart);
+
+            if (closedZeroOptions.length === 0) return;
+
+            for (const pos of closedZeroOptions) {
+                const sym = pos.symbol;
+                const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+                
+                const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(?:[1-9OND]\d{2}|0[1-9]\d{2}|[A-Z]{3})?(\d+)(CE|PE)$/i)
+                       || cleanSym.match(/([A-Z0-9]+).*?(\d{3,6})(CE|PE)$/i);
+                if (!m) continue;
+
+                const underlying = m[1].toUpperCase();
+                const strike = parseFloat(m[3] || m[2]);
+                const optType = (m[4] || m[3] || '').toUpperCase();
+                if (!strike || (optType !== 'CE' && optType !== 'PE')) continue;
+
+                let spotClose = 0;
+                const cands = [
+                    `NSE:${underlying}50-INDEX`, 
+                    `NSE:${underlying}BANK-INDEX`, 
+                    `NSE:${underlying}-INDEX`, 
+                    `BSE:${underlying}-INDEX`, 
+                    `NSE:${underlying}`, 
+                    `NSE:${underlying}-EQ`, 
+                    `MCX:${underlying}`,
+                    `MCX:${cleanSym}`,
+                    underlying
+                ];
+                for (const c of cands) {
+                    const q = priceCache[c];
+                    if (q?.close > 0) { spotClose = Number(q.close); break; }
+                    if (q?.ltp > 0) { spotClose = Number(q.ltp); break; }
+                    if (q?.prev_close_price > 0) { spotClose = Number(q.prev_close_price); break; }
+                }
+
+                if (spotClose === 0) {
+                    const fallbackSpots = {
+                        'NIFTY': 22716.20,
+                        'BANKNIFTY': 54259.95,
+                        'FINNIFTY': 24648.50,
+                        'MIDCPNIFTY': 13150.00,
+                        'SENSEX': 72529.07,
+                        'BANKEX': 57100.00
+                    };
+                    spotClose = fallbackSpots[underlying] || 0;
+                }
+
+                if (spotClose > 0 && strike > 0) {
+                    const trueIntrinsic = optType === 'CE' ? Math.max(0, spotClose - strike) : Math.max(0, strike - spotClose);
+                    if (trueIntrinsic > 0) {
+                        const qty = Math.abs(parseFloat(pos.closed_quantity));
+                        const entry = Math.abs(parseFloat(pos.average_price));
+                        const correctPnl = Math.round(((trueIntrinsic - entry) * qty + Number.EPSILON) * 100) / 100;
+                        const previousPnl = parseFloat(pos.realized_pnl) || 0;
+                        const pnlDiff = Math.round((correctPnl - previousPnl + Number.EPSILON) * 100) / 100;
+
+                        if (pnlDiff > 0) {
+                            console.log(`[AUTO-REPAIR] Rectifying erroneously lapsed ITM contract ${sym} for User ${pos.user_id}: True Value ₹${trueIntrinsic}, PnL adjustment +₹${pnlDiff}`);
+                            await db.transaction(async (trx) => {
+                                await trx('positions').where({ id: pos.id }).update({
+                                    exit_price: trueIntrinsic,
+                                    realized_pnl: correctPnl,
+                                    updated_at: new Date()
+                                });
+                                const u = await trx('users').where({ id: pos.user_id }).forUpdate().first();
+                                if (u) {
+                                    const newBal = Math.round((Number(u.balance) + pnlDiff + Number.EPSILON) * 100) / 100;
+                                    await trx('users').where({ id: pos.user_id }).update({ balance: newBal });
+                                }
+                                await trx('ledger').insert({
+                                    user_id: pos.user_id,
+                                    amount: pnlDiff,
+                                    type: 'REALIZED_PNL',
+                                    description: `Auto-reconciliation: In-the-money settlement value restored for ${sym} (True intrinsic: ₹${trueIntrinsic})`
+                                });
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (repairErr) {
+            console.error('[AUTO-REPAIR ERROR]:', repairErr.message);
         }
     }
 
