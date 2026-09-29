@@ -46,26 +46,28 @@ const LedgerService = require('./ledgerService');
 class PositionsEngine {
     constructor() {
         console.log('PositionsEngine Initialized (EOD Automation)');
-        this.initCronJobs();
-        // Run catchup migration on startup (in case the server was down at 8:00 AM)
-        setTimeout(() => {
-            this.runHoldingsMigration(true);
-        }, 15000);
+        if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+            this.initCronJobs();
+            // Run catchup migration on startup (in case the server was down at 8:00 AM)
+            setTimeout(() => {
+                this.runHoldingsMigration(true);
+            }, 15000);
 
-        // Run catchup expiry settlement on startup if past 03:40 PM IST
-        setTimeout(() => {
-            try {
-                const now = new Date();
-                const istParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
-                const hour = parseInt(istParts.find(p => p.type === 'hour').value, 10);
-                const minute = parseInt(istParts.find(p => p.type === 'minute').value, 10);
-                const timeVal = hour * 100 + minute;
-                if (timeVal >= 1540) {
-                    console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement...');
-                    this.settleExpiries(false).catch(e => console.error('Startup catchup expiry error:', e));
-                }
-            } catch(e) {}
-        }, 20000);
+            // Run catchup expiry settlement on startup if past 03:40 PM IST
+            setTimeout(() => {
+                try {
+                    const now = new Date();
+                    const istParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
+                    const hour = parseInt(istParts.find(p => p.type === 'hour').value, 10);
+                    const minute = parseInt(istParts.find(p => p.type === 'minute').value, 10);
+                    const timeVal = hour * 100 + minute;
+                    if (timeVal >= 1540) {
+                        console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement...');
+                        this.settleExpiries(false).catch(e => console.error('Startup catchup expiry error:', e));
+                    }
+                } catch(e) {}
+            }, 20000);
+        }
     }
 
     initCronJobs() {
@@ -452,7 +454,14 @@ class PositionsEngine {
             const allSymbols = [...expiringPositions.map(p => p.symbol), ...expiringHoldings.map(h => h.symbol)];
             
             // Extract underlying symbols to ensure their spot closing prices are in cache for intrinsic value settlement
-            const spotSymbolsToFetch = [];
+            const spotSymbolsToFetch = [
+                'NSE:NIFTY50-INDEX',
+                'NSE:NIFTYBANK-INDEX',
+                'NSE:FINNIFTY-INDEX',
+                'NSE:MIDCPNIFTY-INDEX',
+                'BSE:SENSEX-INDEX',
+                'BSE:BANKEX-INDEX'
+            ];
             for (const sym of allSymbols) {
                 const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
                 const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
@@ -482,56 +491,79 @@ class PositionsEngine {
 
                 let ltp = 0;
                 const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+                let optType = null;
+                let strike = 0;
+                let underlying = null;
 
-                if (isOpt) {
-                    // Option cash settlement at intrinsic value
-                    let optType = null;
-                    let strike = 0;
-                    let underlying = null;
-
-                    const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
-                    if (monthlyMatch) {
-                        underlying = monthlyMatch[1];
+                // Extract underlying symbol and strike/option type
+                const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+                if (monthlyMatch) {
+                    underlying = monthlyMatch[1].toUpperCase();
+                    if (monthlyMatch[4] && monthlyMatch[5]) {
                         strike = parseFloat(monthlyMatch[4]);
                         optType = monthlyMatch[5].toUpperCase();
+                    }
+                } else {
+                    const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+                    if (weeklyMatch) {
+                        underlying = weeklyMatch[1].toUpperCase();
+                        strike = parseFloat(weeklyMatch[5]);
+                        optType = weeklyMatch[6].toUpperCase();
                     } else {
-                        const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
-                        if (weeklyMatch) {
-                            underlying = weeklyMatch[1];
-                            strike = parseFloat(weeklyMatch[5]);
-                            optType = weeklyMatch[6].toUpperCase();
+                        const genMatch = cleanSym.match(/([A-Z0-9]+).*?(\d{3,6})(CE|PE)$/i);
+                        if (genMatch) {
+                            underlying = genMatch[1].toUpperCase();
+                            strike = parseFloat(genMatch[2]);
+                            optType = genMatch[3].toUpperCase();
                         } else {
-                            const genMatch = cleanSym.match(/([A-Z0-9]+).*?(\d{3,6})(CE|PE)$/i);
-                            if (genMatch) {
-                                underlying = genMatch[1];
-                                strike = parseFloat(genMatch[2]);
-                                optType = genMatch[3].toUpperCase();
-                            }
+                            // General fallback for futures contracts (e.g. TATAPOWER26SEPFUT, TCS26SEPFUT)
+                            underlying = cleanSym.replace(/(?:[-_\s]?FUT|[-_\s]?CE|[-_\s]?PE).*$/i, '').toUpperCase();
                         }
                     }
+                }
 
-                    let spotPrice = 0;
-                    if (underlying) {
-                        const candidates = [
-                            underlying,
-                            `${underlying}-NSE`,
-                            `${underlying}-BSE`,
-                            `NSE:${underlying}`,
-                            `NSE:${underlying}-INDEX`,
-                            `NSE:${underlying}50-INDEX`,
-                            `NSE:${underlying}BANK-INDEX`,
-                            `NSE:${underlying}-EQ`,
-                            `BSE:${underlying}`,
-                            `BSE:${underlying}-INDEX`
-                        ];
-                        for (const cand of candidates) {
-                            if (priceCache[cand]?.ltp > 0) {
-                                spotPrice = Number(priceCache[cand].ltp);
-                                break;
-                            }
-                        }
+                let spotPrice = 0;
+                if (underlying) {
+                    const candidates = [
+                        underlying,
+                        `${underlying}-NSE`,
+                        `${underlying}-BSE`,
+                        `NSE:${underlying}`,
+                        `NSE:${underlying}-EQ`,
+                        `NSE:${underlying}-INDEX`,
+                        `NSE:${underlying}50-INDEX`,
+                        `BSE:${underlying}`,
+                        `BSE:${underlying}-INDEX`
+                    ];
+                    if (underlying === 'BANKNIFTY') {
+                        candidates.unshift('NSE:NIFTYBANK-INDEX', 'NSE:BANKNIFTY-INDEX');
+                    } else if (underlying === 'NIFTY') {
+                        candidates.unshift('NSE:NIFTY50-INDEX');
+                    } else if (underlying === 'FINNIFTY') {
+                        candidates.unshift('NSE:FINNIFTY-INDEX', 'NSE:NIFTYFINSERVICE-INDEX');
+                    } else if (underlying === 'MIDCPNIFTY') {
+                        candidates.unshift('NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYMIDSELECT-INDEX');
+                    } else if (underlying === 'SENSEX') {
+                        candidates.unshift('BSE:SENSEX-INDEX');
+                    } else if (underlying === 'BANKEX') {
+                        candidates.unshift('BSE:BANKEX-INDEX');
                     }
 
+                    for (const cand of candidates) {
+                        if (priceCache[cand]?.ltp > 0) {
+                            spotPrice = Number(priceCache[cand].ltp);
+                            break;
+                        } else if (priceCache[cand]?.close > 0) {
+                            spotPrice = Number(priceCache[cand].close);
+                            break;
+                        } else if (priceCache[cand]?.prev_close_price > 0) {
+                            spotPrice = Number(priceCache[cand].prev_close_price);
+                            break;
+                        }
+                    }
+                }
+
+                if (isOpt) {
                     if (spotPrice > 0 && strike > 0 && optType) {
                         if (optType === 'CE') {
                             ltp = Math.max(0, spotPrice - strike);
@@ -539,12 +571,19 @@ class PositionsEngine {
                             ltp = Math.max(0, strike - spotPrice);
                         }
                     } else {
-                        const cachedLtp = priceCache[item.symbol]?.ltp;
+                        const cachedLtp = priceCache[item.symbol]?.ltp || priceCache[cleanSym]?.ltp;
                         ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
                     }
                 } else {
-                    const cachedLtp = priceCache[item.symbol]?.ltp;
-                    ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
+                    // Futures: settle at future LTP, or official underlying spot closing price per exchange rules
+                    const cachedLtp = priceCache[item.symbol]?.ltp || priceCache[cleanSym]?.ltp;
+                    if (cachedLtp !== undefined && cachedLtp !== null && Number(cachedLtp) > 0) {
+                        ltp = Number(cachedLtp);
+                    } else if (spotPrice > 0) {
+                        ltp = spotPrice;
+                    } else {
+                        ltp = Math.abs(Number(item.average_price) || 0);
+                    }
                 }
 
                 ltp = Math.max(0, parseFloat(Number(ltp).toFixed(2)));
@@ -619,6 +658,16 @@ class PositionsEngine {
                             }
                         }
                     });
+                    if (triggerEngine && triggerEngine.io) {
+                        try {
+                            triggerEngine.io.to(item.user_id.toString()).emit('sync_user_data');
+                            triggerEngine.io.to(item.user_id.toString()).emit('trade_alert', {
+                                event: 'EXECUTED',
+                                symbol: item.symbol,
+                                message: `Option contract expired worthless: ${item.symbol} lapsed at ₹0`
+                            });
+                        } catch (e) {}
+                    }
                     console.log(`[EXPIRY LAPSED AT ₹0] ${item.symbol} lapsed without charges for User ${item.user_id}`);
                     return;
                 }
@@ -650,14 +699,32 @@ class PositionsEngine {
                 const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
                 orderRow.is_rms = false;
                 await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
+                if (triggerEngine && triggerEngine.io) {
+                    try {
+                        triggerEngine.io.to(item.user_id.toString()).emit('sync_user_data');
+                        triggerEngine.io.to(item.user_id.toString()).emit('trade_alert', {
+                            event: 'EXECUTED',
+                            symbol: item.symbol,
+                            message: `Contract expired today: ${item.symbol} settled (${side} ${orderQty} @ ₹${ltp})`
+                        });
+                    } catch (e) {}
+                }
                 console.log(`[EXPIRY SETTLED] ${item.symbol} (${side} ${orderQty} @ ${ltp}) for User ${item.user_id}`);
             };
 
             for (const pos of expiringPositions) {
-                await submitSettlementOrder(pos, false);
+                try {
+                    await submitSettlementOrder(pos, false);
+                } catch (posErr) {
+                    console.error(`[EXPIRY SETTLEMENT ERROR] Failed to settle position ${pos.symbol} for user ${pos.user_id}:`, posErr);
+                }
             }
             for (const hold of expiringHoldings) {
-                await submitSettlementOrder(hold, true);
+                try {
+                    await submitSettlementOrder(hold, true);
+                } catch (holdErr) {
+                    console.error(`[EXPIRY SETTLEMENT ERROR] Failed to settle holding ${hold.symbol} for user ${hold.user_id}:`, holdErr);
+                }
             }
         } catch (error) {
             console.error(`[EXPIRY SETTLEMENT ERROR]:`, error);

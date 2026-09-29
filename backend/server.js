@@ -3787,6 +3787,22 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/admin/settle-expiries', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const positionsEngine = require('./services/positionsEngine');
+    console.log(`[ADMIN] Manual Expiry Settlement triggered by Admin ${caller.id} (${caller.email})`);
+    await positionsEngine.settleExpiries(false, false);
+    await positionsEngine.settleExpiries(true, true);
+    res.json({ success: true, message: 'Expiry settlement executed successfully' });
+  } catch (err) {
+    console.error('Admin settle-expiries error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;

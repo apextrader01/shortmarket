@@ -778,6 +778,20 @@ function initCronJobs(priceCache, triggerEngine) {
         executeClosingAuctionMatch(priceCache, triggerEngine);
     }, TZ);
 
+    // 03:40 PM: Expiry Day Settlement for Equities & Derivatives (F&O, Index Options/Futures, CNC Holdings)
+    cron.schedule('40 15 * * 1-5', async () => {
+        console.log('\n⏰ [CRON 03:40 PM] Expiry Day Settlement triggered for Equities & Derivatives...');
+        const positionsEngine = require('./positionsEngine');
+        await positionsEngine.settleExpiries(false, false).catch(e => console.error('03:40 PM Expiry settlement error:', e));
+    }, TZ);
+
+    // 04:00 PM: Final EOD Safety Net Expiry Settlement for Equities & Derivatives
+    cron.schedule('0 16 * * 1-5', async () => {
+        console.log('\n⏰ [CRON 04:00 PM] Final 04:00 PM Expiry Settlement Safety Net...');
+        const positionsEngine = require('./positionsEngine');
+        await positionsEngine.settleExpiries(false, false).catch(e => console.error('04:00 PM Expiry settlement error:', e));
+    }, TZ);
+
     // Phase 3D: MCX Commodity Auto Square-Off
     // 11:00 PM IST: Summer Session Primary Square-Off (after 10:50 PM cutoff)
     cron.schedule('0 23 * * *', () => {
