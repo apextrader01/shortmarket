@@ -3,13 +3,13 @@ const db = require('../database/db').default || require('../database/db');
 const fs = require('fs');
 const path = require('path');
 const { verifyFyersAuth } = require('./fyers');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
 
 function base32tohex(base32) {
     const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     let bits = '';
     let hex = '';
-    const clean = base32.replace(/[\s=]+/g, '').toUpperCase();
+    const clean = String(base32 || '').replace(/[^A-Za-z2-7]/g, '').toUpperCase();
     for (let i = 0; i < clean.length; i++) {
         const val = base32chars.indexOf(clean.charAt(i));
         if (val === -1) continue;
@@ -23,7 +23,12 @@ function base32tohex(base32) {
 }
 
 function generateTOTP(secret, epochTime = Date.now()) {
-    const key = Buffer.from(base32tohex(secret), 'hex');
+    if (!secret || typeof secret !== 'string') return '';
+    const cleanSecret = String(secret || '').replace(/[^A-Za-z2-7]/g, '').toUpperCase();
+    if (!cleanSecret) return '';
+    const hex = base32tohex(cleanSecret);
+    if (!hex) return '';
+    const key = Buffer.from(hex, 'hex');
     const epoch = Math.floor(epochTime / 1000.0);
     const time = Buffer.alloc(8);
     time.writeBigInt64BE(BigInt(Math.floor(epoch / 30)));
@@ -39,8 +44,9 @@ function generateTOTP(secret, epochTime = Date.now()) {
 }
 
 function encryptSecret(plaintext) {
-    if (!plaintext) return '';
-    const secret = process.env.JWT_SECRET || 'shortmarket_totp_encryption_secret_key_2026';
+    if (!plaintext || typeof plaintext !== 'string') return '';
+    if (plaintext.startsWith('enc:')) return plaintext;
+    const secret = process.env.JWT_SECRET || '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3';
     const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -51,21 +57,33 @@ function encryptSecret(plaintext) {
 }
 
 function decryptSecret(ciphertext) {
-    if (!ciphertext || !ciphertext.startsWith('enc:')) return ciphertext;
-    try {
-        const secret = process.env.JWT_SECRET || 'shortmarket_totp_encryption_secret_key_2026';
-        const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
-        const parts = ciphertext.split(':');
-        if (parts.length !== 4) return ciphertext;
-        const [, ivHex, tagHex, encryptedHex] = parts;
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-        decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        return decrypted;
-    } catch (e) {
-        return ciphertext;
+    if (!ciphertext || typeof ciphertext !== 'string') return '';
+    if (!ciphertext.startsWith('enc:')) return ciphertext.trim();
+    const parts = ciphertext.split(':');
+    if (parts.length !== 4) return '';
+    const [, ivHex, tagHex, encryptedHex] = parts;
+
+    const candidateSecrets = Array.from(new Set([
+        process.env.JWT_SECRET,
+        '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3',
+        'shortmarket_totp_encryption_secret_key_2026'
+    ].filter(Boolean)));
+
+    for (const secret of candidateSecrets) {
+        try {
+            const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
+            const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+            decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+            let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            if (decrypted) return decrypted.trim();
+        } catch (e) {
+            // Try next candidate secret
+        }
     }
+
+    console.error('❌ [FYERS AUTO-LOGIN] Could not decrypt stored TOTP key with any available secret.');
+    return '';
 }
 
 async function getFyersCredentials() {
@@ -103,7 +121,11 @@ async function performFyersAutoLogin(retryCount = 0) {
     const { fy_id, pin, totp_key, app_id, secret_id, redirect_url } = creds;
 
     if (!fy_id || !pin || !totp_key) {
-        const msg = 'Missing Fyers credentials (FYERS_USER_ID, FYERS_PIN, FYERS_TOTP_KEY). Please configure them in Admin Settings.';
+        const msg = !totp_key && !pin && !fy_id 
+            ? 'Missing Fyers credentials (FYERS_USER_ID, FYERS_PIN, FYERS_TOTP_KEY). Please configure them in Admin Settings.'
+            : !totp_key 
+            ? 'Fyers TOTP Secret Key is missing or could not be decrypted. Please re-enter your 32-character TOTP Secret Key in Admin Settings.'
+            : 'Missing Fyers User ID or PIN. Please configure them in Admin Settings.';
         console.warn(`⚠️ [FYERS AUTO-LOGIN] ${msg}`);
         return { success: false, error: msg };
     }
@@ -127,13 +149,45 @@ async function performFyersAutoLogin(retryCount = 0) {
         }
 
         // Step 2: Verify TOTP
+        // Prevent boundary rollover: if within last 3 seconds of current 30s window, wait for next window
+        const secInWindow = Math.floor(Date.now() / 1000) % 30;
+        if (secInWindow >= 27) {
+            const waitMs = (31 - secInWindow) * 1000;
+            console.log(`⏳ [FYERS AUTO-LOGIN] Near 30s TOTP interval boundary (sec ${secInWindow}). Waiting ${waitMs}ms for fresh window...`);
+            await new Promise(r => setTimeout(r, waitMs));
+        }
+
         const currentTotp = generateTOTP(totp_key);
-        const verifyOtpRes = await fetch('https://api-t2.fyers.in/vagator/v2/verify_otp', {
+        console.log(`🔑 [FYERS AUTO-LOGIN] Submitting TOTP code for user: ${fy_id}...`);
+        let verifyOtpRes = await fetch('https://api-t2.fyers.in/vagator/v2/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ request_key: otpData.request_key, otp: currentTotp })
         });
-        const verifyOtpData = await verifyOtpRes.json();
+        let verifyOtpData = await verifyOtpRes.json();
+
+        // Clock skew tolerance: if rejected, try adjacent window offsets [-30000ms, +30000ms]
+        if (!verifyOtpData.request_key) {
+            const offsets = [-30000, 30000];
+            for (const offset of offsets) {
+                const altTotp = generateTOTP(totp_key, Date.now() + offset);
+                console.log(`⏳ [FYERS AUTO-LOGIN] Retrying TOTP with clock offset (${offset / 1000}s)...`);
+                try {
+                    const altRes = await fetch('https://api-t2.fyers.in/vagator/v2/verify_otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ request_key: otpData.request_key, otp: altTotp })
+                    });
+                    const altData = await altRes.json();
+                    if (altData.request_key) {
+                        verifyOtpData = altData;
+                        console.log(`✅ [FYERS AUTO-LOGIN] TOTP verification succeeded with ${offset / 1000}s offset!`);
+                        break;
+                    }
+                } catch (e) {}
+            }
+        }
+
         if (!verifyOtpData.request_key) {
             throw new Error(`Step 2 (Verify TOTP) failed: ${verifyOtpData.message || JSON.stringify(verifyOtpData)}`);
         }

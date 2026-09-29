@@ -8680,8 +8680,14 @@ app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => 
       await db('system_settings').insert({ key: 'fyers_pin', value: fyers_pin.trim(), updated_at: new Date() }).onConflict('key').merge();
     }
     if (fyers_totp_key) {
+      const cleanKey = fyers_totp_key.replace(/\s+/g, '').toUpperCase();
+      if (cleanKey.length === 6 && /^\d{6}$/.test(cleanKey)) {
+        return res.status(400).json({
+          error: 'You entered a 6-digit temporary OTP instead of the permanent 32-character TOTP Secret Key. Please copy the alphanumeric secret key from your Fyers 2FA / Authenticator setup.'
+        });
+      }
       const { encryptSecret } = require('./services/fyersAutoLogin');
-      await db('system_settings').insert({ key: 'fyers_totp_key', value: encryptSecret(fyers_totp_key.replace(/\s+/g, '')), updated_at: new Date() }).onConflict('key').merge();
+      await db('system_settings').insert({ key: 'fyers_totp_key', value: encryptSecret(cleanKey), updated_at: new Date() }).onConflict('key').merge();
     }
 
     // Immediately attempt auto-login with the new credentials
