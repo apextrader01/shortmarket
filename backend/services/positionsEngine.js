@@ -121,10 +121,17 @@ class PositionsEngine {
             }
 
             console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
-            // Step A: Cancel PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for INT/BO/CO
+            // Step A: Cancel PENDING, PARTIAL_FILLED, OPEN entry orders for all product types (including DEL/CNC), EXCEPT AMO orders
             const pendingEntryOrders = await db('orders')
-                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
-                .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
+                .where(function() {
+                    this.whereNot({ status: 'AMO_PENDING' }).andWhere(function() {
+                        this.whereNull('order_variety').orWhereNot({ order_variety: 'AMO' });
+                    });
+                })
+                .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO', 'DEL', 'CNC', 'DELIVERY']);
+
+            const affectedUserIds = new Set();
 
             for (const order of pendingEntryOrders) {
                 const isCommodity = isCommoditySymbol(order.symbol);
@@ -132,10 +139,11 @@ class PositionsEngine {
                     await db.transaction(async (trx) => {
                         const updated = await trx('orders')
                             .where({ id: order.id })
-                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
-                            .update({ status: 'CANCELLED', updated_at: new Date() });
+                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
+                            .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
 
                         if (updated > 0) {
+                            affectedUserIds.add(order.user_id);
                             const totalQ = Number(order.quantity) || 1;
                             const pendingQ = (order.pending_quantity !== null && order.pending_quantity !== undefined)
                                 ? Number(order.pending_quantity)
@@ -144,22 +152,25 @@ class PositionsEngine {
                                 ? Math.round((Number(order.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
                                 : Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
                             if (refundMargin > 0) {
-                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD sweep: margin refunded for ${order.symbol}`);
+                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD 4 PM Order Cancellation: ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
                             try {
                                 const volumeMatchingEngine = require('./volumeMatchingEngine');
                                 volumeMatchingEngine.dequeueOrder(order.id, order.symbol);
                             } catch (e) {}
-                            console.log(`[EOD SWEEP] Cancelled Entry ${order.id} (${order.symbol})`);
+                            console.log(`[EOD SWEEP] Cancelled Entry ${order.id} (${order.symbol} ${order.product_type || 'DEL'})`);
                         }
                     });
                 }
             }
 
-            // Step B: Cancel PENDING_TRIGGER legs (BO/CO SL & Target orders)
+            // Step B: Cancel PENDING_TRIGGER legs (BO/CO SL & Target orders), excluding AMO
             const pendingTriggerOrders = await db('orders')
                 .where('status', 'PENDING_TRIGGER')
+                .where(function() {
+                    this.whereNull('order_variety').orWhereNot({ order_variety: 'AMO' });
+                })
                 .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
             for (const order of pendingTriggerOrders) {
@@ -171,9 +182,10 @@ class PositionsEngine {
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
+                            affectedUserIds.add(order.user_id);
                             const refundMargin = Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
                             if (refundMargin > 0) {
-                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD sweep: margin refunded for ${order.symbol}`);
+                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD 4 PM Order Cancellation: ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
                             try {
@@ -183,6 +195,12 @@ class PositionsEngine {
                             console.log(`[EOD SWEEP] Cancelled PENDING_TRIGGER Leg ${order.id} (${order.symbol})`);
                         }
                     });
+                }
+            }
+
+            if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                for (const uid of affectedUserIds) {
+                    triggerEngine.io.to(uid.toString()).emit('sync_user_data');
                 }
             }
         } catch (error) {
