@@ -1061,12 +1061,28 @@ export const useStore = create(persist((set, get) => ({
         const now = Date.now();
         const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
         
+        const prevUser = get().user;
+        let finalUser = prevUser;
+        if (user && !user.error) {
+          if (!prevUser || 
+              prevUser.id !== user.id || 
+              Number(prevUser.balance) !== Number(user.balance) || 
+              Number(prevUser.used_margin) !== Number(user.used_margin) || 
+              prevUser.is_blocked !== user.is_blocked || 
+              prevUser.role !== user.role || 
+              prevUser.is_onboarded !== user.is_onboarded ||
+              prevUser.phone !== user.phone ||
+              prevUser.email !== user.email) {
+            finalUser = user;
+          }
+        }
+        
         set({
           positions: Array.isArray(positions) ? positions : get().positions, 
           holdings: Array.isArray(holdData) ? holdData : get().holdings,
           sips: Array.isArray(sipsList) ? sipsList : get().sips,
           orders: Array.isArray(orders) ? orders : get().orders, 
-          user: (user && !user.error) ? user : get().user,
+          user: finalUser,
           watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
         });
         
@@ -2182,12 +2198,15 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Announcements ───────────────────────────────────────────────────────────
   announcement: null,
-  fetchAnnouncement: async () => {
+  _lastAnnouncementFetch: 0,
+  fetchAnnouncement: async (force = false) => {
+    const now = Date.now();
+    if (!force && (now - (get()._lastAnnouncementFetch || 0) < 300000)) return;
     try {
       const res = await fetch(`${API}/api/announcement`, { credentials: 'omit' });
       const data = await res.json();
       if (data?.success) {
-        set({ announcement: data.announcement });
+        set({ announcement: data.announcement, _lastAnnouncementFetch: now });
       }
       return data;
     } catch (err) {
@@ -2279,13 +2298,19 @@ export const useStore = create(persist((set, get) => ({
   // ── Market Status & Fyers Health ───────────────────────────────────────────
   marketStatus: { equity: 'AUTO', commodity: 'AUTO' },
   fyersStatus: null,
+  _lastMarketStatusFetch: 0,
 
-  fetchMarketStatus: async () => {
+  fetchMarketStatus: async (force = false) => {
+    const now = Date.now();
+    if (!force && (now - (get()._lastMarketStatusFetch || 0) < 120000)) return;
     try {
       const res = await fetch(`${API}/api/market-status`);
       const data = await res.json();
       if (data && data.success) {
-        set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
+        set({ 
+          marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' },
+          _lastMarketStatusFetch: now
+        });
       }
     } catch (e) {}
   },
@@ -2326,14 +2351,20 @@ export const useStore = create(persist((set, get) => ({
   // ── Market Calendar & Scheduled Holidays ───────────────────────────────────
   marketCalendar: [],
   todayMarketSchedule: null,
+  _lastMarketCalendarFetch: 0,
+  _lastTodayScheduleFetch: 0,
 
-  fetchMarketCalendar: async (month) => {
+  fetchMarketCalendar: async (month, force = false) => {
+    const now = Date.now();
+    if (!month && !force && (now - (get()._lastMarketCalendarFetch || 0) < 300000) && get().marketCalendar.length > 0) {
+      return get().marketCalendar;
+    }
     try {
       const url = month ? `${API}/api/market-calendar?month=${month}` : `${API}/api/market-calendar`;
       const res = await fetch(url);
       const data = await res.json();
       if (data && data.success) {
-        set({ marketCalendar: data.calendar || [] });
+        set({ marketCalendar: data.calendar || [], _lastMarketCalendarFetch: now });
         return data.calendar || [];
       }
     } catch (e) {
@@ -2342,12 +2373,16 @@ export const useStore = create(persist((set, get) => ({
     return [];
   },
 
-  fetchTodayMarketSchedule: async () => {
+  fetchTodayMarketSchedule: async (force = false) => {
+    const now = Date.now();
+    if (!force && (now - (get()._lastTodayScheduleFetch || 0) < 300000) && get().todayMarketSchedule) {
+      return get().todayMarketSchedule;
+    }
     try {
       const res = await fetch(`${API}/api/market-calendar/today`);
       const data = await res.json();
       if (data && data.success) {
-        set({ todayMarketSchedule: data });
+        set({ todayMarketSchedule: data, _lastTodayScheduleFetch: now });
         return data;
       }
     } catch (e) {}

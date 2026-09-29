@@ -48,9 +48,6 @@ function initializeCache() {
     const symbolMap = new Map();
     
     rawInstruments.forEach(item => {
-        item.search_string = `${item.symbol} ${item.name || ''} ${item.description || ''} ${item.exchange || ''}`.toLowerCase();
-        if (!item.unique_symbol) item.unique_symbol = item.symbol;
-        
         // Filter out debt/bonds, debentures, government securities, etc.
         if (item.exchange === 'NSE') {
             // NSE Debt segments: N*, Y*, Z*, GS (Govt Sec), GB (Govt Bond), TB (Treasury Bill), SG (Sovereign Gold)
@@ -60,20 +57,36 @@ function initializeCache() {
             // BSE Debt segments: -F (Fixed Income/NCDs), -G (Govt Securities)
             if (item.symbol.match(/-(F|G)$/i)) return;
         }
-        if (!symbolMap.has(item.unique_symbol)) {
-            symbolMap.set(item.unique_symbol, item);
+
+        const unique_symbol = item.unique_symbol || item.symbol;
+        if (!symbolMap.has(unique_symbol)) {
+            // ⚡ Slim memory representation: only store fields needed by search & order execution
+            symbolMap.set(unique_symbol, {
+                symbol: item.symbol,
+                unique_symbol: unique_symbol,
+                name: item.name || '',
+                description: item.description || '',
+                exchange: item.exchange || '',
+                lotsize: Number(item.lotsize) || 1,
+                token: item.token || '',
+                expiryTimestamp: item.expiryTimestamp || item.expiry_timestamp || null,
+                search_string: `${item.symbol} ${item.name || ''} ${item.description || ''} ${item.exchange || ''}`.toLowerCase()
+            });
         }
     });
     
     let filteredInstruments = Array.from(symbolMap.values());
-    
     allInstruments = filteredInstruments;
     
-    // Pre-calculate lot sizes map for O(1) lookup
+    // Pre-calculate lot sizes map for O(1) lookup — store ONLY non-1 lot sizes to save >80% RAM
     lotSizeMap = {};
     allInstruments.forEach(item => {
-        lotSizeMap[item.symbol] = item.lotsize || 1;
-        lotSizeMap[item.unique_symbol] = item.lotsize || 1;
+        if (item.lotsize && item.lotsize > 1) {
+            lotSizeMap[item.symbol] = item.lotsize;
+            if (item.unique_symbol !== item.symbol) {
+                lotSizeMap[item.unique_symbol] = item.lotsize;
+            }
+        }
     });
 
     // Pre-calculate stocks array once for O(1) instantaneous response in getAllStocks()

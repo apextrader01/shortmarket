@@ -1,31 +1,10 @@
-const { globalNfoFutures, globalNfoOptions } = require('./instruments');
+const { resolveSingleLotSize } = require('./instrumentsCache');
 
-// Helper to lookup lot size from instruments master
+// Fast O(1) lot size lookup using instrumentsCache
 function lookupDerivativeBySymbol(symbol) {
     if (!symbol) return null;
-    // Check futures first
-    for (const underlying of Object.keys(globalNfoFutures || {})) {
-        const list = globalNfoFutures[underlying];
-        if (Array.isArray(list)) {
-            const match = list.find(x => x.symbol === symbol || x.uniqueSymbol === symbol);
-            if (match) return match;
-        }
-    }
-    // Check options (flat search by expiry -> strike)
-    for (const underlying of Object.keys(globalNfoOptions || {})) {
-        const expiries = globalNfoOptions[underlying];
-        if (expiries && typeof expiries === 'object') {
-            for (const expiry of Object.keys(expiries)) {
-                const strikes = expiries[expiry];
-                for (const strike of Object.keys(strikes || {})) {
-                    const { CE, PE } = strikes[strike] || {};
-                    if (CE && (CE.symbol === symbol || CE.uniqueSymbol === symbol)) return CE;
-                    if (PE && (PE.symbol === symbol || PE.uniqueSymbol === symbol)) return PE;
-                }
-            }
-        }
-    }
-    return null;
+    const lotsize = resolveSingleLotSize(symbol);
+    return lotsize > 1 ? { symbol, lotsize } : null;
 }
 
 /**

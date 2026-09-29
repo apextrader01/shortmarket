@@ -290,7 +290,7 @@ function App() {
       window.removeEventListener('skandx_lock_app', handleCustomLock);
       window.removeEventListener('shortmarket_lock_app', handleCustomLock);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
@@ -449,7 +449,7 @@ function App() {
       clearInterval(userInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Global Hotkey Engine (Shift+B, Shift+S)
   useEffect(() => {
