@@ -1218,8 +1218,6 @@ export default function PortfolioView() {
               ref={tableContainerRef}
               style={{ 
                 overflowX: 'auto', 
-                overflowY: isMobile ? 'visible' : 'auto', 
-                maxHeight: isMobile ? 'none' : 'calc(100vh - 280px)',
                 WebkitOverflowScrolling: 'touch' 
               }}
             >
@@ -1325,18 +1323,18 @@ export default function PortfolioView() {
                 </div>
               ) : (
                 /* 🖥️ Modern Desktop Holdings Table */
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
-                  <thead style={{ position: 'sticky', top: 0, zIndex: 25 }}>
-                    <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '180px', minWidth: '160px', maxWidth: '190px' }}>Symbol / Scheme</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '70px', minWidth: '60px' }}>Qty / Units</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '80px', minWidth: '70px' }}>Avg Price</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Live LTP / NAV</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Day Change</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Invested</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Current</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '105px', minWidth: '95px' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '120px', minWidth: '115px' }}>Actions</th>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                  <thead>
+                    <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '11px 16px', fontWeight: '600', whiteSpace: 'nowrap', minWidth: '220px' }}>Symbol / Scheme</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '80px' }}>Qty / Units</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Avg Price</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '95px' }}>Live LTP / NAV</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '105px' }}>Day Change</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Invested</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Current</th>
+                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '115px' }}>Total Return (P&L)</th>
+                      <th style={{ padding: '11px 14px', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', width: '135px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1362,7 +1360,7 @@ export default function PortfolioView() {
                               transition: 'background 0.15s ease'
                             }}
                           >
-                            <td style={{ padding: '9px 12px', fontWeight: '700', width: '180px', minWidth: '160px', maxWidth: '190px' }}>
+                            <td style={{ padding: '11px 16px', fontWeight: '700', minWidth: '220px' }}>
                               {pos.isMf ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1370,8 +1368,8 @@ export default function PortfolioView() {
                                       title={pos.displayName}
                                       style={{ 
                                         color: 'var(--text-primary)', 
-                                        fontSize: '12.5px', 
-                                        maxWidth: isMobile ? '120px' : '130px', 
+                                        fontSize: '13px', 
+                                        maxWidth: isMobile ? '140px' : '260px', 
                                         overflow: 'hidden', 
                                         textOverflow: 'ellipsis', 
                                         whiteSpace: 'nowrap', 
@@ -1384,20 +1382,22 @@ export default function PortfolioView() {
                                       MUTUAL FUND
                                     </span>
                                   </div>
-                                  <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                                     Code: {safeSymbol}
                                   </span>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: 'var(--text-primary)', fontSize: '13px', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
+                                  <span style={{ color: 'var(--text-primary)', fontSize: '13.5px', fontWeight: '700', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}
+                                  </span>
                                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
                                     {safeSymbol.split(':')[0] || 'NSE'}
                                   </span>
                                   <span style={{ 
                                     fontSize: '10px', 
                                     fontWeight: '700', 
-                                    padding: '1px 5px', 
+                                    padding: '2px 6px', 
                                     borderRadius: '4px', 
                                     background: (Number(pos.quantity) < 0 || pos.side === 'SELL') ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', 
                                     color: (Number(pos.quantity) < 0 || pos.side === 'SELL') ? '#ef4444' : '#38bdf8' 
@@ -1407,51 +1407,51 @@ export default function PortfolioView() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '70px', minWidth: '60px' }}>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '80px' }}>
                               {pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '80px', minWidth: '70px' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: '#2563eb', fontVariantNumeric: 'tabular-nums', width: '85px', minWidth: '75px' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '85px', minWidth: '75px' }}>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '90px' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: '#2563eb', fontVariantNumeric: 'tabular-nums', width: '95px' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '105px' }}>
                               {pos.isMf ? (
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '10.5px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '500' }}>
                                   Daily NAV
-                                </div>
+                                </span>
                               ) : (
-                                <>
-                                  <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                  <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600', fontSize: '12px' }}>
                                     {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
                                   </div>
-                                  <div style={{ fontSize: '10.5px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                                  <div style={{ fontSize: '10.5px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.9, fontWeight: '600' }}>
                                     {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
                                   </div>
-                                </>
+                                </div>
                               )}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '90px', minWidth: '80px' }}>{formatCurrency(pos.invested)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '90px', minWidth: '80px' }}>{formatCurrency(pos.current)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '105px', minWidth: '95px' }}>
-                              <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700' }}>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '100px' }}>{formatCurrency(pos.invested)}</td>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '100px' }}>{formatCurrency(pos.current)}</td>
+                            <td style={{ padding: '11px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '115px' }}>
+                              <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700', fontSize: '12.5px' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}
                               </div>
-                              <div style={{ fontSize: '10.5px', color: pos.isProfit ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                              <div style={{ fontSize: '10.5px', color: pos.isProfit ? '#00E676' : '#FF3B30', opacity: 0.9, fontWeight: '600' }}>
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'center', width: '120px', minWidth: '115px' }}>
-                              <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '11px 14px', textAlign: 'center', width: '135px' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
                                       onClick={() => handleMfAction(pos, 'INVEST')}
                                       title="Invest More in Fund"
                                       style={{
-                                        background: 'rgba(168, 85, 247, 0.1)',
-                                        color: '#a855f7',
+                                        background: 'rgba(168, 85, 247, 0.12)',
+                                        color: '#c084fc',
                                         border: '1px solid rgba(168, 85, 247, 0.3)',
-                                        padding: '3px 5px',
+                                        padding: '4px 8px',
                                         borderRadius: '4px',
-                                        fontSize: '10px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
@@ -1464,12 +1464,12 @@ export default function PortfolioView() {
                                       onClick={() => handleMfAction(pos, 'REDEEM')}
                                       title="Redeem Units"
                                       style={{
-                                        background: 'rgba(255, 59, 48, 0.1)',
+                                        background: 'rgba(255, 59, 48, 0.12)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '3px 5px',
+                                        padding: '4px 8px',
                                         borderRadius: '4px',
-                                        fontSize: '10px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
@@ -1485,12 +1485,12 @@ export default function PortfolioView() {
                                       onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotSize || pos.lotsize || 1, 'DEL', false)}
                                       title="Buy More"
                                       style={{
-                                        background: 'rgba(0, 230, 118, 0.1)',
-                                        color: '#00E676',
-                                        border: '1px solid rgba(0, 230, 118, 0.3)',
-                                        padding: '3px 6px',
+                                        background: 'rgba(56, 189, 248, 0.12)',
+                                        color: '#38bdf8',
+                                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        padding: '4px 8px',
                                         borderRadius: '4px',
-                                        fontSize: '10px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
@@ -1508,12 +1508,12 @@ export default function PortfolioView() {
                                       }}
                                       title="Exit / Sell"
                                       style={{
-                                        background: 'rgba(255, 59, 48, 0.1)',
+                                        background: 'rgba(255, 59, 48, 0.12)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '3px 6px',
+                                        padding: '4px 8px',
                                         borderRadius: '4px',
-                                        fontSize: '10px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
