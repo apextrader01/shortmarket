@@ -30,6 +30,104 @@ async function main() {
         console.log('\n🔍 2. Settling MCX Commodity Expiries...');
         await positionsEngine.settleExpiries(true, true);
 
+        console.log('\n🔍 3. Verifying and Restoring any Erroneously Lapsed ITM Contracts...');
+        const erroneouslyLapsed = await db('positions')
+            .where({ exit_price: 0, quantity: 0 })
+            .where('closed_quantity', '>', 0)
+            .where(builder => {
+                builder.where('symbol', 'like', '%PE%').orWhere('symbol', 'like', '%CE%');
+            });
+
+        for (const pos of erroneouslyLapsed) {
+            const cleanSym = pos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+            let underlying = null;
+            let strike = 0;
+            let optType = null;
+
+            const mMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+            if (mMatch) {
+                underlying = mMatch[1].toUpperCase();
+                if (mMatch[4] && mMatch[5]) {
+                    strike = parseFloat(mMatch[4]);
+                    optType = mMatch[5].toUpperCase();
+                }
+            } else {
+                const wMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+                if (wMatch) {
+                    underlying = wMatch[1].toUpperCase();
+                    strike = parseFloat(wMatch[5]);
+                    optType = wMatch[6].toUpperCase();
+                }
+            }
+
+            if (underlying && strike > 0 && optType) {
+                const KNOWN_CLOSING_PRICES = {
+                    'NIFTY': 22716.20,
+                    'BANKNIFTY': 54259.95,
+                    'FINNIFTY': 24648.50,
+                    'MIDCPNIFTY': 13150.00,
+                    'SENSEX': 72529.07,
+                    'BANKEX': 57100.00
+                };
+                const spot = KNOWN_CLOSING_PRICES[underlying];
+                if (spot) {
+                    const intrinsic = optType === 'CE' ? Math.max(0, spot - strike) : Math.max(0, strike - spot);
+                    if (intrinsic > 0) {
+                        const correctLtp = parseFloat(intrinsic.toFixed(2));
+                        const orderQty = Math.abs(parseFloat(pos.closed_quantity));
+                        const entryPrice = Math.abs(parseFloat(pos.average_price));
+                        const correctRealizedPnl = Math.round(((correctLtp - entryPrice) * orderQty + Number.EPSILON) * 100) / 100;
+                        const payout = Math.round((correctLtp * orderQty + Number.EPSILON) * 100) / 100;
+
+                        console.log(`\n⚡ Found erroneously lapsed ITM contract ${pos.symbol} for User ${pos.user_id}!`);
+                        console.log(`   Strike: ${strike} ${optType}, Spot Close: ${spot}, True Value: ₹${correctLtp}`);
+                        console.log(`   Qty: ${orderQty}, Entry: ₹${entryPrice}, Correct PnL: +₹${correctRealizedPnl}, Crediting User: ₹${payout}`);
+
+                        await db.transaction(async (trx) => {
+                            await trx.raw('SELECT pg_advisory_xact_lock(?)', [pos.user_id]);
+                            
+                            // 1. Update position record with true exit price and realized PnL
+                            await trx('positions').where({ id: pos.id }).update({
+                                exit_price: correctLtp,
+                                realized_pnl: correctRealizedPnl,
+                                updated_at: new Date()
+                            });
+
+                            // 2. Remove bogus "worthless loss" ledger entries for this contract
+                            await trx('ledger')
+                                .where({ user_id: pos.user_id })
+                                .where('description', 'like', `%worthless%${pos.symbol}%`)
+                                .del();
+
+                            // 3. Credit user's balance with the full settlement payout
+                            const u = await trx('users').where({ id: pos.user_id }).forUpdate().first();
+                            if (u) {
+                                const newBalance = Math.round((parseFloat(u.balance) + payout + Number.EPSILON) * 100) / 100;
+                                await trx('users').where({ id: pos.user_id }).update({ balance: newBalance });
+                            }
+
+                            // 4. Insert accurate ledger records
+                            await trx('ledger').insert({
+                                user_id: pos.user_id,
+                                amount: Math.round((entryPrice * orderQty) * 100) / 100,
+                                type: 'MARGIN_RELEASE',
+                                description: `Holding principal released for ITM settlement: ${pos.symbol}`
+                            });
+                            if (correctRealizedPnl !== 0) {
+                                await trx('ledger').insert({
+                                    user_id: pos.user_id,
+                                    amount: correctRealizedPnl,
+                                    type: 'REALIZED_PNL',
+                                    description: `Realized profit on ITM expiry settlement: ${pos.symbol} (Settled @ ₹${correctLtp})`
+                                });
+                            }
+                        });
+                        console.log(`✅ [REPAIRED] ${pos.symbol} restored successfully for User ${pos.user_id}!`);
+                    }
+                }
+            }
+        }
+
         console.log('\n✅ All expired contracts (Positions & Holdings) processed successfully.');
     } catch (err) {
         console.error('❌ Expiry Settlement failed:', err);
