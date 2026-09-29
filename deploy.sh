@@ -13,7 +13,8 @@ echo "🚀 Starting Deployment Process..."
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "development")
 echo "📦 Pulling latest changes from Git (branch: $CURRENT_BRANCH)..."
 PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
-git pull origin "$CURRENT_BRANCH"
+git fetch origin "$CURRENT_BRANCH"
+git reset --hard "origin/$CURRENT_BRANCH"
 NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 # 2. Smart Frontend Build (Skips npm install if package.json hasn't changed)
