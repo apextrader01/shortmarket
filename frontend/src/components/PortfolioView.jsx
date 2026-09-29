@@ -41,6 +41,8 @@ export default function PortfolioView() {
   }, []);
 
   const containerRef = React.useRef(null);
+  const tableContainerRef = React.useRef(null);
+  const holdingsPanelRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('Overview');
 
   const handleTabClick = (tabId) => {
@@ -56,6 +58,20 @@ export default function PortfolioView() {
   const [assetFilter, setAssetFilter] = useState('ALL'); // 'ALL', 'EQUITY', 'MF'
   const [selectedMfFund, setSelectedMfFund] = useState(null);
   const [showAssetBreakdown, setShowAssetBreakdown] = useState(false);
+
+  // Auto-reset table scroll position to top when searching or filtering
+  useEffect(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+  }, [searchTerm, filterType, assetFilter, sortBy]);
+
+  // Keep holdings panel in comfortable view when user searches
+  useEffect(() => {
+    if (searchTerm.trim().length > 0 && holdingsPanelRef.current) {
+      holdingsPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [searchTerm]);
 
   const [mfNames, setMfNames] = useState({
     'EDEL-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
@@ -1039,14 +1055,17 @@ export default function PortfolioView() {
           </div>
 
           {/* Holdings Section */}
-          <div className="glass-panel" style={{
-            background: 'var(--bg-panel)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color)',
-            boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0, 0, 0, 0.08))',
-            overflow: 'visible',
-            contain: 'none'
-          }}>
+          <div 
+            ref={holdingsPanelRef}
+            className="glass-panel" 
+            style={{
+              background: 'var(--bg-panel)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0, 0, 0, 0.08))',
+              overflow: 'hidden'
+            }}
+          >
             
             {/* Holdings Header with Search & Filter Controls */}
             <div style={{
@@ -1195,7 +1214,15 @@ export default function PortfolioView() {
             </div>
 
             {/* Holdings Table Content */}
-            <div style={{ overflowX: 'auto', overflowY: 'visible', WebkitOverflowScrolling: 'touch' }}>
+            <div 
+              ref={tableContainerRef}
+              style={{ 
+                overflowX: 'auto', 
+                overflowY: isMobile ? 'visible' : 'auto', 
+                maxHeight: isMobile ? 'none' : 'calc(100vh - 280px)',
+                WebkitOverflowScrolling: 'touch' 
+              }}
+            >
               {isMobile ? (
                 /* 📱 High-Density Mobile Holdings List */
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1299,17 +1326,17 @@ export default function PortfolioView() {
               ) : (
                 /* 🖥️ Modern Desktop Holdings Table */
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
-                  <thead style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35 }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 25 }}>
                     <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '180px', minWidth: '160px', maxWidth: '190px' }}>Symbol / Scheme</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '70px', minWidth: '60px' }}>Qty / Units</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '80px', minWidth: '70px' }}>Avg Price</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Live LTP / NAV</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Day Change</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Invested</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Current</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '105px', minWidth: '95px' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '120px', minWidth: '115px' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '180px', minWidth: '160px', maxWidth: '190px' }}>Symbol / Scheme</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '70px', minWidth: '60px' }}>Qty / Units</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '80px', minWidth: '70px' }}>Avg Price</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Live LTP / NAV</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '85px', minWidth: '75px' }}>Day Change</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Invested</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '90px', minWidth: '80px' }}>Current</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '105px', minWidth: '95px' }}>Total Return (P&L)</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 25, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '120px', minWidth: '115px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
