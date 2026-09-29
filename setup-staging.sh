@@ -83,12 +83,13 @@ fi
 # 5. Clone or Update Staging Directory
 if [ ! -d "$STAGING_DIR" ]; then
   echo "📦 Cloning workspace to $STAGING_DIR tracking 'development'..."
-  sudo -u "$REAL_USER" git clone -b development "$PROD_DIR" "$STAGING_DIR"
+  sudo -u "$REAL_USER" git clone -b development https://github.com/apextrader01/shortmarket.git "$STAGING_DIR"
   cd "$STAGING_DIR"
-  sudo -u "$REAL_USER" git remote set-url origin https://github.com/skand878/shortmarket.git 2>/dev/null || true
+  sudo -u "$REAL_USER" git reset --hard origin/development
 else
   echo "⚡ Existing staging workspace detected at $STAGING_DIR. Pulling latest development branch..."
   cd "$STAGING_DIR"
+  sudo -u "$REAL_USER" git remote set-url origin https://github.com/apextrader01/shortmarket.git 2>/dev/null || true
   sudo -u "$REAL_USER" git fetch origin development
   sudo -u "$REAL_USER" git checkout development
   sudo -u "$REAL_USER" git reset --hard origin/development
