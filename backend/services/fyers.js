@@ -33,7 +33,7 @@ try {
 }
 
 let global_io = null;
-let sharedPriceCache = null;
+let sharedPriceCache = {};
 let wsInstance = null;
 let clientSubscriptions = new Set();
 let mfSubscriptions = new Set();
@@ -308,7 +308,7 @@ function isAnyTradingSessionOpen() {
 
 async function initFyers(io, pc, isMaster = true) {
     global_io = io;
-    sharedPriceCache = pc;
+    sharedPriceCache = pc || sharedPriceCache || {};
     isMasterNode = isMaster;
     
     if (loadTokenFromDisk()) {
@@ -819,6 +819,10 @@ async function garbageCollectSubscriptions() {
 async function fetchBatchLTPs(symbols) {
     if (!Array.isArray(symbols) || symbols.length === 0) return {};
     
+    if (!activeAccessToken) {
+        try { loadTokenFromDisk(); } catch (e) {}
+    }
+    
     const isMfSymbol = s => typeof s === 'string' && (s.endsWith('-MF') || /^\d{5,6}$/.test(s) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(s));
     const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !isMfSymbol(s) && !isExpiredContract(s));
     const mfSymbols = symbols.filter(isMfSymbol);
@@ -843,6 +847,7 @@ async function fetchBatchLTPs(symbols) {
                     const nav = parseFloat(res.data.data[0].nav);
                     if (!isNaN(nav)) {
                         mfResults[sym] = { symbol: sym, ltp: nav, ch: 0, chp: 0, vol: 0, timestamp: Date.now() };
+                        if (!sharedPriceCache) sharedPriceCache = {};
                         if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
                         sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...mfResults[sym] };
                     }
@@ -877,9 +882,9 @@ async function fetchBatchLTPs(symbols) {
     
     if (!activeAccessToken || fyersSymbols.length === 0) {
         return validSymbols.reduce((acc, sym) => {
-            if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
+            if (sharedPriceCache && sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
             return acc;
-        }, mfResults);
+        }, mfResults || {});
     }
 
     try {
@@ -927,11 +932,13 @@ async function fetchBatchLTPs(symbols) {
                                             lower_circuit: Number(item.v.lower_ckt) || Number(item.v.lower_circuit) || null
                                         };
                                         results[uniqueSymbol] = priceObj;
-                                        sharedPriceCache[uniqueSymbol] = priceObj;
-                                        if (uniqueSymbol.includes(':')) {
-                                            const raw = uniqueSymbol.split(':')[1];
-                                            results[raw] = priceObj;
-                                            sharedPriceCache[raw] = priceObj;
+                                        if (sharedPriceCache) {
+                                            sharedPriceCache[uniqueSymbol] = priceObj;
+                                            if (uniqueSymbol.includes(':')) {
+                                                const raw = uniqueSymbol.split(':')[1];
+                                                results[raw] = priceObj;
+                                                sharedPriceCache[raw] = priceObj;
+                                            }
                                         }
                                     });
                                 }
@@ -1187,6 +1194,7 @@ setInterval(async () => {
                 const nav = parseFloat(res.data.data[0].nav);
                 if (!isNaN(nav)) {
                     updates[sym] = { ltp: nav, ch: 0, chp: 0, vol: 0, ts: Date.now() };
+                    if (!sharedPriceCache) sharedPriceCache = {};
                     if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
                     sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...updates[sym] };
                 }

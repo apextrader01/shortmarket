@@ -20,17 +20,17 @@ const isDerivativeSymbol = (symbol) => {
 
 const ensureLivePrices = async (symbols) => {
     const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
-    const priceCache = getPriceFromCache();
+    const priceCache = (typeof getPriceFromCache === 'function' ? getPriceFromCache() : null) || {};
     const missing = [...new Set(symbols)].filter(sym => !priceCache[sym]?.ltp);
     
-    if (missing.length > 0) {
+    if (missing.length > 0 && typeof fetchBatchLTPs === 'function') {
         console.log(`[EOD] Fetching live prices for ${missing.length} offline symbols via REST...`);
         try {
             const fetchedQuotes = await fetchBatchLTPs(missing);
             if (fetchedQuotes && typeof fetchedQuotes === 'object') {
                 for (const [sym, data] of Object.entries(fetchedQuotes)) {
                     if (data && data.ltp) {
-                        priceCache[sym] = { ltp: data.ltp };
+                        priceCache[sym] = { ltp: data.ltp, close: data.close, prev_close_price: data.close };
                     }
                 }
             }
@@ -524,28 +524,38 @@ class PositionsEngine {
 
                 let spotPrice = 0;
                 if (underlying) {
+                    const rawUnderlying = underlying.replace(/\d+L$/, '');
                     const candidates = [
                         underlying,
+                        rawUnderlying,
                         `${underlying}-NSE`,
+                        `${rawUnderlying}-NSE`,
                         `${underlying}-BSE`,
+                        `${rawUnderlying}-BSE`,
                         `NSE:${underlying}`,
+                        `NSE:${rawUnderlying}`,
                         `NSE:${underlying}-EQ`,
+                        `NSE:${rawUnderlying}-EQ`,
                         `NSE:${underlying}-INDEX`,
+                        `NSE:${rawUnderlying}-INDEX`,
                         `NSE:${underlying}50-INDEX`,
+                        `NSE:${rawUnderlying}50-INDEX`,
                         `BSE:${underlying}`,
-                        `BSE:${underlying}-INDEX`
+                        `BSE:${rawUnderlying}`,
+                        `BSE:${underlying}-INDEX`,
+                        `BSE:${rawUnderlying}-INDEX`
                     ];
-                    if (underlying === 'BANKNIFTY') {
+                    if (underlying === 'BANKNIFTY' || rawUnderlying === 'BANKNIFTY') {
                         candidates.unshift('NSE:NIFTYBANK-INDEX', 'NSE:BANKNIFTY-INDEX');
-                    } else if (underlying === 'NIFTY') {
+                    } else if (underlying === 'NIFTY' || rawUnderlying === 'NIFTY') {
                         candidates.unshift('NSE:NIFTY50-INDEX');
-                    } else if (underlying === 'FINNIFTY') {
+                    } else if (underlying === 'FINNIFTY' || rawUnderlying === 'FINNIFTY') {
                         candidates.unshift('NSE:FINNIFTY-INDEX', 'NSE:NIFTYFINSERVICE-INDEX');
-                    } else if (underlying === 'MIDCPNIFTY') {
+                    } else if (underlying === 'MIDCPNIFTY' || rawUnderlying === 'MIDCPNIFTY') {
                         candidates.unshift('NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYMIDSELECT-INDEX');
-                    } else if (underlying === 'SENSEX') {
+                    } else if (underlying === 'SENSEX' || rawUnderlying === 'SENSEX') {
                         candidates.unshift('BSE:SENSEX-INDEX');
-                    } else if (underlying === 'BANKEX') {
+                    } else if (underlying === 'BANKEX' || rawUnderlying === 'BANKEX') {
                         candidates.unshift('BSE:BANKEX-INDEX');
                     }
 
@@ -609,12 +619,18 @@ class PositionsEngine {
                                 created_at: new Date(),
                                 updated_at: new Date()
                             });
+                            if (item.quantity < 0 && realizedPnl > 0) {
+                                const u = await trx('users').where({ id: item.user_id }).forUpdate().first();
+                                if (u) {
+                                    await trx('users').where({ id: item.user_id }).update({ balance: Math.round((parseFloat(u.balance) + realizedPnl + Number.EPSILON) * 100) / 100 });
+                                }
+                            }
                             if (realizedPnl !== 0) {
                                 await trx('ledger').insert({
                                     user_id: item.user_id,
                                     amount: realizedPnl,
                                     type: 'REALIZED_PNL',
-                                    description: `Realized loss on expired worthless holding contract: ${item.symbol}`
+                                    description: `${realizedPnl >= 0 ? 'Realized profit' : 'Realized loss'} on expired worthless holding contract: ${item.symbol}`
                                 });
                             }
                         } else {
@@ -673,10 +689,10 @@ class PositionsEngine {
                 }
 
                 // Defect 31: SEBI physical delivery vs cash settlement segregation
-                const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'].includes(underlying?.toUpperCase());
+                const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'].includes(underlying?.toUpperCase()) || (typeof rawUnderlying !== 'undefined' && ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'].includes(rawUnderlying?.toUpperCase()));
                 const settlementRemark = isIndex ? 'Cash Settlement at Expiry' : 'Physical Delivery Settlement at Expiry (SEBI)';
 
-                const [orderId] = await db('orders').insert({
+                const orderPayload = {
                     user_id: item.user_id,
                     symbol: item.symbol,
                     type: 'MARKET',
@@ -690,16 +706,32 @@ class PositionsEngine {
                     status: 'PENDING',
                     product_type: prodType,
                     is_rms: false, // Natural contract expiry: zero penalty
-                    is_exit: true,
                     remarks: settlementRemark,
                     created_at: new Date(),
                     updated_at: new Date()
-                }).returning('id');
+                };
+
+                let orderId;
+                try {
+                    const [inserted] = await db('orders').insert({
+                        ...orderPayload,
+                        is_exit: true
+                    }).returning('id');
+                    orderId = inserted;
+                } catch (insertErr) {
+                    if (insertErr && insertErr.message && insertErr.message.includes('is_exit')) {
+                        const [inserted] = await db('orders').insert(orderPayload).returning('id');
+                        orderId = inserted;
+                    } else {
+                        throw insertErr;
+                    }
+                }
 
                 const finalId = (orderId && typeof orderId === 'object') ? (orderId.id || orderId[0]?.id || orderId[0]) : orderId;
                 const orderRow = await db('orders').where({ id: finalId }).first();
                 if (orderRow) {
                     orderRow.is_rms = false;
+                    orderRow.is_exit = true;
                     await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
                 }
                 if (triggerEngine && triggerEngine.io) {

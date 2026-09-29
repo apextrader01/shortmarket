@@ -346,6 +346,14 @@ async function initSchema() {
         });
         console.log('Added order_variety to orders table');
       }
+
+      const hasIsExit = await db.schema.hasColumn('orders', 'is_exit');
+      if (!hasIsExit) {
+        await db.schema.alterTable('orders', table => {
+          table.boolean('is_exit').defaultTo(false);
+        });
+        console.log('Added is_exit to orders table');
+      }
     }
 
     // 3.1 Orders Archive Table (for archiving executed orders older than 30 days)
@@ -642,6 +650,8 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS low_water_mark DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_trailing BOOLEAN DEFAULT FALSE');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT FALSE').catch(() => {});
+    await db.raw('ALTER TABLE orders_archive ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT FALSE').catch(() => {});
 
     // 3. Positions table critical columns
     await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity DECIMAL(14,4) DEFAULT 0');
@@ -1003,8 +1013,9 @@ async function ensureCriticalColumns() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_id ON journal_trades(user_id)');
-    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_trade_date ON journal_trades(trade_date)');
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS trade_date VARCHAR(20)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_id ON journal_trades(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_trade_date ON journal_trades(trade_date)').catch(() => {});
 
     await db.raw(`
       CREATE TABLE IF NOT EXISTS trading_checklists (

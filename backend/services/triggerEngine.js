@@ -461,7 +461,7 @@ class TriggerEngine {
             const handleRemainingPos = async (trx, remainingQty, execPrice, customMargin = undefined) => {
                 const isDeriv = isDerivativeSymbol(order.symbol);
 
-                if ((order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') && remainingQty < 0) {
+                if (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') {
                     const holding = await trx('holdings')
                         .where({ user_id: order.user_id })
                         .where(builder => {
@@ -472,22 +472,29 @@ class TriggerEngine {
                                    .orWhere({ symbol: `MCX:${cleanSym}` });
                         })
                         .first();
-                    if (holding && Number(holding.quantity) > 0) {
+                    const isLongHoldingOffset = holding && Number(holding.quantity) > 0 && remainingQty < 0;
+                    const isShortHoldingOffset = holding && Number(holding.quantity) < 0 && remainingQty > 0;
+                    if (isLongHoldingOffset || isShortHoldingOffset) {
                         const hQty = Number(holding.quantity);
                         const hAvg = Number(holding.average_price);
                         const offsetQty = Math.min(Math.abs(remainingQty), hQty);
                         
-                        // Deduct from holding or remove row if sold out
-                        const newHoldingQty = hQty - offsetQty;
-                        if (newHoldingQty <= 0) {
+                        // Deduct from holding or remove row if fully closed
+                        const newHoldingQty = isLongHoldingOffset ? (hQty - offsetQty) : -(hQty - offsetQty);
+                        if (newHoldingQty === 0) {
                             await trx('holdings').where({ id: holding.id }).del();
                         } else {
                             await trx('holdings').where({ id: holding.id }).update({ quantity: newHoldingQty });
                         }
                         
                         // Create a CLOSED position record for today
-                        const realizedPnl = Math.round(((execPrice - hAvg) * offsetQty + Number.EPSILON) * 100) / 100;
-                        const principalAmount = Math.round(((hAvg * offsetQty) + Number.EPSILON) * 100) / 100;
+                        const realizedPnl = isLongHoldingOffset
+                            ? Math.round(((execPrice - hAvg) * offsetQty + Number.EPSILON) * 100) / 100
+                            : Math.round(((hAvg - execPrice) * offsetQty + Number.EPSILON) * 100) / 100;
+
+                        const principalAmount = isLongHoldingOffset
+                            ? Math.round(((hAvg * offsetQty) + Number.EPSILON) * 100) / 100
+                            : 0;
                         await trx('positions').insert({
                             user_id: order.user_id,
                             symbol: order.symbol,
@@ -505,13 +512,16 @@ class TriggerEngine {
                         const rmsPenalty = order.is_rms ? 59 : 0;
                         const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
                         if (user) {
-                            const updatedBalance = Math.round((Number(user.balance) + principalAmount + realizedPnl - rmsPenalty + Number.EPSILON) * 100) / 100;
+                            const credit = isLongHoldingOffset ? (principalAmount + realizedPnl - rmsPenalty) : (realizedPnl - rmsPenalty);
+                            const updatedBalance = Math.round((Number(user.balance) + credit + Number.EPSILON) * 100) / 100;
                             await trx('users').where({ id: order.user_id }).update({ balance: updatedBalance });
                         }
                         
-                        await trx('ledger').insert({
-                            user_id: order.user_id, amount: principalAmount, type: 'MARGIN_RELEASE', description: `Holding principal value released for ${offsetQty} ${order.symbol}`
-                        });
+                        if (principalAmount > 0) {
+                            await trx('ledger').insert({
+                                user_id: order.user_id, amount: principalAmount, type: 'MARGIN_RELEASE', description: `Holding principal value released for ${offsetQty} ${order.symbol}`
+                            });
+                        }
                         await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
                         if (realizedPnl !== 0) {
                             await trx('ledger').insert({
@@ -524,7 +534,11 @@ class TriggerEngine {
                             });
                         }
                         
-                        remainingQty += offsetQty; // e.g. -15 + 10 = -5
+                        if (isLongHoldingOffset) {
+                            remainingQty += offsetQty; // e.g. -15 + 10 = -5
+                        } else {
+                            remainingQty -= offsetQty; // e.g. +15 - 10 = +5
+                        }
                     }
                 }
                 

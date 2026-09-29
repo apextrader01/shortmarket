@@ -12,6 +12,18 @@ async function main() {
     console.log('═══════════════════════════════════════════════════════════════');
 
     try {
+        console.log('\n🔄 0. Verifying database columns and indexes...');
+        try {
+            await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT false;');
+            await db.raw('ALTER TABLE orders_archive ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT false;');
+            await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS trade_date VARCHAR(20);');
+        } catch (dbErr) {
+            console.warn('DB alter warning (non-fatal):', dbErr.message);
+        }
+        if (typeof db.ensureCriticalColumns === 'function') {
+            await db.ensureCriticalColumns();
+        }
+
         console.log('\n🔍 1. Settling Equities, Index Options & Stock Futures Expiries...');
         await positionsEngine.settleExpiries(false, false);
 
