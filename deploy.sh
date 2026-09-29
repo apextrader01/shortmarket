@@ -50,9 +50,11 @@ echo "🗄️ Running Database Schema Migrations..."
 node scripts/migrate_columns.js || node -e "const db = require('./database/db'); db.ensureCriticalColumns().then(() => process.exit(0)).catch(() => process.exit(0));"
 
 # 5. Reload PM2 (Zero Downtime Restart)
-echo "🔄 Reloading PM2 Clusters (Zero Downtime)..."
+APP_NAME=$(node -e "try { const c = require('./ecosystem.config.js'); console.log(c.apps[0].name); } catch(e) { console.log('skandx-backend'); }" 2>/dev/null || echo "skandx-backend")
+echo "🔄 Reloading PM2 Application: $APP_NAME (Zero Downtime)..."
 pm2 delete shortmarket-backend 2>/dev/null || true
-pm2 reload ecosystem.config.js --update-env 2>/dev/null || pm2 start ecosystem.config.js
+pm2 reload "$APP_NAME" --update-env 2>/dev/null || pm2 start ecosystem.config.js
+pm2 save 2>/dev/null || true
 
-echo "✅ Deployment Successful! Platform is running cleanly."
+echo "✅ Deployment Successful! [$APP_NAME] is running cleanly."
 cd ..

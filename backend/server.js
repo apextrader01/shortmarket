@@ -506,9 +506,11 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 // When running in PM2 Cluster Mode, NODE_APP_INSTANCE tells us the worker ID
 const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
 
+const socketKey = process.env.SOCKET_KEY || (process.env.PORT == 5001 ? 'socket.io-staging' : 'socket.io');
+
 const io = new Server(server, {
   cors: { origin: true, credentials: true, methods: ['GET', 'POST'] },
-  adapter: createAdapter(adapterPubClient, adapterSubClient)
+  adapter: createAdapter(adapterPubClient, adapterSubClient, { key: socketKey })
 });
 
 // Listen for Fyers token updates, Market Status updates & Calendar updates on all cluster nodes
