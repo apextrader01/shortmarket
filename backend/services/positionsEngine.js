@@ -135,34 +135,41 @@ class PositionsEngine {
 
             for (const order of pendingEntryOrders) {
                 const isCommodity = isCommoditySymbol(order.symbol);
-                if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
-                    await db.transaction(async (trx) => {
-                        const updated = await trx('orders')
-                            .where({ id: order.id })
-                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
-                            .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+                // 🛡️ Strict Shield: 4:00 PM delivery & intraday cancellation is ONLY for NSE, NFO, BFO, BSE. NEVER touch Commodities (MCX).
+                if (market === 'EQUITY' && isCommodity) continue;
+                if (market === 'COMMODITY' && !isCommodity) continue;
 
-                        if (updated > 0) {
-                            affectedUserIds.add(order.user_id);
-                            const totalQ = Number(order.quantity) || 1;
-                            const pendingQ = (order.pending_quantity !== null && order.pending_quantity !== undefined)
-                                ? Number(order.pending_quantity)
-                                : ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(order.filled_quantity || 0)) : totalQ);
-                            const refundMargin = totalQ > 0
-                                ? Math.round((Number(order.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
-                                : Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
-                            if (refundMargin > 0) {
-                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD 4 PM Order Cancellation: ${order.symbol}`);
-                            }
-                            triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                            try {
-                                const volumeMatchingEngine = require('./volumeMatchingEngine');
-                                volumeMatchingEngine.dequeueOrder(order.id, order.symbol);
-                            } catch (e) {}
-                            console.log(`[EOD SWEEP] Cancelled Entry ${order.id} (${order.symbol} ${order.product_type || 'DEL'})`);
+                // Never cancel delivery orders for Commodity markets
+                const isDel = ['DEL', 'CNC', 'DELIVERY'].includes(order.product_type);
+                if (market === 'COMMODITY' && isDel) continue;
+
+                await db.transaction(async (trx) => {
+                    const updated = await trx('orders')
+                        .where({ id: order.id })
+                        .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
+                        .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+
+                    if (updated > 0) {
+                        affectedUserIds.add(order.user_id);
+                        const totalQ = Number(order.quantity) || 1;
+                        const pendingQ = (order.pending_quantity !== null && order.pending_quantity !== undefined)
+                            ? Number(order.pending_quantity)
+                            : ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(order.filled_quantity || 0)) : totalQ);
+                        const refundMargin = totalQ > 0
+                            ? Math.round((Number(order.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
+                            : Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
+                        if (refundMargin > 0) {
+                            const desc = market === 'EQUITY' ? `EOD 4 PM Order Cancellation: ${order.symbol}` : `EOD Sweep: ${order.symbol}`;
+                            await LedgerService.releaseMargin(trx, order.user_id, refundMargin, desc);
                         }
-                    });
-                }
+                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                        try {
+                            const volumeMatchingEngine = require('./volumeMatchingEngine');
+                            volumeMatchingEngine.dequeueOrder(order.id, order.symbol);
+                        } catch (e) {}
+                        console.log(`[EOD SWEEP] Cancelled Entry ${order.id} (${order.symbol} ${order.product_type || 'DEL'})`);
+                    }
+                });
             }
 
             // Step B: Cancel PENDING_TRIGGER legs (BO/CO SL & Target orders), excluding AMO
