@@ -75,13 +75,15 @@ export default function PnLShareCardModal({ trade, onClose }) {
   const isProfit = pnl >= 0;
   const rawPnlPercent = trade?.pnlPercent !== undefined
     ? Number(trade.pnlPercent)
-    : (trade?.avg && Number(trade.avg) > 0 && trade?.exit_price
+    : (trade?.avg && Number(trade.avg) > 0 && trade?.exit_price !== null && trade?.exit_price !== undefined
       ? ((Number(trade.exit_price) - Number(trade.avg)) / Number(trade.avg)) * 100 * (trade.side === 'SELL' ? -1 : 1)
       : 0);
   const pnlPercent = isNaN(rawPnlPercent) ? 0 : rawPnlPercent;
 
   const entryPrice = Number(trade?.avg || trade?.average_price || trade?.buyPrice || 0);
-  const exitPrice = Number(trade?.exit_price || trade?.ltp || trade?.sellPrice || entryPrice);
+  const exitPrice = (trade?.exit_price !== null && trade?.exit_price !== undefined && !isNaN(Number(trade.exit_price)))
+    ? Number(trade.exit_price)
+    : Number(trade?.ltp || trade?.sellPrice || entryPrice);
   const quantity = Math.abs(Number(trade?.qty || trade?.quantity || trade?.closed_quantity || 1));
   const productType = trade?.product_type || trade?.productLabel || 'INTRADAY';
   const side = trade?.side || (isProfit ? 'BUY' : 'SELL');

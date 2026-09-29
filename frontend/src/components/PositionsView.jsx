@@ -258,6 +258,23 @@ export default function PositionsView() {
   }));
   const prices = relevantPrices;
 
+  const renderExitPrice = (pos) => {
+    if (pos.exit_price !== null && pos.exit_price !== undefined && !isNaN(Number(pos.exit_price))) {
+      return `₹${Math.abs(parseFloat(pos.exit_price)).toFixed(2)}`;
+    }
+    const closedQty = Math.abs(parseFloat(pos.closed_quantity) || 0);
+    const avg = Math.abs(parseFloat(pos.average_price || pos.avg) || 0);
+    const pnl = parseFloat(pos.realized_pnl);
+    if (closedQty > 0 && !isNaN(pnl) && avg > 0) {
+      const isShort = pos.side === 'SELL';
+      const computedExit = isShort ? (avg - (pnl / closedQty)) : (avg + (pnl / closedQty));
+      if (!isNaN(computedExit) && computedExit >= 0) {
+        return `₹${Math.abs(computedExit).toFixed(2)}`;
+      }
+    }
+    return '—';
+  };
+
   // Group positions by Symbol + Product Type (Flat List)
   const { flatPositions, globalMTM, totalInvested, totalCurrent } = useMemo(() => {
     let globalMTM = 0;
@@ -385,7 +402,9 @@ export default function PositionsView() {
       if (viewMode === 'CLOSED') {
         const closedQty = Math.abs(parseFloat(pos.closed_quantity) || 1);
         const entryPrice = Math.abs(parseFloat(pos.average_price) || 0);
-        const exitPrice = Math.abs(parseFloat(pos.exit_price || ltp) || 0);
+        const exitPrice = (pos.exit_price !== null && pos.exit_price !== undefined && !isNaN(Number(pos.exit_price)))
+          ? Math.abs(parseFloat(pos.exit_price))
+          : Math.abs(parseFloat(ltp) || 0);
         totalInvested += closedQty * entryPrice;
         totalCurrent += closedQty * exitPrice;
         globalMTM += realizedPnl;
@@ -887,7 +906,7 @@ export default function PositionsView() {
                       {/* Column 5: Last Price (LTP) / Exit Price */}
                       <td data-label="LTP" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>
                         {viewMode === 'CLOSED' 
-                          ? (pos.exit_price ? `₹${Math.abs(parseFloat(pos.exit_price)).toFixed(2)}` : '—') 
+                          ? renderExitPrice(pos) 
                           : (pos.ltp > 0 ? `₹${parseFloat(pos.ltp).toFixed(2)}` : '—')}
                       </td>
 
@@ -949,7 +968,7 @@ export default function PositionsView() {
                                 realized_pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
                                 pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
                                 avg: pos.avg,
-                                exit_price: pos.exit_price || pos.ltp,
+                                exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
                                 qty: Math.abs(pos.qty || pos.closed_quantity || holdingQty || 1),
                                 product_type: pos.productLabel || pos.product_type || (viewMode === 'HOLDINGS' ? 'DEL' : 'INT'),
                                 side: pos.qty >= 0 ? 'BUY' : 'SELL'
@@ -1237,7 +1256,7 @@ export default function PositionsView() {
                                 : (isMf ? Number(pos.qty || holdingQty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || holdingQty || 0)).toLocaleString('en-IN')))} • Avg: ₹{Math.abs(pos.avg || 0).toFixed(2)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{isMf ? 'NAV' : 'LTP'}: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? Math.abs(parseFloat(pos.exit_price)).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
+                          <span>{isMf ? 'NAV' : viewMode === 'CLOSED' ? 'Exit' : 'LTP'}: {viewMode === 'CLOSED' ? renderExitPrice(pos) : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}</span>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1248,7 +1267,7 @@ export default function PositionsView() {
                                 realized_pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
                                 pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
                                 avg: pos.avg,
-                                exit_price: pos.exit_price || pos.ltp,
+                                exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
                                 qty: Math.abs(pos.qty || pos.closed_quantity || 1),
                                 product_type: pos.productLabel || pos.product_type || 'INT',
                                 side: pos.qty >= 0 ? 'BUY' : 'SELL'

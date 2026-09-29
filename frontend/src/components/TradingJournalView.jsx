@@ -181,7 +181,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
           const closingOrder = (orders || []).find(o => (o.position_id === p.id || o.symbol === p.symbol) && (o.status === 'COMPLETED' || o.status === 'EXECUTED') && (o.closed_quantity > 0 || (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off')))));
           if (closingOrder) {
             entrySide = closingOrder.side === 'BUY' ? 'SELL' : 'BUY';
-          } else if (p.exit_price && p.average_price && p.exit_price !== p.average_price) {
+          } else if (p.exit_price !== null && p.exit_price !== undefined && p.average_price && p.exit_price !== p.average_price) {
             const longPnl = (Number(p.exit_price) - Number(p.average_price)) * Number(p.closed_quantity || 1);
             entrySide = Math.abs(pnl - longPnl) < 1 ? 'BUY' : 'SELL';
           } else {
@@ -197,7 +197,9 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
           side: entrySide,
           qty: Math.abs(p.closed_quantity || 1),
           avg: Math.abs(Number(p.average_price || 0)),
-          exit_price: Math.abs(Number(p.exit_price || p.average_price || 0)),
+          exit_price: (p.exit_price !== null && p.exit_price !== undefined && !isNaN(Number(p.exit_price)))
+            ? Math.abs(Number(p.exit_price))
+            : Math.abs(Number(p.average_price || 0)),
           pnl: pnl,
           date: p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-IN') : 'Today',
           rawDate: p.updated_at || p.created_at || new Date().toISOString()

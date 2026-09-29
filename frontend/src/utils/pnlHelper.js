@@ -52,8 +52,8 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
     if (Number(p.quantity) !== 0) return false;
     if (!isToday(p.updated_at || p.created_at)) return false;
 
-    // Must have either an actual exit price > 0, non-zero realized pnl, or a matching executed exit order today
-    const hasExitPrice = p.exit_price !== null && p.exit_price !== undefined && Number(p.exit_price) > 0;
+    // Must have either an actual exit price (including 0 for worthless expiry), non-zero realized pnl, or a matching executed exit order today
+    const hasExitPrice = p.exit_price !== null && p.exit_price !== undefined && !isNaN(Number(p.exit_price));
     const hasRealizedPnl = p.realized_pnl !== null && p.realized_pnl !== undefined && Number(p.realized_pnl) !== 0;
     const hasMatchingTodayOrder = (orders || []).some(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
@@ -141,7 +141,9 @@ export const getTodayRealizedMetrics = (positions = [], orders = [], options = {
     const pnl = parseFloat(pos.realized_pnl) || 0;
     const closedQty = parseFloat(pos.closed_quantity) || 0;
     const entryPrice = Math.abs(parseFloat(pos.average_price) || 0);
-    const exitPrice = Math.abs(parseFloat(pos.exit_price) || 0);
+    const exitPrice = (pos.exit_price !== null && pos.exit_price !== undefined && !isNaN(Number(pos.exit_price)))
+      ? Math.abs(parseFloat(pos.exit_price))
+      : null;
 
     if (!symbolAgg[key]) {
       symbolAgg[key] = { 
@@ -159,7 +161,7 @@ export const getTodayRealizedMetrics = (positions = [], orders = [], options = {
       if (entryPrice > 0 && (!agg.average_price || agg.average_price === 0)) {
         agg.average_price = entryPrice;
       }
-      if (exitPrice > 0) {
+      if (exitPrice !== null) {
         agg.exit_price = exitPrice;
       }
     }
