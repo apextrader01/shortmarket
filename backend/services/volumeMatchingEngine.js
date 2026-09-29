@@ -833,22 +833,63 @@ class VolumeMatchingEngine {
             });
           }
 
+          let sliceGroupId = order.slice_group_id;
+          if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+            const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+            if (match) sliceGroupId = match[1];
+          }
+          const orderTag = sliceGroupId ? `[${sliceGroupId}]` : `(Order #${order.id})`;
+
           if (marginRefund > 0) {
-            await trx('ledger').insert({
-              user_id: order.user_id,
-              amount: marginRefund,
-              type: 'MARGIN_RELEASE',
-              description: `Margin released for partial close: ${closeQty} ${order.symbol}`
-            });
+            const existingRelease = await trx('ledger')
+              .where({ user_id: order.user_id, type: 'MARGIN_RELEASE' })
+              .where('description', 'like', `%${orderTag}%`)
+              .first();
+
+            if (existingRelease) {
+              const updatedAmount = Math.round((Number(existingRelease.amount) + marginRefund + Number.EPSILON) * 100) / 100;
+              const prevQtyMatch = existingRelease.description.match(/(?:close:\s*|close\s+)([\d.]+)/i);
+              const prevQty = prevQtyMatch ? parseFloat(prevQtyMatch[1]) : 0;
+              const totalClose = roundQty(prevQty + closeQty);
+              await trx('ledger').where({ id: existingRelease.id }).update({
+                amount: updatedAmount,
+                description: `Margin released for partial close: ${totalClose} ${order.symbol} ${orderTag}`,
+                updated_at: new Date()
+              });
+            } else {
+              await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: marginRefund,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released for partial close: ${closeQty} ${order.symbol} ${orderTag}`
+              });
+            }
           }
 
           if (realizedPnl !== 0) {
-            await trx('ledger').insert({
-              user_id: order.user_id,
-              amount: realizedPnl,
-              type: 'REALIZED_PNL',
-              description: `Realized P&L on ${closeQty} ${order.symbol}`
-            });
+            const existingPnl = await trx('ledger')
+              .where({ user_id: order.user_id, type: 'REALIZED_PNL' })
+              .where('description', 'like', `%${orderTag}%`)
+              .first();
+
+            if (existingPnl) {
+              const updatedAmount = Math.round((Number(existingPnl.amount) + realizedPnl + Number.EPSILON) * 100) / 100;
+              const prevQtyMatch = existingPnl.description.match(/on\s+([\d.]+)/i);
+              const prevQty = prevQtyMatch ? parseFloat(prevQtyMatch[1]) : 0;
+              const totalClose = roundQty(prevQty + closeQty);
+              await trx('ledger').where({ id: existingPnl.id }).update({
+                amount: updatedAmount,
+                description: `Realized P&L on ${totalClose} ${order.symbol} ${orderTag}`,
+                updated_at: new Date()
+              });
+            } else {
+              await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L on ${closeQty} ${order.symbol} ${orderTag}`
+              });
+            }
           }
 
           // Synchronize / decrement holdings table if an entry exists for this user and symbol to prevent ghost holdings

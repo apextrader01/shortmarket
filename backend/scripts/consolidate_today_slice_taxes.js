@@ -148,25 +148,32 @@ async function consolidateTodaySliceTaxes(knexInstance = db) {
         const groupMatch = desc.match(/\[(slice_[^\]]+)\]/);
         const sliceGroupId = groupMatch ? groupMatch[1] : null;
 
+        const orderMatch = desc.match(/\(Order\s+#(\d+)\)/i);
+        const orderId = orderMatch ? orderMatch[1] : null;
+
         let symbol = 'SCRIP';
         let qty = 0;
-        const symMatch = desc.match(/(?:cancelled orders|dangling order|exit order|cancelled order:\s+(?:[\d.]+\s+)?)\s*([^\s\[:]+(?::[^\s\[:]+)?)/i);
+        const symMatch = desc.match(/(?:partial close:\s*|close:\s*|cancelled orders|dangling order|exit order|cancelled order:\s+(?:[\d.]+\s+)?)\s*(?:[\d.]+\s+)?([^\s\[:]+(?::[^\s\[:]+)?)/i);
         if (symMatch) {
           symbol = symMatch[1].trim();
         }
 
-        const qtyMatch = desc.match(/cancelled order:\s+([\d.]+)/i);
+        const qtyMatch = desc.match(/(?:partial close:\s*|close:\s*|cancelled order:\s+)([\d.]+)/i);
         if (qtyMatch) {
           qty = parseFloat(qtyMatch[1]) || 0;
         }
 
         const timeBucket = Math.floor(new Date(entry.created_at).getTime() / 180000);
-        const key = sliceGroupId ? `rel_grp_${entry.user_id}_${sliceGroupId}` : `rel_${entry.user_id}_${symbol}_${timeBucket}`;
+        const key = sliceGroupId 
+          ? `rel_grp_${entry.user_id}_${sliceGroupId}` 
+          : (orderId ? `rel_ord_${entry.user_id}_${orderId}` : `rel_${entry.user_id}_${symbol}_${timeBucket}`);
 
         if (!releaseGroups[key]) {
           releaseGroups[key] = {
             user_id: entry.user_id,
             symbol,
+            orderId,
+            sliceGroupId,
             totalQty: 0,
             totalAmount: 0,
             ids: [],
@@ -183,11 +190,79 @@ async function consolidateTodaySliceTaxes(knexInstance = db) {
         if (g.ids.length > 1) {
           await knexInstance.transaction(async (trx) => {
             await trx('ledger').whereIn('id', g.ids).del();
+            const tag = g.sliceGroupId ? ` [${g.sliceGroupId}]` : (g.orderId ? ` (Order #${g.orderId})` : ' (Consolidated)');
             await trx('ledger').insert({
               user_id: g.user_id,
               amount: Math.round((g.totalAmount + Number.EPSILON) * 100) / 100,
               type: 'MARGIN_RELEASE',
-              description: `Margin released for ${g.totalQty > 0 ? g.totalQty + ' ' : ''}${g.symbol} (Consolidated)`,
+              description: `Margin released for close: ${g.totalQty > 0 ? g.totalQty + ' ' : ''}${g.symbol}${tag.includes('Consolidated') ? tag : tag + ' (Consolidated)'}`,
+              created_at: g.firstCreatedAt
+            });
+          });
+          consolidatedRows += g.ids.length;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 4. Consolidate fragmented REALIZED_PNL entries
+    // ─────────────────────────────────────────────────────────────────────────
+    const slicePnlEntries = await knexInstance('ledger')
+      .where('type', 'REALIZED_PNL')
+      .where('created_at', '>=', todayStart)
+      .whereNot('description', 'like', '%Consolidated%');
+
+    if (slicePnlEntries && slicePnlEntries.length > 1) {
+      const pnlGroups = {};
+      for (const entry of slicePnlEntries) {
+        const desc = entry.description || '';
+        const groupMatch = desc.match(/\[(slice_[^\]]+)\]/);
+        const sliceGroupId = groupMatch ? groupMatch[1] : null;
+
+        const orderMatch = desc.match(/\(Order\s+#(\d+)\)/i);
+        const orderId = orderMatch ? orderMatch[1] : null;
+
+        let symbol = 'SCRIP';
+        let qty = 0;
+        const pnlMatch = desc.match(/Realized\s+P&L\s+(?:on|for)\s+(?:([\d.]+)\s+)?([^\s\[:\(]+(?::[^\s\[:\(]+)?)/i);
+        if (pnlMatch) {
+          qty = parseFloat(pnlMatch[1]) || 0;
+          symbol = pnlMatch[2].trim();
+        }
+
+        const timeBucket = Math.floor(new Date(entry.created_at).getTime() / 180000);
+        const key = sliceGroupId 
+          ? `pnl_grp_${entry.user_id}_${sliceGroupId}` 
+          : (orderId ? `pnl_ord_${entry.user_id}_${orderId}` : `pnl_${entry.user_id}_${symbol}_${timeBucket}`);
+
+        if (!pnlGroups[key]) {
+          pnlGroups[key] = {
+            user_id: entry.user_id,
+            symbol,
+            orderId,
+            sliceGroupId,
+            totalQty: 0,
+            totalAmount: 0,
+            ids: [],
+            firstCreatedAt: entry.created_at
+          };
+        }
+        pnlGroups[key].totalQty += qty;
+        pnlGroups[key].totalAmount += Number(entry.amount || 0);
+        pnlGroups[key].ids.push(entry.id);
+      }
+
+      for (const key of Object.keys(pnlGroups)) {
+        const g = pnlGroups[key];
+        if (g.ids.length > 1) {
+          await knexInstance.transaction(async (trx) => {
+            await trx('ledger').whereIn('id', g.ids).del();
+            const tag = g.sliceGroupId ? ` [${g.sliceGroupId}]` : (g.orderId ? ` (Order #${g.orderId})` : ' (Consolidated)');
+            await trx('ledger').insert({
+              user_id: g.user_id,
+              amount: Math.round((g.totalAmount + Number.EPSILON) * 100) / 100,
+              type: 'REALIZED_PNL',
+              description: `Realized P&L on ${g.totalQty > 0 ? g.totalQty + ' ' : ''}${g.symbol}${tag.includes('Consolidated') ? tag : tag + ' (Consolidated)'}`,
               created_at: g.firstCreatedAt
             });
           });

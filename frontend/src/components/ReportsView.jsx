@@ -147,23 +147,11 @@ const LedgerStatement = () => {
     }
   };
 
-  // Consolidate consecutive sliced order ledger records (e.g. 100 slices into 1 consolidated entry)
+  // Consolidate consecutive or interleaved sliced order ledger records (e.g. 100 slices into 1 clean consolidated entry)
   const paginatedLedger = useMemo(() => {
     if (!Array.isArray(ledger) || ledger.length === 0) return [];
     const result = [];
-    let currentGroup = null;
-
-    const finalizeGroup = (g) => {
-      if (!g) return null;
-      if (g.sliceCount > 1) {
-        return {
-          ...g,
-          amount: Math.round((g.amount + Number.EPSILON) * 100) / 100,
-          description: g.customDesc || g.description
-        };
-      }
-      return g;
-    };
+    const openBuckets = new Map();
 
     for (let i = 0; i < ledger.length; i++) {
       const entry = ledger[i];
@@ -172,69 +160,98 @@ const LedgerStatement = () => {
 
       let groupId = null;
       const groupMatch = desc.match(/\[(slice_[^\]]+)\]/);
-      if (groupMatch) {
-        groupId = groupMatch[1];
-      }
+      if (groupMatch) groupId = groupMatch[1];
+
+      let orderId = null;
+      const ordMatch = desc.match(/\(Order\s+#(\d+)\)/i);
+      if (ordMatch) orderId = ordMatch[1];
 
       const isBlock = t === 'MARGIN_BLOCK';
       const isRelease = t === 'MARGIN_RELEASE';
       const isTaxes = t === 'TAXES';
-      const isConsolidatable = isBlock || isRelease || isTaxes;
+      const isPnl = t === 'REALIZED_PNL';
+      const isConsolidatable = isBlock || isRelease || isTaxes || isPnl;
 
-      const blockMatch = desc.match(/Margin blocked for (BUY|SELL)\s+(\d+)\s+([^\s]+)/i);
-      const releaseMatch = desc.match(/Margin release.*for.*([^\s]+)/i) || desc.match(/Excess margin refunded.*([^\s]+)/i);
-      const taxesMatch = desc.match(/Taxes & Brokerage for (BUY|SELL)\s+(\d+)\s+([^\s]+)/i);
+      if (!isConsolidatable) {
+        result.push(entry);
+        continue;
+      }
 
-      const entryTime = new Date(entry.created_at).getTime();
+      let symbol = null;
+      let qty = 0;
+      let side = null;
 
-      let matched = false;
-      if (currentGroup && currentGroup.type === t && isConsolidatable) {
-        const timeDiff = Math.abs(currentGroup.rawTime - entryTime);
-        const sameGroupId = groupId && currentGroup.groupId === groupId;
-        const sameBlockSym = blockMatch && currentGroup.blockSide === blockMatch[1] && currentGroup.blockSym === blockMatch[3] && timeDiff < 180000;
-        const sameReleaseSym = releaseMatch && currentGroup.releaseSym === releaseMatch[1] && timeDiff < 180000;
-        const sameTaxesSym = taxesMatch && currentGroup.taxesSide === taxesMatch[1] && currentGroup.taxesSym === taxesMatch[3] && timeDiff < 180000;
-
-        if (sameGroupId || sameBlockSym || sameReleaseSym || sameTaxesSym) {
-          currentGroup.sliceCount += 1;
-          currentGroup.amount = currentGroup.amount + Number(entry.amount);
-          currentGroup.running_balance = entry.running_balance;
-          if (blockMatch) {
-            currentGroup.totalQty += (parseInt(blockMatch[2], 10) || 0);
-            currentGroup.customDesc = `Margin blocked for ${currentGroup.blockSide} ${currentGroup.totalQty.toLocaleString('en-IN')} ${currentGroup.blockSym} (${currentGroup.sliceCount} Slices)`;
-          } else if (releaseMatch) {
-            currentGroup.customDesc = `Margin released for ${currentGroup.releaseSym} (${currentGroup.sliceCount} Slices)`;
-          } else if (taxesMatch) {
-            currentGroup.totalQty += (parseInt(taxesMatch[2], 10) || 0);
-            currentGroup.customDesc = `Taxes & Brokerage for ${currentGroup.taxesSide} ${currentGroup.totalQty.toLocaleString('en-IN')} ${currentGroup.taxesSym} (${currentGroup.sliceCount} Slices)`;
+      if (isBlock) {
+        const m = desc.match(/Margin\s+blocked\s+for\s+(BUY|SELL)\s+([\d.]+)?\s*([^\s\[]+)/i);
+        if (m) {
+          side = m[1];
+          qty = m[2] ? parseFloat(m[2]) : 0;
+          symbol = m[3];
+        }
+      } else if (isRelease) {
+        const m = desc.match(/Margin\s+released\s+for\s+(?:partial close:\s*|close:\s*|position close:\s*)?([\d.]+)?\s*([^\s\[]+)/i) ||
+                  desc.match(/Excess\s+margin\s+refunded.*?\s+([^\s\[]+)/i) ||
+                  desc.match(/Margin\s+released\s+for\s+([^\s\[]+)/i);
+        if (m) {
+          if (m[2]) {
+            qty = m[1] ? parseFloat(m[1]) : 0;
+            symbol = m[2];
+          } else {
+            symbol = m[1];
           }
-          matched = true;
+        }
+      } else if (isTaxes) {
+        const m = desc.match(/Taxes\s+&\s+Brokerage\s+for\s+(BUY|SELL)\s+([\d.]+)?\s*([^\s\[]+)/i);
+        if (m) {
+          side = m[1];
+          qty = m[2] ? parseFloat(m[2]) : 0;
+          symbol = m[3];
+        }
+      } else if (isPnl) {
+        const m = desc.match(/Realized\s+P&L\s+(?:on|for)\s+([\d.]+)?\s*([^\s\[]+)/i);
+        if (m) {
+          qty = m[1] ? parseFloat(m[1]) : 0;
+          symbol = m[2];
         }
       }
 
-      if (!matched) {
-        if (currentGroup) {
-          result.push(finalizeGroup(currentGroup));
+      const cleanSym = symbol ? symbol.replace(/^(NSE:|BSE:|MCX:)/i, '') : 'SCRIP';
+      const entryTime = new Date(entry.created_at).getTime();
+      const timeBucket = Math.floor(entryTime / 180000); // 3-minute aggregation window
+
+      const bucketKey = groupId 
+        ? `${t}_grp_${groupId}` 
+        : (orderId ? `${t}_ord_${orderId}` : `${t}_${cleanSym}_${timeBucket}`);
+
+      if (openBuckets.has(bucketKey)) {
+        const b = openBuckets.get(bucketKey);
+        b.sliceCount += 1;
+        b.amount = Math.round((b.amount + Number(entry.amount || 0) + Number.EPSILON) * 100) / 100;
+        b.totalQty += qty;
+        b.running_balance = entry.running_balance; // latest authoritative running balance
+
+        if (isBlock) {
+          b.description = `Margin blocked for ${b.side || side || ''} ${b.totalQty > 0 ? b.totalQty.toLocaleString('en-IN') + ' ' : ''}${b.symbol} (${b.sliceCount} Slices)`;
+        } else if (isRelease) {
+          b.description = `Margin released for close: ${b.totalQty > 0 ? b.totalQty.toLocaleString('en-IN') + ' ' : ''}${b.symbol}${b.sliceCount > 1 ? ` (${b.sliceCount} Slices)` : ''}`;
+        } else if (isTaxes) {
+          b.description = `Taxes & Brokerage for ${b.side || side || ''} ${b.totalQty > 0 ? b.totalQty.toLocaleString('en-IN') + ' ' : ''}${b.symbol} (${b.sliceCount} Slices)`;
+        } else if (isPnl) {
+          b.description = `Realized P&L on ${b.totalQty > 0 ? b.totalQty.toLocaleString('en-IN') + ' ' : ''}${b.symbol}${b.sliceCount > 1 ? ` (${b.sliceCount} Slices)` : ''}`;
         }
-        currentGroup = {
+      } else {
+        const newBucket = {
           ...entry,
-          rawTime: entryTime,
-          groupId,
           sliceCount: 1,
-          amount: Number(entry.amount) || 0,
-          totalQty: blockMatch ? (parseInt(blockMatch[2], 10) || 0) : (taxesMatch ? (parseInt(taxesMatch[2], 10) || 0) : 0),
-          blockSide: blockMatch ? blockMatch[1] : null,
-          blockSym: blockMatch ? blockMatch[3] : null,
-          releaseSym: releaseMatch ? releaseMatch[1] : null,
-          taxesSide: taxesMatch ? taxesMatch[1] : null,
-          taxesSym: taxesMatch ? taxesMatch[3] : null,
-          customDesc: null
+          amount: Number(entry.amount || 0),
+          totalQty: qty,
+          symbol: cleanSym,
+          side,
+          bucketKey
         };
+        openBuckets.set(bucketKey, newBucket);
+        result.push(newBucket);
       }
-    }
-
-    if (currentGroup) {
-      result.push(finalizeGroup(currentGroup));
     }
 
     return result;
