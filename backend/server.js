@@ -10211,6 +10211,15 @@ const cleanupAndExit = () => {
   }, 1000);
 };
 
+// Gentle periodic memory cleanup (every 10 minutes) when garbage collection is enabled
+if (typeof global.gc === 'function') {
+  setInterval(() => {
+    try {
+      global.gc();
+    } catch (e) {}
+  }, 10 * 60 * 1000).unref();
+}
+
 process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 

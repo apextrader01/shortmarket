@@ -110,6 +110,9 @@ function initializeCache() {
     cachedAllStocksETag = `"${crypto.createHash('md5').update(cachedAllStocksJson).digest('hex')}"`;
     
     console.log(`Loaded ${allInstruments.length} instruments into memory after filtering duplicates.`);
+    if (typeof global.gc === 'function') {
+        try { global.gc(); } catch (e) {}
+    }
 }
 
 // Initial load

@@ -7,7 +7,7 @@ module.exports = {
       exec_mode: 'cluster',
       watch: false,
       max_memory_restart: '800M',
-      node_args: '--max-old-space-size=512',
+      node_args: '--optimize_for_size --max-old-space-size=384 --expose-gc',
       env: {
         NODE_ENV: 'production',
         PORT: 5000,
