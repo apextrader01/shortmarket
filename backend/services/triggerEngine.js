@@ -595,6 +595,7 @@ class TriggerEngine {
                 if (isPartialClose) {
                     const absQty = roundQty(Math.abs(Number(order.quantity)));
                     const posAbsQty = Math.abs(existingPos.quantity);
+                    const absPosQty = posAbsQty;
                     const closeQty = roundQty(Math.min(posAbsQty, absQty));
 
                     if (absQty <= posAbsQty) {

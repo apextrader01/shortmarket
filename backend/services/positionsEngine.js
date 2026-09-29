@@ -696,9 +696,12 @@ class PositionsEngine {
                     updated_at: new Date()
                 }).returning('id');
 
-                const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
-                orderRow.is_rms = false;
-                await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
+                const finalId = (orderId && typeof orderId === 'object') ? (orderId.id || orderId[0]?.id || orderId[0]) : orderId;
+                const orderRow = await db('orders').where({ id: finalId }).first();
+                if (orderRow) {
+                    orderRow.is_rms = false;
+                    await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
+                }
                 if (triggerEngine && triggerEngine.io) {
                     try {
                         triggerEngine.io.to(item.user_id.toString()).emit('sync_user_data');
