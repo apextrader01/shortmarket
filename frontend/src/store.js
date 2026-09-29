@@ -1455,7 +1455,7 @@ export const useStore = create(persist((set, get) => ({
       if (slices && slices.length > 1) {
         // Multi-slice execution for large orders exceeding freeze limits
         const sliceGroupId = `slice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const slicePromises = slices.map((sliceQty, index) => {
+        const slicePromises = slices.map(async (sliceQty, index) => {
           const childPayload = {
             ...normalizedPayload,
             quantity: sliceQty,
@@ -1464,12 +1464,28 @@ export const useStore = create(persist((set, get) => ({
             slice_index: index + 1,
             slice_total: slices.length
           };
-          return fetch(`${API}/api/order`, {
-            credentials: 'include',
-            method: 'POST',
-            headers,
-            body: JSON.stringify(childPayload)
-          }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+          for (let attempt = 0; attempt <= 2; attempt++) {
+            try {
+              const res = await fetch(`${API}/api/order`, {
+                credentials: 'include',
+                method: 'POST',
+                headers,
+                body: JSON.stringify(childPayload)
+              });
+              const json = await res.json();
+              if (res.status === 429 && attempt < 2) {
+                await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                continue;
+              }
+              return json;
+            } catch (e) {
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 200));
+                continue;
+              }
+              return { success: false, error: e.message };
+            }
+          }
         });
 
         const results = await Promise.all(slicePromises);

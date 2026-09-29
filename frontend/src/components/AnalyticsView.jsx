@@ -611,7 +611,7 @@ export default function AnalyticsView() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
                       <div>{new Date(trade.created_at).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                      <div>Qty: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{Math.abs(trade.quantity)}</span></div>
+                      <div>Qty: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{Math.abs(trade.quantity).toLocaleString('en-IN')}</span>{trade.sliceCount > 1 && <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>({trade.sliceCount} slices)</span>}</div>
                     </div>
                   </div>
                 );
@@ -656,7 +656,14 @@ export default function AnalyticsView() {
                           {trade.side}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--text-primary)' }}>{Math.abs(trade.quantity)}</td>
+                      <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--text-primary)' }}>
+                        {Math.abs(trade.quantity).toLocaleString('en-IN')}
+                        {trade.sliceCount > 1 && (
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                            {trade.sliceCount} slices
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: '700', color: isWin ? '#00E676' : '#FF3B30' }}>
                         {isWin ? '+' : ''}{formatCurrency(pnl)}
                       </td>

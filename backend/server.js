@@ -809,8 +809,8 @@ const authLimiter = rateLimit({
 
 const orderLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 120, // limit each user/IP to 120 orders per minute
-  message: { error: 'Order rate limit exceeded (max 120/min)' },
+  max: 1500, // limit each user/IP to 1500 orders per minute (allows high-concurrency iceberg slice bursts & exit-all)
+  message: { error: 'Order rate limit exceeded (max 1500/min)' },
   keyGenerator: (req) => {
     return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
   }
@@ -2127,10 +2127,68 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
 // ─── Analytics ─────────────────────────────────────────────────────────────
 app.get('/api/analytics', authenticateToken, async (req, res) => {
   try {
-    const orders = await db('orders')
+    const rawOrders = await db('orders')
       .where({ user_id: req.user.id })
       .whereNot('realized_pnl', 0)
       .orderBy('created_at', 'asc');
+
+    // Consolidate sliced iceberg orders into single unified trades
+    const groupMap = new Map();
+    const orders = [];
+
+    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    const timeClusters = new Map();
+    for (const o of rawOrders) {
+      if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
+      }
+    }
+
+    for (const o of rawOrders) {
+      let groupId = o.slice_group_id;
+      if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
+        const match = o.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) groupId = match[1];
+      }
+      if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
+        const dStr = new Date(o.created_at || o.createdAt).toISOString().slice(0, 16);
+        groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+      }
+      if (!groupId) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        if ((timeClusters.get(cKey) || 0) > 1) {
+          groupId = `cluster_${cKey}`;
+        }
+      }
+
+      if (groupId) {
+        if (!groupMap.has(groupId)) {
+          const parent = {
+            ...o,
+            sliceCount: 1,
+            quantity: Number(o.quantity) || 0,
+            realized_pnl: parseFloat(o.realized_pnl) || 0
+          };
+          groupMap.set(groupId, parent);
+          orders.push(parent);
+        } else {
+          const parent = groupMap.get(groupId);
+          parent.sliceCount += 1;
+          parent.quantity += Number(o.quantity) || 0;
+          parent.realized_pnl += parseFloat(o.realized_pnl) || 0;
+        }
+      } else {
+        orders.push({
+          ...o,
+          sliceCount: 1,
+          quantity: Number(o.quantity) || 0,
+          realized_pnl: parseFloat(o.realized_pnl) || 0
+        });
+      }
+    }
       
     let totalTrades = orders.length;
     let winningTrades = 0;
@@ -2174,7 +2232,7 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
        avgWinner: avgWinner.toFixed(2),
        avgLoser: avgLoser.toFixed(2),
        equityCurve,
-       recentTrades: orders.slice(-50).reverse() // Last 50 trades for the log
+       recentTrades: orders.slice(-50).reverse() // Consolidated trades for the log
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
