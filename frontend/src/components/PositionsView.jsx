@@ -5,6 +5,7 @@ import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract } from '../utils/lotsizeHelper';
+import { calculateOrderSlices } from '../utils/freezeLimits';
 import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
 import { getMarketSession } from '../utils/marketTiming';
 
@@ -504,27 +505,39 @@ export default function PositionsView() {
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
       const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type === 'INT' || pos.product_type === 'MIS' ? pos.product_type : 'INT');
-      const payload = {
-        symbol: pos.symbol,
-        type: 'MARKET',
-        side: exitSide,
-        quantity: Math.abs(Number(pos.unencumberedQty)),
-        price: liveLtp,
-        sl_price: null,
-        tgt_price: null,
-        margin: 0,
-        lotsize: pos.lotSize || 1,
-        product_type: effectiveProductType,
-        is_exit: true,
-        remarks: 'Exit All Positions'
-      };
-      const res = await store.placeOrder(payload);
-      if (res && res.success) {
+      const totalExitQty = Math.abs(Number(pos.unencumberedQty));
+      if (!totalExitQty || totalExitQty <= 0) return { success: true };
+
+      const slices = calculateOrderSlices(pos.symbol, totalExitQty, pos.lotSize || pos.lotsize || 1);
+      let allSliceSuccess = true;
+      let sliceError = '';
+      for (const sliceQty of slices) {
+        const payload = {
+          symbol: pos.symbol,
+          type: 'MARKET',
+          side: exitSide,
+          quantity: sliceQty,
+          price: liveLtp,
+          sl_price: null,
+          tgt_price: null,
+          margin: 0,
+          lotsize: pos.lotSize || pos.lotsize || 1,
+          product_type: effectiveProductType,
+          is_exit: true,
+          remarks: 'Exit All Positions'
+        };
+        const res = await store.placeOrder(payload);
+        if (!res || !res.success) {
+          allSliceSuccess = false;
+          sliceError = store.authError || (res && res.error) || 'Failed to place exit order slice';
+          break;
+        }
+      }
+      if (allSliceSuccess) {
         store.clearPendingTriggersForSymbol(pos.symbol);
         return { success: true };
       } else {
-        const err = store.authError || (res && res.error) || 'Failed to place exit order';
-        return { success: false, error: err };
+        return { success: false, error: sliceError };
       }
     }));
 
@@ -1537,27 +1550,39 @@ export default function PositionsView() {
                       }
                     }
 
-                    const ok = await useStore.getState().placeOrder({
-                      symbol: partialExitPos.symbol,
-                      type: partialExitType,
-                      side: exitSide,
-                      quantity: qtyToExit,
-                      lotsize: ls,
-                      price: partialExitType === 'MARKET' ? (relevantPrices[partialExitPos.symbol]?.ltp || store.prices?.[partialExitPos.symbol]?.ltp || partialExitPos.ltp || 0) : parseFloat(partialExitPrice),
-                      sl_price: null,
-                      tgt_price: null,
-                      margin: 0,
-                      product_type: effProd,
-                      variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
-                      is_amo: partialExitIsAmo,
-                      is_exit: true,
-                      remarks: 'Exit Position'
-                    });
-                    if (ok && ok.success) {
+                    const slices = calculateOrderSlices(partialExitPos.symbol, qtyToExit, ls);
+                    let allOk = true;
+                    let lastErrMsg = '';
+                    const exitLtp = partialExitType === 'MARKET' ? (relevantPrices[partialExitPos.symbol]?.ltp || store.prices?.[partialExitPos.symbol]?.ltp || partialExitPos.ltp || 0) : parseFloat(partialExitPrice);
+
+                    for (const sliceQty of slices) {
+                      const ok = await useStore.getState().placeOrder({
+                        symbol: partialExitPos.symbol,
+                        type: partialExitType,
+                        side: exitSide,
+                        quantity: sliceQty,
+                        lotsize: ls,
+                        price: exitLtp,
+                        sl_price: null,
+                        tgt_price: null,
+                        margin: 0,
+                        product_type: effProd,
+                        variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
+                        is_amo: partialExitIsAmo,
+                        is_exit: true,
+                        remarks: 'Exit Position'
+                      });
+                      if (!ok || !ok.success) {
+                        allOk = false;
+                        lastErrMsg = (ok && ok.error) || useStore.getState().authError || 'Failed to exit slice';
+                        break;
+                      }
+                    }
+
+                    if (allOk) {
                       setPartialExitPos(null);
                     } else {
-                      const storeErr = useStore.getState().authError;
-                      alert(`Exit failed: ${(ok && ok.error) || storeErr || 'Check the browser console (F12) for error details.'}`);
+                      alert(`Exit failed: ${lastErrMsg || 'Check the browser console (F12) for error details.'}`);
                     }
                   }}
                   style={{

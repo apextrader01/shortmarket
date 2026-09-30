@@ -8170,6 +8170,21 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           }
           const newPendingQty = Math.max(0, newQty - filledQty);
 
+          // Validate Exchange Freeze Limit on order modification
+          const isMF = String(order.symbol).endsWith('-MF') || String(order.symbol).includes('MUTUALFUND');
+          if (!isMF) {
+            const { getFreezeLimit, getInstantLotsize } = require('./services/taxCalculator');
+            const freezeLimit = getFreezeLimit(order.symbol);
+            if (freezeLimit && newQty > freezeLimit) {
+              const lotSize = getInstantLotsize(order.symbol);
+              const maxLots = (lotSize && lotSize > 1) ? Math.floor(freezeLimit / lotSize) : freezeLimit;
+              const err = (lotSize && lotSize > 1)
+                ? `Modified quantity (${newQty} qty / ${Math.round(newQty / lotSize)} lots) for ${order.symbol} exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} qty (${maxLots} lots). Please adjust quantity.`
+                : `Modified quantity (${newQty.toLocaleString('en-IN')} shares) for ${order.symbol} exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares. Please adjust quantity.`;
+              throw Object.assign(new Error(err), { statusCode: 400 });
+            }
+          }
+
           // Handle Market Execution override for Pending Triggers
           if (isMarket && order.status === 'PENDING_TRIGGER') {
              ltpForMarket = getLtpFromPriceCache(order.symbol) || Number(order.trigger_price) || Number(order.price) || 0;

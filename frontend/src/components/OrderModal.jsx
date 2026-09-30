@@ -74,7 +74,10 @@ export default function OrderModal() {
       }
 
       if (orderModal.totalExitQty) {
-          setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / effectiveLotsize)));
+          const rawLots = Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / effectiveLotsize));
+          const freezeLim = getFreezeLimit(orderModal.symbol, effectiveLotsize);
+          const maxAllowed = (effectiveLotsize && effectiveLotsize > 1) ? Math.floor(freezeLim / effectiveLotsize) : freezeLim;
+          setQuantity(maxAllowed > 0 ? Math.min(rawLots, maxAllowed) : rawLots);
       } else {
           setQuantity(1);
       }
@@ -97,7 +100,10 @@ export default function OrderModal() {
               const ls = data[orderModal.symbol];
               useStore.getState().setOrderModalLotsize(ls);
               if (orderModal.totalExitQty) {
-                  setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / ls)));
+                  const rawLots = Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / ls));
+                  const freezeLim = getFreezeLimit(orderModal.symbol, ls);
+                  const maxAllowed = (ls && ls > 1) ? Math.floor(freezeLim / ls) : freezeLim;
+                  setQuantity(maxAllowed > 0 ? Math.min(rawLots, maxAllowed) : rawLots);
               }
             }
           }).catch(console.error);
@@ -1181,27 +1187,48 @@ export default function OrderModal() {
               padding: '8px 10px', 
               marginTop: '8px',
               display: 'flex',
-              alignItems: 'flex-start',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '8px',
               lineHeight: '1.4'
             }}>
-              <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <div style={{ fontWeight: '700', color: '#ef4444' }}>
-                  {orderModal.lotsize > 1 ? (
-                    `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
-                  ) : (
-                    `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`
-                  )}
-                </div>
-                <div style={{ color: '#d1d5db', marginTop: '2px' }}>
-                  {orderModal.lotsize > 1 ? (
-                    `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
-                  ) : (
-                    `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Shares.`
-                  )}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: '700', color: '#ef4444' }}>
+                    {orderModal.lotsize > 1 ? (
+                      `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
+                    ) : (
+                      `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`
+                    )}
+                  </div>
+                  <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                    {orderModal.lotsize > 1 ? (
+                      `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
+                    ) : (
+                      `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Shares.`
+                    )}
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setQuantity(orderModal.lotsize > 1 ? maxAllowedLots : freezeLimit)}
+                style={{
+                  flexShrink: 0,
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.5)',
+                  color: '#f87171',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                SET MAX
+              </button>
             </div>
           )}
 

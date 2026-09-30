@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { X, Maximize2, Info } from 'lucide-react';
+import { X, Maximize2, Info, AlertTriangle } from 'lucide-react';
+import { getFreezeLimit } from '../utils/freezeLimits';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function EditOrderModal() {
   const editOrderModal = useStore(state => state.editOrderModal);
@@ -90,13 +92,30 @@ export default function EditOrderModal() {
     }
   }
   
-  const isInsufficient = marginDifference > 0 && balanceNum < marginDifference;
   const isBuy = order.side === 'BUY';
+  const orderLotSize = (order?.lotsize && Number(order.lotsize) > 1) 
+    ? Number(order.lotsize) 
+    : (order?.lot_size && Number(order.lot_size) > 1)
+      ? Number(order.lot_size)
+      : getInstantLotsize(symbol);
+
+  const freezeLimit = symbol ? getFreezeLimit(symbol, orderLotSize) : 100000;
+  const maxAllowedLots = (orderLotSize > 1) ? Math.floor(freezeLimit / orderLotSize) : freezeLimit;
+  const numQty = Number(quantity) || 0;
+  const isExceedingFreezeLimit = freezeLimit > 0 && numQty > freezeLimit;
+
+  const isInsufficient = marginDifference > 0 && balanceNum < marginDifference;
 
   const handleUpdateOrder = async () => {
-    const numQty = Number(quantity);
     if (!numQty || numQty <= 0 || isNaN(numQty)) {
       alert('Please enter a valid quantity greater than 0.');
+      return;
+    }
+
+    if (isExceedingFreezeLimit) {
+      alert(orderLotSize > 1
+        ? `Modified quantity (${numQty} qty / ${Math.round(numQty / orderLotSize)} lots) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} qty (${maxAllowedLots} lots). Please adjust quantity.`
+        : `Modified quantity (${numQty.toLocaleString('en-IN')} shares) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares. Please adjust quantity.`);
       return;
     }
 
@@ -466,6 +485,54 @@ export default function EditOrderModal() {
             </>
           )}
 
+          {/* Exchange Freeze Limit Alert Banner */}
+          {isExceedingFreezeLimit && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '6px',
+              padding: '10px 14px',
+              marginTop: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                  <div style={{ fontWeight: '700', color: '#ef4444' }}>
+                    {orderLotSize > 1
+                      ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
+                      : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`}
+                  </div>
+                  <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                    {orderLotSize > 1
+                      ? `Entered ${numQty.toLocaleString('en-IN')} Qty (${Math.round(numQty / orderLotSize).toLocaleString('en-IN')} Lots) exceeds maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
+                      : `Entered ${numQty.toLocaleString('en-IN')} Shares exceeds maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Shares.`}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuantity(freezeLimit)}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.5)',
+                  color: '#f87171',
+                  borderRadius: '4px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                SET MAX
+              </button>
+            </div>
+          )}
+
           {/* Margin Alert (if insufficient) */}
           {isInsufficient && (
             <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '12px', borderRadius: '8px', marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -504,15 +571,17 @@ export default function EditOrderModal() {
           )}
           <button 
             onClick={handleUpdateOrder}
-            disabled={isInsufficient}
+            disabled={isInsufficient || isExceedingFreezeLimit}
             style={{ 
-              background: isInsufficient ? 'var(--bg-panel)' : 'var(--color-blue)', 
-              color: isInsufficient ? 'var(--text-secondary)' : '#fff', 
+              background: (isInsufficient || isExceedingFreezeLimit) ? 'var(--bg-panel)' : 'var(--color-blue)', 
+              color: (isInsufficient || isExceedingFreezeLimit) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: isInsufficient ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+              border: 'none', cursor: (isInsufficient || isExceedingFreezeLimit) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
             }}
           >
-            UPDATE ORDER
+            {isExceedingFreezeLimit 
+              ? (orderLotSize > 1 ? `EXCEEDS FREEZE LIMIT (${maxAllowedLots} LOTS MAX)` : `EXCEEDS FREEZE LIMIT (${freezeLimit.toLocaleString('en-IN')} MAX)`) 
+              : 'UPDATE ORDER'}
           </button>
         </div>
 
