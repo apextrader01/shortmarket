@@ -1692,6 +1692,14 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       reset_otp_expires: expires
     });
 
+    // Store ephemeral OTP in Redis with 15-min TTL
+    try {
+      const { generalClient } = require('./services/redisClient');
+      if (generalClient && generalClient.isOpen) {
+        await generalClient.setEx(`otp:reset:${user.id}`, 900, otpHash).catch(() => {});
+      }
+    } catch (e) {}
+
     console.log(`[FORGOT PASSWORD] 🔑 Generated Reset OTP for ${normalizedEmail}: ${otp}`);
 
     // 1. Deliver the 6-digit numeric OTP directly to user's inbox
@@ -1747,7 +1755,22 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
 
     const crypto = require('crypto');
     const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
-    const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+    
+    let isOtpMatch = false;
+    try {
+      const { generalClient } = require('./services/redisClient');
+      if (generalClient && generalClient.isOpen) {
+        const redisOtp = await generalClient.get(`otp:reset:${user.id}`).catch(() => null);
+        if (redisOtp && (redisOtp === inputHash || redisOtp === String(otp).trim())) {
+          isOtpMatch = true;
+          generalClient.del(`otp:reset:${user.id}`).catch(() => {});
+        }
+      }
+    } catch (e) {}
+
+    if (!isOtpMatch) {
+      isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+    }
 
     if (!isOtpMatch) {
       attemptRecord.count += 1;

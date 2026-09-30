@@ -1054,6 +1054,18 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     }, TZ);
 
+    // 🗓️ 00:05 AM IST on 1st of Every Month: Synchronize Database Monthly Partitions
+    cron.schedule('5 0 1 * *', async () => {
+        try {
+            console.log('🗓️ [CRON 1st of Month] Synchronizing upcoming monthly table partitions...');
+            if (typeof db.ensureMonthlyPartitions === 'function') {
+                await db.ensureMonthlyPartitions();
+            }
+        } catch (mErr) {
+            console.error('❌ [CRON] Monthly partition synchronization error:', mErr.message);
+        }
+    }, TZ);
+
     // --- 8:37 AM Daily Expired Watchlist & Subscriptions Cleanup ---
     cron.schedule('37 8 * * *', async () => {
         const lockKey = 'cron_watchlist_cleanup';
@@ -1337,10 +1349,78 @@ async function runOrderLifecycleArchive(cutoffDays = 30) {
         }
 
         console.log(`📦 [CRON 08:05 AM] Step 2: Archived ${totalArchived} EXECUTED orders (> ${cutoffDays} days) to orders_archive.`);
-        return { purged: purgedCount || 0, archived: totalArchived };
+
+        // Step 3: Archive completed ledger entries older than 90 days to ledger_archive
+        const ledgerArchived = await runLedgerLifecycleArchive(90);
+
+        return { purged: purgedCount || 0, archived: totalArchived, ledgerArchived };
     } catch (err) {
         console.error('❌ [CRON 08:05 AM] runOrderLifecycleArchive error:', err.message);
         throw err;
+    }
+}
+
+/**
+ * Archive completed ledger entries older than cutoffDays (default 90 days) into ledger_archive table
+ * to prevent the active ledger table from growing to 100M+ rows.
+ */
+async function runLedgerLifecycleArchive(cutoffDays = 90) {
+    try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - cutoffDays);
+
+        let totalArchived = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            const oldLedger = await db('ledger')
+                .whereIn('type', ['MARGIN_BLOCK', 'MARGIN_RELEASE', 'TAXES', 'REALIZED_PNL', 'RMS_PENALTY'])
+                .where('created_at', '<', cutoffDate)
+                .orderBy('id', 'asc')
+                .limit(batchSize);
+
+            if (!oldLedger || oldLedger.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            const ledgerIds = oldLedger.map(l => l.id);
+            const now = new Date();
+            const archiveRecords = oldLedger.map(rec => ({
+                id: rec.id,
+                user_id: rec.user_id,
+                amount: rec.amount,
+                type: rec.type,
+                description: rec.description,
+                created_at: rec.created_at,
+                archived_at: now
+            }));
+
+            await db.transaction(async (trx) => {
+                await trx('ledger_archive')
+                    .insert(archiveRecords)
+                    .onConflict('id')
+                    .ignore();
+
+                await trx('ledger')
+                    .whereIn('id', ledgerIds)
+                    .del();
+            });
+
+            totalArchived += oldLedger.length;
+            if (oldLedger.length < batchSize) {
+                hasMore = false;
+            }
+        }
+
+        if (totalArchived > 0) {
+            console.log(`📦 [CRON 08:05 AM] Step 3: Archived ${totalArchived} ledger records (> ${cutoffDays} days) to ledger_archive.`);
+        }
+        return totalArchived;
+    } catch (err) {
+        console.error('❌ runLedgerLifecycleArchive error:', err.message);
+        return 0;
     }
 }
 
@@ -1352,5 +1432,6 @@ module.exports = {
     executeAmoOrders,
     executeCasOpeningMatch,
     updateWeeklyCasStocksList,
-    runOrderLifecycleArchive
+    runOrderLifecycleArchive,
+    runLedgerLifecycleArchive
 };

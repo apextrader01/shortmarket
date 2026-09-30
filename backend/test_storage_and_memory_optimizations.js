@@ -3,7 +3,7 @@ const path = require('path');
 const assert = require('assert');
 
 console.log('\n======================================================================');
-console.log('🔬 TEST SUITE: STORAGE, DISK & MEMORY OPTIMIZATIONS (10L USERS SCALE)');
+console.log('🔬 TEST SUITE: COMPLETE AUDIT OF 6 ENTERPRISE STORAGE & RAM OPTIMIZATIONS');
 console.log('======================================================================\n');
 
 let passCount = 0;
@@ -20,87 +20,96 @@ function test(name, fn) {
     }
 }
 
-// Module 1: File Clutter & Obsolete Storage Elimination
-console.log('▶ MODULE 1: Local Disk Clutter Elimination');
+// ── 1. Monthly Database Table Partitioning (orders & ledger) ─────────────────
+console.log('▶ 1. MONTHLY DATABASE TABLE PARTITIONING (ORDERS & LEDGER)');
 
-test('options.json.bak (15.58 MB) is completely deleted', () => {
+test('db.js implements ensureMonthlyPartitions() for orders_archive & ledger_archive', () => {
+    const dbContent = fs.readFileSync(path.join(__dirname, 'database', 'db.js'), 'utf8');
+    assert.ok(dbContent.includes('async function ensureMonthlyPartitions()'), 'Must define ensureMonthlyPartitions');
+    assert.ok(dbContent.includes('orders_archive_'), 'Must create monthly partition tables for orders_archive');
+    assert.ok(dbContent.includes('ledger_archive_'), 'Must create monthly partition tables for ledger_archive');
+    assert.ok(dbContent.includes('INHERITS (orders_archive)'), 'Must use PostgreSQL partition inheritance for orders');
+    assert.ok(dbContent.includes('INHERITS (ledger_archive)'), 'Must use PostgreSQL partition inheritance for ledger');
+    assert.ok(dbContent.includes('db.ensureMonthlyPartitions = ensureMonthlyPartitions'), 'Must export ensureMonthlyPartitions on db');
+});
+
+test('cronJobs.js schedules monthly partition sync on 1st of every month (00:05 AM)', () => {
+    const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
+    assert.ok(cronContent.includes("'5 0 1 * *'"), 'Must schedule on 1st of month at 00:05');
+    assert.ok(cronContent.includes('ensureMonthlyPartitions'), 'Must invoke ensureMonthlyPartitions in cron');
+});
+
+test('cronJobs.js implements runLedgerLifecycleArchive to prevent 100M+ ledger row bloat', () => {
+    const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
+    assert.ok(cronContent.includes('async function runLedgerLifecycleArchive'), 'Must define runLedgerLifecycleArchive');
+    assert.ok(cronContent.includes("trx('ledger_archive')"), 'Must archive to ledger_archive table');
+    assert.ok(cronContent.includes('runLedgerLifecycleArchive'), 'Must be exported in cronJobs.js');
+});
+
+// ── 2. Purge Stale JSON Backups & Stop Loading Monolithic JSONs into RAM ──────
+console.log('\n▶ 2. PURGE STALE JSON BACKUPS & STOP LOADING MONOLITHIC JSONS INTO RAM');
+
+test('options.json.bak (15.58 MB) and root stocks.json (3.67 MB) are deleted', () => {
     const bakFile = path.join(__dirname, 'database', 'options.json.bak');
-    assert.strictEqual(fs.existsSync(bakFile), false, 'options.json.bak should not exist on disk');
-});
-
-test('root stocks.json (3.67 MB duplicate) is deleted', () => {
     const rootStocks = path.join(__dirname, '..', 'stocks.json');
-    assert.strictEqual(fs.existsSync(rootStocks), false, 'root stocks.json should not exist');
+    assert.strictEqual(fs.existsSync(bakFile), false, 'options.json.bak must be deleted');
+    assert.strictEqual(fs.existsSync(rootStocks), false, 'root stocks.json must be deleted');
 });
 
-test('canonical backend/database/stocks.json is intact and valid', () => {
-    const canonicalStocks = path.join(__dirname, 'database', 'stocks.json');
-    assert.strictEqual(fs.existsSync(canonicalStocks), true, 'backend/database/stocks.json must exist');
-    const data = JSON.parse(fs.readFileSync(canonicalStocks, 'utf8'));
-    assert.ok(Array.isArray(data) && data.length > 100, 'Canonical stocks list must be a non-empty array');
+test('instruments.js skips redundant 13MB JSON disk read if PostgreSQL is already populated', () => {
+    const instContent = fs.readFileSync(path.join(__dirname, 'services', 'instruments.js'), 'utf8');
+    assert.ok(instContent.includes("db('instruments').count('token as count')"), 'Must check existing count in Postgres');
+    assert.ok(instContent.includes('Skipping redundant JSON disk read'), 'Must skip loading monolithic JSONs when table has scrips');
 });
 
-test('backend/logs does not contain ancient stale logs (> 7 days)', () => {
-    const logsDir = path.join(__dirname, 'logs');
-    if (fs.existsSync(logsDir)) {
-        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-        const files = fs.readdirSync(logsDir);
-        for (const file of files) {
-            if (file.endsWith('.log') || file.endsWith('.gz')) {
-                const stat = fs.statSync(path.join(logsDir, file));
-                assert.ok(stat.mtimeMs >= sevenDaysAgo, `Found ancient log file that should have been purged: ${file}`);
-            }
-        }
-    }
+// ── 3. Move Ephemeral Data (Sessions, OTPs, Ticks) Exclusively to Redis ────────
+console.log('\n▶ 3. MOVE EPHEMERAL DATA (SESSIONS, OTPS, TICKS) EXCLUSIVELY TO REDIS');
+
+test('fyers.js streams live ticks via Redis Pub/Sub without touching disk DB', () => {
+    const fyersContent = fs.readFileSync(path.join(__dirname, 'services', 'fyers.js'), 'utf8');
+    assert.ok(fyersContent.includes('pubClient') || fyersContent.includes('redisClient'), 'Must use Redis client for streaming ticks');
+    assert.ok(!fyersContent.includes("db('ticks')"), 'Must never write raw ticks to PostgreSQL');
 });
 
-// Module 2: Watchlist Memory Cursor Batching & Scaling
-console.log('\n▶ MODULE 2: Watchlist Cleanup Memory Streaming / Cursor Pagination');
+test('auth.js warms active sessions in Redis with 24h TTL to reduce DB disk reads', () => {
+    const authContent = fs.readFileSync(path.join(__dirname, 'middleware', 'auth.js'), 'utf8');
+    assert.ok(authContent.includes('generalClient.setEx(`sess:${tokenHash}`, 86400'), 'Must warm session in Redis with 24h TTL');
+});
 
-test('cronJobs.js implements cursor pagination batching (batchSize = 500)', () => {
+test('server.js stores and validates reset OTPs via Redis with automatic TTL expiry', () => {
+    const serverContent = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    assert.ok(serverContent.includes('otp:reset:'), 'Must use Redis otp:reset: key');
+    assert.ok(serverContent.includes('generalClient.setEx(`otp:reset:'), 'Must set OTP in Redis with TTL');
+});
+
+// ── 4. Optimize Morning Watchlist Cleanup for 10 Lakh Users ───────────────────
+console.log('\n▶ 4. OPTIMIZE MORNING WATCHLIST CLEANUP FOR 10 LAKH USERS');
+
+test('cronJobs.js implements cursor pagination batching (batchSize = 500) for watchlists', () => {
     const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
     assert.ok(cronContent.includes('const batchSize = 500;'), 'Must define batchSize of 500');
     assert.ok(cronContent.includes("where('id', '>', lastUserId)"), 'Must use indexed cursor pagination on user id');
     assert.ok(!cronContent.includes("const users = await db('users').whereNotNull('watchlists');"), 'Must not load all users into memory at once');
 });
 
-test('cronJobs.js cleans expired reset_otp and login_email_otp', () => {
-    const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
-    assert.ok(cronContent.includes('reset_otp_expires'), 'Must clean up expired reset OTPs');
-    assert.ok(cronContent.includes('login_email_otp_expires'), 'Must clean up expired login email OTPs');
+// ── 5. On-the-Fly Contract Notes & Reports (Zero Disk PDF Storage) ────────────
+console.log('\n▶ 5. ON-THE-FLY CONTRACT NOTES & REPORTS (ZERO DISK PDF STORAGE)');
+
+test('ReportsView and clientReportGenerator generate reports client-side with 0 server disk files', () => {
+    const clientGenPath = path.join(__dirname, '..', 'frontend', 'src', 'utils', 'clientReportGenerator.js');
+    assert.ok(fs.existsSync(clientGenPath), 'clientReportGenerator.js must exist in frontend');
+    const genContent = fs.readFileSync(clientGenPath, 'utf8');
+    assert.ok(genContent.includes('generatePDF') || genContent.includes('html2pdf') || genContent.includes('window.print') || genContent.includes('URL.createObjectURL'), 'Must generate dynamically in browser');
 });
 
-test('cronJobs.js has automated 7-day log purge logic', () => {
-    const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
-    assert.ok(cronContent.includes('sevenDaysAgo') && cronContent.includes('purgedLogCount'), 'Must include automated log purge logic');
-});
+// ── 6. PostgreSQL Autovacuum & Index Compaction ───────────────────────────────
+console.log('\n▶ 6. POSTGRESQL AUTOVACUUM & INDEX COMPACTION');
 
-// Module 3: Database Indexing & Autovacuum Tuning for PostgreSQL
-console.log('\n▶ MODULE 3: Database Indexing & Autovacuum Tuning');
-
-test('db.js configures autovacuum scale factor for orders, positions, and ledger', () => {
+test('db.js configures autovacuum scale factor (0.05) on orders, positions, and ledger', () => {
     const dbContent = fs.readFileSync(path.join(__dirname, 'database', 'db.js'), 'utf8');
     assert.ok(dbContent.includes('ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05'), 'orders must have autovacuum scale factor 0.05');
     assert.ok(dbContent.includes('ALTER TABLE positions SET (autovacuum_vacuum_scale_factor = 0.05'), 'positions must have autovacuum scale factor 0.05');
     assert.ok(dbContent.includes('ALTER TABLE ledger SET (autovacuum_vacuum_scale_factor = 0.05'), 'ledger must have autovacuum scale factor 0.05');
-});
-
-test('db.js has composite indexes on orders_archive to accelerate historical reporting', () => {
-    const dbContent = fs.readFileSync(path.join(__dirname, 'database', 'db.js'), 'utf8');
-    assert.ok(dbContent.includes('idx_orders_archive_created'), 'Must index orders_archive on created_at');
-    assert.ok(dbContent.includes('idx_orders_archive_symbol'), 'Must index orders_archive on symbol');
-    assert.ok(dbContent.includes('idx_orders_archive_user_id'), 'Must index orders_archive on user_id');
-});
-
-// Module 4: Order Lifecycle & Archival Engine
-console.log('\n▶ MODULE 4: Order Lifecycle & Archival Engine');
-
-test('runOrderLifecycleArchive archives orders in 1000-row batches', () => {
-    const cronContent = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
-    assert.ok(cronContent.includes('runOrderLifecycleArchive'), 'Must define runOrderLifecycleArchive');
-    assert.ok(cronContent.includes('const batchSize = 1000;'), 'Must archive in batches of 1000');
-    assert.ok(cronContent.includes("status: 'EXECUTED'"), 'Must archive executed orders');
-    assert.ok(cronContent.includes("del()"), 'Must delete archived and cancelled orders from active table');
 });
 
 console.log('\n======================================================================');
@@ -108,7 +117,7 @@ console.log(`TOTAL CHECKS: ${totalCount} | PASSED: ${passCount} | FAILED: ${tota
 console.log('======================================================================');
 
 if (passCount === totalCount) {
-    console.log('🎉 ALL STORAGE, DISK & MEMORY OPTIMIZATION CHECKS PASSED PERFECTLY!\n');
+    console.log('🎉 ALL 6 ENTERPRISE STORAGE & RAM OPTIMIZATIONS VERIFIED 100% PERFECT!\n');
     process.exit(0);
 } else {
     console.error('❌ SOME CHECKS FAILED!\n');

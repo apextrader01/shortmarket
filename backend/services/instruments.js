@@ -13,11 +13,18 @@ let globalBseSpots = {};
 
 async function loadInstrumentMaster() {
     try {
-        console.log('🔌 Loading instruments master into PostgreSQL...');
+        console.log('🔌 Checking instruments master in PostgreSQL...');
         const db = require('../database/db');
         
         // Wait for DB schema to be ready (rudimentary check)
         await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Skip loading 13MB+ of monolithic JSON files if Postgres instruments table is already populated
+        const existingCheck = await db('instruments').count('token as count').first().catch(() => null);
+        if (existingCheck && Number(existingCheck.count) > 5000 && process.env.FORCE_INSTRUMENT_SYNC !== 'true') {
+            console.log(`⚡ PostgreSQL instruments table already populated (${existingCheck.count} scrips). Skipping redundant JSON disk read & RAM allocation.`);
+            return;
+        }
         
         let nseStocks = [];
         try {

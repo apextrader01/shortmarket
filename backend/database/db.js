@@ -1095,8 +1095,108 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_created ON ledger(user_id, created_at DESC, id DESC)');
 
     console.log('✅ Critical columns, high-performance indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
+    
+    // Initialize enterprise monthly table partitioning (orders_archive & ledger_archive)
+    await ensureMonthlyPartitions();
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
+  }
+}
+
+/**
+ * Enterprise Monthly Table Partitioning (orders_archive & ledger_archive)
+ * Automatically provisions monthly partition tables (e.g. orders_archive_2026_09, ledger_archive_2026_09)
+ * with strict date range CHECK constraints and composite indexes.
+ * In PostgreSQL, table inheritance + constraint exclusion ensures queries for a single month only scan that month's partition.
+ */
+async function ensureMonthlyPartitions() {
+  try {
+    // 1. Ensure master archive tables exist
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS orders_archive (
+        id BIGINT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        symbol VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        side VARCHAR(10) NOT NULL,
+        product_type VARCHAR(20) DEFAULT 'DEL',
+        trigger_type VARCHAR(50) DEFAULT 'REGULAR',
+        quantity DECIMAL(14, 4) NOT NULL,
+        price DECIMAL(14, 2),
+        status VARCHAR(50) NOT NULL DEFAULT 'EXECUTED',
+        trigger_price DECIMAL(14, 2),
+        sl_price DECIMAL(14, 2),
+        tgt_price DECIMAL(14, 2),
+        trail_amount DECIMAL(14, 2),
+        margin DECIMAL(14, 2) DEFAULT 0,
+        realized_pnl DECIMAL(14, 2) DEFAULT 0,
+        taxes DECIMAL(14, 2) DEFAULT 0,
+        parent_order_id INTEGER,
+        linked_order_id INTEGER,
+        filled_quantity DECIMAL(14, 4) DEFAULT 0,
+        pending_quantity DECIMAL(14, 4),
+        average_price DECIMAL(14, 2),
+        order_variety VARCHAR(50) DEFAULT 'REGULAR',
+        remarks TEXT DEFAULT '',
+        is_exit BOOLEAN DEFAULT FALSE,
+        archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS ledger_archive (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14, 2) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+
+    // 2. Pre-create monthly partition tables for past 2 months, current month, and next 2 months
+    const now = new Date();
+    const monthOffsets = [-2, -1, 0, 1, 2];
+
+    for (const offset of monthOffsets) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      const year = targetDate.getFullYear();
+      const monthNum = targetDate.getMonth() + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+      const suffix = `${year}_${monthStr}`;
+
+      const nextMonthDate = new Date(year, targetDate.getMonth() + 1, 1);
+      const nextMonthStr = String(nextMonthDate.getMonth() + 1).padStart(2, '0');
+      const startStr = `${year}-${monthStr}-01 00:00:00`;
+      const endStr = `${nextMonthDate.getFullYear()}-${nextMonthStr}-01 00:00:00`;
+
+      // Monthly Partition for orders_archive
+      const ordersPartitionTable = `orders_archive_${suffix}`;
+      await db.raw(`
+        CREATE TABLE IF NOT EXISTS ${ordersPartitionTable} (
+          CHECK (created_at >= '${startStr}' AND created_at < '${endStr}')
+        ) INHERITS (orders_archive)
+      `).catch(() => {});
+      await db.raw(`CREATE INDEX IF NOT EXISTS idx_${ordersPartitionTable}_user_created ON ${ordersPartitionTable}(user_id, created_at DESC)`).catch(() => {});
+      await db.raw(`CREATE INDEX IF NOT EXISTS idx_${ordersPartitionTable}_symbol ON ${ordersPartitionTable}(symbol)`).catch(() => {});
+
+      // Monthly Partition for ledger_archive
+      const ledgerPartitionTable = `ledger_archive_${suffix}`;
+      await db.raw(`
+        CREATE TABLE IF NOT EXISTS ${ledgerPartitionTable} (
+          CHECK (created_at >= '${startStr}' AND created_at < '${endStr}')
+        ) INHERITS (ledger_archive)
+      `).catch(() => {});
+      await db.raw(`CREATE INDEX IF NOT EXISTS idx_${ledgerPartitionTable}_user_created ON ${ledgerPartitionTable}(user_id, created_at DESC)`).catch(() => {});
+    }
+
+    console.log('✅ Enterprise monthly partitions (orders_archive & ledger_archive) synchronized');
+  } catch (err) {
+    console.error('ensureMonthlyPartitions error (non-fatal):', err.message);
   }
 }
 
@@ -1106,6 +1206,7 @@ initSchema()
   .catch(err => console.error('ensureCriticalColumns error:', err?.message || err));
 
 db.ensureCriticalColumns = ensureCriticalColumns;
+db.ensureMonthlyPartitions = ensureMonthlyPartitions;
 db.initSchema = initSchema;
 
 module.exports = db;

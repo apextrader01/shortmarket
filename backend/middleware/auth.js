@@ -174,6 +174,19 @@ async function authenticateToken(req, res, next) {
 
         // Upsert user_sessions entry to keep device security manager synchronized
         if (tokenHash) {
+          // Warm session in Redis with 24-hour TTL for lightning-fast memory checks
+          try {
+            const { generalClient } = require('../services/redisClient');
+            if (generalClient && generalClient.isOpen) {
+              generalClient.setEx(`sess:${tokenHash}`, 86400, JSON.stringify({
+                userId: user.id,
+                deviceModel,
+                clientIp,
+                ts: Date.now()
+              })).catch(() => {});
+            }
+          } catch (rErr) {}
+
           db('user_sessions')
             .where({ token_hash: tokenHash })
             .first()
