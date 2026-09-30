@@ -1353,7 +1353,10 @@ async function runOrderLifecycleArchive(cutoffDays = 30) {
         // Step 3: Archive completed ledger entries older than 90 days to ledger_archive
         const ledgerArchived = await runLedgerLifecycleArchive(90);
 
-        return { purged: purgedCount || 0, archived: totalArchived, ledgerArchived };
+        // Step 4: Archive closed positions (quantity === 0) older than 30 days to positions_archive
+        const positionsArchived = await runPositionsLifecycleArchive(30);
+
+        return { purged: purgedCount || 0, archived: totalArchived, ledgerArchived, positionsArchived };
     } catch (err) {
         console.error('❌ [CRON 08:05 AM] runOrderLifecycleArchive error:', err.message);
         throw err;
@@ -1424,6 +1427,76 @@ async function runLedgerLifecycleArchive(cutoffDays = 90) {
     }
 }
 
+/**
+ * Archive closed positions (quantity === 0) older than cutoffDays (default 30 days) into positions_archive table
+ * to keep the active positions table ultra-lean and query response under 5ms.
+ */
+async function runPositionsLifecycleArchive(cutoffDays = 30) {
+    try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - cutoffDays);
+
+        let totalArchived = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            const oldPositions = await db('positions')
+                .where({ quantity: 0 })
+                .where('updated_at', '<', cutoffDate)
+                .orderBy('id', 'asc')
+                .limit(batchSize);
+
+            if (!oldPositions || oldPositions.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            const positionIds = oldPositions.map(p => p.id);
+            const now = new Date();
+            const archiveRecords = oldPositions.map(pos => ({
+                id: pos.id,
+                user_id: pos.user_id,
+                symbol: pos.symbol,
+                quantity: pos.quantity,
+                closed_quantity: pos.closed_quantity || 0,
+                average_price: pos.average_price,
+                exit_price: pos.exit_price,
+                product_type: pos.product_type || 'INT',
+                margin: pos.margin || 0,
+                realized_pnl: pos.realized_pnl || 0,
+                created_at: pos.created_at,
+                updated_at: pos.updated_at,
+                archived_at: now
+            }));
+
+            await db.transaction(async (trx) => {
+                await trx('positions_archive')
+                    .insert(archiveRecords)
+                    .onConflict('id')
+                    .ignore();
+
+                await trx('positions')
+                    .whereIn('id', positionIds)
+                    .del();
+            });
+
+            totalArchived += oldPositions.length;
+            if (oldPositions.length < batchSize) {
+                hasMore = false;
+            }
+        }
+
+        if (totalArchived > 0) {
+            console.log(`📦 [CRON 08:05 AM] Step 4: Archived ${totalArchived} closed positions (> ${cutoffDays} days) to positions_archive.`);
+        }
+        return totalArchived;
+    } catch (err) {
+        console.error('❌ [CRON 08:05 AM] runPositionsLifecycleArchive error:', err.message);
+        return 0;
+    }
+}
+
 module.exports = {
     initCronJobs,
     isIntradayBlocked,
@@ -1433,5 +1506,6 @@ module.exports = {
     executeCasOpeningMatch,
     updateWeeklyCasStocksList,
     runOrderLifecycleArchive,
-    runLedgerLifecycleArchive
+    runLedgerLifecycleArchive,
+    runPositionsLifecycleArchive
 };

@@ -16,8 +16,8 @@ const dbConfig = {
   client: 'pg',
   connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
   pool: { 
-    min: 2, 
-    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 25,
+    min: process.env.DB_POOL_MIN ? parseInt(process.env.DB_POOL_MIN) : 2, 
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 35,
     idleTimeoutMillis: 30000,
     createTimeoutMillis: 5000,
     acquireTimeoutMillis: 10000,
@@ -870,6 +870,10 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_archive_user_created ON ledger_archive(user_id, created_at DESC)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_created_at ON ledger(created_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_type_created ON ledger(type, created_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_qty_updated ON positions(user_id, quantity, updated_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_qty_updated ON positions(quantity, updated_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_created ON deposit_requests(user_id, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_archive_user_updated ON positions_archive(user_id, updated_at DESC)').catch(() => {});
 
     // Autovacuum Tuning: Automatically clean up dead tuples from frequent order/position updates to prevent disk bloat
     await db.raw('ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
@@ -877,6 +881,9 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE ledger SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     await db.raw('ALTER TABLE orders_archive SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     await db.raw('ALTER TABLE ledger_archive SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+    await db.raw('ALTER TABLE positions_archive SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+    await db.raw('ALTER TABLE user_sessions SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+    await db.raw('ALTER TABLE trusted_devices SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     
     // System Settings Table (for Admin market toggles, maintenance mode, etc.)
     await db.raw(`
@@ -1165,8 +1172,27 @@ async function ensureMonthlyPartitions() {
       )
     `).catch(() => {});
 
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS positions_archive (
+        id BIGINT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol VARCHAR(255) NOT NULL,
+        quantity DECIMAL(14, 4) NOT NULL DEFAULT 0,
+        closed_quantity DECIMAL(14, 4) DEFAULT 0,
+        average_price DECIMAL(14, 2) NOT NULL,
+        exit_price DECIMAL(14, 2),
+        product_type VARCHAR(20) DEFAULT 'INT',
+        margin DECIMAL(14, 2) DEFAULT 0,
+        realized_pnl DECIMAL(14, 2) DEFAULT 0,
+        archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_archive_user_created ON orders_archive(user_id, created_at DESC)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_archive_user_created ON ledger_archive(user_id, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_archive_user_updated ON positions_archive(user_id, updated_at DESC)').catch(() => {});
 
     // 2. Pre-create monthly partition tables for past 2 months, current month, and next 2 months
     const now = new Date();
@@ -1202,9 +1228,19 @@ async function ensureMonthlyPartitions() {
         ) INHERITS (ledger_archive)
       `).catch(() => {});
       await db.raw(`CREATE INDEX IF NOT EXISTS idx_${ledgerPartitionTable}_user_created ON ${ledgerPartitionTable}(user_id, created_at DESC)`).catch(() => {});
+
+      // Monthly Partition for positions_archive
+      const positionsPartitionTable = `positions_archive_${suffix}`;
+      await db.raw(`
+        CREATE TABLE IF NOT EXISTS ${positionsPartitionTable} (
+          CHECK (updated_at >= '${startStr}' AND updated_at < '${endStr}')
+        ) INHERITS (positions_archive)
+      `).catch(() => {});
+      await db.raw(`CREATE INDEX IF NOT EXISTS idx_${positionsPartitionTable}_user_updated ON ${positionsPartitionTable}(user_id, updated_at DESC)`).catch(() => {});
+      await db.raw(`CREATE INDEX IF NOT EXISTS idx_${positionsPartitionTable}_symbol ON ${positionsPartitionTable}(symbol)`).catch(() => {});
     }
 
-    console.log('✅ Enterprise monthly partitions (orders_archive & ledger_archive) synchronized');
+    console.log('✅ Enterprise monthly partitions (orders_archive, ledger_archive & positions_archive) synchronized');
   } catch (err) {
     console.error('ensureMonthlyPartitions error (non-fatal):', err.message);
   }

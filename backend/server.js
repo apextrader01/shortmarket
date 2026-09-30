@@ -1915,7 +1915,13 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
 
     const [userRow, positionsRows, holdingsRows, sipsRows, activeOrders, todayOrders, recentOrders] = await Promise.all([
       db('users').where({ id: userId }).first(),
-      db('positions').where({ user_id: userId }),
+      db('positions')
+        .where({ user_id: userId })
+        .where(function() {
+          this.whereNot({ quantity: 0 })
+            .orWhere('updated_at', '>=', todayStartIST);
+        })
+        .orderBy('updated_at', 'desc'),
       db('holdings').where({ user_id: userId }).whereNot({ quantity: 0 }).orderBy('id', 'desc'),
       db('sips').where({ user_id: userId }),
       // 1. ALL active/open/pending orders - ZERO truncation, guarantee 100% presence
@@ -4099,7 +4105,33 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
 // ─── Positions ────────────────────────────────────────────────────────────
 app.get('/api/positions', authenticateToken, async (req, res) => {
   try {
-    const positions = await db('positions').where({ user_id: req.user.id });
+    const isFull = req.query.all === 'true' || req.query.export === 'true';
+    const limit = isFull ? (parseInt(req.query.limit) || 5000) : (parseInt(req.query.limit) || 200);
+    const todayStartIST = getTradingSessionStartIST();
+
+    let positions;
+    if (isFull) {
+      const [activeAndRecent, archived] = await Promise.all([
+        db('positions').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit),
+        db('positions_archive').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit).catch(() => [])
+      ]);
+      const map = new Map();
+      (activeAndRecent || []).forEach(p => map.set(p.id, p));
+      (archived || []).forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
+      positions = Array.from(map.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else {
+      const [openPos, todayClosedPos, recentClosedPos] = await Promise.all([
+        db('positions').where({ user_id: req.user.id }).whereNot({ quantity: 0 }),
+        db('positions').where({ user_id: req.user.id }).where({ quantity: 0 }).where('updated_at', '>=', todayStartIST),
+        db('positions').where({ user_id: req.user.id }).where({ quantity: 0 }).orderBy('updated_at', 'desc').limit(50)
+      ]);
+      const map = new Map();
+      (openPos || []).forEach(p => map.set(p.id, p));
+      (todayClosedPos || []).forEach(p => map.set(p.id, p));
+      (recentClosedPos || []).forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
+      positions = Array.from(map.values()).sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+    }
+
     const formatted = positions.map(p => ({
       ...p,
       quantity: Number(p.quantity),
