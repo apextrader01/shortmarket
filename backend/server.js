@@ -5445,7 +5445,8 @@ let lastOrderError = null;
 
 app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   lastOrderError = null;
-  const symbol = req.body.symbol;
+  try {
+    const symbol = req.body.symbol;
   const type = req.body.type || req.body.orderType;
   const side = req.body.side;
 
@@ -5944,8 +5945,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
-  try {
-    await db.transaction(async (trx) => {
+  await db.transaction(async (trx) => {
       // Serialize order operations per-user to prevent race conditions with execution/cancel
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
 
@@ -7366,7 +7366,8 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
 
 // 🧺 Place Basket Order 🧺───────────────────────────────────────────────────────
 app.post('/api/basket-order', authenticateToken, async (req, res) => {
-  const { items, total_margin } = req.body;
+  try {
+    const { items, total_margin } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Basket is empty' });
   }
@@ -7537,8 +7538,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     }
   }
 
-  try {
-    await db.transaction(async (trx) => {
+  await db.transaction(async (trx) => {
       // Advisory transaction lock per-user to eliminate concurrency double-spending
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
 

@@ -445,7 +445,7 @@ const OptionChainViewInternal = () => {
         side,
         quantity: 1,
         lotsize: getInstantLotsize(legData.symbol),
-        price: legData.ltp,
+        price: legData.ltp || 0,
         iv: legData.iv || 0.2
       };
     };

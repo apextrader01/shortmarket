@@ -397,7 +397,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                         style={{ width: '60px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: '#fff', padding: '4px 8px', borderRadius: '4px', textAlign: 'center' }}
                       />
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{leg.price.toFixed(1)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(leg.price ?? 0).toFixed(1)}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       <button onClick={() => onRemoveLeg(i)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                         <i className="fi fi-rr-trash"></i>

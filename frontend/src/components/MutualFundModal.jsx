@@ -82,7 +82,7 @@ export default function MutualFundModal({ fund, onClose }) {
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)' }}>{fund.name}</h2>
             <div style={{ display: 'flex', gap: '24px', fontSize: '13px' }}>
-                <div>NAV: <span style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '15px' }}>₹{fund.nav.toFixed(2)}</span></div>
+                <div>NAV: <span style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '15px' }}>₹{(fund.nav ?? 0).toFixed(2)}</span></div>
                 <div>3Y Return: <span style={{ color: 'var(--color-green-light)', fontWeight: '700', fontSize: '15px' }}>+{fund.return3y}%</span></div>
             </div>
           </div>

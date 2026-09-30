@@ -413,7 +413,7 @@ export default function ChartWidget() {
               onMouseOver={e => e.currentTarget.style.background = '#d64530'}
               onMouseOut={e => e.currentTarget.style.background = '#F0533C'}
             >
-              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price?.ltp !== undefined && price?.ltp !== null ? Number(price.ltp).toFixed(2) : '--'}</div>
               <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>SELL</div>
               <div style={{ fontSize: '8px', opacity: 0.8 }}>Shift+S</div>
             </button>
@@ -429,7 +429,7 @@ export default function ChartWidget() {
               onMouseOver={e => e.currentTarget.style.background = '#0d9b73'}
               onMouseOut={e => e.currentTarget.style.background = '#0FB384'}
             >
-              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price?.ltp !== undefined && price?.ltp !== null ? Number(price.ltp).toFixed(2) : '--'}</div>
               <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>BUY</div>
               <div style={{ fontSize: '8px', opacity: 0.8 }}>Shift+B</div>
             </button>
