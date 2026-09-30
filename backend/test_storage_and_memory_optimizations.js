@@ -112,6 +112,21 @@ test('db.js configures autovacuum scale factor (0.05) on orders, positions, and 
     assert.ok(dbContent.includes('ALTER TABLE ledger SET (autovacuum_vacuum_scale_factor = 0.05'), 'ledger must have autovacuum scale factor 0.05');
 });
 
+// ── 7. Seamless Active & Archive Data Bridging ───────────────────────────────
+console.log('\n▶ 7. SEAMLESS ACTIVE & ARCHIVE DATA BRIDGING (HISTORICAL REPORTS GUARANTEE)');
+
+test('server.js GET /api/orders supplements from orders_archive (monthly partitions)', () => {
+    const serverContent = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    assert.ok(serverContent.includes("db('orders_archive')"), 'GET /api/orders must query orders_archive for older orders');
+    assert.ok(serverContent.includes('ordersMap.has(o.id)'), 'Must deduplicate and merge archived orders seamlessly');
+});
+
+test('server.js GET /api/ledger supplements from ledger_archive (monthly partitions)', () => {
+    const serverContent = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    assert.ok(serverContent.includes("db('ledger_archive')"), 'GET /api/ledger must query ledger_archive for older statements');
+    assert.ok(serverContent.includes('ledger.push(...archivedLedger)'), 'Must append archived ledger records for reports');
+});
+
 console.log('\n======================================================================');
 console.log(`TOTAL CHECKS: ${totalCount} | PASSED: ${passCount} | FAILED: ${totalCount - passCount}`);
 console.log('======================================================================');

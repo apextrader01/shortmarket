@@ -5357,6 +5357,20 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
     (recentOrders || []).forEach(o => {
       if (!ordersMap.has(o.id)) ordersMap.set(o.id, o);
     });
+
+    // Seamlessly supplement from orders_archive (monthly partitions) if room remains in limit
+    if (ordersMap.size < limit) {
+      try {
+        const archivedOrders = await db('orders_archive')
+          .where({ user_id: req.user.id })
+          .orderBy('created_at', 'desc')
+          .limit(limit - ordersMap.size);
+        (archivedOrders || []).forEach(o => {
+          if (!ordersMap.has(o.id)) ordersMap.set(o.id, o);
+        });
+      } catch (archErr) {}
+    }
+
     const orders = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     res.json(orders);
   } catch (err) {
@@ -7291,6 +7305,21 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
       .orderBy('created_at', 'desc')
       .orderBy('id', 'desc')
       .limit(fetchLimit);
+
+    // Seamlessly supplement from ledger_archive (monthly partitions) if room remains in fetchLimit
+    if (ledger.length < fetchLimit) {
+      try {
+        let archQuery = db('ledger_archive').where({ user_id: req.user.id });
+        if (filterType === 'Credits') archQuery = archQuery.where('amount', '>', 0);
+        else if (filterType === 'Debits') archQuery = archQuery.where('amount', '<', 0);
+        if (startDate) archQuery = archQuery.where('created_at', '>=', startDate);
+        if (endDate) archQuery = archQuery.where('created_at', '<=', endDate);
+        const archivedLedger = await archQuery.orderBy('created_at', 'desc').limit(fetchLimit - ledger.length);
+        if (archivedLedger && archivedLedger.length > 0) {
+          ledger.push(...archivedLedger);
+        }
+      } catch (archErr) {}
+    }
 
     if (ledger && ledger.length > 0) {
       const chronological = [...ledger].reverse();
