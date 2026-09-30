@@ -2755,6 +2755,101 @@ app.post('/api/admin/master_square_off', authenticateToken, async (req, res) => 
   }
 });
 
+// ─── Staging Environment Power Management (ON / OFF / Status) ────────────────
+app.get('/api/admin/staging-power', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+
+    const { exec } = require('child_process');
+    const PM2_BIN = 'PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(node -v 2>/dev/null)/bin pm2';
+
+    exec(`${PM2_BIN} jlist`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      if (err) {
+        return res.json({ success: true, running: false, status: 'stopped', note: 'PM2 query returned error or not running' });
+      }
+      try {
+        const list = JSON.parse(stdout);
+        const stagingApp = Array.isArray(list) ? list.find(a => a.name === 'skandx-backend-staging') : null;
+        if (!stagingApp) {
+          return res.json({ success: true, running: false, status: 'stopped', note: 'App not registered in PM2' });
+        }
+
+        const status = stagingApp.pm2_env?.status || 'stopped';
+        const isRunning = status === 'online';
+        const memoryMB = stagingApp.monit?.memory ? (stagingApp.monit.memory / (1024 * 1024)).toFixed(1) : '0';
+        const cpuPct = stagingApp.monit?.cpu !== undefined ? stagingApp.monit.cpu : 0;
+        const uptime = stagingApp.pm2_env?.pm_uptime ? Math.floor((Date.now() - stagingApp.pm2_env.pm_uptime) / 1000) : 0;
+
+        return res.json({
+          success: true,
+          running: isRunning,
+          status,
+          memoryMB,
+          cpuPct,
+          uptime
+        });
+      } catch (parseErr) {
+        return res.json({ success: true, running: false, status: 'stopped' });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/staging-power', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+
+    const { action } = req.body || {};
+    if (!['start', 'stop', 'restart'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Allowed: start, stop, restart' });
+    }
+
+    const { exec } = require('child_process');
+    const PM2_BIN = 'PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(node -v 2>/dev/null)/bin pm2';
+
+    let execCmd = '';
+    if (action === 'stop') {
+      execCmd = `${PM2_BIN} stop skandx-backend-staging`;
+    } else if (action === 'start') {
+      execCmd = `${PM2_BIN} start skandx-backend-staging 2>/dev/null || (cd ~/shortmarket-staging/backend && ${PM2_BIN} start ecosystem.config.js)`;
+    } else if (action === 'restart') {
+      execCmd = `${PM2_BIN} restart skandx-backend-staging`;
+    }
+
+    exec(execCmd, (cmdErr) => {
+      // Re-read status after command execution
+      setTimeout(() => {
+        exec(`${PM2_BIN} jlist`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+          let isRunning = action !== 'stop';
+          let status = action === 'stop' ? 'stopped' : 'online';
+          try {
+            const list = JSON.parse(stdout);
+            const stagingApp = Array.isArray(list) ? list.find(a => a.name === 'skandx-backend-staging') : null;
+            if (stagingApp) {
+              status = stagingApp.pm2_env?.status || status;
+              isRunning = status === 'online';
+            }
+          } catch (_) {}
+
+          return res.json({
+            success: true,
+            action,
+            running: isRunning,
+            status,
+            message: `Staging environment successfully ${action === 'stop' ? 'STOPPED (Sleeping)' : action === 'start' ? 'STARTED (Live)' : 'RESTARTED'}.`
+          });
+        });
+      }, 1000);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/admin/heal-referrals', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
@@ -10144,8 +10239,13 @@ server.listen(PORT, async () => {
       }, 5 * 60 * 1000);
       // ---------------------------------
 
-      // Update options master in background
-      updateOptionsMaster().catch(e => console.error(e));
+      // ⚡ Lightweight Staging Check: Staging only needs basic trade testing, skip heavy background downloads
+      const isStagingEnv = process.env.NODE_ENV === 'staging' || process.env.PORT == 5001;
+
+      // Update options master in background (Production only to save staging CPU/RAM)
+      if (!isStagingEnv) {
+        updateOptionsMaster().catch(e => console.error(e));
+      }
     
     // Start Cron Jobs
     const { startSquareOffJobs } = require('./services/autoSquareOff');
@@ -10185,17 +10285,19 @@ server.listen(PORT, async () => {
       } catch(e) { console.error('Backup auto-login cron error:', e); }
     });
 
-    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun)
-    const optionsMorningRule = new schedule.RecurrenceRule();
-    optionsMorningRule.hour = 8;
-    optionsMorningRule.minute = 15;
-    optionsMorningRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(optionsMorningRule, async () => {
-      console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
-      try {
-        await updateOptionsMaster();
-      } catch(e) { console.error('Options Master update cron error:', e); }
-    });
+    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun) - Production only
+    if (!isStagingEnv) {
+      const optionsMorningRule = new schedule.RecurrenceRule();
+      optionsMorningRule.hour = 8;
+      optionsMorningRule.minute = 15;
+      optionsMorningRule.tz = 'Asia/Kolkata';
+      schedule.scheduleJob(optionsMorningRule, async () => {
+        console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
+        try {
+          await updateOptionsMaster();
+        } catch(e) { console.error('Options Master update cron error:', e); }
+      });
+    }
 
     // RAM Optimization: Clean expired derivative contracts from priceCache daily at 08:05 AM IST
     async function cleanStaleOptionCache() {
@@ -10252,7 +10354,9 @@ server.listen(PORT, async () => {
     startSquareOffJobs();
     initRiskyStocksSync();
     initOrderExecutor(priceCache);
-    SIPEngine.init(priceCache);
+    if (!isStagingEnv) {
+      SIPEngine.init(priceCache);
+    }
 
     // Auto-heal user email casing and link orphaned referrals
     async function autoHealReferralsAndUsers() {

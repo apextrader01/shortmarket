@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle, Trophy, Gift, Award, Send, ShieldAlert, Loader2, Save, Bell } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle, Trophy, Gift, Award, Send, ShieldAlert, Loader2, Save, Bell, Power } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
@@ -1307,8 +1307,66 @@ export default function AdminDashboard() {
   const [marketUpdating, setMarketUpdating] = useState(false);
   const isMarketOpenNow = isMarketHours();
 
+  // Staging Environment Power States (1-Click Sleep / Wake)
+  const [stagingRunning, setStagingRunning] = useState(false);
+  const [stagingLoading, setStagingLoading] = useState(false);
+  const [stagingDetail, setStagingDetail] = useState(null);
+
+  const fetchStagingPowerStatus = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/staging-power`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setStagingRunning(!!data.running);
+        setStagingDetail(data);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch staging power status:', e);
+    }
+  };
+
+  const handleToggleStagingPower = async () => {
+    const nextAction = stagingRunning ? 'stop' : 'start';
+    const confirmMsg = stagingRunning
+      ? 'Are you sure you want to Turn OFF Staging?\n\nThis completely stops the staging backend process, saving 100% of its CPU and RAM. You can turn it back ON anytime.'
+      : 'Turn ON Staging backend for testing?\n\nIt will start in ~2 seconds.';
+    if (!window.confirm(confirmMsg)) return;
+
+    setStagingLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/staging-power`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ action: nextAction })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setStagingRunning(!!data.running);
+        setStagingDetail(data);
+        alert(`✅ Staging is now ${data.running ? 'ONLINE (Ready for testing)' : 'STOPPED (Sleeping, 0% CPU)'}!`);
+      } else {
+        alert('Failed: ' + (data?.error || 'Could not toggle staging power'));
+      }
+    } catch (err) {
+      alert('Error toggling staging power: ' + err.message);
+    } finally {
+      setStagingLoading(false);
+      fetchStagingPowerStatus();
+    }
+  };
+
   useEffect(() => {
     fetchMarketStatus?.();
+    fetchStagingPowerStatus();
     const checkFyers = async () => {
       try {
         const data = await fetchFyersStatus?.();
@@ -1317,7 +1375,10 @@ export default function AdminDashboard() {
       finally { setFyersLoading(false); }
     };
     checkFyers();
-    const interval = setInterval(checkFyers, 60000);
+    const interval = setInterval(() => {
+      checkFyers();
+      fetchStagingPowerStatus();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -2421,6 +2482,47 @@ export default function AdminDashboard() {
           >
             Connect Web
           </button>
+
+          {/* Staging Environment Power Toggle */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              background: 'rgba(255,255,255,0.04)', 
+              border: `1px solid ${stagingRunning ? 'rgba(34, 197, 94, 0.4)' : 'rgba(156, 163, 175, 0.25)'}`, 
+              borderRadius: '5px', 
+              padding: '2px 6px', 
+              height: '28px', 
+              gap: '6px' 
+            }}
+            title={stagingRunning ? `Staging Live (${stagingDetail?.memoryMB || 0} MB RAM, ${stagingDetail?.cpuPct || 0}% CPU). Click to sleep.` : "Staging is Stopped (0% CPU). Click to wake up."}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: '600', color: stagingRunning ? 'var(--color-green)' : 'var(--text-secondary)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: stagingRunning ? '#22c55e' : '#6b7280', boxShadow: stagingRunning ? '0 0 6px #22c55e' : 'none' }}></span>
+              Staging: {stagingRunning ? 'Live' : 'Off'}
+            </span>
+            <button
+              onClick={handleToggleStagingPower}
+              disabled={stagingLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                background: stagingRunning ? 'rgba(239, 68, 68, 0.18)' : 'rgba(34, 197, 94, 0.2)',
+                color: stagingRunning ? '#ef4444' : '#22c55e',
+                border: `1px solid ${stagingRunning ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.5)'}`,
+                borderRadius: '4px',
+                padding: '2px 7px',
+                fontSize: '10px',
+                fontWeight: '700',
+                cursor: stagingLoading ? 'wait' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {stagingLoading ? <RefreshCw size={10} className="animate-spin" /> : <Power size={10} />}
+              {stagingLoading ? '...' : (stagingRunning ? 'Turn Off' : 'Turn On')}
+            </button>
+          </div>
 
           <div className="input-group" style={{ width: '150px' }}>
             <Search size={12} style={{ position: 'absolute', left: '8px', top: '8px', color: 'var(--text-secondary)' }} />
