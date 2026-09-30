@@ -1541,17 +1541,18 @@ const DownloadReports = () => {
   useEffect(() => {
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     
-    fetch(`${API}/api/orders`, { headers, credentials: 'include' })
+    fetch(`${API}/api/orders?all=true`, { headers, credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setOrdersData(data);
       })
       .catch(() => {});
 
-    fetch(`${API}/api/ledger`, { headers, credentials: 'include' })
+    fetch(`${API}/api/ledger?all=true`, { headers, credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setLedgerData(data);
+        else if (data && Array.isArray(data.ledger)) setLedgerData(data.ledger);
       })
       .catch(() => {});
   }, [token]);

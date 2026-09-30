@@ -5357,7 +5357,10 @@ app.get('/api/options/futures/:symbol', async (req, res) => {
 // ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 5000;
+    const isFull = req.query.all === 'true' || req.query.export === 'true';
+    const requestedLimit = parseInt(req.query.limit);
+    const limit = isFull ? (requestedLimit || 5000) : (requestedLimit || 200);
+
     const activeOrderStatuses = [
       'PENDING', 
       'PARTIAL_FILLED', 
@@ -5368,12 +5371,30 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
       'AMO_PENDING', 
       'AMO_REQ_RECEIVED'
     ];
-    const [activeOrders, recentOrders] = await Promise.all([
-      db('orders').where({ user_id: req.user.id }).whereIn('status', activeOrderStatuses).orderBy('created_at', 'desc'),
-      db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit)
+
+    const todayStartIST = getTradingSessionStartIST();
+
+    const [activeOrders, todayOrders, recentOrders] = await Promise.all([
+      db('orders')
+        .where({ user_id: req.user.id })
+        .whereIn('status', activeOrderStatuses)
+        .orderBy('created_at', 'desc'),
+      db('orders')
+        .where({ user_id: req.user.id })
+        .where(function() {
+          this.where('created_at', '>=', todayStartIST)
+            .orWhere('updated_at', '>=', todayStartIST);
+        })
+        .orderBy('created_at', 'desc'),
+      db('orders')
+        .where({ user_id: req.user.id })
+        .orderBy('created_at', 'desc')
+        .limit(limit)
     ]);
+
     const ordersMap = new Map();
     (activeOrders || []).forEach(o => ordersMap.set(o.id, o));
+    (todayOrders || []).forEach(o => ordersMap.set(o.id, o));
     (recentOrders || []).forEach(o => {
       if (!ordersMap.has(o.id)) ordersMap.set(o.id, o);
     });
@@ -7320,7 +7341,9 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
     }
 
     // Fallback for non-paginated or export requests:
-    const fetchLimit = isExport ? 10000 : (parseInt(req.query.limit) || 5000);
+    const isFull = req.query.all === 'true' || isExport;
+    const requestedLimit = parseInt(req.query.limit);
+    const fetchLimit = isFull ? (requestedLimit || 10000) : (requestedLimit || 200);
     const ledger = await baseQuery
       .orderBy('created_at', 'desc')
       .orderBy('id', 'desc')
