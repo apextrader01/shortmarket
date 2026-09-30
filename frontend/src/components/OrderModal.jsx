@@ -5,7 +5,7 @@ import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag, AlertT
 import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
-import { getTodayRealizedMetrics } from '../utils/pnlHelper';
+import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
@@ -548,11 +548,9 @@ export default function OrderModal() {
     }
 
     if (user && user.risk_guardian_active && !orderModal.isExit) {
-      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
       const todayOrders = (orders || []).filter(o => {
         if (o.status !== 'COMPLETED' && o.status !== 'COMPLETE' && o.status !== 'EXECUTED') return false;
-        const oDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(o.created_at));
-        return oDate === todayIST;
+        return isToday(o.created_at);
       });
       const todayTradesCount = todayOrders.length;
       const { todayRealizedPnl } = getTodayRealizedMetrics(positions, orders);

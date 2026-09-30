@@ -121,6 +121,37 @@ function isValidPublicIp(ip) {
   return ipv4Pattern.test(clean) || ipv6Pattern.test(clean);
 }
 
+/**
+ * Returns the Date marking the start of the current trading session (07:55 AM IST).
+ * Any order or trade between 07:55 AM today and 07:54:59 AM tomorrow belongs to the same trading day.
+ */
+function getTradingSessionStartIST(refDate = new Date()) {
+  const d = new Date(refDate);
+  const formatter = new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'Asia/Kolkata', 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const getPart = (type) => parts.find(p => p.type === type)?.value;
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = parseInt(getPart('hour') || '0', 10);
+  const minute = parseInt(getPart('minute') || '0', 10);
+
+  let sessionStart = new Date(`${year}-${month}-${day}T07:55:00+05:30`);
+  if (hour < 7 || (hour === 7 && minute < 55)) {
+    sessionStart = new Date(sessionStart.getTime() - 24 * 60 * 60 * 1000);
+  }
+  return sessionStart;
+}
+
 function getClientIp(req, optionalBodyIp) {
   // 1. Trusted Reverse Proxy & Cloud Provider Headers
   const cfIp = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'];
@@ -1851,13 +1882,8 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       'AMO_REQ_RECEIVED'
     ];
 
-    // Compute start of today in IST (Asia/Kolkata timezone: UTC+5:30)
-    const istFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const parts = istFormatter.formatToParts(new Date());
-    const year = parts.find(p => p.type === 'year').value;
-    const month = parts.find(p => p.type === 'month').value;
-    const day = parts.find(p => p.type === 'day').value;
-    const todayStartIST = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+    // Compute start of active trading session in IST (07:55 AM cutoff)
+    const todayStartIST = getTradingSessionStartIST();
 
     const [userRow, positionsRows, holdingsRows, sipsRows, activeOrders, todayOrders, recentOrders] = await Promise.all([
       db('users').where({ id: userId }).first(),
@@ -5560,12 +5586,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         error: `🛡️ Risk Guardian is active. You can only place closing orders up to your open short position size (${Math.abs(Number(existingShortPos.quantity))} shares).`
       });
     }
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const parts = formatter.formatToParts(new Date());
-    const year = parts.find(p => p.type === 'year').value;
-    const month = parts.find(p => p.type === 'month').value;
-    const day = parts.find(p => p.type === 'day').value;
-    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+    const todayStart = getTradingSessionStartIST();
 
     // 1. Check Max Daily Trades Limit
     if (currentUser.max_daily_trades && currentUser.max_daily_trades > 0) {
@@ -9119,12 +9140,7 @@ app.get('/api/leaderboard', async (req, res) => {
         }
       }
     } else if (timeframe !== 'all_time') {
-      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-      const parts = formatter.formatToParts(new Date());
-      const year = parts.find(p => p.type === 'year').value;
-      const month = parts.find(p => p.type === 'month').value;
-      const day = parts.find(p => p.type === 'day').value;
-      const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+      const todayStart = getTradingSessionStartIST();
 
       query.where(builder => {
         builder.where('positions.created_at', '>=', todayStart).orWhere('positions.updated_at', '>=', todayStart);

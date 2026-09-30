@@ -16,6 +16,39 @@ const istDateFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit' 
 });
 
+const istTimeFormatter = new Intl.DateTimeFormat('en-CA', { 
+  timeZone: 'Asia/Kolkata', 
+  year: 'numeric', 
+  month: '2-digit', 
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+});
+
+/**
+ * Returns the timestamp marking the start of the current trading session (07:55 AM IST).
+ * Any trade between 07:55 AM today and 07:54:59 AM tomorrow belongs to the same trading day.
+ */
+export const getTradingSessionStartIST = (refDate = new Date()) => {
+  const d = new Date(refDate);
+  const parts = istTimeFormatter.formatToParts(d);
+  const getPart = (type) => parts.find(p => p.type === type)?.value;
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = parseInt(getPart('hour') || '0', 10);
+  const minute = parseInt(getPart('minute') || '0', 10);
+
+  let sessionStart = new Date(`${year}-${month}-${day}T07:55:00+05:30`);
+  // Before 07:55 AM IST, the active trading session belongs to yesterday's cycle
+  if (hour < 7 || (hour === 7 && minute < 55)) {
+    sessionStart = new Date(sessionStart.getTime() - 24 * 60 * 60 * 1000);
+  }
+  return sessionStart;
+};
+
 export const getISTDate = (date) => {
   if (!date) return '';
   try {
@@ -30,8 +63,13 @@ export const isToday = (dateString) => {
   if (!dateString) return false;
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return false;
-  const todayStr = getISTDate(new Date());
-  return getISTDate(d) === todayStr;
+  
+  const now = new Date();
+  const sessionStart = getTradingSessionStartIST(now);
+  const nextSessionStart = new Date(sessionStart.getTime() + 24 * 60 * 60 * 1000);
+  
+  // Active trading day: From 07:55 AM today until 07:55 AM tomorrow
+  return d.getTime() >= sessionStart.getTime() && d.getTime() < nextSessionStart.getTime();
 };
 
 /**

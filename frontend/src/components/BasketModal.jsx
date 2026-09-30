@@ -5,7 +5,7 @@ import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
-import { getTodayRealizedMetrics } from '../utils/pnlHelper';
+import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -690,11 +690,9 @@ export default function BasketModal() {
     }
 
     if (user && user.risk_guardian_active) {
-      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
       const todayOrders = (orders || []).filter(o => {
         if (o.status !== 'COMPLETED' && o.status !== 'COMPLETE' && o.status !== 'EXECUTED') return false;
-        const oDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(o.created_at));
-        return oDate === todayIST;
+        return isToday(o.created_at);
       });
       const todayTradesCount = todayOrders.length;
       const { todayRealizedPnl } = getTodayRealizedMetrics(positions, orders);
