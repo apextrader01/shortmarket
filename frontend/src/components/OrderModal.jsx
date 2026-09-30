@@ -1281,27 +1281,6 @@ export default function OrderModal() {
           </div>
         )}
 
-        {/* Exchange Freeze Limit Red Alert Banner (Matches Reference Screenshot) */}
-        {isExceedingFreezeLimit && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.12)',
-            borderTop: '1px solid rgba(239, 68, 68, 0.3)',
-            borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
-            padding: isMobile ? '8px 14px' : '9px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            textAlign: 'center'
-          }}>
-            <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
-            <span style={{ color: '#ef4444', fontSize: isMobile ? '12px' : '12.5px', fontWeight: '700' }}>
-              {orderModal.lotsize > 1
-                ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
-                : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`}
-            </span>
-          </div>
-        )}
 
         {/* Footer Bar */}
         <div style={{

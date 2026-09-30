@@ -51,7 +51,7 @@ export default function MarketDepthModal() {
   const handleOneClickOrder = (side) => {
     const totalQty = lotSize * (oneClickMultiplier || 1);
     const currentPrice = (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0;
-    const freezeLimit = getFreezeLimit(symbol);
+    const freezeLimit = getFreezeLimit(symbol, lotSize);
     const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotSize) * lotSize : totalQty;
 
     const buildPayload = (qty) => ({
@@ -68,7 +68,7 @@ export default function MarketDepthModal() {
     });
 
     if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
-      const slices = calculateOrderSlices(totalQty, lotSize, freezeLimit);
+      const slices = calculateOrderSlices(symbol, totalQty, lotSize);
       for (const sliceQty of slices) {
         placeOrder(buildPayload(sliceQty));
       }

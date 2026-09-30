@@ -133,6 +133,11 @@ check(
 );
 
 check(
+  'DOMLadderModal calls calculateOrderSlices with exact arguments (symbol, totalQty, lotsize)',
+  domLadderCode.includes('calculateOrderSlices(symbol, totalQty, lotsize)')
+);
+
+check(
   'DOMLadderModal auto-slices orders exceeding freeze limit',
   domLadderCode.includes('calculateOrderSlices(') && domLadderCode.includes('maxAllowedLots')
 );
@@ -167,8 +172,13 @@ check(
 );
 
 check(
+  'MarketDepthModal calls calculateOrderSlices with exact arguments (symbol, totalQty, lotSize)',
+  marketDepthCode.includes('calculateOrderSlices(symbol, totalQty, lotSize)')
+);
+
+check(
   'MarketDepthModal has handleOneClickOrder helper with freeze limit logic',
-  marketDepthCode.includes('handleOneClickOrder') && marketDepthCode.includes('getFreezeLimit(symbol)')
+  marketDepthCode.includes('handleOneClickOrder') && marketDepthCode.includes('getFreezeLimit(symbol')
 );
 
 check(
@@ -192,7 +202,31 @@ results.forEach(r => console.log(r));
 results.length = 0;
 console.log('');
 
-// ─── MODULE 5: Backend PositionsEngine Validation ───────────────────────────
+// ─── MODULE 5: OrderModal Single Clean Freeze Alert Banner ───────────────────
+
+console.log('▶ MODULE 5: OrderModal Clean Alert Banner (No Duplication)');
+
+const orderModalCode = fs.readFileSync(
+  path.join(__dirname, '..', 'frontend', 'src', 'components', 'OrderModal.jsx'), 'utf8'
+);
+
+// Count occurrences of max allowed lots per order (1 in submit validation alert, 1 in visual banner)
+const warningOccurrences = (orderModalCode.match(/Max allowed lots per order as per exchange is/g) || []).length;
+check(
+  'OrderModal has exactly 1 visual freeze limit alert banner (duplicate 3rd banner eliminated)',
+  warningOccurrences === 2 && !orderModalCode.includes('borderBottom: \'1px solid rgba(239, 68, 68, 0.3)\'')
+);
+
+check(
+  'OrderModal includes SET MAX clamp button within the single alert banner',
+  orderModalCode.includes('SET MAX') && orderModalCode.includes('setQuantity(orderModal.lotsize > 1 ? maxAllowedLots : freezeLimit)')
+);
+
+results.forEach(r => console.log(r));
+results.length = 0;
+console.log('');
+
+// ─── MODULE 6: Backend PositionsEngine Validation ───────────────────────────
 
 console.log('▶ MODULE 5: Backend PositionsEngine Critical Path Validation');
 

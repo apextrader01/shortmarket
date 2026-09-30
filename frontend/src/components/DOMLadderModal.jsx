@@ -118,12 +118,12 @@ export default function DOMLadderModal() {
   const handleOrder = (price, side) => {
     if (oneClickMode) {
       const totalQty = lotsize * (oneClickMultiplier || 1);
-      const freezeLimit = getFreezeLimit(symbol);
+      const freezeLimit = getFreezeLimit(symbol, lotsize);
       const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotsize) * lotsize : totalQty;
 
       if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
         // Auto-slice into compliant chunks
-        const slices = calculateOrderSlices(totalQty, lotsize, freezeLimit);
+        const slices = calculateOrderSlices(symbol, totalQty, lotsize);
         for (const sliceQty of slices) {
           placeOrder({
             symbol,
