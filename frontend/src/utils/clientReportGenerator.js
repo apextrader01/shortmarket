@@ -135,11 +135,27 @@ function isDerivativeFuture(sym) {
   return /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
 }
 
+export function isTradeExecutionOrder(o) {
+  if (!o) return false;
+  const s = String(o.status || '').toUpperCase();
+  const isComplete = s === 'COMPLETED' || s === 'COMPLETE' || s === 'EXECUTED';
+  const isPartial = s === 'PARTIAL_FILLED' || s === 'PARTIALLY_FILLED';
+  const hasFilledQty = Number(o.filled_quantity) > 0;
+  return isComplete || isPartial || hasFilledQty;
+}
+
+export function getTradedOrderQuantity(o) {
+  if (!o) return 0;
+  const filled = Number(o.filled_quantity);
+  if (!isNaN(filled) && filled > 0) return filled;
+  return Math.abs(Number(o.quantity) || 0);
+}
+
 /**
  * Standard Indian Regulatory Charges Calculator
  */
 export function calculateIndianCharges(order) {
-  const qty = Math.abs(Number(order.quantity) || 0);
+  const qty = getTradedOrderQuantity(order);
   const price = Math.abs(Number(order.average_price || order.price || order.execution_price || 0));
   const tradeValue = qty * price;
   const isDelivery = (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY');
@@ -410,7 +426,7 @@ export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], table
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateTaxPnLReport(orders = [], positions = [], user = {}, dateRange = 'FY 2025-26', format = 'excel', customStart = '', customEnd = '') {
   const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
-  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executed = filtered.filter(o => isTradeExecutionOrder(o) && getTradedOrderQuantity(o) > 0);
   
   const scripMap = {};
   executed.forEach(o => {
@@ -431,7 +447,7 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
         charges: 0
       };
     }
-    const qty = Math.abs(Number(o.quantity) || 0);
+    const qty = getTradedOrderQuantity(o);
     const price = Math.abs(Number(o.average_price || o.price || 0));
     const val = qty * price;
     const isBuy = (o.side === 'BUY' || o.type === 'BUY');
@@ -596,7 +612,7 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
 // ─────────────────────────────────────────────────────────────────────────────
 export function generatePnLSummaryReport(orders = [], positions = [], user = {}, dateRange = 'Current Month', format = 'excel', customStart = '', customEnd = '') {
   const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
-  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executed = filtered.filter(o => isTradeExecutionOrder(o) && getTradedOrderQuantity(o) > 0);
   
   const segments = {
     'Equity Intraday': { trades: 0, turnover: 0, grossPnl: 0, charges: 0 },
@@ -737,7 +753,7 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateTradesAndChargesReport(orders = [], user = {}, dateRange = 'Current Month', format = 'excel', customStart = '', customEnd = '') {
   const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
-  const rawExecuted = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const rawExecuted = filtered.filter(o => isTradeExecutionOrder(o) && getTradedOrderQuantity(o) > 0);
 
   // Consolidate sliced orders for reporting
   const groupMap = new Map();
@@ -770,20 +786,21 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
         groupId = `cluster_${cKey}`;
       }
     }
+    const oTradedQty = getTradedOrderQuantity(o);
     if (groupId) {
       if (!groupMap.has(groupId)) {
         const parent = {
           ...o,
           sliceCount: 1,
-          totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
-          quantity: Number(o.quantity) || 0
+          totalTradeValue: oTradedQty * (Number(o.average_price || o.price || 0)),
+          quantity: oTradedQty
         };
         groupMap.set(groupId, parent);
         executed.push(parent);
       } else {
         const parent = groupMap.get(groupId);
         parent.sliceCount += 1;
-        const q = Number(o.quantity) || 0;
+        const q = oTradedQty;
         const p = Number(o.average_price || o.price || 0);
         parent.quantity += q;
         parent.totalTradeValue += (q * p);
@@ -1092,8 +1109,10 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateContractNoteReport(orders = [], user = {}, tradeDate = new Date().toISOString().slice(0, 10), format = 'pdf') {
   const executed = (orders || []).filter(o => {
-    const isDone = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+    const isDone = isTradeExecutionOrder(o);
     if (!isDone) return false;
+    const tradedQty = getTradedOrderQuantity(o);
+    if (tradedQty <= 0) return false;
     const oDate = getISTDateString(o.created_at);
     return oDate === tradeDate;
   });
@@ -1122,16 +1141,19 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
     totalSEBI += ch.sebiFee;
     totalStamp += ch.stampDuty;
 
+    const actualQty = getTradedOrderQuantity(o);
+    const actualPrice = Math.abs(Number(o.average_price || o.price || 0));
+
     return {
       orderNo: o.id || `ORD${1000 + idx}`,
       tradeTime: safeFormatTime(o.created_at),
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',
-      qty: Math.abs(Number(o.quantity) || 0),
-      price: Math.abs(Number(o.average_price || o.price || 0)),
+      qty: actualQty,
+      price: actualPrice,
       tradeValue: ch.tradeValue,
       brokerage: ch.brokerage,
-      netRate: isBuy ? (Math.abs(Number(o.average_price || o.price || 0)) + ch.brokerage / (Math.abs(Number(o.quantity)) || 1)) : (Math.abs(Number(o.average_price || o.price || 0)) - ch.brokerage / (Math.abs(Number(o.quantity)) || 1)),
+      netRate: isBuy ? (actualPrice + ch.brokerage / (actualQty || 1)) : (actualPrice - ch.brokerage / (actualQty || 1)),
       netTotal: isBuy ? (ch.tradeValue + ch.totalCharges) : (ch.tradeValue - ch.totalCharges)
     };
   });
