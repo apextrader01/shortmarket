@@ -1364,6 +1364,46 @@ export default function AdminDashboard() {
     }
   };
 
+  // Live Market Feed (Main) Power States
+  const [liveFeedLoading, setLiveFeedLoading] = useState(false);
+
+  const handleToggleLiveFeed = async () => {
+    const isCurrentlyPaused = !!fyersStatus?.isPaused;
+    const nextAction = isCurrentlyPaused ? 'resume' : 'pause';
+    const confirmMsg = isCurrentlyPaused
+      ? 'Resume Live Market Feed streaming from Fyers?'
+      : 'Pause Live Market Feed streaming?\n\nThis disconnects incoming live ticks from Fyers to save CPU and bandwidth. Prices will hold and you can Turn On anytime.';
+    if (!window.confirm(confirmMsg)) return;
+
+    setLiveFeedLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/live-feed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ action: nextAction })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        alert(`✅ Live Market Feed is now ${data.isPaused ? 'PAUSED (0 ticks, saving CPU)' : 'LIVE (Streaming active)'}!`);
+        if (typeof fetchFyersStatus === 'function') {
+          const fresh = await fetchFyersStatus();
+          if (fresh) setFyersStatus(fresh);
+        }
+      } else {
+        alert('Failed: ' + (data?.error || 'Could not toggle live feed'));
+      }
+    } catch (err) {
+      alert('Error toggling live feed: ' + err.message);
+    } finally {
+      setLiveFeedLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchMarketStatus?.();
     fetchStagingPowerStatus();
@@ -2521,6 +2561,47 @@ export default function AdminDashboard() {
             >
               {stagingLoading ? <RefreshCw size={10} className="animate-spin" /> : <Power size={10} />}
               {stagingLoading ? '...' : (stagingRunning ? 'Turn Off' : 'Turn On')}
+            </button>
+          </div>
+
+          {/* Live Market Feed (Main) Power Toggle */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              background: 'rgba(255,255,255,0.04)', 
+              border: `1px solid ${(!fyersStatus?.isPaused && fyersStatus?.isFyersConnected) ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.3)'}`, 
+              borderRadius: '5px', 
+              padding: '2px 6px', 
+              height: '28px', 
+              gap: '6px' 
+            }}
+            title={fyersStatus?.isPaused ? "Live market ticks are paused (0 CPU). Click Turn On to resume streaming." : "Live ticks streaming from Fyers. Click Turn Off to pause and save CPU/bandwidth."}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: '600', color: (!fyersStatus?.isPaused && fyersStatus?.isFyersConnected) ? 'var(--color-green)' : '#ef4444' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: (!fyersStatus?.isPaused && fyersStatus?.isFyersConnected) ? '#22c55e' : '#ef4444', boxShadow: (!fyersStatus?.isPaused && fyersStatus?.isFyersConnected) ? '0 0 6px #22c55e' : 'none' }}></span>
+              Live Feed: {fyersStatus?.isPaused ? 'Off' : 'Live'}
+            </span>
+            <button
+              onClick={handleToggleLiveFeed}
+              disabled={liveFeedLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                background: fyersStatus?.isPaused ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.18)',
+                color: fyersStatus?.isPaused ? '#22c55e' : '#ef4444',
+                border: `1px solid ${fyersStatus?.isPaused ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.4)'}`,
+                borderRadius: '4px',
+                padding: '2px 7px',
+                fontSize: '10px',
+                fontWeight: '700',
+                cursor: liveFeedLoading ? 'wait' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {liveFeedLoading ? <RefreshCw size={10} className="animate-spin" /> : (fyersStatus?.isPaused ? <Play size={10} /> : <Pause size={10} />)}
+              {liveFeedLoading ? '...' : (fyersStatus?.isPaused ? 'Turn On' : 'Turn Off')}
             </button>
           </div>
 

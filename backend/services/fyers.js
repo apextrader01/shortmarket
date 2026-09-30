@@ -406,6 +406,42 @@ async function initFyers(io, pc, isMaster = true) {
 
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
+let isMarketFeedPaused = false;
+
+function pauseLiveFeed() {
+    isMarketFeedPaused = true;
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    if (wsInstance) {
+        try {
+            if (wsInstance.close) wsInstance.close();
+            if (wsInstance.disconnect) wsInstance.disconnect();
+        } catch(e) {}
+    }
+    isFyersConnected = false;
+    if (global_io) {
+        global_io.emit('market_feed_status', { connected: false, isPaused: true, lastTickTime });
+    }
+    console.log("⏸️ [FYERS] Live Market Feed PAUSED by Admin.");
+    return { success: true, isPaused: true };
+}
+
+function resumeLiveFeed() {
+    isMarketFeedPaused = false;
+    console.log("▶️ [FYERS] Live Market Feed RESUMED by Admin.");
+    startLiveWebSocket();
+    if (global_io) {
+        global_io.emit('market_feed_status', { connected: isFyersConnected, isPaused: false, lastTickTime });
+    }
+    return { success: true, isPaused: false };
+}
+
+function isLiveFeedPaused() {
+    return isMarketFeedPaused;
+}
+
 function startLiveWebSocket() {
     purgeExpiredSubscriptions();
     if (reconnectTimer) {
@@ -500,7 +536,7 @@ function startLiveWebSocket() {
                 }
             });
 
-            if (!isWeekend && staleSec > 60 && hasActiveMarketSubscriptions && uptimeSec > 90) {
+            if (!isMarketFeedPaused && !isWeekend && staleSec > 60 && hasActiveMarketSubscriptions && uptimeSec > 90) {
                 console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck during active market hours. Forcing PM2 restart...`);
                 process.exit(0);
             }
@@ -616,6 +652,11 @@ function startLiveWebSocket() {
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
+        }
+
+        if (isMarketFeedPaused) {
+            console.log("[WS] Live feed is paused by Admin — skipping auto-reconnect.");
+            return;
         }
 
         reconnectAttempts++;
@@ -1132,6 +1173,7 @@ function getFyersStatus() {
     return {
         isMasterNode,
         isFyersConnected: isMasterNode ? (isFyersConnected && hasValidToken) : (isFyersConnected || recentTick),
+        isPaused: !!isMarketFeedPaused,
         hasAccessToken: hasValidToken,
         tokenExpired: !!isTokenExpiredError,
         tokenExpiryDate,
@@ -1165,6 +1207,9 @@ module.exports = {
     addSubscriptionBatch,
     handlePingSubscriptions,
     getFyersStatus,
+    pauseLiveFeed,
+    resumeLiveFeed,
+    isLiveFeedPaused,
     isAnyTradingSessionOpen,
     toFyersSymbol,
     fromFyersSymbol,

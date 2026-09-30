@@ -2850,6 +2850,46 @@ app.post('/api/admin/staging-power', authenticateToken, async (req, res) => {
   }
 });
 
+// ─── Live Market Feed Power Management (Pause / Resume Fyers WebSocket) ──────
+app.post('/api/admin/live-feed', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+
+    const { action } = req.body || {}; // 'pause', 'resume', 'toggle'
+    const { pauseLiveFeed, resumeLiveFeed, isLiveFeedPaused, getFyersStatus } = require('./services/fyers');
+
+    const currentlyPaused = isLiveFeedPaused ? isLiveFeedPaused() : false;
+    let newPausedState = false;
+
+    if (action === 'pause') {
+      if (pauseLiveFeed) pauseLiveFeed();
+      newPausedState = true;
+    } else if (action === 'resume') {
+      if (resumeLiveFeed) resumeLiveFeed();
+      newPausedState = false;
+    } else {
+      if (currentlyPaused) {
+        if (resumeLiveFeed) resumeLiveFeed();
+        newPausedState = false;
+      } else {
+        if (pauseLiveFeed) pauseLiveFeed();
+        newPausedState = true;
+      }
+    }
+
+    const status = getFyersStatus ? getFyersStatus() : {};
+    res.json({
+      success: true,
+      isPaused: newPausedState,
+      message: newPausedState ? 'Live Market Feed Paused (0 ticks, saving CPU)' : 'Live Market Feed Resumed',
+      status
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/admin/heal-referrals', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
