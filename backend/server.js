@@ -5439,6 +5439,35 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
     const isFull = req.query.all === 'true' || req.query.export === 'true';
     const requestedLimit = parseInt(req.query.limit);
     const limit = isFull ? (requestedLimit || 5000) : (requestedLimit || 200);
+    const offset = parseInt(req.query.offset) || 0;
+
+    // For secondary paginated pages (offset > 0), only query the requested historical page
+    if (offset > 0) {
+      const pagedOrders = await db('orders')
+        .where({ user_id: req.user.id })
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .offset(offset);
+
+      const pagedMap = new Map();
+      (pagedOrders || []).forEach(o => pagedMap.set(o.id, o));
+
+      if (pagedMap.size < limit) {
+        try {
+          const archivedOrders = await db('orders_archive')
+            .where({ user_id: req.user.id })
+            .orderBy('created_at', 'desc')
+            .limit(limit - pagedMap.size)
+            .offset(Math.max(0, offset - (pagedOrders?.length || 0)));
+          (archivedOrders || []).forEach(o => {
+            if (!pagedMap.has(o.id)) pagedMap.set(o.id, o);
+          });
+        } catch (_) {}
+      }
+
+      const orders = Array.from(pagedMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      return res.json(orders);
+    }
 
     const activeOrderStatuses = [
       'PENDING', 
@@ -10481,7 +10510,7 @@ server.listen(PORT, async () => {
           const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
 
           if (includeWatchlists) {
-            const userRows = await db('users').select('watchlists').catch(() => []);
+            const userRows = await db('users').whereNotNull('watchlists').select('watchlists').catch(() => []);
             userRows.forEach(row => {
               try {
                 const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);

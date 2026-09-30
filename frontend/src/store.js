@@ -113,23 +113,24 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
       ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
       : 'flat';
     
-    newPrices[symbol] = { ...old, ...data, tick };
-    
+    const tickObj = { ...old, ...data, tick };
     if (isFromWebSocket) {
-        newPrices[symbol].lastWsUpdate = now;
+        tickObj.lastWsUpdate = now;
     }
+    newPrices[symbol] = tickObj;
 
     // ⚡ Dual-key prices with and without exchange prefix so watchlists always find the price
+    // Re-use tickObj reference directly to eliminate redundant heap allocations per tick
     if (symbol.includes(':')) {
         const rawSym = symbol.split(':')[1];
-        newPrices[rawSym] = { ...newPrices[rawSym], ...data, tick };
+        newPrices[rawSym] = tickObj;
     } else {
         const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => symbol.startsWith(c)) || symbol.includes('-MCX');
         if (isCommodity) {
-            newPrices[`MCX:${symbol}`] = { ...newPrices[`MCX:${symbol}`], ...data, tick };
+            newPrices[`MCX:${symbol}`] = tickObj;
         } else {
-            newPrices[`NSE:${symbol}`] = { ...newPrices[`NSE:${symbol}`], ...data, tick };
-            newPrices[`BSE:${symbol}`] = { ...newPrices[`BSE:${symbol}`], ...data, tick };
+            newPrices[`NSE:${symbol}`] = tickObj;
+            newPrices[`BSE:${symbol}`] = tickObj;
         }
     }
   }
@@ -761,15 +762,9 @@ export const useStore = create(persist((set, get) => ({
           }
           if (Object.keys(batchedPrices).length > 0) {
             set((state) => {
-              const nextPrices = { ...state.prices };
-              for (const sym in batchedPrices) {
-                const d = batchedPrices[sym];
-                const old = nextPrices[sym];
-                const tick = old ? (d.ltp > old.ltp ? 'up' : d.ltp < old.ltp ? 'down' : 'flat') : 'flat';
-                nextPrices[sym] = { ...old, ...d, tick };
-              }
+              const next = applySnapshot(batchedPrices, state, true);
               batchedPrices = {};
-              return { prices: nextPrices };
+              return next === state.prices ? {} : { prices: next };
             });
           }
         }
@@ -812,16 +807,10 @@ export const useStore = create(persist((set, get) => ({
         const delay = (typeof document !== 'undefined' && document.hidden) ? 3000 : 150;
         batchTimeout = setTimeout(() => {
           set((state) => {
-            const nextPrices = { ...state.prices };
-            for (const sym in batchedPrices) {
-              const d = batchedPrices[sym];
-              const old = nextPrices[sym];
-              const tick = old ? (d.ltp > old.ltp ? 'up' : d.ltp < old.ltp ? 'down' : 'flat') : 'flat';
-              nextPrices[sym] = { ...old, ...d, tick };
-            }
+            const next = applySnapshot(batchedPrices, state, true);
             batchedPrices = {};
             batchTimeout = null;
-            return { prices: nextPrices };
+            return next === state.prices ? {} : { prices: next };
           });
         }, delay); // Batch state updates to ~6 FPS to prevent UI lag (3s when tab is hidden)
       }

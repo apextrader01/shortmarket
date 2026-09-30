@@ -218,6 +218,8 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
 }
 
 .main-content {
@@ -382,6 +384,11 @@ h1, h2, h3, h4, h5, h6 {
 .hoverable:hover {
   background: var(--bg-hover) !important;
   
+}
+
+.hoverable-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 44px;
 }
 
 .hoverable-row:hover {
@@ -876,6 +883,8 @@ input:checked + .slider:before {
   flex: 1;
   overflow: auto;
   min-height: 0;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
 }
 
 .option-chain-table {
@@ -883,6 +892,11 @@ input:checked + .slider:before {
   text-align: left;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.option-chain-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 38px;
 }
 
 .option-chain-table th {
