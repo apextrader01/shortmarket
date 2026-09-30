@@ -862,6 +862,14 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_created_at ON user_sessions(created_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_date ON journal_trades(user_id, trade_date DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_archive_created ON orders_archive(created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_archive_symbol ON orders_archive(symbol)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_archive_user_id ON orders_archive(user_id)').catch(() => {});
+
+    // Autovacuum Tuning: Automatically clean up dead tuples from frequent order/position updates to prevent disk bloat
+    await db.raw('ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+    await db.raw('ALTER TABLE positions SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+    await db.raw('ALTER TABLE ledger SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     
     // System Settings Table (for Admin market toggles, maintenance mode, etc.)
     await db.raw(`

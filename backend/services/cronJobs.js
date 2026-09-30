@@ -1106,28 +1106,50 @@ function initCronJobs(priceCache, triggerEngine) {
 
             let usersUpdated = 0;
             let totalRemoved = 0;
-            const users = await db('users').whereNotNull('watchlists');
-            
-            for (const user of users) {
-                let changed = false;
-                let watchlists = user.watchlists;
-                if (typeof watchlists === 'string') { try { watchlists = JSON.parse(watchlists); } catch(e) { continue; } }
-                
-                if (Array.isArray(watchlists)) {
-                    watchlists.forEach(wl => {
-                        if (Array.isArray(wl.symbols)) {
-                            const originalLen = wl.symbols.length;
-                            wl.symbols = wl.symbols.filter(sym => !isExpired(sym));
-                            if (wl.symbols.length !== originalLen) {
-                                totalRemoved += (originalLen - wl.symbols.length);
-                                changed = true;
-                            }
-                        }
-                    });
+            const batchSize = 500;
+            let lastUserId = 0;
+            let hasMoreUsers = true;
+
+            // Stream users in chunks to guarantee minimal RAM usage at scale (10 Lakh users)
+            while (hasMoreUsers) {
+                const usersBatch = await db('users')
+                    .whereNotNull('watchlists')
+                    .where('id', '>', lastUserId)
+                    .orderBy('id', 'asc')
+                    .limit(batchSize)
+                    .select('id', 'watchlists');
+
+                if (!usersBatch || usersBatch.length === 0) {
+                    hasMoreUsers = false;
+                    break;
                 }
-                if (changed) {
-                    await db('users').where({ id: user.id }).update({ watchlists: typeof user.watchlists === 'string' ? JSON.stringify(watchlists) : watchlists });
-                    usersUpdated++;
+
+                for (const user of usersBatch) {
+                    lastUserId = user.id;
+                    let changed = false;
+                    let watchlists = user.watchlists;
+                    if (typeof watchlists === 'string') { try { watchlists = JSON.parse(watchlists); } catch(e) { continue; } }
+                    
+                    if (Array.isArray(watchlists)) {
+                        watchlists.forEach(wl => {
+                            if (Array.isArray(wl.symbols)) {
+                                const originalLen = wl.symbols.length;
+                                wl.symbols = wl.symbols.filter(sym => !isExpired(sym));
+                                if (wl.symbols.length !== originalLen) {
+                                    totalRemoved += (originalLen - wl.symbols.length);
+                                    changed = true;
+                                }
+                            }
+                        });
+                    }
+                    if (changed) {
+                        await db('users').where({ id: user.id }).update({ watchlists: typeof user.watchlists === 'string' ? JSON.stringify(watchlists) : watchlists });
+                        usersUpdated++;
+                    }
+                }
+
+                if (usersBatch.length < batchSize) {
+                    hasMoreUsers = false;
                 }
             }
             console.log(`✅ [CRON 8:37 AM] Watchlist cleanup complete. Removed ${totalRemoved} expired symbol(s) across ${usersUpdated} user(s).`);
@@ -1148,6 +1170,44 @@ function initCronJobs(priceCache, triggerEngine) {
                     console.log(`[CRON] Purged ${purgedDevices} expired trusted device token(s).`);
                 }
             } catch (devErr) {}
+
+            // Purge expired OTPs from users table to prevent data clutter
+            try {
+                const now = new Date();
+                await db('users')
+                    .whereNotNull('reset_otp_expires')
+                    .where('reset_otp_expires', '<', now)
+                    .update({ reset_otp: null, reset_otp_expires: null });
+                await db('users')
+                    .whereNotNull('login_email_otp_expires')
+                    .where('login_email_otp_expires', '<', now)
+                    .update({ login_email_otp: null, login_email_otp_expires: null });
+            } catch (otpErr) {}
+
+            // Auto-clean old log files (> 7 days) to reclaim server disk
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const logsDir = path.join(__dirname, '../logs');
+                if (fs.existsSync(logsDir)) {
+                    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+                    const files = fs.readdirSync(logsDir);
+                    let purgedLogCount = 0;
+                    for (const file of files) {
+                        if (file.endsWith('.log') || file.endsWith('.gz')) {
+                            const filePath = path.join(logsDir, file);
+                            const stats = fs.statSync(filePath);
+                            if (stats.mtimeMs < sevenDaysAgo) {
+                                fs.unlinkSync(filePath);
+                                purgedLogCount++;
+                            }
+                        }
+                    }
+                    if (purgedLogCount > 0) {
+                        console.log(`[CRON] Cleaned up ${purgedLogCount} stale log file(s) older than 7 days.`);
+                    }
+                }
+            } catch (logErr) {}
 
             // Auto-expire past tournaments whose end_date has passed
             try {
