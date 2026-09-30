@@ -138,10 +138,14 @@ function isDerivativeFuture(sym) {
 export function isTradeExecutionOrder(o) {
   if (!o) return false;
   const s = String(o.status || '').toUpperCase();
+  if (s === 'REJECTED') return false;
   const isComplete = s === 'COMPLETED' || s === 'COMPLETE' || s === 'EXECUTED';
   const isPartial = s === 'PARTIAL_FILLED' || s === 'PARTIALLY_FILLED';
   const hasFilledQty = Number(o.filled_quantity) > 0;
-  return isComplete || isPartial || hasFilledQty;
+  // If an order partially filled and was subsequently cancelled for the remainder, it has average_price and filled_quantity
+  const hasTradedAvgPrice = o.average_price !== null && o.average_price !== undefined && Number(o.average_price) > 0;
+  const isPartiallyFilledCancelled = (s === 'CANCELLED' && hasTradedAvgPrice && (hasFilledQty || o.average_price));
+  return isComplete || isPartial || hasFilledQty || isPartiallyFilledCancelled;
 }
 
 export function getTradedOrderQuantity(o) {

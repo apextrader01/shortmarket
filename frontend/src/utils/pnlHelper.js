@@ -94,7 +94,9 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
     const hasExitPrice = p.exit_price !== null && p.exit_price !== undefined && !isNaN(Number(p.exit_price));
     const hasRealizedPnl = p.realized_pnl !== null && p.realized_pnl !== undefined && Number(p.realized_pnl) !== 0;
     const hasMatchingTodayOrder = (orders || []).some(o => {
-      const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED' || o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED' || Number(o.filled_quantity) > 0;
+      const s = String(o.status || '').toUpperCase();
+      const hasAvgPrice = o.average_price !== null && o.average_price !== undefined && Number(o.average_price) > 0;
+      const isExecuted = s === 'COMPLETED' || s === 'COMPLETE' || s === 'EXECUTED' || s === 'PARTIAL_FILLED' || s === 'PARTIALLY_FILLED' || Number(o.filled_quantity) > 0 || (s === 'CANCELLED' && hasAvgPrice);
       if (!isExecuted) return false;
       if (!isToday(o.updated_at || o.created_at)) return false;
       return normalizeSym(o.symbol) === normalizeSym(p.symbol);
@@ -119,7 +121,9 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
   // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed AND NOT currently open
   const closedOrdersMap = {};
   (orders || []).forEach(o => {
-    const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED' || o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED' || Number(o.filled_quantity) > 0;
+    const s = String(o.status || '').toUpperCase();
+    const hasAvgPrice = o.average_price !== null && o.average_price !== undefined && Number(o.average_price) > 0;
+    const isExecuted = s === 'COMPLETED' || s === 'COMPLETE' || s === 'EXECUTED' || s === 'PARTIAL_FILLED' || s === 'PARTIALLY_FILLED' || Number(o.filled_quantity) > 0 || (s === 'CANCELLED' && hasAvgPrice);
     const orderPnl = Number(o.realized_pnl || 0);
     const hasExitRemarks = Boolean(
       (o.remarks && /exit|square-off|auto-square-off|close/i.test(o.remarks)) ||
