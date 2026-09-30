@@ -1349,17 +1349,6 @@ class VolumeMatchingEngine {
     this._heartbeatInterval = setInterval(async () => {
       try {
         if (this.symbolQueues.size === 0) return;
-
-        // ⚡ Guard: Skip heartbeat loop when all markets (Equities & MCX) are closed
-        const nowDate = new Date();
-        const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(nowDate);
-        const istH = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
-        const istM = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
-        const istDay = istParts.find(p => p.type === 'weekday')?.value;
-        const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
-        const isMarketHours = !isWeekend && ((istH > 9 || (istH === 9 && istM >= 0)) && (istH < 23 || (istH === 23 && istM <= 30)));
-        if (!isMarketHours) return;
-
         const now = Date.now();
         const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
 

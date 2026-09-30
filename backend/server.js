@@ -10239,13 +10239,8 @@ server.listen(PORT, async () => {
       }, 5 * 60 * 1000);
       // ---------------------------------
 
-      // ⚡ Lightweight Staging Check: Staging only needs basic trade testing, skip heavy background downloads
-      const isStagingEnv = process.env.NODE_ENV === 'staging' || process.env.PORT == 5001;
-
-      // Update options master in background (Production only to save staging CPU/RAM)
-      if (!isStagingEnv) {
-        updateOptionsMaster().catch(e => console.error(e));
-      }
+      // Update options master in background
+      updateOptionsMaster().catch(e => console.error(e));
     
     // Start Cron Jobs
     const { startSquareOffJobs } = require('./services/autoSquareOff');
@@ -10285,19 +10280,17 @@ server.listen(PORT, async () => {
       } catch(e) { console.error('Backup auto-login cron error:', e); }
     });
 
-    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun) - Production only
-    if (!isStagingEnv) {
-      const optionsMorningRule = new schedule.RecurrenceRule();
-      optionsMorningRule.hour = 8;
-      optionsMorningRule.minute = 15;
-      optionsMorningRule.tz = 'Asia/Kolkata';
-      schedule.scheduleJob(optionsMorningRule, async () => {
-        console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
-        try {
-          await updateOptionsMaster();
-        } catch(e) { console.error('Options Master update cron error:', e); }
-      });
-    }
+    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun)
+    const optionsMorningRule = new schedule.RecurrenceRule();
+    optionsMorningRule.hour = 8;
+    optionsMorningRule.minute = 15;
+    optionsMorningRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(optionsMorningRule, async () => {
+      console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
+      try {
+        await updateOptionsMaster();
+      } catch(e) { console.error('Options Master update cron error:', e); }
+    });
 
     // RAM Optimization: Clean expired derivative contracts from priceCache daily at 08:05 AM IST
     async function cleanStaleOptionCache() {
@@ -10354,9 +10347,7 @@ server.listen(PORT, async () => {
     startSquareOffJobs();
     initRiskyStocksSync();
     initOrderExecutor(priceCache);
-    if (!isStagingEnv) {
-      SIPEngine.init(priceCache);
-    }
+    SIPEngine.init(priceCache);
 
     // Auto-heal user email casing and link orphaned referrals
     async function autoHealReferralsAndUsers() {
