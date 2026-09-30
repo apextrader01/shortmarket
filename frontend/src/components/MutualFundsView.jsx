@@ -409,7 +409,7 @@ export default function MutualFundsView() {
                                 <div className="mf-card-stats">
                                     <div>
                                         <div className="mf-stat-label">Current NAV</div>
-                                        <div className="mf-stat-value">₹{fund.nav.toFixed(2)}</div>
+                                        <div className="mf-stat-value">₹{(fund.nav ?? 0).toFixed(2)}</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <div className="mf-stat-label">1Y Return</div>
@@ -494,7 +494,7 @@ export default function MutualFundsView() {
                                             {fund.risk}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{fund.nav.toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{(fund.nav ?? 0).toFixed(2)}</td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
                                     <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>

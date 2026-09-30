@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { X } from 'lucide-react';
 import { socket } from '../store'; // Import socket to emit subscribe events
 import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
 
 export default function MarketDepthModal() {
   const marketDepthModal = useStore(state => state.marketDepthModal);
@@ -46,6 +47,35 @@ export default function MarketDepthModal() {
   const totalVol = totalBidQty + totalAskQty;
   const bidRatio = totalVol ? (totalBidQty / totalVol) * 100 : 50;
   const askRatio = totalVol ? (totalAskQty / totalVol) * 100 : 50;
+
+  const handleOneClickOrder = (side) => {
+    const totalQty = lotSize * (oneClickMultiplier || 1);
+    const currentPrice = (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0;
+    const freezeLimit = getFreezeLimit(symbol);
+    const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotSize) * lotSize : totalQty;
+
+    const buildPayload = (qty) => ({
+      symbol,
+      type: 'MARKET',
+      side,
+      quantity: qty,
+      price: currentPrice,
+      trigger_price: null,
+      sl_price: null,
+      tgt_price: null,
+      margin: 0,
+      product_type: 'INT'
+    });
+
+    if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
+      const slices = calculateOrderSlices(totalQty, lotSize, freezeLimit);
+      for (const sliceQty of slices) {
+        placeOrder(buildPayload(sliceQty));
+      }
+    } else {
+      placeOrder(buildPayload(totalQty));
+    }
+  };
 
   return (
     <div className="modal-backdrop" style={{
@@ -200,19 +230,7 @@ export default function MarketDepthModal() {
              <button 
                 onClick={() => {
                   if (oneClickMode) {
-                    const payload = {
-                      symbol,
-                      type: 'MARKET',
-                      side: 'BUY',
-                      quantity: lotSize * (oneClickMultiplier || 1),
-                      price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
-                      trigger_price: null,
-                      sl_price: null,
-                      tgt_price: null,
-                      margin: 0,
-                      product_type: 'INT'
-                    };
-                    placeOrder(payload);
+                    handleOneClickOrder('BUY');
                   } else {
                     closeMarketDepthModal();
                     openOrderModal(symbol, 'BUY', lotSize);
@@ -227,19 +245,7 @@ export default function MarketDepthModal() {
              <button 
                 onClick={() => {
                   if (oneClickMode) {
-                    const payload = {
-                      symbol,
-                      type: 'MARKET',
-                      side: 'SELL',
-                      quantity: lotSize * (oneClickMultiplier || 1),
-                      price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
-                      trigger_price: null,
-                      sl_price: null,
-                      tgt_price: null,
-                      margin: 0,
-                      product_type: 'INT'
-                    };
-                    placeOrder(payload);
+                    handleOneClickOrder('SELL');
                   } else {
                     closeMarketDepthModal();
                     openOrderModal(symbol, 'SELL', lotSize);

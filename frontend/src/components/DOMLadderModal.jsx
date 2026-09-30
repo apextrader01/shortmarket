@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore, socket } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
@@ -116,19 +117,41 @@ export default function DOMLadderModal() {
 
   const handleOrder = (price, side) => {
     if (oneClickMode) {
-      const payload = {
-        symbol,
-        type: 'LIMIT',
-        side,
-        quantity: lotsize * (oneClickMultiplier || 1),
-        price: parseFloat(price),
-        trigger_price: null,
-        sl_price: null,
-        tgt_price: null,
-        margin: 0,
-        product_type: 'INT'
-      };
-      placeOrder(payload);
+      const totalQty = lotsize * (oneClickMultiplier || 1);
+      const freezeLimit = getFreezeLimit(symbol);
+      const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotsize) * lotsize : totalQty;
+
+      if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
+        // Auto-slice into compliant chunks
+        const slices = calculateOrderSlices(totalQty, lotsize, freezeLimit);
+        for (const sliceQty of slices) {
+          placeOrder({
+            symbol,
+            type: 'LIMIT',
+            side,
+            quantity: sliceQty,
+            price: parseFloat(price),
+            trigger_price: null,
+            sl_price: null,
+            tgt_price: null,
+            margin: 0,
+            product_type: 'INT'
+          });
+        }
+      } else {
+        placeOrder({
+          symbol,
+          type: 'LIMIT',
+          side,
+          quantity: totalQty,
+          price: parseFloat(price),
+          trigger_price: null,
+          sl_price: null,
+          tgt_price: null,
+          margin: 0,
+          product_type: 'INT'
+        });
+      }
     } else {
       closeDomLadderModal();
       openOrderModal(symbol, side, lotsize, 'INT', false, 0, parseFloat(price));

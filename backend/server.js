@@ -709,16 +709,21 @@ app.get('/api/prices', (req, res) => {
 });
 
 app.get('/api/prices/batch', async (req, res) => {
-  const symbols = req.query.symbols?.split(',') || [];
-  if (symbols.length === 0) return res.json({});
-  
-  const { fetchBatchLTPs } = require('./services/fyers');
-  if (fetchBatchLTPs) {
-    const prices = await fetchBatchLTPs(symbols);
-    Object.assign(priceCache, prices);
-    res.json(prices);
-  } else {
-    res.json({});
+  try {
+    const symbols = req.query.symbols?.split(',') || [];
+    if (symbols.length === 0) return res.json({});
+    
+    const { fetchBatchLTPs } = require('./services/fyers');
+    if (fetchBatchLTPs) {
+      const prices = await fetchBatchLTPs(symbols);
+      Object.assign(priceCache, prices);
+      res.json(prices);
+    } else {
+      res.json({});
+    }
+  } catch (err) {
+    console.error('/api/prices/batch Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -5270,67 +5275,82 @@ async function loadOptionsAndFuturesCache() {
 loadOptionsAndFuturesCache();
 
 app.get('/api/options/chain/:symbol', async (req, res) => {
-  const symbol = req.params.symbol.toUpperCase();
+  try {
+    const symbol = req.params.symbol.toUpperCase();
 
-  if (!cachedOptionsData) {
-    await loadOptionsAndFuturesCache();
+    if (!cachedOptionsData) {
+      await loadOptionsAndFuturesCache();
+    }
+
+    if (!cachedOptionsData) {
+      return res.status(503).json({ error: 'Options database is currently being built. Please try again in a minute.' });
+    }
+
+    if (!cachedOptionsData[symbol]) {
+      return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(cachedOptionsData[symbol]);
+  } catch (err) {
+    console.error('/api/options/chain Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  if (!cachedOptionsData) {
-    return res.status(503).json({ error: 'Options database is currently being built. Please try again in a minute.' });
-  }
-
-  if (!cachedOptionsData[symbol]) {
-    return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
-  }
-
-  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-  res.json(cachedOptionsData[symbol]);
 });
 
 // Endpoint to fetch all available underlying symbols for options (e.g., NIFTY, RELIANCE, CRUDEOIL)
 app.get('/api/options/symbols', async (req, res) => {
-  if (!cachedOptionsData) {
-    await loadOptionsAndFuturesCache();
-  }
+  try {
+    if (!cachedOptionsData) {
+      await loadOptionsAndFuturesCache();
+    }
 
-  if (!cachedOptionsData) {
-    return res.status(503).json({ error: 'Options database is currently being built.' });
-  }
+    if (!cachedOptionsData) {
+      return res.status(503).json({ error: 'Options database is currently being built.' });
+    }
 
-  res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
-  res.json(cachedOptionsSymbols);
+    res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
+    res.json(cachedOptionsSymbols);
+  } catch (err) {
+    console.error('/api/options/symbols Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/options/futures/:symbol', async (req, res) => {
-  const symbol = req.params.symbol.toUpperCase();
+  try {
+    const symbol = req.params.symbol.toUpperCase();
 
-  if (!cachedFuturesData) {
-    await loadOptionsAndFuturesCache();
-  }
-
-  if (!cachedFuturesData) {
-    return res.status(503).json({ error: 'Futures database not ready.' });
-  }
-
-  const data = cachedFuturesData;
-  if (data[symbol] && data[symbol].length > 0) {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    const validFutures = data[symbol].filter(f => {
-      const expDate = new Date(f.expiry);
-      return expDate >= now;
-    });
-
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
-    if (validFutures.length > 0) {
-      res.json(validFutures[0]);
-    } else {
-      res.json(data[symbol][data[symbol].length - 1]);
+    if (!cachedFuturesData) {
+      await loadOptionsAndFuturesCache();
     }
-  } else {
-    res.status(404).json({ error: 'No futures found for symbol' });
+
+    if (!cachedFuturesData) {
+      return res.status(503).json({ error: 'Futures database not ready.' });
+    }
+
+    const data = cachedFuturesData;
+    if (data[symbol] && data[symbol].length > 0) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const validFutures = data[symbol].filter(f => {
+        const expDate = new Date(f.expiry);
+        return expDate >= now;
+      });
+
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
+      if (validFutures.length > 0) {
+        res.json(validFutures[0]);
+      } else {
+        res.json(data[symbol][data[symbol].length - 1]);
+      }
+    } else {
+      res.status(404).json({ error: 'No futures found for symbol' });
+    }
+  } catch (err) {
+    console.error('/api/options/futures Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

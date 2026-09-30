@@ -316,7 +316,7 @@ function StockDetails({ symbol, price, candles }) {
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontWeight: '700' }}>₹{peer.livePriceData.ltp.toFixed(2)}</span>
                               <span style={{ fontSize: '11px', color: peer.livePriceData.dayChange < 0 ? 'var(--color-red-light)' : 'var(--color-green-light)', fontWeight: '600' }}>
-                                {peer.livePriceData.dayChange > 0 ? '+' : ''}{peer.livePriceData.dayChange.toFixed(2)} ({peer.livePriceData.dayChangePerc.toFixed(2)}%)
+                                {(peer.livePriceData.dayChange ?? 0) > 0 ? '+' : ''}{(peer.livePriceData.dayChange ?? 0).toFixed(2)} ({(peer.livePriceData.dayChangePerc ?? 0).toFixed(2)}%)
                               </span>
                             </div>
                           ) : '-'}
