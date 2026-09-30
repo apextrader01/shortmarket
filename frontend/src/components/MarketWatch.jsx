@@ -418,6 +418,9 @@ export default function MarketWatch({ className = '', onStockSelect }) {
     return list;
   }, [isSearchMode, searchResults, watchlistStocks, filterSegment, sortBy]);
 
+  const searchSymbolsKey = React.useMemo(() => searchResults.map(s => s.uniqueSymbol).join(','), [searchResults]);
+  const activeWatchlistSymbolsKey = activeWatchlist?.symbols?.join(',') || '';
+
   React.useEffect(() => {
     // Collect all stocks currently visible (watchlist or search results)
     const visibleStocks = isSearchMode ? searchResults : watchlistStocks;
@@ -456,7 +459,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
         unsubscribeBatch(tokensToSub);
       };
     }
-  }, [isSearchMode, searchResults.map(s => s.uniqueSymbol).join(','), activeWatchlist?.symbols?.join(',') || '']);
+  }, [isSearchMode, searchSymbolsKey, activeWatchlistSymbolsKey]);
 
   return (
     <div className={`sidebar glass-panel ${className}`}>

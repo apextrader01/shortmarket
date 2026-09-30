@@ -762,18 +762,33 @@ app.get('/api/stocks', async (req, res) => {
   }
 });
 
+  const localSearchLRU = new Map();
+  const MAX_SEARCH_LRU = 500;
+
   app.get('/api/stocks/search', async (req, res) => {
     const q = req.query.q;
     if (!q || q.length < 2) return res.json([]);
     
     const qLower = q.toLowerCase();
-        try {
-        const { generalClient } = require('./services/redisClient');
-        const cacheKey = `api:search:v6:${qLower}`;
+
+    // 1. Fast in-memory cache check (sub-0.1ms latency without Redis roundtrip)
+    const localHit = localSearchLRU.get(qLower);
+    if (localHit && (Date.now() - localHit.time < 300000)) { // 5-minute local TTL
+      res.setHeader('Content-Type', 'application/json');
+      return res.send(localHit.data);
+    }
+
+    try {
+      const { generalClient } = require('./services/redisClient');
+      const cacheKey = `api:search:v6:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
         if (cached) {
+          if (localSearchLRU.size >= MAX_SEARCH_LRU) {
+            localSearchLRU.delete(localSearchLRU.keys().next().value);
+          }
+          localSearchLRU.set(qLower, { data: cached, time: Date.now() });
           res.setHeader('Content-Type', 'application/json');
           return res.send(cached);
         }
@@ -819,6 +834,11 @@ app.get('/api/stocks', async (req, res) => {
       
       const responseData = JSON.stringify(results);
       
+      if (localSearchLRU.size >= MAX_SEARCH_LRU) {
+        localSearchLRU.delete(localSearchLRU.keys().next().value);
+      }
+      localSearchLRU.set(qLower, { data: responseData, time: Date.now() });
+
       if (generalClient && generalClient.isReady) {
         generalClient.set(cacheKey, responseData, { EX: 3600 }).catch(console.error); // 1 hour cache
       }
@@ -1922,7 +1942,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
             .orWhere('updated_at', '>=', todayStartIST);
         })
         .orderBy('updated_at', 'desc'),
-      db('holdings').where({ user_id: userId }).whereNot({ quantity: 0 }).orderBy('id', 'desc'),
+      db('holdings').where({ user_id: userId }).where('quantity', '>', 0).orderBy('id', 'desc'),
       db('sips').where({ user_id: userId }),
       // 1. ALL active/open/pending orders - ZERO truncation, guarantee 100% presence
       db('orders')
@@ -2189,10 +2209,27 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
 // ─── Analytics ─────────────────────────────────────────────────────────────
 app.get('/api/analytics', authenticateToken, async (req, res) => {
   try {
-    const rawOrders = await db('orders')
+    let rawOrders = await db('orders')
       .where({ user_id: req.user.id })
       .whereNot('realized_pnl', 0)
+      .select('id', 'symbol', 'side', 'quantity', 'realized_pnl', 'created_at', 'slice_group_id', 'remarks')
       .orderBy('created_at', 'asc');
+
+    // Bridge with orders_archive so lifetime analytics, equity curve, and win rate remain 100% complete
+    try {
+      const hasArchive = await db.schema.hasTable('orders_archive');
+      if (hasArchive) {
+        const archivedOrders = await db('orders_archive')
+          .where({ user_id: req.user.id })
+          .whereNot('realized_pnl', 0)
+          .select('id', 'symbol', 'side', 'quantity', 'realized_pnl', 'created_at', 'slice_group_id', 'remarks')
+          .orderBy('created_at', 'asc');
+        if (archivedOrders && archivedOrders.length > 0) {
+          rawOrders = [...archivedOrders, ...rawOrders];
+          rawOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        }
+      }
+    } catch (_) {}
 
     // Consolidate sliced iceberg orders into single unified trades
     const groupMap = new Map();
@@ -3316,10 +3353,10 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
       .join('users', 'deposit_requests.user_id', 'users.id')
       .select('deposit_requests.*', 'users.username', 'users.email', 'users.client_id');
 
-    let countQuery = db('deposit_requests')
-      .join('users', 'deposit_requests.user_id', 'users.id');
+    let countQuery = db('deposit_requests');
 
     if (search) {
+      countQuery = countQuery.join('users', 'deposit_requests.user_id', 'users.id');
       const s = `%${search}%`;
       query = query.where(function() {
         this.where('users.username', 'ilike', s)
@@ -3432,37 +3469,38 @@ app.get('/api/admin/analytics', authenticateToken, async (req, res) => {
     const { sum: totalAumRow } = await db('users').sum('balance as sum').first();
     const totalAum = parseFloat(totalAumRow || 0);
 
-    // 2. Today's Volume and Realized P&L
-    const today = new Date();
+    // 2. Today's Volume and Realized P&L (Direct in-database aggregation)
+    const today = (typeof getTradingSessionStartIST === 'function') ? getTradingSessionStartIST() : new Date();
     today.setHours(0, 0, 0, 0);
     
-    const todayOrders = await db('orders')
-      .where('status', 'EXECUTED')
-      .andWhere('created_at', '>=', today);
+    const [summaryRow, topSymbolsRows] = await Promise.all([
+      db('orders')
+        .where('status', 'EXECUTED')
+        .andWhere('created_at', '>=', today)
+        .select(
+          db.raw('COALESCE(SUM(ABS(quantity) * ABS(COALESCE(average_price, price, 0))), 0) as total_volume'),
+          db.raw('COALESCE(SUM(realized_pnl), 0) as total_realized_pnl')
+        )
+        .first(),
 
-    let todayVolume = 0;
-    let todayRealizedPnl = 0;
-    const symbolVolume = {};
+      db('orders')
+        .where('status', 'EXECUTED')
+        .andWhere('created_at', '>=', today)
+        .groupBy('symbol')
+        .select(
+          'symbol',
+          db.raw('COALESCE(SUM(ABS(quantity) * ABS(COALESCE(average_price, price, 0))), 0) as volume')
+        )
+        .orderBy('volume', 'desc')
+        .limit(5)
+    ]);
 
-    todayOrders.forEach(o => {
-      const vol = Math.abs(parseFloat(o.quantity)) * Math.abs(parseFloat(o.average_price || o.price || 0));
-      todayVolume += vol;
-      
-      const pnl = parseFloat(o.realized_pnl || 0);
-      todayRealizedPnl += pnl;
-
-      if (!symbolVolume[o.symbol]) symbolVolume[o.symbol] = 0;
-      symbolVolume[o.symbol] += vol;
-    });
-
-    // 3. Top Traded Symbols
-    const topSymbols = Object.entries(symbolVolume)
-      .map(([symbol, volume]) => ({ symbol, volume }))
-      .sort((a, b) => b.volume - a.volume)
-      .slice(0, 5);
-
-    // 4. All Open Positions (Frontend will calculate Unrealized P&L using live prices)
-    const openPositions = await db('positions').where('quantity', '!=', 0);
+    const todayVolume = parseFloat(summaryRow?.total_volume || 0);
+    const todayRealizedPnl = parseFloat(summaryRow?.total_realized_pnl || 0);
+    const topSymbols = (topSymbolsRows || []).map(r => ({
+      symbol: r.symbol,
+      volume: parseFloat(r.volume || 0)
+    }));
 
     res.json({
       success: true,
@@ -3470,7 +3508,7 @@ app.get('/api/admin/analytics', authenticateToken, async (req, res) => {
       todayVolume,
       todayRealizedPnl,
       topSymbols,
-      openPositions
+      openPositions: [] // 0-byte payload optimization (positions inspected via dedicated /api/admin/positions route)
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3499,17 +3537,28 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     if (search) {
       countQuery = countQuery.join('users', 'orders.user_id', '=', 'users.id');
       const s = `%${search}%`;
+      const numSearch = parseInt(search, 10);
+      const isNum = !isNaN(numSearch) && String(numSearch) === search.trim();
+
       query = query.where(function() {
         this.where('orders.symbol', 'ilike', s)
             .orWhere('users.username', 'ilike', s)
-            .orWhere('users.client_id', 'ilike', s)
-            .orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+            .orWhere('users.client_id', 'ilike', s);
+        if (isNum) {
+          this.orWhere('orders.id', numSearch);
+        } else {
+          this.orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+        }
       });
       countQuery = countQuery.where(function() {
         this.where('orders.symbol', 'ilike', s)
             .orWhere('users.username', 'ilike', s)
-            .orWhere('users.client_id', 'ilike', s)
-            .orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+            .orWhere('users.client_id', 'ilike', s);
+        if (isNum) {
+          this.orWhere('orders.id', numSearch);
+        } else {
+          this.orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+        }
       });
     }
 
@@ -4159,13 +4208,11 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
       return false;
     };
 
-    // BUG FIX: Filter zero-qty holdings in SQL, not in JS after fetching
-    const rawHoldings = await db('holdings')
+    // Filter non-positive holdings in SQL using composite index (user_id, quantity)
+    const holdings = await db('holdings')
       .where({ user_id: req.user.id })
-      .whereNot({ quantity: 0 })
+      .where('quantity', '>', 0)
       .orderBy('id', 'desc');
-
-    const holdings = rawHoldings.filter(h => Number(h.quantity) > 0);
 
     // Auto-align legacy MF holdings (EDEL, MIRA, NIPP) with real AMFI NAVs and calculate correct units
     const LEGACY_FIX_MAP = {
@@ -9244,10 +9291,10 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
         'users.registration_ip'
       );
 
-    let countQuery = db('reward_withdrawals')
-      .join('users', 'reward_withdrawals.user_id', 'users.id');
+    let countQuery = db('reward_withdrawals');
 
     if (search) {
+      countQuery = countQuery.join('users', 'reward_withdrawals.user_id', 'users.id');
       const s = `%${search}%`;
       query = query.where(function() {
         this.where('users.username', 'ilike', s)

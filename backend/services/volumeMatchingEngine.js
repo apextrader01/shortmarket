@@ -599,6 +599,7 @@ class VolumeMatchingEngine {
               .orWhere({ symbol: `MCX:${cleanSym}` });
           })
           .whereNot({ quantity: 0 })
+          .forUpdate()
           .first();
 
         // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "-1.0000" + 1 = "-1.00001")
@@ -954,6 +955,7 @@ class VolumeMatchingEngine {
             const existingClosedPos = await trx('positions')
               .where({ user_id: order.user_id, symbol: order.symbol, quantity: 0 })
               .where('updated_at', '>=', todayStart)
+              .forUpdate()
               .first();
 
             if (existingClosedPos) {

@@ -42,17 +42,20 @@ const OptionChainRow = React.memo(({
                               (putKey && (putKey.includes('MCX') || putKey.includes('COMMODITY'))) || 
                               (call?.exch_seg === 'MCX') || (put?.exch_seg === 'MCX'));
 
-  // Calculate IV (using Black-76 for commodities)
-  let cIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r, isCommodity) : 0;
-  let pIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r, isCommodity) : 0;
+  // Calculate IV (using Black-76 for commodities) & Greeks with memoization
+  const { cIV, pIV, cGreeks, pGreeks } = React.useMemo(() => {
+    let callIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r, isCommodity) : 0;
+    let putIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r, isCommodity) : 0;
 
-  // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
-  if (cIV === 0 && pIV > 0) cIV = pIV;
-  if (pIV === 0 && cIV > 0) pIV = cIV;
+    // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
+    if (callIV === 0 && putIV > 0) callIV = putIV;
+    if (putIV === 0 && callIV > 0) putIV = callIV;
 
-  // Calculate Greeks
-  const cGreeks = (cIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, cIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
-  const pGreeks = (pIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, pIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
+    const callGreeks = (callIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, callIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
+    const putGreeks = (putIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, putIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
+
+    return { cIV: callIV, pIV: putIV, cGreeks: callGreeks, pGreeks: putGreeks };
+  }, [cLtp, pLtp, basePrice, strike, T, r, isCommodity]);
 
   const isCallITM = basePrice > 0 && strike < basePrice;
   const isPutITM = basePrice > 0 && strike > basePrice;

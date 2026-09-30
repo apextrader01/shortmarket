@@ -873,6 +873,11 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_qty_updated ON positions(user_id, quantity, updated_at DESC)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_qty_updated ON positions(quantity, updated_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_created ON deposit_requests(user_id, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_created_at ON deposit_requests(created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_reward_withdrawals_created_at ON reward_withdrawals(created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_reward_withdrawals_user_created ON reward_withdrawals(user_id, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_updated_at ON positions(updated_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_qty ON holdings(user_id, quantity)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_archive_user_updated ON positions_archive(user_id, updated_at DESC)').catch(() => {});
 
     // Autovacuum Tuning: Automatically clean up dead tuples from frequent order/position updates to prevent disk bloat
