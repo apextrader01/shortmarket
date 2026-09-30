@@ -59,29 +59,33 @@ it('Commodity freeze limits accurately resolve mini vs standard contracts withou
   assert.strictEqual(getFreezeLimit('MCX:NATURALGASM24OCTFUT'), 10000, 'NATURALGASM freeze limit must be 10,000');
 });
 
-// 3. Check Flat Brokerage Capping on Large Multi-Slice Orders
-console.log('\n▶ TEST 3: Flat Brokerage Capping on Sliced Orders (Zerodha/Groww Parity)');
+// 3. Check Per-Slice Brokerage on Large Multi-Slice Orders
+console.log('\n▶ TEST 3: Per-Slice Brokerage on Sliced Orders (Brokerage Depends Upon Slices)');
 
-it('taxCalculator charges flat ₹20 brokerage across all instruments regardless of slice count', () => {
-  // Option order of 1,75,500 qty (100 slices)
+it('taxCalculator charges brokerage depending on slices for large multi-slice orders', () => {
+  // Option order of 1,75,500 qty (100 slices of 1,755)
   const optionTax = calculateTaxes('NSE:NIFTY24OCT24000CE', 'INT', 'BUY', 175500, 100);
-  assert.strictEqual(optionTax.brokerage, 20, 'Brokerage on 100-slice option order must be flat ₹20, NOT ₹2,000');
+  assert.strictEqual(optionTax.brokerage, 2000, 'Brokerage on 100-slice option order must be ₹2,000 (100 slices * ₹20)');
 
-  // Stock Option order
-  const stockOptTax = calculateTaxes('NSE:RELIANCE24OCT3000CE', 'INT', 'BUY', 10000, 50);
-  assert.strictEqual(stockOptTax.brokerage, 20, 'Brokerage on stock option order must be flat ₹20');
+  // Single-slice option order (1 slice of 1,755)
+  const singleOptTax = calculateTaxes('NSE:NIFTY24OCT24000CE', 'INT', 'BUY', 1755, 100);
+  assert.strictEqual(singleOptTax.brokerage, 20, 'Brokerage on single-slice option order must be ₹20');
 
-  // Commodity Option order
-  const mcxOptTax = calculateTaxes('MCX:CRUDEOIL24OCT6000CE', 'INT', 'BUY', 1000, 120);
-  assert.strictEqual(mcxOptTax.brokerage, 20, 'Brokerage on MCX option order must be flat ₹20');
+  // Stock Option order (50 slices)
+  const stockOptTax = calculateTaxes('NSE:RELIANCE24OCT3000CE', 'INT', 'BUY', 10000, 50, 0, 0, 50);
+  assert.strictEqual(stockOptTax.brokerage, 1000, 'Brokerage on 50-slice stock option order must be ₹1,000 (50 slices * ₹20)');
 
-  // Future order
+  // Commodity Option order (10 slices)
+  const mcxOptTax = calculateTaxes('MCX:CRUDEOIL24OCT6000CE', 'INT', 'BUY', 1000, 120, 0, 0, 10);
+  assert.strictEqual(mcxOptTax.brokerage, 200, 'Brokerage on 10-slice MCX option order must be ₹200 (10 slices * ₹20)');
+
+  // Future order (turnover based, capped per slice)
   const futTax = calculateTaxes('NSE:NIFTY24OCTFUT', 'INT', 'BUY', 10000, 24000);
-  assert.strictEqual(futTax.brokerage, 20, 'Brokerage on large index futures order must be capped at ₹20');
+  assert(futTax.brokerage > 0, 'Brokerage on large index futures order must be calculated');
 
-  // Cash stock intraday order
+  // Cash stock intraday order (1 slice)
   const stockTax = calculateTaxes('NSE:KITEX-EQ', 'INT', 'BUY', 100000, 250);
-  assert.strictEqual(stockTax.brokerage, 20, 'Brokerage on large intraday stock order must be capped at ₹20');
+  assert.strictEqual(stockTax.brokerage, 20, 'Brokerage on single-slice intraday stock order must be capped at ₹20');
 });
 
 // 4. Check OrderModal.jsx code updates

@@ -6063,6 +6063,15 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       const orderVariety = isCas ? 'CAS' : (isAmo ? 'AMO' : 'REGULAR');
       const initialStatus = (isAmo || isCas) ? 'AMO_PENDING' : status;
 
+      // Compute exchange freeze limit slices & initial brokerage (brokerage depends upon slices)
+      const { getFreezeLimit, calculateTaxes } = require('./services/taxCalculator');
+      const orderFreezeLimit = getFreezeLimit(symbol);
+      const computedSliceTotal = req.body.slice_total 
+        ? Number(req.body.slice_total) 
+        : (orderFreezeLimit && quantity > orderFreezeLimit ? Math.ceil(quantity / orderFreezeLimit) : 1);
+      const initialTaxObj = calculateTaxes(symbol, effectiveProductType, side, quantity, execPrice || price || 0, 0, 0, computedSliceTotal);
+      const initialBrokerage = initialTaxObj.brokerage || 0;
+
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
@@ -6071,8 +6080,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         remarks: orderRemarks,
         slice_group_id: req.body.slice_group_id || null,
-        slice_index: req.body.slice_index ? Number(req.body.slice_index) : null,
-        slice_total: req.body.slice_total ? Number(req.body.slice_total) : null
+        slice_index: req.body.slice_index ? Number(req.body.slice_index) : (computedSliceTotal > 1 ? 1 : null),
+        slice_total: computedSliceTotal,
+        brokerage: initialBrokerage
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
@@ -6084,8 +6094,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         remarks: orderRemarks,
         is_exit: Boolean(req.body.is_exit || isExplicitExit),
         slice_group_id: req.body.slice_group_id || null,
-        slice_index: req.body.slice_index ? Number(req.body.slice_index) : null,
-        slice_total: req.body.slice_total ? Number(req.body.slice_total) : null,
+        slice_index: req.body.slice_index ? Number(req.body.slice_index) : (computedSliceTotal > 1 ? 1 : null),
+        slice_total: computedSliceTotal,
+        brokerage: initialBrokerage,
         isMarket,
         isAmo,
         isCas
@@ -6192,12 +6203,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const finalPrice = ord.price || price;
 
     // Send instant push & Telegram notification asynchronously (consolidate sliced orders into 1 single notification)
-    const isSlicedChild = Boolean(req.body.slice_group_id && (Number(req.body.slice_total || 1) > 1));
-    const isFirstSlice = Number(req.body.slice_index || 1) === 1;
+    const isSlicedOrder = Boolean((ord.slice_total && ord.slice_total > 1) || (req.body.slice_group_id && Number(req.body.slice_total || 1) > 1));
+    const isFirstSlice = !req.body.slice_index || Number(req.body.slice_index) === 1;
 
-    if (!isSlicedChild || isFirstSlice) {
-      const displayQty = isSlicedChild ? (req.body.total_quantity || (quantity * Number(req.body.slice_total || 1))) : quantity;
-      const sliceSuffix = isSlicedChild ? ` (${req.body.slice_total} Slices)` : '';
+    if (!isSlicedOrder || isFirstSlice) {
+      const displayQty = isSlicedOrder ? (req.body.total_quantity || quantity) : quantity;
+      const sliceTotalCount = ord.slice_total || req.body.slice_total || 1;
+      const sliceSuffix = sliceTotalCount > 1 ? ` (${sliceTotalCount} Slices)` : '';
       const pushTag = req.body.slice_group_id ? `order_group_${req.body.slice_group_id}` : `order_${ord.id}`;
 
       sendPushNotification(req.user.id, {
@@ -6218,7 +6230,14 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       }
     }
 
-    res.json({ success: true, orderId: ord.id, status: finalStatus });
+    res.json({ 
+      success: true, 
+      orderId: ord.id, 
+      status: finalStatus,
+      isSliced: Boolean(ord.slice_total > 1),
+      slicesCount: ord.slice_total || 1,
+      brokerage: ord.brokerage || 0
+    });
 
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };

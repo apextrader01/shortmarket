@@ -1,6 +1,6 @@
 const db = require('../database/db');
 const LedgerService = require('./ledgerService');
-const { calculateTaxes, isDerivativeContract } = require('./taxCalculator');
+const { calculateTaxes, isDerivativeContract, getFreezeLimit } = require('./taxCalculator');
 
 function normalizeSymbol(sym) {
   if (!sym || typeof sym !== 'string') return '';
@@ -482,13 +482,18 @@ class VolumeMatchingEngine {
         const isComplete = newPending <= 0;
         const newStatus = isComplete ? 'EXECUTED' : 'PARTIAL_FILLED';
 
-        // Order-level cumulative taxes (capped at standard broker rates e.g. max ₹20 per order)
+        // Order-level cumulative taxes (brokerage depends upon slices)
+        const orderFreezeLimit = getFreezeLimit(order.symbol);
+        const orderSliceTotal = currentOrder.slice_total || order.slice_total || (orderFreezeLimit && newFilled > orderFreezeLimit ? Math.ceil(newFilled / orderFreezeLimit) : 1);
         const totalOrderTaxesObj = calculateTaxes(
           order.symbol,
           order.product_type,
           order.side,
           newFilled,
-          newAvgPrice
+          newAvgPrice,
+          0,
+          0,
+          orderSliceTotal
         );
         const accumulatedTaxes = Math.round((Number(totalOrderTaxesObj.totalTaxes || 0) + Number.EPSILON) * 100) / 100;
         const previouslyDebited = Number(currentOrder.taxes || 0);
@@ -511,6 +516,7 @@ class VolumeMatchingEngine {
           average_price: newAvgPrice,
           price: isComplete ? newAvgPrice : (currentOrder.price || newAvgPrice),
           taxes: accumulatedTaxes,
+          brokerage: totalOrderTaxesObj.brokerage,
           status: newStatus,
           updated_at: new Date()
         });
@@ -1095,6 +1101,7 @@ class VolumeMatchingEngine {
         order.pending_quantity = newPending;
         order.average_price = newAvgPrice;
         order.taxes = accumulatedTaxes;
+        order.brokerage = totalOrderTaxesObj.brokerage;
         order.status = newStatus;
 
         if (isComplete) {

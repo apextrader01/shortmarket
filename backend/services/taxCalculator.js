@@ -139,6 +139,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
 
     const freezeLimit = getFreezeLimit(symbol);
     const slicesCount = slicesOverride !== null ? slicesOverride : (quantity > 0 ? (quantity > freezeLimit ? Math.min(100, Math.ceil(quantity / freezeLimit)) : 1) : 0);
+    const effectiveSlices = Math.max(1, Number(slicesCount) || 1);
 
     let brokerage = 0;
     let stt = 0;
@@ -152,7 +153,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
         if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
     } else if (isOption) {
-        brokerage = isExercise ? 0 : 20; // Flat ₹20 per executed order for Options; ₹0 on expiry exercise
+        brokerage = isExercise ? 0 : (20 * effectiveSlices); // ₹20 per slice for Options; ₹0 on expiry exercise
         if (isExercise) {
             // Statutory 0.125% STT on exercised ITM options at expiry (Finance Act Section 98)
             stt = turnover * 0.00125;
@@ -163,7 +164,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY' && !isExercise) stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        brokerage = Math.min(turnover * 0.0003, 20); // Flat ₹20 or 0.03% whichever is lower per order
+        brokerage = Math.min(turnover * 0.0003, 20 * effectiveSlices); // ₹20 per slice or 0.03% whichever is lower
         if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0001 : 0.0002); // 0.02% STT on Futures sale (revised Oct 2024)
         }
@@ -179,7 +180,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
             // Intraday Equity (INT, BO, CO, MIS)
-            brokerage = Math.min(turnover * 0.0003, 20); // Flat ₹20 or 0.03% whichever is lower per order
+            brokerage = Math.min(turnover * 0.0003, 20 * effectiveSlices); // ₹20 per slice or 0.03% whichever is lower
             if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
             if (side === 'BUY') stampDuty = turnover * 0.00003;
         }

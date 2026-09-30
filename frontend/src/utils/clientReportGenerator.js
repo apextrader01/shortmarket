@@ -1,5 +1,6 @@
 // frontend/src/utils/clientReportGenerator.js
 // High-Precision Financial Reports & Statements Generator (Excel + PDF + HTML)
+import { getFreezeLimit } from './freezeLimits';
 
 export function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -168,8 +169,17 @@ export function calculateIndianCharges(order) {
   const isMCX = /(MCX|GOLD|SILVER|CRUDE|NATURALGAS|COPPER)/i.test(order.symbol || '');
   const isSell = (order.side === 'SELL' || order.type === 'SELL');
 
-  // Brokerage: ₹20 flat or ₹0 for delivery
-  let brokerage = isDelivery ? 0 : 20;
+  // Brokerage: depends on slices (₹20 per slice for F&O/Intraday, or ₹0 for delivery)
+  let slicesCount = order.sliceCount || order.slice_total || null;
+  if (!slicesCount && order.symbol) {
+    const fLimit = getFreezeLimit(order.symbol);
+    if (fLimit && qty > fLimit) {
+      slicesCount = Math.min(100, Math.ceil(qty / fLimit));
+    }
+  }
+  const effectiveSlices = Math.max(1, Number(slicesCount) || 1);
+
+  let brokerage = isDelivery ? 0 : (20 * effectiveSlices);
   if (order.brokerage !== undefined && order.brokerage !== null) {
     brokerage = Number(order.brokerage);
   }
@@ -1112,7 +1122,7 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
 // 5. OFFICIAL DAILY CONTRACT NOTE GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateContractNoteReport(orders = [], user = {}, tradeDate = new Date().toISOString().slice(0, 10), format = 'pdf') {
-  const executed = (orders || []).filter(o => {
+  const rawExecuted = (orders || []).filter(o => {
     const isDone = isTradeExecutionOrder(o);
     if (!isDone) return false;
     const tradedQty = getTradedOrderQuantity(o);
@@ -1120,6 +1130,67 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
     const oDate = getISTDateString(o.created_at);
     return oDate === tradeDate;
   });
+
+  // Consolidate sliced orders for reporting
+  const groupMap = new Map();
+  const executed = [];
+
+  // Pre-calculate 30-second time clusters for legacy orders without explicit slice IDs
+  const timeClusters = new Map();
+  for (const o of rawExecuted) {
+    if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
+      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+      const cKey = `${o.symbol}_${o.side}_${tSec}`;
+      timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
+    }
+  }
+
+  for (const o of rawExecuted) {
+    let groupId = o.slice_group_id;
+    if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
+      const match = o.remarks.match(/\[(slice_[^\]]+)\]/);
+      if (match) groupId = match[1];
+    }
+    if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
+      const dStr = new Date(o.created_at || o.createdAt).toISOString().slice(0, 16);
+      groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+    }
+    if (!groupId) {
+      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+      const cKey = `${o.symbol}_${o.side}_${tSec}`;
+      if ((timeClusters.get(cKey) || 0) > 1) {
+        groupId = `cluster_${cKey}`;
+      }
+    }
+
+    const oTradedQty = getTradedOrderQuantity(o);
+    const oPrice = Math.abs(Number(o.average_price || o.price || 0));
+
+    if (groupId) {
+      if (!groupMap.has(groupId)) {
+        const parent = {
+          ...o,
+          sliceCount: 1,
+          totalTradeValue: oTradedQty * oPrice,
+          quantity: oTradedQty,
+          filled_quantity: oTradedQty,
+          brokerage: o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage
+        };
+        groupMap.set(groupId, parent);
+        executed.push(parent);
+      } else {
+        const parent = groupMap.get(groupId);
+        parent.sliceCount += 1;
+        parent.quantity += oTradedQty;
+        parent.filled_quantity += oTradedQty;
+        parent.totalTradeValue += (oTradedQty * oPrice);
+        parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : oPrice;
+        parent.brokerage = (parent.brokerage || 0) + (o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage);
+      }
+    } else {
+      executed.push(o);
+    }
+  }
 
   const cnNumber = `CN-${tradeDate.replace(/-/g, '')}-${(user.client_id || user.id || 'SE000001')}`;
   
@@ -1147,9 +1218,11 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
 
     const actualQty = getTradedOrderQuantity(o);
     const actualPrice = Math.abs(Number(o.average_price || o.price || 0));
+    const sliceCountNum = o.sliceCount || o.slice_total || 1;
+    const orderLabel = (o.id || `ORD${1000 + idx}`) + (sliceCountNum > 1 ? ` (${sliceCountNum} Slices)` : '');
 
     return {
-      orderNo: o.id || `ORD${1000 + idx}`,
+      orderNo: orderLabel,
       tradeTime: safeFormatTime(o.created_at),
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',

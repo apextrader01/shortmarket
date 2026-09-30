@@ -1452,91 +1452,30 @@ export const useStore = create(persist((set, get) => ({
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      if (slices && slices.length > 1) {
-        // Multi-slice execution for large orders exceeding freeze limits
-        const sliceGroupId = `slice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const slicePromises = slices.map(async (sliceQty, index) => {
-          const childPayload = {
-            ...normalizedPayload,
-            quantity: sliceQty,
-            total_quantity: quantity,
-            slice_group_id: sliceGroupId,
-            slice_index: index + 1,
-            slice_total: slices.length
-          };
-          for (let attempt = 0; attempt <= 2; attempt++) {
-            try {
-              const res = await fetch(`${API}/api/order`, {
-                credentials: 'include',
-                method: 'POST',
-                headers,
-                body: JSON.stringify(childPayload)
-              });
-              const json = await res.json();
-              if (res.status === 429 && attempt < 2) {
-                await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-                continue;
-              }
-              return json;
-            } catch (e) {
-              if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 200));
-                continue;
-              }
-              return { success: false, error: e.message };
-            }
-          }
-        });
-
-        const results = await Promise.all(slicePromises);
-        const successful = results.filter(r => r && r.success);
-        
-        get().fetchUserData().catch(() => {});
-        if (successful.length === slices.length) {
-          playOrderExecutedSound();
-          return {
-            success: true,
-            status: successful[0]?.status || 'EXECUTED',
-            isSliced: true,
-            slicesCount: slices.length,
-            message: `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
-          };
-        } else if (successful.length > 0) {
-          playOrderExecutedSound();
-          const totalPlacedQty = results.reduce((sum, r, idx) => (r && r.success ? sum + (Number(slices[idx]) || 0) : sum), 0);
-          const failedResults = results.filter(r => !r || !r.success);
-          const firstErr = failedResults[0]?.error || 'Some order slices failed to execute';
-          return {
-            success: false,
-            partialSuccess: true,
-            status: 'PARTIAL',
-            placedCount: successful.length,
-            totalSlices: slices.length,
-            placedQty: totalPlacedQty,
-            totalQty: quantity,
-            isSliced: true,
-            slicesCount: slices.length,
-            error: `Partial fill: ${successful.length}/${slices.length} slices placed (${totalPlacedQty}/${quantity} qty). Failed remainder: ${firstErr}`,
-            message: `Partial fill: Placed ${successful.length} of ${slices.length} slices (${totalPlacedQty}/${quantity} qty). Remaining failed: ${firstErr}`
-          };
-        } else {
-          const firstErr = results[0]?.error || 'Order placement failed';
-          return { success: false, error: firstErr };
-        }
-      }
+      // Single unified HTTP request: Backend manages freeze limit slicing, brokerage, and volume matching atomically
+      // This eliminates parallel HTTP connection flooding, Node.js event loop lag, and database row explosion
+      const payloadToSend = {
+        ...normalizedPayload,
+        slice_total: slices && slices.length > 1 ? slices.length : 1
+      };
 
       const res = await fetch(`${API}/api/order`, { 
         credentials: 'include', 
         method: 'POST',
         headers,
-        body: JSON.stringify(normalizedPayload),
+        body: JSON.stringify(payloadToSend),
       });
       const data = await res.json();
       if (data.success) {
         playOrderExecutedSound();
         // Sync user data non-blockingly in background for sub-100ms instant execution
         get().fetchUserData().catch(() => {});
-        return data;
+        return {
+          ...data,
+          isSliced: slices && slices.length > 1,
+          slicesCount: slices ? slices.length : 1,
+          message: slices && slices.length > 1 ? `Successfully placed order (${quantity} total qty across ${slices.length} exchange freeze slices)` : (data.message || 'Order placed successfully')
+        };
       }
       console.error('[placeOrder FAILED]', data);
       return { success: false, error: data.error || 'Order failed' };

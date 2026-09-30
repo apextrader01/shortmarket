@@ -820,6 +820,7 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_group_id VARCHAR(100)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_index INTEGER');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_total INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS brokerage DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS basket_group_id VARCHAR(100)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trail_amount DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS high_water_mark DECIMAL(14,2)');

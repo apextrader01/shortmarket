@@ -399,6 +399,11 @@ export default function OrdersView() {
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                               Qty. {Number(order.filled_quantity) > 0 ? `${formatOrderQty(order, order.filled_quantity)}/${formatOrderQty(order, order.quantity)}` : `${formatOrderQty(order, order.quantity)}`}
                             </span>
+                            {order.slice_total && order.slice_total > 1 ? (
+                              <span style={{ fontSize: '9.5px', fontWeight: '700', color: '#60a5fa', background: 'rgba(96,165,250,0.12)', padding: '1px 4px', borderRadius: '3px' }}>
+                                ⚡ {order.slice_total} Slices
+                              </span>
+                            ) : null}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
@@ -632,6 +637,13 @@ export default function OrdersView() {
                       ) : (
                         formatOrderQty(order, order.quantity)
                       )}
+                      {order.slice_total && order.slice_total > 1 ? (
+                        <div style={{ marginTop: '2px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#60a5fa', background: 'rgba(96,165,250,0.12)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(96,165,250,0.25)' }}>
+                            ⚡ {order.slice_total} Slices
+                          </span>
+                        </div>
+                      ) : null}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       {order.type === 'TRAILING_STOP' ? (
@@ -909,6 +921,18 @@ export default function OrdersView() {
                   ₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0) * (Number(selectedOrder.filled_quantity) > 0 && selectedOrder.status === 'CANCELLED' ? Number(selectedOrder.filled_quantity) : Number(selectedOrder.quantity))).toFixed(2)}
                 </span>
               </div>
+              {selectedOrder.slice_total && selectedOrder.slice_total > 1 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Exchange Slices:</span>
+                  <span style={{ fontWeight: '600', color: '#60a5fa' }}>⚡ {selectedOrder.slice_total} Slices (Freeze Limit Compliant)</span>
+                </div>
+              ) : null}
+              {selectedOrder.brokerage !== undefined && selectedOrder.brokerage !== null && Number(selectedOrder.brokerage) > 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Brokerage:</span>
+                  <span style={{ fontWeight: '600' }}>₹{Number(selectedOrder.brokerage).toFixed(2)}</span>
+                </div>
+              ) : null}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
                 <span style={{ fontWeight: '700', color: (selectedOrder.status === 'EXECUTED' || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'COMPLETE') ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' ? 'var(--color-red-light)' : (selectedOrder.status === 'CANCELLED' ? (Number(selectedOrder.filled_quantity) > 0 ? '#f59e0b' : 'var(--color-red-light)') : 'var(--color-yellow)')) }}>

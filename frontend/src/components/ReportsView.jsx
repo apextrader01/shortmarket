@@ -147,7 +147,7 @@ const LedgerStatement = () => {
     }
   };
 
-  // Consolidate consecutive or interleaved sliced order ledger records (e.g. 100 slices into 1 clean consolidated entry)
+  // Consolidate consecutive sliced order ledger records (e.g. 100 slices into 1 clean consolidated entry)
   const paginatedLedger = useMemo(() => {
     if (!Array.isArray(ledger) || ledger.length === 0) return [];
     const result = [];
@@ -573,7 +573,7 @@ const TradesAndCharges = () => {
     });
   }, [executedOrders, filterPeriod, customStart, customEnd]);
 
-  // Consolidate sliced orders so brokerage is charged once per parent order (not per slice)
+  // Consolidate sliced orders so brokerage is charged once per parent order (brokerage depends upon slices)
   const consolidatedOrders = useMemo(() => {
     const groupMap = new Map();
     const result = [];
@@ -613,7 +613,8 @@ const TradesAndCharges = () => {
             sliceCount: 1,
             totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
             quantity: Number(o.quantity) || 0,
-            filled_quantity: Number(o.filled_quantity || o.quantity || 0)
+            filled_quantity: Number(o.filled_quantity || o.quantity || 0),
+            brokerage: o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage
           };
           groupMap.set(groupId, parent);
           result.push(parent);
@@ -626,6 +627,7 @@ const TradesAndCharges = () => {
           parent.filled_quantity += Number(o.filled_quantity || o.quantity || 0);
           parent.totalTradeValue += (q * p);
           parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : p;
+          parent.brokerage = (parent.brokerage || 0) + (o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage);
         }
       } else {
         result.push(o);
@@ -966,6 +968,7 @@ const ProfitAndLoss = () => {
             sliceCount: 1,
             totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
             quantity: Number(o.quantity) || 0,
+            brokerage: o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage,
             realized_pnl: (o.realized_pnl !== null && o.realized_pnl !== undefined) ? parseFloat(o.realized_pnl) : 0
           };
           groupMap.set(groupId, parent);
@@ -978,6 +981,7 @@ const ProfitAndLoss = () => {
           parent.quantity += q;
           parent.totalTradeValue += (q * p);
           parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : p;
+          parent.brokerage = (parent.brokerage || 0) + (o.brokerage !== undefined && o.brokerage !== null ? Number(o.brokerage) : calculateIndianCharges(o).brokerage);
           if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
             parent.realized_pnl += parseFloat(o.realized_pnl);
           }
