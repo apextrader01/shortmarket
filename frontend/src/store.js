@@ -1446,6 +1446,21 @@ export const useStore = create(persist((set, get) => ({
         product_type: orderPayload.product_type || orderPayload.productType || 'INT'
       };
       const { symbol, quantity, lotsize } = normalizedPayload;
+
+      // Strict Exchange Freeze Limit Validation (Client-Side Protection)
+      const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+      const isMF = cleanSym.endsWith('-MF') || ['EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym);
+      if (!isMF) {
+        const freezeLimit = getFreezeLimit(symbol, lotsize);
+        if (freezeLimit && Number(quantity) > freezeLimit) {
+          const maxLots = (lotsize && lotsize > 1) ? Math.floor(freezeLimit / lotsize) : freezeLimit;
+          const err = (lotsize && lotsize > 1)
+            ? `Order quantity (${Number(quantity).toLocaleString('en-IN')} qty / ${Math.round(quantity / lotsize)} lots) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} qty (${maxLots} lots) for ${symbol}. Please place an order within the freeze limit.`
+            : `Order quantity (${Number(quantity).toLocaleString('en-IN')} shares) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares for ${symbol}. Please place an order within the freeze limit.`;
+          return { success: false, error: err };
+        }
+      }
+
       const slices = calculateOrderSlices(symbol, quantity, lotsize);
 
       const token = localStorage.getItem('token');

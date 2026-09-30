@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Search, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
@@ -591,6 +591,12 @@ export default function BasketModal() {
     return agg;
   }, [enhancedItems, basketItems, productType, totalExecutionSlices]);
 
+  const freezeExceededLegs = enhancedItems.filter(item => {
+    const limit = getFreezeLimit(item.symbol, item.lotsize);
+    return limit && item.totalQuantity > limit;
+  });
+  const hasFreezeExceededItem = freezeExceededLegs.length > 0;
+
   // Check market session restrictions and cutoff
   let blockedMarketReason = null;
   const isMarketBlocked = enhancedItems.some(item => {
@@ -669,6 +675,14 @@ export default function BasketModal() {
     if (basketItems.length === 0) return;
 
     for (const item of enhancedItems) {
+      const limit = getFreezeLimit(item.symbol, item.lotsize);
+      if (limit && item.totalQuantity > limit) {
+        const maxLots = (item.lotsize && item.lotsize > 1) ? Math.floor(limit / item.lotsize) : limit;
+        alert(item.lotsize > 1
+          ? `Order for ${item.symbol} (${item.totalQuantity} qty / ${item.quantity} lots) exceeds exchange freeze limit of ${limit} qty (${maxLots} lots). Please adjust quantity.`
+          : `Order for ${item.symbol} (${item.totalQuantity} shares) exceeds exchange freeze limit of ${limit.toLocaleString('en-IN')} shares. Please adjust quantity.`);
+        return;
+      }
       if (item.orderType === 'LIMIT' && (!item.price || parseFloat(item.price) <= 0 || isNaN(parseFloat(item.price)))) {
         alert(`Please enter a valid limit price greater than 0 for ${item.symbol}.`);
         return;
@@ -1837,28 +1851,24 @@ export default function BasketModal() {
 
         {/* Footer */}
         <div style={{ background: 'var(--bg-card)', padding: '14px 20px', borderTop: '1px solid var(--border-color)' }}>
-          {/* Order Slicing Notice Banner if quantities exceed freeze limits */}
-          {totalExecutionSlices > enhancedItems.length && basketItems.length > 0 && (
+          {/* Exchange Freeze Limit Notice Banner if quantities exceed freeze limits */}
+          {hasFreezeExceededItem && basketItems.length > 0 && (
             <div style={{
-              background: 'rgba(245, 158, 11, 0.1)',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
               borderRadius: '6px',
               padding: '8px 12px',
               marginBottom: '12px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '11.5px',
-              color: '#d97706'
+              gap: '8px',
+              fontSize: '12px',
+              color: '#ef4444'
             }}>
-              <span>⚡ <strong>Exchange Order Slicing:</strong> Quantities exceed freeze limits and will be split into <strong>{totalExecutionSlices} orders</strong> (₹20 brokerage/order).</span>
-              <button
-                type="button"
-                onClick={() => setShowBreakup(true)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', fontWeight: '700', textDecoration: 'underline', padding: 0 }}
-              >
-                View Breakup
-              </button>
+              <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Exchange Freeze Limit Exceeded:</strong> One or more orders exceed the exchange freeze limit. Please reduce quantity to execute.
+              </span>
             </div>
           )}
 
@@ -1904,15 +1914,15 @@ export default function BasketModal() {
             </div>
             <button 
               onClick={handleExecute}
-              disabled={isInsufficient || isSubmitting || basketItems.length === 0}
+              disabled={isInsufficient || isSubmitting || basketItems.length === 0 || hasFreezeExceededItem}
               style={{ 
-                background: (isInsufficient || basketItems.length === 0) ? 'var(--bg-card)' : 'var(--color-blue)', 
-                color: (isInsufficient || basketItems.length === 0) ? 'var(--text-secondary)' : '#fff', 
+                background: (isInsufficient || basketItems.length === 0 || hasFreezeExceededItem) ? 'var(--bg-card)' : 'var(--color-blue)', 
+                color: (isInsufficient || basketItems.length === 0 || hasFreezeExceededItem) ? 'var(--text-secondary)' : '#fff', 
                 padding: '10px 22px', borderRadius: '6px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.5px',
-                border: 'none', cursor: (isInsufficient || basketItems.length === 0) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+                border: 'none', cursor: (isInsufficient || basketItems.length === 0 || hasFreezeExceededItem) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
               }}
             >
-              {isSubmitting ? 'EXECUTING...' : 'EXECUTE BASKET'}
+              {isSubmitting ? 'EXECUTING...' : (hasFreezeExceededItem ? 'EXCEEDS FREEZE LIMIT' : 'EXECUTE BASKET')}
             </button>
           </div>
         </div>

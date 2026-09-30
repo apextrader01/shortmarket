@@ -107,15 +107,15 @@ export default function OrderModal() {
 
   const balanceNum = Number(user?.balance) || 0;
   const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
-  const maxAllowedQty = freezeLimit > 0 ? freezeLimit * 100 : 10000000;
-  const maxAllowedLots = (orderModal.lotsize && orderModal.lotsize > 1) ? Math.floor(maxAllowedQty / orderModal.lotsize) : maxAllowedQty;
+  const maxAllowedQty = freezeLimit;
+  const maxAllowedLots = (orderModal.lotsize && orderModal.lotsize > 1) ? Math.floor(freezeLimit / orderModal.lotsize) : freezeLimit;
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   const isMutualFund = cleanSym.endsWith('-MF') || ['EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym) || (/^\d{5,6}$/.test(cleanSym) && !symbol.startsWith('BSE:') && !symbol.startsWith('NSE:'));
   const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : Math.round((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
-  const isCappedBySlicing = totalQuantity > maxAllowedQty;
-  const effectiveQuantity = isCappedBySlicing ? maxAllowedQty : totalQuantity;
+  const isExceedingFreezeLimit = !isMutualFund && freezeLimit > 0 && totalQuantity > freezeLimit;
+  const effectiveQuantity = totalQuantity;
   const slicesCount = getOrderSlicesCount(symbol, effectiveQuantity, orderModal.lotsize);
   
   // Fetch Estimated Charges
@@ -566,6 +566,12 @@ export default function OrderModal() {
 
     if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
       alert("Please enter a valid quantity greater than 0.");
+      return;
+    }
+    if (isExceedingFreezeLimit) {
+      alert(orderModal.lotsize > 1
+        ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
+        : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`);
       return;
     }
     if (orderType === 'LIMIT' && (!price || parseFloat(price) <= 0 || isNaN(parseFloat(price)))) {
@@ -1024,17 +1030,17 @@ export default function OrderModal() {
               </fieldset>
               {orderModal.lotsize > 1 ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
-                  <span style={{ color: isCappedBySlicing ? '#f59e0b' : 'var(--text-secondary)' }}>
+                  <span style={{ color: isExceedingFreezeLimit ? '#ef4444' : 'var(--text-secondary)' }}>
                     Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
                   </span>
-                  {isCappedBySlicing && (
+                  {isExceedingFreezeLimit && (
                     <button
                       type="button"
                       onClick={() => setQuantity(maxAllowedLots)}
                       style={{
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '1px solid rgba(245, 158, 11, 0.4)',
-                        color: '#f59e0b',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#ef4444',
                         borderRadius: '4px',
                         padding: '1px 6px',
                         fontSize: '10px',
@@ -1047,15 +1053,15 @@ export default function OrderModal() {
                     </button>
                   )}
                 </div>
-              ) : isCappedBySlicing ? (
+              ) : isExceedingFreezeLimit ? (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
                   <button
                     type="button"
                     onClick={() => setQuantity(maxAllowedQty)}
                     style={{
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      color: '#f59e0b',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      color: '#ef4444',
                       borderRadius: '4px',
                       padding: '1px 6px',
                       fontSize: '10px',
@@ -1164,13 +1170,13 @@ export default function OrderModal() {
             </div>
           )}
 
-          {/* Slicing Notice Banner */}
-          {isCappedBySlicing ? (
+          {/* Exchange Freeze Limit Alert Banner */}
+          {isExceedingFreezeLimit && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#f59e0b', 
-              background: 'rgba(245, 158, 11, 0.12)', 
-              border: '1px solid rgba(245, 158, 11, 0.35)', 
+              color: '#ef4444', 
+              background: 'rgba(239, 68, 68, 0.12)', 
+              border: '1px solid rgba(239, 68, 68, 0.35)', 
               borderRadius: '6px', 
               padding: '8px 10px', 
               marginTop: '8px',
@@ -1179,46 +1185,25 @@ export default function OrderModal() {
               gap: '8px',
               lineHeight: '1.4'
             }}>
-              <AlertTriangle size={15} color="#f59e0b" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>
-                <div style={{ fontWeight: '700' }}>
-                  Order Slicing Cap Reached (Max 100 Slices):
+                <div style={{ fontWeight: '700', color: '#ef4444' }}>
+                  {orderModal.lotsize > 1 ? (
+                    `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
+                  ) : (
+                    `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`
+                  )}
                 </div>
                 <div style={{ color: '#d1d5db', marginTop: '2px' }}>
                   {orderModal.lotsize > 1 ? (
-                    `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds maximum allowed per order.`
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
                   ) : (
-                    `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds maximum allowed per order.`
-                  )}
-                </div>
-                <div style={{ color: '#fbbf24', marginTop: '2px', fontWeight: '600' }}>
-                  {orderModal.lotsize > 1 ? (
-                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots across 100 orders of ${freezeLimit.toLocaleString('en-IN')}). Remaining quantity must be placed in a separate order.`
-                  ) : (
-                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Shares across 100 orders of ${freezeLimit.toLocaleString('en-IN')}. Remaining quantity must be placed in a separate order.`
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Shares.`
                   )}
                 </div>
               </div>
             </div>
-          ) : totalQuantity > freezeLimit ? (
-            <div style={{ 
-              fontSize: '11.5px', 
-              color: '#93c5fd', 
-              background: 'rgba(59, 130, 246, 0.12)', 
-              border: '1px solid rgba(59, 130, 246, 0.3)', 
-              borderRadius: '6px', 
-              padding: '7px 10px', 
-              marginTop: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <Zap size={14} color="#60a5fa" />
-              <span>
-                Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} {orderModal.lotsize > 1 ? 'Qty' : 'Shares'}</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
-              </span>
-            </div>
-          ) : null}
+          )}
 
           {/* Trailing Stop Loss (TSL) Jump Input */}
           {(tab === 'Stop Loss' || isCO || isBO) && (
@@ -1266,6 +1251,28 @@ export default function OrderModal() {
               </div>
             </div>
             <button style={{ background: '#2563eb', color: 'white', border: 'none', padding: '5px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
+          </div>
+        )}
+
+        {/* Exchange Freeze Limit Red Alert Banner (Matches Reference Screenshot) */}
+        {isExceedingFreezeLimit && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            borderTop: '1px solid rgba(239, 68, 68, 0.3)',
+            borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
+            padding: isMobile ? '8px 14px' : '9px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            textAlign: 'center'
+          }}>
+            <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+            <span style={{ color: '#ef4444', fontSize: isMobile ? '12px' : '12.5px', fontWeight: '700' }}>
+              {orderModal.lotsize > 1
+                ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
+                : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`}
+            </span>
           </div>
         )}
 
@@ -1361,15 +1368,17 @@ export default function OrderModal() {
                   closeOrderModal();
                   useStore.getState().setBasketModalOpen(true);
                 }}
+                disabled={isExceedingFreezeLimit}
                 style={{
                   background: 'var(--bg-panel)',
                   border: '1px solid var(--border-color)',
-                  color: 'var(--color-blue)',
+                  color: isExceedingFreezeLimit ? 'var(--text-secondary)' : 'var(--color-blue)',
+                  opacity: isExceedingFreezeLimit ? 0.4 : 1,
                   padding: isMobile ? '10px 12px' : '9px 12px',
                   borderRadius: '6px',
                   fontSize: '12px',
                   fontWeight: '700',
-                  cursor: 'pointer',
+                  cursor: isExceedingFreezeLimit ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1385,17 +1394,17 @@ export default function OrderModal() {
             <button 
               type="button"
               onClick={handlePlaceOrder}
-              disabled={isInsufficient || isPlacing}
+              disabled={isInsufficient || isPlacing || isExceedingFreezeLimit}
               style={{ 
-                background: (isInsufficient || isPlacing) ? '#334155' : (isBuy ? '#10b981' : '#ef4444'), 
-                color: (isInsufficient || isPlacing) ? '#94a3b8' : '#ffffff', 
+                background: (isInsufficient || isPlacing || isExceedingFreezeLimit) ? '#334155' : (isBuy ? '#10b981' : '#ef4444'), 
+                color: (isInsufficient || isPlacing || isExceedingFreezeLimit) ? '#94a3b8' : '#ffffff', 
                 padding: isMobile ? '10px 18px' : '9px 18px', 
                 borderRadius: '6px', 
                 fontSize: '13px', 
                 fontWeight: '800', 
                 letterSpacing: '0.3px',
                 border: 'none', 
-                cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', 
+                cursor: (isInsufficient || isPlacing || isExceedingFreezeLimit) ? 'not-allowed' : 'pointer', 
                 transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
@@ -1403,14 +1412,16 @@ export default function OrderModal() {
                 minWidth: isMobile ? '120px' : '120px',
                 flex: isMobile ? 2 : 'none',
                 whiteSpace: 'nowrap',
-                boxShadow: (isInsufficient || isPlacing) ? 'none' : (isBuy ? '0 0 12px rgba(16, 185, 129, 0.3)' : '0 0 12px rgba(239, 68, 68, 0.3)')
+                boxShadow: (isInsufficient || isPlacing || isExceedingFreezeLimit) ? 'none' : (isBuy ? '0 0 12px rgba(16, 185, 129, 0.3)' : '0 0 12px rgba(239, 68, 68, 0.3)')
               }}
             >
               {isPlacing ? 'PLACING...' : (
-                isTrueExit ? (
-                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                isExceedingFreezeLimit ? (
+                  orderModal.lotsize > 1 ? `EXCEEDS FREEZE LIMIT (${maxAllowedLots} LOTS MAX)` : `EXCEEDS FREEZE LIMIT (${freezeLimit.toLocaleString('en-IN')} MAX)`
+                ) : isTrueExit ? (
+                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isAmo ? '(AMO)' : ''}`
                 ) : (
-                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isAmo ? '(AMO)' : ''}`
                 )
               )}
             </button>

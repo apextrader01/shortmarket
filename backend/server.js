@@ -5533,6 +5533,24 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // Validate Exchange Freeze Limit (Hard Limit per Single Order)
+  // Enforces regulatory maximum order quantity per order (e.g. 1,755 for NIFTY, 600 for BANKNIFTY, 1 Lakh for Equities, MCX limits)
+  if (!isMF) {
+    const { getFreezeLimit } = require('./services/taxCalculator');
+    const freezeLimit = getFreezeLimit(symbol);
+    if (freezeLimit && Number(quantity) > freezeLimit) {
+      const { getLotSizes } = require('./services/instrumentsCache');
+      const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const lotSizes = getLotSizes([symbol, cleanSym]);
+      const lotsize = lotSizes[symbol] || lotSizes[cleanSym] || 1;
+      const maxLots = (lotsize && lotsize > 1) ? Math.floor(freezeLimit / lotsize) : freezeLimit;
+      const errorMsg = (lotsize && lotsize > 1)
+        ? `Order quantity (${quantity} qty / ${Math.round(quantity / lotsize)} lots) exceeds exchange freeze limit of ${freezeLimit} qty (${maxLots} lots) for ${symbol}. Please place an order within the freeze limit.`
+        : `Order quantity (${quantity} shares) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares for ${symbol}. Please place an order within the freeze limit.`;
+      return res.status(400).json({ error: errorMsg });
+    }
+  }
+
   // Validate Bracket Order (BO) and Cover Order (CO) formats
   if (product_type === 'BO' || product_type === 'CO') {
     const ltp = getLtpFromPriceCache(symbol);
@@ -7429,6 +7447,21 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           });
         }
       }
+    }
+
+    // Validate Freeze Limit for each basket item
+    const { getFreezeLimit } = require('./services/taxCalculator');
+    const legFreezeLimit = getFreezeLimit(item.symbol);
+    if (legFreezeLimit && Number(item.quantity) > legFreezeLimit) {
+      const { getLotSizes } = require('./services/instrumentsCache');
+      const cleanSym = String(item.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const lotSizes = getLotSizes([item.symbol, cleanSym]);
+      const lotsize = lotSizes[item.symbol] || lotSizes[cleanSym] || 1;
+      const maxLots = (lotsize && lotsize > 1) ? Math.floor(legFreezeLimit / lotsize) : legFreezeLimit;
+      const err = (lotsize && lotsize > 1)
+        ? `Order quantity (${item.quantity} qty / ${Math.round(item.quantity / lotsize)} lots) for ${item.symbol} exceeds exchange freeze limit of ${legFreezeLimit} qty (${maxLots} lots). Please adjust quantity.`
+        : `Order quantity (${item.quantity} shares) for ${item.symbol} exceeds exchange freeze limit of ${legFreezeLimit.toLocaleString('en-IN')} shares. Please adjust quantity.`;
+      return res.status(400).json({ error: err });
     }
   }
 

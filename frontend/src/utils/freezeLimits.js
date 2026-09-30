@@ -49,7 +49,8 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
 
   // 2. Cash Equities & ETFs (lot === 1 and not derivative contract)
   // Ensures cash ETFs like NIFTYBEES, BANKBEES, JUNIORBEES are not misclassified as index derivatives
-  if (lot === 1 && !isDerivativeContract(symbol) && !upper.includes('FUT') && !upper.includes('CE') && !upper.includes('PE')) {
+  const isDeriv = isDerivativeContract(symbol) || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(upper) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(upper) || upper.endsWith('-FUT');
+  if (lot === 1 && !isDeriv) {
     return 100000;
   }
 
@@ -78,7 +79,7 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
 
   // 3. Stock F&O (Derivatives: Futures & Options for individual stocks)
   // NSE standard freeze limit for individual security F&O is 40 market lots
-  if (isDerivativeContract(symbol) || upper.includes('FUT') || upper.includes('CE') || upper.includes('PE')) {
+  if (isDeriv) {
     if (lot > 1) {
       return lot * 40;
     }

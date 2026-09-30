@@ -91,16 +91,15 @@ it('taxCalculator charges brokerage depending on slices for large multi-slice or
 // 4. Check OrderModal.jsx code updates
 console.log('\n▶ TEST 4: OrderModal.jsx Implementation Check');
 
-it('OrderModal imports AlertTriangle, computes maxAllowedQty, and supports both Lots and Cash Shares', () => {
+it('OrderModal imports AlertTriangle, enforces freeze limit, disables button, and provides Set Max helper', () => {
   const modalPath = path.join(__dirname, '../frontend/src/components/OrderModal.jsx');
   const content = fs.readFileSync(modalPath, 'utf8').replace(/\r\n/g, '\n');
 
   assert(content.includes('AlertTriangle'), 'OrderModal must import AlertTriangle');
-  assert(content.includes('const maxAllowedQty = freezeLimit > 0 ? freezeLimit * 100 : 10000000;'), 'OrderModal must compute maxAllowedQty');
-  assert(content.includes('const isCappedBySlicing = totalQuantity > maxAllowedQty;'), 'OrderModal must compute isCappedBySlicing');
-  assert(content.includes('const effectiveQuantity = isCappedBySlicing ? maxAllowedQty : totalQuantity;'), 'OrderModal must compute effectiveQuantity');
-  assert(content.includes('quantity: effectiveQuantity'), 'OrderModal must send effectiveQuantity in payload');
-  assert(content.includes('Order Slicing Cap Reached (Max 100 Slices)'), 'OrderModal must display capped warning banner');
+  assert(content.includes('const maxAllowedQty = freezeLimit;'), 'OrderModal must compute maxAllowedQty as freezeLimit');
+  assert(content.includes('const isExceedingFreezeLimit = !isMutualFund && freezeLimit > 0 && totalQuantity > freezeLimit;'), 'OrderModal must compute isExceedingFreezeLimit');
+  assert(content.includes('disabled={isInsufficient || isPlacing || isExceedingFreezeLimit}'), 'OrderModal must disable submit button when isExceedingFreezeLimit is true');
+  assert(content.includes('Max allowed lots per order as per exchange is'), 'OrderModal must display exchange freeze warning banner');
   assert(content.includes('Set Max: {maxAllowedLots.toLocaleString(\'en-IN\')} Lots'), 'OrderModal must provide Set Max helper button for lots');
   assert(content.includes('Set Max: {maxAllowedQty.toLocaleString(\'en-IN\')} Shares'), 'OrderModal must provide Set Max helper button for cash shares');
   assert(content.includes('${orderModal.lotsize > 1 ? \'Qty\' : \'Shares\'}'), 'OrderModal submit button must dynamically show Qty vs Shares');
