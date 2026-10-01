@@ -27,29 +27,31 @@ const lazyWithRetry = (importFn) => lazy(async () => {
   }
 });
 
-// ⚡ Lazy Loaded Sub-Views & Modals (Reduces initial JS bundle by 85% for instant page load)
-const ChartWidget = lazyWithRetry(() => import('./components/ChartWidget'));
-const PositionsView = lazyWithRetry(() => import('./components/PositionsView'));
-const OrdersView = lazyWithRetry(() => import('./components/OrdersView'));
-const PortfolioView = lazyWithRetry(() => import('./components/PortfolioView'));
-const ClientDataView = lazyWithRetry(() => import('./components/ClientDataView'));
-const OrderModal = lazyWithRetry(() => import('./components/OrderModal'));
-const EditOrderModal = lazyWithRetry(() => import('./components/EditOrderModal'));
-const DepositModal = lazyWithRetry(() => import('./components/DepositModal'));
-const AlertModal = lazyWithRetry(() => import('./components/AlertModal'));
-const BasketModal = lazyWithRetry(() => import('./components/BasketModal'));
-const BiometricLockModal = lazyWithRetry(() => import('./components/BiometricLockModal'));
-const OptionChainView = lazyWithRetry(() => import('./components/OptionChainView'));
-const MutualFundsView = lazyWithRetry(() => import('./components/MutualFundsView'));
-const AboutUsView = lazyWithRetry(() => import('./components/AboutUsView'));
-const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
+// ⚡ Core Dashboard Views (Imported directly for instant 0ms switching with zero "Loading module..." delay)
+import ChartWidget from './components/ChartWidget';
+import PositionsView from './components/PositionsView';
+import OrdersView from './components/OrdersView';
+import PortfolioView from './components/PortfolioView';
+import ClientDataView from './components/ClientDataView';
+import OptionChainView from './components/OptionChainView';
+import MutualFundsView from './components/MutualFundsView';
+import AnalyticsView from './components/AnalyticsView';
+import LeaderboardView from './components/LeaderboardView';
+import TradingJournalView from './components/TradingJournalView';
+import TradeDiaryView from './components/TradeDiaryView';
+import ReportsView from './components/ReportsView';
+import PricingView from './components/PricingView';
+import AboutUsView from './components/AboutUsView';
+import ReferralsView from './components/ReferralsView';
+import OrderModal from './components/OrderModal';
+import EditOrderModal from './components/EditOrderModal';
+import DepositModal from './components/DepositModal';
+import BasketModal from './components/BasketModal';
+
+// ⚡ Lazy Loaded Secondary / Heavy Auxiliary Views
 const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard'));
-const AnalyticsView = lazyWithRetry(() => import('./components/AnalyticsView'));
-const PricingView = lazyWithRetry(() => import('./components/PricingView'));
-const ReferralsView = lazyWithRetry(() => import('./components/ReferralsView'));
-const LeaderboardView = lazyWithRetry(() => import('./components/LeaderboardView'));
-const TradingJournalView = lazyWithRetry(() => import('./components/TradingJournalView'));
-const TradeDiaryView = lazyWithRetry(() => import('./components/TradeDiaryView'));
+const AlertModal = lazyWithRetry(() => import('./components/AlertModal'));
+const BiometricLockModal = lazyWithRetry(() => import('./components/BiometricLockModal'));
 const OnboardingWizard = lazyWithRetry(() => import('./components/OnboardingWizard'));
 const DOMLadderModal = lazyWithRetry(() => import('./components/DOMLadderModal'));
 const MarketDepthModal = lazyWithRetry(() => import('./components/MarketDepthModal'));
@@ -60,38 +62,14 @@ const ConsentBanner = lazyWithRetry(() => import('./components/ConsentBanner'));
 const NotFoundView = lazyWithRetry(() => import('./components/NotFoundView'));
 
 const TabLoader = () => (
-  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
-    <div style={{ width: '28px', height: '28px', border: '3px solid rgba(59, 130, 246, 0.2)', borderTopColor: 'var(--color-blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-    <span style={{ fontSize: '12px', fontWeight: '600' }}>Loading module...</span>
+  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
+    <div style={{ width: '32px', height: '32px', border: '3px solid rgba(59, 130, 246, 0.15)', borderTopColor: 'var(--color-blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>Loading...</span>
   </div>
 );
 
-// ⚡ High-Speed Tab & Sub-View Pre-fetcher (Eliminates "Loading module..." delay)
-const tabComponentMap = {
-  TradeDiary: () => import('./components/TradeDiaryView'),
-  Markets: () => import('./components/ChartWidget'),
-  Positions: () => import('./components/PositionsView'),
-  Orders: () => import('./components/OrdersView'),
-  Portfolio: () => import('./components/PortfolioView'),
-  MutualFunds: () => import('./components/MutualFundsView'),
-  Options: () => import('./components/OptionChainView'),
-  Analytics: () => import('./components/AnalyticsView'),
-  Leaderboard: () => import('./components/LeaderboardView'),
-  Journal: () => import('./components/TradingJournalView'),
-  ClientData: () => import('./components/ClientDataView'),
-  Settings: () => import('./components/ClientDataView'),
-  AboutUs: () => import('./components/AboutUsView'),
-  Reports: () => import('./components/ReportsView'),
-  Pricing: () => import('./components/PricingView'),
-  Referrals: () => import('./components/ReferralsView'),
-};
-
-const prefetchTab = (key) => {
-  try {
-    const loader = tabComponentMap[key];
-    if (loader) loader().catch(() => {});
-  } catch (_) {}
-};
+// Core views are loaded synchronously - prefetchTab is a safe no-op
+const prefetchTab = () => {};
 import NetworkStatusBanner from './components/NetworkStatusBanner';
 import SessionExpiredModal from './components/SessionExpiredModal';
 import PermissionDenied from './components/PermissionDenied';
@@ -390,50 +368,6 @@ function App() {
     if (fetchAnnouncement) fetchAnnouncement();
   }, []);
 
-  // ⚡ Intelligent Background Pre-fetching during Browser Idle Time
-  useEffect(() => {
-    if (!user) return;
-    const modulesToPreload = [
-      () => import('./components/PositionsView'),
-      () => import('./components/OrdersView'),
-      () => import('./components/PortfolioView'),
-      () => import('./components/MutualFundsView'),
-      () => import('./components/OptionChainView'),
-      () => import('./components/AnalyticsView'),
-      () => import('./components/OrderModal'),
-      () => import('./components/TradingJournalView'),
-      () => import('./components/ClientDataView'),
-      () => import('./components/LeaderboardView'),
-      () => import('./components/ReportsView'),
-      () => import('./components/PricingView'),
-      () => import('./components/AboutUsView'),
-    ];
-
-    let index = 0;
-    const scheduleNext = () => {
-      if (index >= modulesToPreload.length) return;
-      const loadFn = modulesToPreload[index++];
-      try {
-        loadFn().catch(() => {});
-      } catch (_) {}
-
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        window.requestIdleCallback(scheduleNext, { timeout: 2500 });
-      } else {
-        setTimeout(scheduleNext, 200);
-      }
-    };
-
-    const idleTimer = setTimeout(() => {
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        window.requestIdleCallback(scheduleNext, { timeout: 3000 });
-      } else {
-        setTimeout(scheduleNext, 250);
-      }
-    }, 1200);
-
-    return () => clearTimeout(idleTimer);
-  }, [user?.id]);
 
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
