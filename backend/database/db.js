@@ -541,6 +541,21 @@ async function initSchema() {
         console.log('Created referrals table');
       }
 
+      // 11. Audit Logs Table (OWASP #9 / CERT-In & Regulatory Audit Trail)
+      const hasAuditLogs = await db.schema.hasTable('audit_logs');
+      if (!hasAuditLogs) {
+        await db.schema.createTable('audit_logs', table => {
+          table.increments('id').primary();
+          table.integer('user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+          table.integer('admin_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+          table.string('action', 100).notNullable().index();
+          table.string('ip_address', 64);
+          table.jsonb('details');
+          table.timestamp('created_at').defaultTo(db.fn.now()).index();
+        });
+        console.log('Created audit_logs table');
+      }
+
       // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
@@ -889,6 +904,23 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE positions_archive SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     await db.raw('ALTER TABLE user_sessions SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
     await db.raw('ALTER TABLE trusted_devices SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_cost_limit = 1000)').catch(() => {});
+
+    // Audit Logs Table (OWASP #9 / CERT-In & Regulatory Audit Trail)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        action VARCHAR(100) NOT NULL,
+        ip_address VARCHAR(64),
+        details JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_audit_logs_admin_id ON audit_logs(admin_id)').catch(() => {});
     
     // System Settings Table (for Admin market toggles, maintenance mode, etc.)
     await db.raw(`

@@ -648,10 +648,18 @@ if (!isMaster) {
   else cacheSubClient.on('ready', setupCacheSync);
 }
 
+app.disable('x-powered-by');
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginOpenerPolicy: false,
-  contentSecurityPolicy: false // Managed at reverse proxy / frontend layer
+  contentSecurityPolicy: false, // Managed at reverse proxy / frontend layer
+  dnsPrefetchControl: { allow: false },
+  frameguard: { action: 'sameorigin' },
+  hidePoweredBy: true,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
 const allowedOrigins = [
@@ -869,8 +877,8 @@ app.get('/api/stocks', async (req, res) => {
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { authenticateToken, JWT_SECRET, hashToken } = require('./middleware/auth');
+const { authenticateToken, requireAdmin, JWT_SECRET, hashToken } = require('./middleware/auth');
+const { logAuditEvent } = require('./services/auditLogger');
 const { parseDeviceDetails, parseIpLocation, syncBannedEntities, isIpBanned, isPhoneBanned } = require('./services/deviceSecurity');
 const rateLimit = require('express-rate-limit');
 
@@ -10721,6 +10729,20 @@ const { initFyers, setPriceCache } = require('./services/fyers');
 setPriceCache(priceCache);
 
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
+
+// ─── Centralized Exceptional Error Handling (OWASP #10) ───────────────────
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || err.status || 500;
+  const isProd = process.env.NODE_ENV === 'production';
+  console.error(`🚨 [EXCEPTIONAL ERROR] [${req.method} ${req.url}]:`, err.message || err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  return res.status(statusCode).json({
+    error: err.userMessage || err.message || 'Internal server error',
+    ...(isProd ? {} : { stack: err.stack })
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 

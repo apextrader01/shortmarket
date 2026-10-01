@@ -219,4 +219,24 @@ async function authenticateToken(req, res, next) {
     next();
 }
 
-module.exports = { authenticateToken, JWT_SECRET, hashToken };
+/**
+ * Centralized Administrator Access Control (OWASP #1: Broken Access Control)
+ * Strictly verifies caller possesses active is_admin privileges in database.
+ */
+async function requireAdmin(req, res, next) {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    const caller = await db('users').select('id', 'is_admin').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) {
+      return res.status(403).json({ error: 'Access denied: Administrator privileges required.' });
+    }
+    req.admin = caller;
+    next();
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to verify administrative authorization' });
+  }
+}
+
+module.exports = { authenticateToken, requireAdmin, JWT_SECRET, hashToken };
