@@ -73,10 +73,17 @@ class TriggerEngine {
             const ordCopy = { ...order };
             this.trailingOrders.set(order.id.toString(), ordCopy);
             if (order.symbol) {
+                const clean = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
                 if (!this.trailingOrdersBySymbol.has(order.symbol)) {
                     this.trailingOrdersBySymbol.set(order.symbol, new Map());
                 }
                 this.trailingOrdersBySymbol.get(order.symbol).set(order.id.toString(), ordCopy);
+                if (clean && clean !== order.symbol) {
+                    if (!this.trailingOrdersBySymbol.has(clean)) {
+                        this.trailingOrdersBySymbol.set(clean, new Map());
+                    }
+                    this.trailingOrdersBySymbol.get(clean).set(order.id.toString(), ordCopy);
+                }
             }
         }
         
@@ -207,10 +214,21 @@ class TriggerEngine {
         const cleanSym = symbol && symbol.includes(':') ? symbol.split(':')[1] : symbol;
         const symMap = this.trailingOrdersBySymbol.get(symbol);
         const cleanMap = (cleanSym && cleanSym !== symbol) ? this.trailingOrdersBySymbol.get(cleanSym) : null;
-        const targetTrailingMap = symMap || cleanMap;
+        
+        let candidateOrders = symMap;
+        if (cleanMap && cleanMap.size > 0) {
+            if (!symMap || symMap.size === 0) {
+                candidateOrders = cleanMap;
+            } else {
+                candidateOrders = new Map(symMap);
+                for (const [id, ord] of cleanMap) {
+                    if (!candidateOrders.has(id)) candidateOrders.set(id, ord);
+                }
+            }
+        }
 
-        if (targetTrailingMap && targetTrailingMap.size > 0) {
-            for (const [orderId, tOrder] of targetTrailingMap.entries()) {
+        if (candidateOrders && candidateOrders.size > 0) {
+            for (const [orderId, tOrder] of candidateOrders.entries()) {
                 const trailAmount = Number(tOrder.trail_amount || 0);
                 if (trailAmount <= 0) continue;
 

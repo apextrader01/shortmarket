@@ -1677,7 +1677,13 @@ export const useStore = create(persist((set, get) => ({
         }
       });
       const data = await res.json();
-      if (data.success) { get().fetchUserData(); return true; }
+      if (data.success) { 
+        get().fetchUserData(); 
+        if (data.autoExited && data.message) {
+          alert("ℹ️ " + data.message);
+        }
+        return true; 
+      }
       if (data.error) set({ authError: data.error });
       return false;
     } catch (_) { return false; }

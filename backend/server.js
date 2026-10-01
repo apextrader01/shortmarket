@@ -8490,7 +8490,11 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
         }
     } catch(e) {}
     
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      autoExited: Boolean(autoExitOrderToExecute),
+      message: autoExitOrderToExecute ? 'Bracket order and underlying position squared off at market.' : 'Order cancelled successfully.'
+    });
   } catch (err) {
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({ error: err.message });

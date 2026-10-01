@@ -643,6 +643,7 @@ export default function OrderModal() {
       side,
       quantity: effectiveQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
+      quoted_price: orderType === 'MARKET' ? (livePrice || parseFloat(price) || null) : (parseFloat(price) || null),
       trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || parsedTrail > 0) && slTrigger ? parseFloat(slTrigger) : null,
       trail_amount: parsedTrail > 0 ? parsedTrail : null,
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
@@ -1150,6 +1151,13 @@ export default function OrderModal() {
                     style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                   />
                 </fieldset>
+                {orderType === 'MARKET' && (isCO || isBO) && parseFloat(slPrice) > 0 && livePrice > 0 && (
+                  <div style={{ fontSize: '10.5px', color: '#ef4444', fontWeight: '500', marginTop: '2px', paddingLeft: '2px' }}>
+                    {side === 'BUY' 
+                      ? (livePrice > parseFloat(slPrice) ? `-${(livePrice - parseFloat(slPrice)).toFixed(2)} pts from fill` : 'Must be < fill price')
+                      : (parseFloat(slPrice) > livePrice ? `+${(parseFloat(slPrice) - livePrice).toFixed(2)} pts from fill` : 'Must be > fill price')}
+                  </div>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
                   <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: '#2563eb' }} /> 
                   CO (Cover Order)
@@ -1168,6 +1176,13 @@ export default function OrderModal() {
                     style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                   />
                 </fieldset>
+                {orderType === 'MARKET' && isBO && parseFloat(tgtPrice) > 0 && livePrice > 0 && (
+                  <div style={{ fontSize: '10.5px', color: '#10b981', fontWeight: '500', marginTop: '2px', paddingLeft: '2px' }}>
+                    {side === 'BUY'
+                      ? (parseFloat(tgtPrice) > livePrice ? `+${(parseFloat(tgtPrice) - livePrice).toFixed(2)} pts from fill` : 'Must be > fill price')
+                      : (livePrice > parseFloat(tgtPrice) ? `-${(livePrice - parseFloat(tgtPrice)).toFixed(2)} pts from fill` : 'Must be < fill price')}
+                  </div>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
                   <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: '#2563eb' }} /> 
                   BO (Bracket Order)
