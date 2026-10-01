@@ -67,12 +67,21 @@ async function runPlaywrightSuite() {
   const server = await startStaticServer();
   console.log('✔ Static server listening.\n');
 
-  console.log('▶ Launching Google Chrome browser...');
-  const browser = await chromium.launch({
-    channel: 'chrome',
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
-  });
+  console.log('▶ Launching browser (Chromium / Chrome)...');
+  const launchArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--single-process'];
+  let browser;
+  try {
+    // 1. Try standard Playwright Chromium (installed via npx playwright install on Linux/GCP)
+    browser = await chromium.launch({ headless: true, args: launchArgs });
+  } catch (_) {
+    try {
+      // 2. Fallback to system Google Chrome
+      browser = await chromium.launch({ channel: 'chrome', headless: true, args: launchArgs });
+    } catch (_) {
+      // 3. Fallback to Microsoft Edge
+      browser = await chromium.launch({ channel: 'msedge', headless: true, args: launchArgs });
+    }
+  }
 
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
