@@ -56,6 +56,7 @@ const MarketDepthModal = lazyWithRetry(() => import('./components/MarketDepthMod
 const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
 const MobileStockOverviewModal = lazyWithRetry(() => import('./components/MobileStockOverviewModal'));
 const LegalView = lazyWithRetry(() => import('./components/LegalView'));
+const ConsentBanner = lazyWithRetry(() => import('./components/ConsentBanner'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
@@ -490,11 +491,15 @@ function App() {
     currentPath.includes('delete-account') || 
     currentPath.includes('deleteaccount') || 
     currentPath.includes('risk-policy') || 
-    currentPath.includes('riskpolicy')
+    currentPath.includes('riskpolicy') ||
+    currentPath.includes('data-rights') ||
+    currentPath.includes('datarights') ||
+    currentPath.includes('legal')
   ) {
     const initialTab = currentPath.includes('terms') ? 'terms' : 
                        (currentPath.includes('delete') ? 'delete-account' : 
-                       (currentPath.includes('risk') ? 'risk' : 'privacy'));
+                       (currentPath.includes('risk') ? 'risk' : 
+                       (currentPath.includes('data') ? 'data-rights' : 'privacy')));
     return (
       <Suspense fallback={<TabLoader />}>
         <LegalView initialTab={initialTab} />
@@ -772,6 +777,13 @@ function App() {
                   </Suspense>
                 </div>
               )}
+              {(activeTab === 'Legal' || activeTab === 'Privacy') && (
+                <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-main)' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <LegalView initialTab="privacy" onBack={() => setActiveTab('Markets')} />
+                  </Suspense>
+                </div>
+              )}
               </main>
             </div>
           </div>
@@ -827,6 +839,7 @@ function App() {
             { label: 'Referrals', key: 'Referrals', icon: Gift },
             { label: 'Pricing', key: 'Pricing', icon: Star },
             { label: 'About Us', key: 'AboutUs', icon: Info },
+            { label: 'Privacy & Legal', key: 'Legal', icon: Shield },
             ...(user?.is_admin ? [{ label: 'Admin Panel', key: 'AdminPanel', icon: ShieldCheck }] : [])
           ].map(tab => (
             <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.key); setShowMobileMenu(false); }}>
@@ -866,6 +879,11 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* DPDP Act 2023 & GDPR Cookie / Privacy Consent Banner */}
+      <Suspense fallback={null}>
+        <ConsentBanner />
+      </Suspense>
     </div>
   );
 }

@@ -308,7 +308,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  register: async (username, email, phone, password, firebaseToken = null, otp = null) => {
+  register: async (username, email, phone, password, firebaseToken = null, otp = null, consents = {}) => {
     try {
       set({ authError: null });
       const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
@@ -322,7 +322,10 @@ export const useStore = create(persist((set, get) => ({
         referral_code: localStorage.getItem('referral_code'),
         client_ip: publicInfo?.ip || undefined,
         client_city: publicInfo?.city || undefined,
-        client_state: publicInfo?.state || undefined
+        client_state: publicInfo?.state || undefined,
+        consent_terms: consents?.terms !== false,
+        consent_data_processing: consents?.dataProcessing !== false,
+        consent_marketing: !!consents?.marketing
       };
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -1366,6 +1369,76 @@ export const useStore = create(persist((set, get) => ({
       }
     } catch(err) {
       throw err;
+    }
+  },
+
+  // Privacy & Data Rights (DPDP Act 2023 & GDPR)
+  recordUserConsent: async (consent_type, status = 'GRANTED', email = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/user/consent`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ consent_type, status, email }),
+        credentials: 'include'
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  fetchUserConsents: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/user/consents`, { headers, credentials: 'include' });
+      const data = await res.json();
+      return data.consents || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  submitDataRightsRequest: async (email, request_type, details) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/user/data-rights-request`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email, request_type, details }),
+        credentials: 'include'
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  downloadDataExport: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/user/data-export`, { headers, credentials: 'include' });
+      if (!res.ok) throw new Error('Data export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `skandx_data_export_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
     }
   },
 

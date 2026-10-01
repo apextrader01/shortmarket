@@ -1102,6 +1102,41 @@ async function ensureCriticalColumns() {
       )
     `);
 
+    // Privacy & DPDP Compliance Tables (Consent Tracking & Data Rights Requests)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS user_consents (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        email VARCHAR(255),
+        consent_type VARCHAR(100) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'GRANTED',
+        consent_version VARCHAR(50) DEFAULT 'v2026.1',
+        ip_address VARCHAR(50),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_consents_email ON user_consents(email)').catch(() => {});
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS data_rights_requests (
+        id SERIAL PRIMARY KEY,
+        request_id VARCHAR(50) NOT NULL UNIQUE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        email VARCHAR(255) NOT NULL,
+        request_type VARCHAR(100) NOT NULL,
+        details TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        admin_notes TEXT,
+        ip_address VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_data_rights_requests_email ON data_rights_requests(email)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_data_rights_requests_status ON data_rights_requests(status)').catch(() => {});
+
     // High-Performance Query Indexes to eliminate full table scans & slash CPU/RAM
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');

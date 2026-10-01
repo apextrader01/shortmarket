@@ -83,6 +83,11 @@ export default function LoginView() {
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [registeredPhone, setRegisteredPhone] = useState('');
+  
+  // Consent & DPDP States (Explicit Unticked Opt-Ins)
+  const [consentTerms, setConsentTerms] = useState(false);
+  const [consentDataProcessing, setConsentDataProcessing] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
 
   const setupRecaptchaVerifier = () => {
     if (window.recaptchaVerifier) {
@@ -266,6 +271,16 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
+      if (!consentTerms) {
+        useStore.setState({ authError: 'Please check the box to agree to the Terms of Service and Privacy Notice.' });
+        setLoading(false);
+        return;
+      }
+      if (!consentDataProcessing) {
+        useStore.setState({ authError: 'Please check the box to consent to Personal Data Processing to register.' });
+        setLoading(false);
+        return;
+      }
 
       // Try Phone SMS first via Firebase, fallback to high-reliability Email OTP
       try {
@@ -297,23 +312,25 @@ export default function LoginView() {
         return;
       }
 
+      const consentsPayload = { terms: consentTerms, dataProcessing: consentDataProcessing, marketing: consentMarketing };
+
       if (registerOtpMethod === 'phone' && confirmationResult) {
         try {
           const userCredential = await confirmationResult.confirm(cleanOtp);
           const firebaseToken = await userCredential?.user?.getIdToken().catch(() => null);
-          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, firebaseToken, null);
+          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, firebaseToken, null, consentsPayload);
           if (res && !res.success) {
             useStore.setState({ authError: res.error || 'Registration failed' });
           }
         } catch (error) {
           console.warn('Firebase SMS confirm failed, attempting Email OTP validation:', error);
-          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp);
+          const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp, consentsPayload);
           if (res && !res.success) {
             useStore.setState({ authError: error.message?.includes('invalid') ? 'Invalid verification code. Please check and try again.' : (res.error || 'Verification failed') });
           }
         }
       } else {
-        const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp);
+        const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, cleanOtp, consentsPayload);
         if (res && !res.success) {
           useStore.setState({ authError: res.error || 'Invalid or expired verification code. Please request a new code.' });
         }
@@ -691,6 +708,61 @@ export default function LoginView() {
                   </div>
                 </label>
               )}
+            </div>
+          )}
+          {view === 'register' && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px',
+              margin: '8px 0 14px 0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#10b981' }}>
+                Consent Declarations (DPDP Act, 2023)
+              </div>
+
+              {/* Purpose 1: Terms & Privacy (Mandatory) */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#d1d5db', lineHeight: '1.4' }}>
+                <input
+                  type="checkbox"
+                  checked={consentTerms}
+                  onChange={(e) => setConsentTerms(e.target.checked)}
+                  style={{ marginTop: '2px', accentColor: '#10b981', cursor: 'pointer', width: '16px', height: '16px' }}
+                />
+                <span>
+                  I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>Terms of Service</a> and confirm I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>Privacy Notice</a>. <strong style={{ color: '#ef4444' }}>*</strong>
+                </span>
+              </label>
+
+              {/* Purpose 2: Core Data Processing (Mandatory) */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#d1d5db', lineHeight: '1.4' }}>
+                <input
+                  type="checkbox"
+                  checked={consentDataProcessing}
+                  onChange={(e) => setConsentDataProcessing(e.target.checked)}
+                  style={{ marginTop: '2px', accentColor: '#10b981', cursor: 'pointer', width: '16px', height: '16px' }}
+                />
+                <span>
+                  I consent to the collection and processing of my phone, email, device telemetry, and order logs for account authentication, trade execution, and regulatory compliance. <strong style={{ color: '#ef4444' }}>*</strong>
+                </span>
+              </label>
+
+              {/* Purpose 3: Marketing & Research (Optional) */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#9ca3af', lineHeight: '1.4' }}>
+                <input
+                  type="checkbox"
+                  checked={consentMarketing}
+                  onChange={(e) => setConsentMarketing(e.target.checked)}
+                  style={{ marginTop: '2px', accentColor: '#10b981', cursor: 'pointer', width: '16px', height: '16px' }}
+                />
+                <span>
+                  I agree to receive market analysis, research alerts, and platform announcements via SMS/Email (Optional).
+                </span>
+              </label>
             </div>
           )}
 

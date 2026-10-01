@@ -1003,8 +1003,11 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
 });
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { username, email, phone, password, referral_code, firebase_token, otp } = req.body;
+  const { username, email, phone, password, referral_code, firebase_token, otp, consent_terms, consent_data_processing, consent_marketing } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
+  if (consent_terms === false || consent_data_processing === false) {
+    return res.status(400).json({ error: 'You must accept the Terms of Service and Personal Data Processing agreement to register.' });
+  }
 
   const cleanEmail = String(email).toLowerCase().trim();
   const cleanPhone = String(phone).replace(/\D/g, '');
@@ -1082,6 +1085,30 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // Generate Professional Client ID: SE + Base36(userId) padded to 6 chars
     const clientId = 'SE' + Number(userId).toString(36).toUpperCase().padStart(6, '0');
     await db('users').where({ id: userId }).update({ client_id: clientId });
+
+    // Record user consents for DPDP compliance (unticked opt-ins recorded with timestamp and IP)
+    try {
+      const consentsToRecord = [
+        { type: 'TERMS_AND_PRIVACY', granted: !!consent_terms },
+        { type: 'DATA_PROCESSING_CORE', granted: !!consent_data_processing },
+        { type: 'MARKETING_PROMOTIONS', granted: !!consent_marketing }
+      ];
+      for (const item of consentsToRecord) {
+        if (item.granted) {
+          await db('user_consents').insert({
+            user_id: userId,
+            email: cleanEmail,
+            consent_type: item.type,
+            status: 'GRANTED',
+            consent_version: 'v2026.1',
+            ip_address: clientIp,
+            user_agent: req.headers['user-agent'] || ''
+          }).catch(() => {});
+        }
+      }
+    } catch (cErr) {
+      console.warn('[DPDP] Consent recording note:', cErr.message);
+    }
 
     // Handle Referral Logic (supports client_id like 'SE000001', numeric user id, or username)
     if (referral_code) {
@@ -2408,7 +2435,7 @@ app.post('/api/user/details', authenticateToken, async (req, res) => {
 
 app.post('/api/user/kyc', authenticateToken, async (req, res) => {
   try {
-    const { kyc_pan_url, kyc_aadhar_url } = req.body;
+    const { kyc_pan_url, kyc_aadhar_url, consent_kyc_processing } = req.body;
     if (kyc_pan_url && !isValidMediaUrl(kyc_pan_url)) {
       return res.status(400).json({ error: 'Invalid PAN document URL or image format.' });
     }
@@ -2419,7 +2446,168 @@ app.post('/api/user/kyc', authenticateToken, async (req, res) => {
       kyc_pan_url: kyc_pan_url ? kyc_pan_url.trim() : null, 
       kyc_aadhar_url: kyc_aadhar_url ? kyc_aadhar_url.trim() : null 
     });
+
+    if (consent_kyc_processing) {
+      await db('user_consents').insert({
+        user_id: req.user.id,
+        email: req.user.email || '',
+        consent_type: 'KYC_DOCUMENT_PROCESSING',
+        status: 'GRANTED',
+        consent_version: 'v2026.1',
+        ip_address: (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '').replace(/^::ffff:/, '').trim(),
+        user_agent: req.headers['user-agent'] || ''
+      }).catch(() => {});
+    }
+
     res.json({ success: true, kyc_pan_url, kyc_aadhar_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Privacy & Data Rights Endpoints (DPDP Act 2023 & GDPR) ─────────────────
+
+// Record or update user consent (unticked opt-in records)
+app.post('/api/user/consent', async (req, res) => {
+  try {
+    const { consent_type, status = 'GRANTED', email } = req.body;
+    if (!consent_type) return res.status(400).json({ error: 'consent_type is required' });
+
+    let userId = null;
+    let userEmail = email ? String(email).toLowerCase().trim() : null;
+
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      try {
+        const token = authHeader.slice(7).trim();
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.id) {
+          userId = decoded.id;
+          if (!userEmail) {
+            const u = await db('users').where({ id: userId }).select('email').first();
+            userEmail = u?.email || null;
+          }
+        }
+      } catch (e) {}
+    }
+
+    const clientIp = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '').replace(/^::ffff:/, '').trim();
+
+    await db('user_consents').insert({
+      user_id: userId,
+      email: userEmail,
+      consent_type: String(consent_type).trim(),
+      status: status === 'WITHDRAWN' ? 'WITHDRAWN' : 'GRANTED',
+      consent_version: 'v2026.1',
+      ip_address: clientIp,
+      user_agent: req.headers['user-agent'] || ''
+    });
+
+    res.json({ success: true, message: `Consent for ${consent_type} recorded successfully.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get active consents for authenticated user
+app.get('/api/user/consents', authenticateToken, async (req, res) => {
+  try {
+    const consents = await db('user_consents')
+      .where({ user_id: req.user.id })
+      .orderBy('created_at', 'desc');
+    res.json({ success: true, consents });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Submit Data Rights Request (Access, Rectification, Erasure, Withdraw Consent)
+app.post('/api/user/data-rights-request', async (req, res) => {
+  try {
+    const { email, request_type, details } = req.body;
+    if (!email || !request_type) {
+      return res.status(400).json({ error: 'Email and request_type are required' });
+    }
+
+    const validTypes = ['ACCESS', 'CORRECTION', 'ERASURE', 'WITHDRAW_CONSENT'];
+    const cleanType = String(request_type).trim().toUpperCase();
+    if (!validTypes.includes(cleanType)) {
+      return res.status(400).json({ error: `Invalid request_type. Must be one of: ${validTypes.join(', ')}` });
+    }
+
+    const cleanEmail = String(email).toLowerCase().trim();
+    let userId = null;
+
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      try {
+        const token = authHeader.slice(7).trim();
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.id) userId = decoded.id;
+      } catch (e) {}
+    }
+
+    if (!userId) {
+      const u = await db('users').where({ email: cleanEmail }).first();
+      if (u) userId = u.id;
+    }
+
+    const crypto = require('crypto');
+    const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+    const requestId = `DRR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomSuffix}`;
+    const clientIp = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '').replace(/^::ffff:/, '').trim();
+
+    await db('data_rights_requests').insert({
+      request_id: requestId,
+      user_id: userId,
+      email: cleanEmail,
+      request_type: cleanType,
+      details: details ? String(details).trim().slice(0, 2000) : null,
+      status: 'PENDING',
+      ip_address: clientIp
+    });
+
+    res.json({
+      success: true,
+      request_id: requestId,
+      message: `Your data rights request (${cleanType}) has been logged. Under Section 13 of the DPDP Act 2023, our Grievance Redressal Officer will acknowledge within 24 hours and resolve your request within 30 days.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Instant Right to Data Portability / Access Export (DPDP Section 11 / GDPR Art. 15 & 20)
+app.get('/api/user/data-export', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Strictly exclude password hashes and raw crypto secrets
+    const { password_hash, totp_secret, reset_otp, login_email_otp, ...safeUser } = user;
+
+    const [positions, holdings, recentOrders, consents] = await Promise.all([
+      db('positions').where({ user_id: req.user.id }),
+      db('holdings').where({ user_id: req.user.id }),
+      db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(500),
+      db('user_consents').where({ user_id: req.user.id }).orderBy('created_at', 'desc')
+    ]);
+
+    const exportPayload = {
+      export_version: 'v2026.1',
+      exported_at: new Date().toISOString(),
+      platform: 'SkandX (https://skandx.in)',
+      data_fiduciary: 'SkandX Technologies Pvt. Ltd.',
+      user_profile: safeUser,
+      positions,
+      holdings,
+      orders_sample: recentOrders,
+      consent_records: consents
+    };
+
+    res.setHeader('Content-Disposition', `attachment; filename="skandx_data_export_${req.user.id}_${Date.now()}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(exportPayload, null, 2));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
