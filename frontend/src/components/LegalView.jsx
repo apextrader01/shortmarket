@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, Mail, Phone, MapPin, ExternalLink, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, Mail, Phone, MapPin, ExternalLink, HelpCircle, ArrowUp } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function LegalView({ initialTab = 'privacy', onBack }) {
@@ -20,6 +20,27 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
   const [rightsSubmitting, setRightsSubmitting] = useState(false);
   const [rightsResponse, setRightsResponse] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
+
+  // Scroll Progress & Back-to-Top
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollHeight > 0) {
+        const scrolled = window.scrollY;
+        setScrollProgress(Math.min(100, Math.max(0, (scrolled / scrollHeight) * 100)));
+        setShowBackToTop(scrolled > 260);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleDeleteRequest = async (e) => {
     e.preventDefault();
@@ -65,8 +86,24 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
       backgroundColor: '#0a0d14',
       color: '#f3f4f6',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      padding: '24px 16px'
+      padding: '24px 16px',
+      position: 'relative'
     }}>
+      {/* Reading Scroll Progress Bar */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: `${scrollProgress}%`,
+          height: '3px',
+          background: 'linear-gradient(90deg, #10b981 0%, #38bdf8 100%)',
+          zIndex: 9999,
+          boxShadow: '0 0 8px rgba(56, 189, 248, 0.6)',
+          transition: 'width 0.1s ease-out'
+        }} 
+      />
+
       <div style={{ maxWidth: '880px', margin: '0 auto' }}>
         
         {/* Navigation & Header */}
@@ -755,6 +792,45 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         </div>
 
       </div>
+
+      {/* Floating Back to Top Button */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          aria-label="Back to top"
+          style={{
+            position: 'fixed',
+            bottom: '28px',
+            right: '28px',
+            width: '46px',
+            height: '46px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid rgba(16, 185, 129, 0.5)',
+            backdropFilter: 'blur(8px)',
+            color: '#10b981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#10b981';
+            e.currentTarget.style.color = '#0a0d14';
+            e.currentTarget.style.transform = 'translateY(-3px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+            e.currentTarget.style.color = '#10b981';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <ArrowUp size={20} />
+        </button>
+      )}
     </div>
   );
 }
