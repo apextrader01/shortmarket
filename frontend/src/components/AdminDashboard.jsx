@@ -1287,7 +1287,8 @@ export default function AdminDashboard() {
     prize_2nd: '₹250 Cash + 1-Month Free PRO',
     prize_3rd: '₹100 Cash + Free PRO',
     status: 'ACTIVE',
-    segment: 'ALL'
+    segment: 'ALL',
+    access_tier: 'ALL'
   });
   const [showContestModal, setShowContestModal] = useState(false);
   const [contestSaving, setContestSaving] = useState(false);
@@ -1691,7 +1692,7 @@ export default function AdminDashboard() {
     } else if (clientFilter === 'BANNED') {
       list = list.filter(u => u.is_banned);
     } else if (clientFilter === 'PRO') {
-      list = list.filter(u => u.subscription_tier === 'PRO');
+      list = list.filter(u => ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(u.subscription_tier));
     } else if (clientFilter === 'KYC_VERIFIED') {
       list = list.filter(u => u.kyc_pan_url && u.kyc_aadhar_url);
     } else if (clientFilter === 'KYC_MISSING') {
@@ -3228,7 +3229,8 @@ export default function AdminDashboard() {
                       prize_2nd: '₹250 Cash + 1-Month Free PRO',
                       prize_3rd: '₹100 Cash + Free PRO',
                       status: 'ACTIVE',
-                      segment: 'ALL'
+                      segment: 'ALL',
+                      access_tier: 'ALL'
                     });
                     setShowContestModal(true);
                   }}
@@ -3262,6 +3264,7 @@ export default function AdminDashboard() {
                   const isUpcoming = !isEnded && c.status === 'UPCOMING';
                   const seg = (c.segment || 'ALL').toUpperCase();
                   const segBadge = seg === 'EQUITY' ? '📈 Equity' : seg === 'FNO' ? '⚡ F&O' : seg === 'COMMODITY' ? '🛢️ Commodities' : '🌐 All Markets';
+                  const at = (c.access_tier || 'ALL').toUpperCase();
                   return (
                     <div
                       key={c.id}
@@ -3303,6 +3306,56 @@ export default function AdminDashboard() {
                             }}>
                               {segBadge}
                             </span>
+                            {/* Access Tier Eligibility Badge */}
+                            {at === 'HIGHEST_ONLY' ? (
+                              <span style={{
+                                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(168, 85, 247, 0.2))',
+                                border: '1px solid #eab308',
+                                color: '#fbbf24',
+                                fontSize: '10.5px',
+                                fontWeight: '800',
+                                padding: '2px 8px',
+                                borderRadius: '12px'
+                              }}>
+                                👑 Feature Plan VIP Only
+                              </span>
+                            ) : at === 'YEARLY_PLUS' ? (
+                              <span style={{
+                                background: 'rgba(234, 179, 8, 0.15)',
+                                border: '1px solid rgba(234, 179, 8, 0.4)',
+                                color: '#f59e0b',
+                                fontSize: '10.5px',
+                                fontWeight: '800',
+                                padding: '2px 8px',
+                                borderRadius: '12px'
+                              }}>
+                                ⭐ Yearly+ Only
+                              </span>
+                            ) : at === 'MONTHLY_PLUS' ? (
+                              <span style={{
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                color: '#60a5fa',
+                                fontSize: '10.5px',
+                                fontWeight: '800',
+                                padding: '2px 8px',
+                                borderRadius: '12px'
+                              }}>
+                                ⚡ Monthly+ Only
+                              </span>
+                            ) : (
+                              <span style={{
+                                background: 'rgba(148, 163, 184, 0.12)',
+                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                color: '#94a3b8',
+                                fontSize: '10.5px',
+                                fontWeight: '700',
+                                padding: '2px 8px',
+                                borderRadius: '12px'
+                              }}>
+                                🌐 Open to All
+                              </span>
+                            )}
                           </div>
                           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                             {c.description}
@@ -3323,7 +3376,8 @@ export default function AdminDashboard() {
                                 prize_2nd: c.prize_2nd || '',
                                 prize_3rd: c.prize_3rd || '',
                                 status: c.status || 'ACTIVE',
-                                segment: c.segment || 'ALL'
+                                segment: c.segment || 'ALL',
+                                access_tier: c.access_tier || 'ALL'
                               });
                               setShowContestModal(true);
                             }}
@@ -3527,6 +3581,23 @@ export default function AdminDashboard() {
                           <option value="ENDED">🏁 Concluded / Ended</option>
                         </select>
                       </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#60a5fa', marginBottom: '4px' }}>
+                        🛡️ Plan Eligibility (Who Can Join & Compete)
+                      </label>
+                      <select
+                        className="input-field"
+                        value={contestForm.access_tier || 'ALL'}
+                        onChange={e => setContestForm({ ...contestForm, access_tier: e.target.value })}
+                        style={{ width: '100%', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="ALL">🌐 Open to All Traders (Normal Free + All Paid Plans)</option>
+                        <option value="MONTHLY_PLUS">⚡ Pro Monthly & Above (Monthly, Yearly, Feature Plan)</option>
+                        <option value="YEARLY_PLUS">⭐ Pro Yearly & Above (Yearly, Feature Plan)</option>
+                        <option value="HIGHEST_ONLY">👑 Feature Plan Only (Highest Tier VIP Exclusive)</option>
+                      </select>
                     </div>
 
                     <div>
@@ -4568,7 +4639,10 @@ export default function AdminDashboard() {
                                 </span>
                                 <span>{u.username || 'Unknown User'}</span>
                                 {u.is_admin && <span style={{ fontSize: '8px', background: 'var(--color-red)', padding: '1px 3px', borderRadius: '3px' }}>ADMIN</span>}
-                                {u.subscription_tier === 'PRO' && <span style={{ fontSize: '8px', background: 'rgba(34,197,94,0.15)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>PRO</span>}
+                                {['HIGHEST', 'FEATURE'].includes(u.subscription_tier) && <span style={{ fontSize: '8px', background: 'linear-gradient(135deg, rgba(234,179,8,0.3), rgba(168,85,247,0.3))', color: '#fbbf24', border: '1px solid #eab308', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>👑 VIP</span>}
+                                {u.subscription_tier === 'YEARLY' && <span style={{ fontSize: '8px', background: 'rgba(234,179,8,0.15)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.4)', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>⭐ YEARLY</span>}
+                                {(u.subscription_tier === 'MONTHLY' || u.subscription_tier === 'PRO') && <span style={{ fontSize: '8px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>⚡ PRO</span>}
+                                {(!u.subscription_tier || u.subscription_tier === 'BASIC' || u.subscription_tier === 'NORMAL') && <span style={{ fontSize: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>NORMAL</span>}
                                 {u.shared_ip_count > 1 && (
                                   <span 
                                     title={`Multi-Account Risk! ${u.shared_ip_count} accounts on this IP (${u.shared_users?.join(', ') || ''})`}
@@ -5820,7 +5894,7 @@ export default function AdminDashboard() {
                   <Activity size={14} style={{ color: 'var(--color-blue)' }} /> Subscription Tier
                 </h4>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Current Tier: <strong style={{ color: selectedUser.subscription_tier === 'PRO' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>{selectedUser.subscription_tier || 'BASIC'}</strong>
+                  Current Tier: <strong style={{ color: ['HIGHEST', 'FEATURE'].includes(selectedUser.subscription_tier) ? '#fbbf24' : selectedUser.subscription_tier === 'YEARLY' ? '#f59e0b' : (selectedUser.subscription_tier === 'MONTHLY' || selectedUser.subscription_tier === 'PRO') ? 'var(--color-green-light)' : 'var(--text-primary)' }}>{selectedUser.subscription_tier || 'BASIC'}</strong>
                   {selectedUser.subscription_expires && ` (Expires: ${new Date(selectedUser.subscription_expires).toLocaleDateString()})`}
                 </div>
                 <form onSubmit={handleUpdateSubscription} style={{ display: 'flex', gap: '12px' }}>
@@ -5830,8 +5904,10 @@ export default function AdminDashboard() {
                     onChange={e => setNewSubTier(e.target.value)}
                     style={{ flex: 1 }}
                   >
-                    <option value="BASIC">Basic (3 Watchlists)</option>
-                    <option value="PRO">PRO (5 Watchlists)</option>
+                    <option value="BASIC">Normal / Basic (3 Watchlists - Free)</option>
+                    <option value="MONTHLY">Pro Monthly (5 Watchlists - ₹99/mo)</option>
+                    <option value="YEARLY">Pro Yearly (5 Watchlists - ₹499/yr)</option>
+                    <option value="HIGHEST">Feature Plan / VIP (10 Watchlists - Highest Tier)</option>
                   </select>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Tier'}

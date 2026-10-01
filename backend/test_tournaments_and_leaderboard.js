@@ -203,8 +203,8 @@ function evaluateTournamentStatus(status, endDateStr) {
 }
 
 it('Correctly marks tournaments as ENDED when end_date is in the past', () => {
-  const pastDate = '2026-09-11T23:59:59.000Z'; // Past date
-  const futureDate = '2026-09-30T23:59:59.000Z'; // Future date
+  const pastDate = new Date(Date.now() - 86400000).toISOString(); // 1 day in past
+  const futureDate = new Date(Date.now() + 86400000).toISOString(); // 1 day in future
 
   assert.strictEqual(evaluateTournamentStatus('ACTIVE', pastDate), 'ENDED', 'Past tournament with ACTIVE status should evaluate to ENDED');
   assert.strictEqual(evaluateTournamentStatus('ACTIVE', futureDate), 'ACTIVE', 'Future tournament with ACTIVE status should evaluate to ACTIVE');

@@ -2193,11 +2193,18 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
   try {
     const { plan } = req.body || {};
     
-    // These must be created in Razorpay Dashboard -> Subscriptions -> Plans
-    const planId = plan === 'monthly' ? (process.env.RAZORPAY_PLAN_ID_MONTHLY || 'plan_placeholder_monthly') : (process.env.RAZORPAY_PLAN_ID_YEARLY || 'plan_placeholder_yearly');
+    // Support monthly, yearly, and highest / feature plan
+    let planId;
+    if (plan === 'highest' || plan === 'feature') {
+      planId = process.env.RAZORPAY_PLAN_ID_HIGHEST || 'plan_placeholder_highest';
+    } else if (plan === 'yearly') {
+      planId = process.env.RAZORPAY_PLAN_ID_YEARLY || 'plan_placeholder_yearly';
+    } else {
+      planId = process.env.RAZORPAY_PLAN_ID_MONTHLY || 'plan_placeholder_monthly';
+    }
 
     if (planId.includes('placeholder')) {
-      console.warn('WARNING: Using placeholder Plan ID. Real Razorpay recurring payments will fail until you configure RAZORPAY_PLAN_ID_MONTHLY in .env');
+      console.warn('WARNING: Using placeholder Plan ID. Real Razorpay recurring payments will fail until you configure Plan IDs in .env');
     }
 
     // 7 days from now in Unix timestamp
@@ -2255,15 +2262,21 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
           ? new Date(user.subscription_expires) 
           : now;
         const expires = new Date(baseDate.getTime());
-        const selectedPlan = plan === 'yearly' ? 'yearly' : 'monthly';
-        if (selectedPlan === 'monthly') {
-          expires.setMonth(expires.getMonth() + 1);
-        } else {
+        const selectedPlan = (plan || '').toLowerCase();
+        let targetTier = 'MONTHLY';
+        if (selectedPlan === 'highest' || selectedPlan === 'feature') {
+          targetTier = 'HIGHEST';
           expires.setFullYear(expires.getFullYear() + 1);
+        } else if (selectedPlan === 'yearly') {
+          targetTier = 'YEARLY';
+          expires.setFullYear(expires.getFullYear() + 1);
+        } else {
+          targetTier = 'MONTHLY';
+          expires.setMonth(expires.getMonth() + 1);
         }
 
         await trx('users').where({ id: req.user.id }).update({
-          subscription_tier: 'PRO',
+          subscription_tier: targetTier,
           subscription_expires: expires
         });
 
@@ -2275,7 +2288,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
             .first();
 
           if (pendingRef) {
-            const rewardAmount = selectedPlan === 'monthly' ? 9.9 : 49.9;
+            const rewardAmount = (selectedPlan === 'highest' || selectedPlan === 'feature') ? 99.9 : (selectedPlan === 'yearly' ? 49.9 : 9.9);
             
             // Mark as completed
             await trx('referrals')
@@ -2292,7 +2305,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
               user_id: pendingRef.referrer_id,
               amount: rewardAmount,
               type: 'DEPOSIT',
-              description: `Referral reward bonus for user ${user.username || req.user.id} PRO upgrade`
+              description: `Referral reward bonus for user ${user.username || req.user.id} ${targetTier} upgrade`
             });
           }
         } catch (e) {
@@ -4333,11 +4346,12 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     
     // Check subscription tier
     const user = await db('users').where({ id: req.user.id }).first();
-    const isPro = user.subscription_tier === 'PRO' && (!user.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const limit = isPro ? 5 : 3;
+    const isPro = ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const isHighest = ['HIGHEST', 'FEATURE'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const limit = isHighest ? 10 : (isPro ? 5 : 3);
     
     if (watchlists.length > limit) {
-      return res.status(403).json({ error: `Your ${isPro ? 'PRO' : 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
+      return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
     }
 
     await db('users').where({ id: req.user.id }).update({ watchlists: JSON.stringify(watchlists) });
@@ -9796,12 +9810,48 @@ function applySegmentFilterToQuery(query, segment) {
   return query;
 }
 
+// ─── Subscription Access Tier Helper for Leaderboards & Contests ───────────
+function applyTierFilterToQuery(query, accessTier) {
+  if (!accessTier || accessTier === 'ALL') return query;
+  const tier = String(accessTier).toUpperCase();
+  const now = new Date();
+
+  // MONTHLY_PLUS: Allowed tiers: MONTHLY, YEARLY, HIGHEST, FEATURE, PRO
+  if (tier === 'MONTHLY_PLUS') {
+    query.whereIn('users.subscription_tier', ['MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'PRO'])
+         .where(builder => {
+           builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
+         });
+  } 
+  // YEARLY_PLUS: Allowed tiers: YEARLY, HIGHEST, FEATURE
+  else if (tier === 'YEARLY_PLUS') {
+    query.whereIn('users.subscription_tier', ['YEARLY', 'HIGHEST', 'FEATURE'])
+         .where(builder => {
+           builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
+         });
+  } 
+  // HIGHEST_ONLY: Allowed tiers: HIGHEST, FEATURE
+  else if (tier === 'HIGHEST_ONLY' || tier === 'FEATURE_ONLY') {
+    query.whereIn('users.subscription_tier', ['HIGHEST', 'FEATURE'])
+         .where(builder => {
+           builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
+         });
+  }
+  return query;
+}
+
 // ─── Live Leaderboard (Cached in Redis for 60s) ───────────────────────────
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const { contest_id, segment, timeframe } = req.query;
     const { generalClient } = require('./services/redisClient');
     const segKey = (segment || 'ALL').toUpperCase();
+
+    let contest = null;
+    if (contest_id) {
+      contest = await db('contests').where({ id: contest_id }).first();
+    }
+    const tierKey = contest?.access_tier ? contest.access_tier.toUpperCase() : 'ALL';
     const contestKey = contest_id ? `contest_${contest_id}` : (timeframe === 'all_time' ? 'all_time' : 'daily');
     const cacheKey = `leaderboard:${contestKey}:${segKey}:top50`;
 
@@ -9818,19 +9868,17 @@ app.get('/api/leaderboard', async (req, res) => {
 
     let effectiveSegment = segKey;
 
-    if (contest_id) {
-      const contest = await db('contests').where({ id: contest_id }).first();
-      if (contest) {
-        if (contest.start_date) {
-          query.where('positions.created_at', '>=', new Date(contest.start_date));
-        }
-        if (contest.end_date) {
-          query.where('positions.created_at', '<=', new Date(contest.end_date));
-        }
-        if (contest.segment && contest.segment !== 'ALL') {
-          effectiveSegment = contest.segment.toUpperCase();
-        }
+    if (contest) {
+      if (contest.start_date) {
+        query.where('positions.created_at', '>=', new Date(contest.start_date));
       }
+      if (contest.end_date) {
+        query.where('positions.created_at', '<=', new Date(contest.end_date));
+      }
+      if (contest.segment && contest.segment !== 'ALL') {
+        effectiveSegment = contest.segment.toUpperCase();
+      }
+      applyTierFilterToQuery(query, contest.access_tier || 'ALL');
     } else if (timeframe !== 'all_time') {
       const todayStart = getTradingSessionStartIST();
 
@@ -10023,26 +10071,13 @@ app.get('/api/contests/active', async (req, res) => {
       })
       .orderBy('id', 'desc');
 
-    // If no active contest exists, auto-seed one for the current month
     if (!contests || contests.length === 0) {
-      const now = new Date();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const monthName = monthNames[now.getMonth()];
-      const [newId] = await db('contests').insert({
-        title: `🏆 ${monthName} Premier Trader Championship ${now.getFullYear()}`,
-        description: `Official monthly intraday & F&O championship. Trade, scale up profits, and top the leaderboard to win real cash prizes and free PRO memberships!`,
-        start_date: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0),
-        end_date: endOfMonth,
-        prize_1st: '₹500 Cash + 1-Month Free PRO',
-        prize_2nd: '₹250 Cash + 1-Month Free PRO',
-        prize_3rd: '₹100 Cash + Free PRO',
-        status: 'ACTIVE',
-        segment: 'ALL'
-      }).returning('id');
-      const cid = typeof newId === 'object' ? newId.id : newId;
-      const createdContest = await db('contests').where({ id: cid }).first();
-      contests = [createdContest];
+      return res.json({
+        success: true,
+        contests: [],
+        contest: null,
+        topContenders: []
+      });
     }
 
     const primaryContest = contests[0];
@@ -10056,6 +10091,7 @@ app.get('/api/contests/active', async (req, res) => {
       topQuery.where('positions.created_at', '<=', new Date(primaryContest.end_date));
     }
     applySegmentFilterToQuery(topQuery, primaryContest?.segment || 'ALL');
+    applyTierFilterToQuery(topQuery, primaryContest?.access_tier || 'ALL');
 
     const topContenders = await topQuery
       .groupBy('users.id', 'users.username', 'users.profile_picture_url')
@@ -10134,8 +10170,20 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
     if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
     const { id, title, description, start_date, end_date, prize_1st, prize_2nd, prize_3rd, status, segment } = req.body;
+    const access_tier = req.body.access_tier || 'ALL';
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    // Flush Redis cache for leaderboard
+    try {
+      const { generalClient } = require('./services/redisClient');
+      if (generalClient && generalClient.isReady) {
+        const keys = await generalClient.keys('leaderboard:*');
+        if (keys && keys.length > 0) {
+          await generalClient.del(keys);
+        }
+      }
+    } catch (e) {}
 
     if (id) {
       await db('contests').where({ id }).update({
@@ -10148,6 +10196,7 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
         prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
         status: status || 'ACTIVE',
         segment: segment || 'ALL',
+        access_tier: access_tier || 'ALL',
         updated_at: new Date()
       });
       return res.json({ success: true, message: 'Contest updated successfully' });
@@ -10161,7 +10210,8 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
         prize_2nd: prize_2nd || '₹250 Cash + Free PRO',
         prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
         status: status || 'ACTIVE',
-        segment: segment || 'ALL'
+        segment: segment || 'ALL',
+        access_tier: access_tier || 'ALL'
       }).returning('id');
       return res.json({ success: true, message: 'Contest created successfully', id: typeof newId === 'object' ? newId.id : newId });
     }
@@ -10179,7 +10229,19 @@ app.delete('/api/admin/contests/:id', authenticateToken, async (req, res) => {
 
     const contestId = req.params.id;
     await db('contests').where({ id: contestId }).del();
-    res.json({ success: true, message: 'Contest deleted successfully' });
+
+    // Flush Redis cache for leaderboard so deleted contest data is purged immediately
+    try {
+      const { generalClient } = require('./services/redisClient');
+      if (generalClient && generalClient.isReady) {
+        const keys = await generalClient.keys('leaderboard:*');
+        if (keys && keys.length > 0) {
+          await generalClient.del(keys);
+        }
+      }
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Tournament deleted successfully' });
   } catch (err) {
     console.error('Error deleting contest:', err);
     res.status(500).json({ error: 'Failed to delete contest' });

@@ -903,7 +903,7 @@ function App() {
               {activeTab === 'Leaderboard' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <LeaderboardView />
+                    <LeaderboardView setActiveTab={setActiveTab} />
                   </Suspense>
                 </div>
               )}
@@ -999,8 +999,14 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
-                {user.subscription_tier === 'PRO' && (
-                  <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>PRO</span>
+                {['HIGHEST', 'FEATURE'].includes(user.subscription_tier) && (
+                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #a855f7)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 VIP</span>
+                )}
+                {user.subscription_tier === 'YEARLY' && (
+                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>⭐ YEARLY</span>
+                )}
+                {(user.subscription_tier === 'MONTHLY' || user.subscription_tier === 'PRO') && (
+                  <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>⚡ PRO</span>
                 )}
               </div>
             </div>

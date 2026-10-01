@@ -6,8 +6,9 @@ import {
   CheckCircle2, ChevronDown, ChevronUp, Layers, TrendingUp, Zap, Clock, History
 } from 'lucide-react';
 
-export default function LeaderboardView() {
+export default function LeaderboardView({ onNavigateTab, setActiveTab: setParentTab }) {
   const { 
+    user,
     leaderboard, 
     leaderboardLoading, 
     fetchLeaderboard, 
@@ -19,6 +20,7 @@ export default function LeaderboardView() {
     fetchPastContests,
     selectActiveContest 
   } = useStore(useShallow(state => ({
+    user: state.user,
     leaderboard: state.leaderboard,
     leaderboardLoading: state.leaderboardLoading,
     fetchLeaderboard: state.fetchLeaderboard,
@@ -141,6 +143,64 @@ export default function LeaderboardView() {
       </span>
     );
   };
+
+  const getTierLevel = (t) => {
+    const tier = (t || 'BASIC').toUpperCase();
+    if (['HIGHEST', 'FEATURE', 'ELITE', 'VIP'].includes(tier)) return 3;
+    if (tier === 'YEARLY') return 2;
+    if (['MONTHLY', 'PRO'].includes(tier)) return 1;
+    return 0; // BASIC / NORMAL
+  };
+
+  const getRequiredTierLevel = (req) => {
+    const r = (req || 'ALL').toUpperCase();
+    if (['HIGHEST_ONLY', 'FEATURE_ONLY', 'VIP_ONLY'].includes(r)) return 3;
+    if (r === 'YEARLY_PLUS') return 2;
+    if (r === 'MONTHLY_PLUS') return 1;
+    return 0; // ALL
+  };
+
+  const getTierBadge = (accessTier) => {
+    const at = (accessTier || 'ALL').toUpperCase();
+    if (['HIGHEST_ONLY', 'FEATURE_ONLY'].includes(at)) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(168, 85, 247, 0.25))', border: '1px solid #eab308', color: '#fbbf24', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          👑 Feature Plan VIP
+        </span>
+      );
+    }
+    if (at === 'YEARLY_PLUS') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.4)', color: '#f59e0b', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          ⭐ Pro Yearly+
+        </span>
+      );
+    }
+    if (at === 'MONTHLY_PLUS') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          ⚡ Pro Monthly+
+        </span>
+      );
+    }
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(148, 163, 184, 0.12)', border: '1px solid rgba(148, 163, 184, 0.3)', color: '#94a3b8', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '700' }}>
+        🌐 Open to All
+      </span>
+    );
+  };
+
+  const getRequiredTierName = (accessTier) => {
+    const at = (accessTier || 'ALL').toUpperCase();
+    if (['HIGHEST_ONLY', 'FEATURE_ONLY'].includes(at)) return 'Feature Plan / VIP';
+    if (at === 'YEARLY_PLUS') return 'Pro Yearly or Highest';
+    if (at === 'MONTHLY_PLUS') return 'Pro Monthly or above';
+    return 'Open to All Traders';
+  };
+
+  const isProActive = !user?.subscription_expires || new Date(user.subscription_expires).getTime() > Date.now();
+  const userEffectiveTier = isProActive ? (user?.subscription_tier || 'BASIC') : 'BASIC';
+  const isUserEligible = getTierLevel(userEffectiveTier) >= getRequiredTierLevel(activeContest?.access_tier);
 
   const top3 = leaderboard.slice(0, 3);
 
@@ -288,8 +348,9 @@ export default function LeaderboardView() {
                   <div style={{ fontSize: '12px', fontWeight: isSelected ? '800' : '600', color: isSelected ? '#fbbf24' : 'var(--text-primary)' }}>
                     {c.title}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
                     {getSegmentBadge(c.segment)}
+                    {getTierBadge(c.access_tier)}
                     <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                       {c.end_date ? new Date(c.end_date).toLocaleDateString('en-IN') : ''}
                     </span>
@@ -302,7 +363,7 @@ export default function LeaderboardView() {
       )}
 
       {/* Active Tournament & Prize Pool Hero Banner */}
-      {activeContest && (
+      {activeContest ? (
         <div className="glass-panel" style={{
           background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, var(--bg-panel) 50%, rgba(168, 85, 247, 0.08) 100%)',
           border: '1px solid var(--border-color)',
@@ -341,6 +402,9 @@ export default function LeaderboardView() {
 
               {/* Segment Badge */}
               {getSegmentBadge(activeContest.segment)}
+
+              {/* Tier Access Badge */}
+              {getTierBadge(activeContest.access_tier)}
 
               {activeContest.end_date && !ended && (
                 <span style={{
@@ -390,6 +454,74 @@ export default function LeaderboardView() {
             </p>
           </div>
 
+          {/* User Eligibility Upgrade Prompt Banner */}
+          {!isUserEligible && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)',
+              border: '1px solid rgba(234, 179, 8, 0.4)',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px',
+              flexDirection: isMobile ? 'column' : 'row'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '28px' }}>🔒</span>
+                <div>
+                  <div style={{ fontWeight: '800', color: '#fbbf24', fontSize: '13.5px' }}>
+                    Exclusive Tournament: Upgrade Required to Compete
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: '1.4' }}>
+                    This championship is exclusive to <strong>{getRequiredTierName(activeContest.access_tier)}</strong> members. Your current plan is <strong>{userEffectiveTier}</strong>. Upgrade now so your trades qualify for ranking and cash prizes!
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (setParentTab) setParentTab('Pricing');
+                  else if (onNavigateTab) onNavigateTab('Pricing');
+                  else window.location.hash = '#pricing';
+                }}
+                className="btn btn-primary hoverable"
+                style={{
+                  background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                  color: '#000',
+                  fontWeight: '800',
+                  fontSize: '12.5px',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  whiteSpace: 'nowrap',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
+                  width: isMobile ? '100%' : 'auto'
+                }}
+              >
+                ⚡ Upgrade Plan
+              </button>
+            </div>
+          )}
+
+          {isUserEligible && activeContest.access_tier && activeContest.access_tier !== 'ALL' && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.1)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: '8px',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: '#4ade80',
+              fontWeight: '600'
+            }}>
+              <CheckCircle2 size={14} /> You have an eligible active plan ({userEffectiveTier}) and are enrolled to win prizes in this tournament!
+            </div>
+          )}
+
           {/* Rules Dropdown Banner */}
           {showRules && (
             <div style={{
@@ -407,7 +539,9 @@ export default function LeaderboardView() {
                 <CheckCircle2 size={14} color="#16a34a" /> Tournament Rules & Eligibility
               </div>
               <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <li>All registered traders are automatically enrolled (₹0 entry fee).</li>
+                <li>
+                  Tournament Eligibility: <strong>{getRequiredTierName(activeContest.access_tier)}</strong> ({isUserEligible ? 'Enrolled & Eligible ✓' : 'Upgrade Required to Rank'}).
+                </li>
                 <li>
                   Eligible Instruments: <strong>{activeContest.segment === 'EQUITY' ? 'Cash Stocks Only' : activeContest.segment === 'FNO' ? 'Futures & Options Only' : activeContest.segment === 'COMMODITY' ? 'MCX Commodities Only' : 'All Traded Instruments'}</strong>.
                 </li>
@@ -488,6 +622,23 @@ export default function LeaderboardView() {
               </div>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="glass-panel" style={{
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border-color)',
+          borderRadius: isMobile ? '12px' : '16px',
+          padding: isMobile ? '30px 20px' : '40px 24px',
+          textAlign: 'center',
+          boxShadow: 'var(--card-shadow, 0 8px 24px rgba(0,0,0,0.08))'
+        }}>
+          <Trophy size={48} color="#eab308" style={{ margin: '0 auto 12px auto', opacity: 0.8 }} />
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
+            No Active Tournaments Currently Running
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '460px', margin: '0 auto', lineHeight: '1.5' }}>
+            No live tournament is currently open. You can view past championship winners or check back when a new league is announced!
+          </p>
         </div>
       )}
 
