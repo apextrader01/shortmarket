@@ -423,7 +423,6 @@ export default function PositionsView() {
         const inv = avg * hQty;
         const cur = (ltp || avg) * hQty;
         totalInvested += inv;
-        totalCurrent += cur;
         const hPnl = isShortHolding ? (inv - cur) : (cur - inv);
         globalMTM += hPnl;
       } else {
@@ -433,7 +432,7 @@ export default function PositionsView() {
       }
     });
 
-    if (viewMode === 'OPEN') {
+    if (viewMode === 'OPEN' || viewMode === 'HOLDINGS') {
       totalCurrent = totalInvested + globalMTM;
     }
 
@@ -833,8 +832,9 @@ export default function PositionsView() {
                   const exchange = (safeSymbol.includes(':') ? safeSymbol.split(':')[0] : pos.exchange) || 'NSE';
                   const holdingQty = Math.abs(rawQty);
                   const investedVal = Math.abs(pos.avg || 0) * holdingQty;
-                  const currentVal = ((pos.ltp || pos.avg) || 0) * holdingQty;
-                  const holdingPnl = isShort ? (investedVal - currentVal) : (currentVal - investedVal);
+                  const rawCurrentVal = ((pos.ltp || pos.avg) || 0) * holdingQty;
+                  const holdingPnl = isShort ? (investedVal - rawCurrentVal) : (rawCurrentVal - investedVal);
+                  const currentVal = isShort ? (investedVal + holdingPnl) : rawCurrentVal;
                   const holdingPnlPct = investedVal > 0 ? (holdingPnl / investedVal) * 100 : 0;
 
                   return (
