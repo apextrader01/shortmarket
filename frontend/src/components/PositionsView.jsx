@@ -429,10 +429,13 @@ export default function PositionsView() {
       } else {
         // OPEN
         totalInvested += invested;
-        totalCurrent += currentValue;
         globalMTM += pnl;
       }
     });
+
+    if (viewMode === 'OPEN') {
+      totalCurrent = totalInvested + globalMTM;
+    }
 
     // Sort: 1. Stocks -> 2. Derivatives -> 3. Mutual Funds
     flatList.sort((a, b) => {
