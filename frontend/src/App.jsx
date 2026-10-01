@@ -65,6 +65,33 @@ const TabLoader = () => (
     <span style={{ fontSize: '12px', fontWeight: '600' }}>Loading module...</span>
   </div>
 );
+
+// ⚡ High-Speed Tab & Sub-View Pre-fetcher (Eliminates "Loading module..." delay)
+const tabComponentMap = {
+  TradeDiary: () => import('./components/TradeDiaryView'),
+  Markets: () => import('./components/ChartWidget'),
+  Positions: () => import('./components/PositionsView'),
+  Orders: () => import('./components/OrdersView'),
+  Portfolio: () => import('./components/PortfolioView'),
+  MutualFunds: () => import('./components/MutualFundsView'),
+  Options: () => import('./components/OptionChainView'),
+  Analytics: () => import('./components/AnalyticsView'),
+  Leaderboard: () => import('./components/LeaderboardView'),
+  Journal: () => import('./components/TradingJournalView'),
+  ClientData: () => import('./components/ClientDataView'),
+  Settings: () => import('./components/ClientDataView'),
+  AboutUs: () => import('./components/AboutUsView'),
+  Reports: () => import('./components/ReportsView'),
+  Pricing: () => import('./components/PricingView'),
+  Referrals: () => import('./components/ReferralsView'),
+};
+
+const prefetchTab = (key) => {
+  try {
+    const loader = tabComponentMap[key];
+    if (loader) loader().catch(() => {});
+  } catch (_) {}
+};
 import NetworkStatusBanner from './components/NetworkStatusBanner';
 import SessionExpiredModal from './components/SessionExpiredModal';
 import PermissionDenied from './components/PermissionDenied';
@@ -362,6 +389,51 @@ function App() {
     if (theme) setTheme(theme);
     if (fetchAnnouncement) fetchAnnouncement();
   }, []);
+
+  // ⚡ Intelligent Background Pre-fetching during Browser Idle Time
+  useEffect(() => {
+    if (!user) return;
+    const modulesToPreload = [
+      () => import('./components/PositionsView'),
+      () => import('./components/OrdersView'),
+      () => import('./components/PortfolioView'),
+      () => import('./components/MutualFundsView'),
+      () => import('./components/OptionChainView'),
+      () => import('./components/AnalyticsView'),
+      () => import('./components/OrderModal'),
+      () => import('./components/TradingJournalView'),
+      () => import('./components/ClientDataView'),
+      () => import('./components/LeaderboardView'),
+      () => import('./components/ReportsView'),
+      () => import('./components/PricingView'),
+      () => import('./components/AboutUsView'),
+    ];
+
+    let index = 0;
+    const scheduleNext = () => {
+      if (index >= modulesToPreload.length) return;
+      const loadFn = modulesToPreload[index++];
+      try {
+        loadFn().catch(() => {});
+      } catch (_) {}
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(scheduleNext, { timeout: 2500 });
+      } else {
+        setTimeout(scheduleNext, 200);
+      }
+    };
+
+    const idleTimer = setTimeout(() => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(scheduleNext, { timeout: 3000 });
+      } else {
+        setTimeout(scheduleNext, 250);
+      }
+    }, 1200);
+
+    return () => clearTimeout(idleTimer);
+  }, [user?.id]);
 
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
