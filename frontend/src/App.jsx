@@ -525,8 +525,73 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Public Legal & Compliance routes (Accessible without login for Google Play reviewers and search bots)
+  // ── Guard & Route Detection ──────────────────────────────────────────────────
   const currentPath = (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '');
+  const isKnownRoute = 
+    !currentPath ||
+    currentPath === '/' ||
+    currentPath === '/login' ||
+    currentPath === '/register' ||
+    currentPath.startsWith('/adminpanel') ||
+    currentPath.startsWith('/pricing') ||
+    currentPath.startsWith('/about') ||
+    currentPath.startsWith('/terms') ||
+    currentPath.startsWith('/privacy') ||
+    currentPath.startsWith('/risk') ||
+    currentPath.startsWith('/delete') ||
+    currentPath.startsWith('/data') ||
+    currentPath.startsWith('/legal') ||
+    currentPath.startsWith('/manifest') ||
+    currentPath.startsWith('/sitemap') ||
+    currentPath.startsWith('/robots') ||
+    currentPath.startsWith('/sw.js') ||
+    currentPath.startsWith('/apple-touch-icon') ||
+    currentPath.startsWith('/favicon') ||
+    currentPath.startsWith('/pwa-') ||
+    currentPath.startsWith('/skandx-');
+
+  // Dynamic SEO Page Titles (Item 10)
+  useEffect(() => {
+    const tabTitleMap = {
+      Markets: 'Live Markets & Watchlist | SkandX',
+      Orders: 'Order Book & Executions | SkandX',
+      Positions: 'Open Positions & P&L | SkandX',
+      Portfolio: 'Portfolio & Holdings | SkandX',
+      OptionChain: 'Option Chain Analytics | SkandX',
+      MutualFunds: 'Mutual Funds Terminal | SkandX',
+      Pricing: 'Subscription Plans & Pricing | SkandX',
+      AboutUs: 'About Us & Company Disclosures | SkandX',
+      ClientData: 'Account Profile & Banking | SkandX',
+      Settings: 'Security & Terminal Settings | SkandX',
+      Reports: 'P&L Reports & Tax Statements | SkandX',
+      Leaderboard: 'Trader Leaderboard | SkandX',
+      Journal: 'Trading Journal & Logs | SkandX',
+      TradeDiary: 'Trade Diary & Insights | SkandX',
+      AdminPanel: 'System Administration | SkandX'
+    };
+
+    if (!user) {
+      if (currentPath.includes('terms')) {
+        document.title = 'Terms of Service | SkandX';
+      } else if (currentPath.includes('privacy')) {
+        document.title = 'Privacy Policy | SkandX';
+      } else if (currentPath.includes('risk')) {
+        document.title = 'Risk Disclosure Document | SkandX';
+      } else if (currentPath === '/pricing') {
+        document.title = 'Subscription Plans & Pricing | SkandX';
+      } else if (currentPath.includes('about')) {
+        document.title = 'About Us & Company Disclosures | SkandX';
+      } else if (!isKnownRoute && currentPath !== '') {
+        document.title = '404 - Page Not Found | SkandX';
+      } else {
+        document.title = 'SkandX | The Future of Algorithmic Trading';
+      }
+    } else {
+      document.title = tabTitleMap[activeTab] || 'SkandX | Algorithmic Trading Platform';
+    }
+  }, [activeTab, user, currentPath, isKnownRoute]);
+
+  // Public Legal & Compliance routes (Accessible without login for Google Play reviewers and search bots)
   if (
     currentPath.includes('privacy') || 
     currentPath.includes('terms') || 
@@ -578,30 +643,6 @@ function App() {
       </Suspense>
     );
   }
-
-  // Unrecognized route detection (Item 15: Custom 404 Page)
-  const isKnownRoute = 
-    !currentPath ||
-    currentPath === '/' ||
-    currentPath === '/login' ||
-    currentPath === '/register' ||
-    currentPath.startsWith('/adminpanel') ||
-    currentPath.startsWith('/pricing') ||
-    currentPath.startsWith('/about') ||
-    currentPath.startsWith('/terms') ||
-    currentPath.startsWith('/privacy') ||
-    currentPath.startsWith('/risk') ||
-    currentPath.startsWith('/delete') ||
-    currentPath.startsWith('/data') ||
-    currentPath.startsWith('/legal') ||
-    currentPath.startsWith('/manifest') ||
-    currentPath.startsWith('/sitemap') ||
-    currentPath.startsWith('/robots') ||
-    currentPath.startsWith('/sw.js') ||
-    currentPath.startsWith('/apple-touch-icon') ||
-    currentPath.startsWith('/favicon') ||
-    currentPath.startsWith('/pwa-') ||
-    currentPath.startsWith('/skandx-');
 
   if (!isKnownRoute) {
     return (

@@ -3,4 +3,28 @@ Allow: /
 Disallow: /adminpanel
 Disallow: /api/
 
+# OpenAI Search & Crawler Bots (Item 15)
+User-agent: GPTBot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# Perplexity AI Search Crawler
+User-agent: PerplexityBot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# Anthropic Claude Search Crawler
+User-agent: ClaudeBot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# Canonical Sitemap Declaration
 Sitemap: https://skandx.in/sitemap.xml
