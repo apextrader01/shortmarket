@@ -4,6 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
+import SkeletonLoader from './SkeletonLoader';
+import EmptyState from './EmptyState';
 import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract, getInstantLotsize } from '../utils/lotsizeHelper';
 import { calculateOrderSlices } from '../utils/freezeLimits';
 import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
@@ -39,12 +41,13 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, orders, marketStatus, marketCalendar } = useStore(useShallow(state => ({
+  const { positions, holdings, orders, marketStatus, marketCalendar, isInitialUserDataLoaded } = useStore(useShallow(state => ({
     positions: state.positions,
     holdings: state.holdings,
     orders: state.orders,
     marketStatus: state.marketStatus,
-    marketCalendar: state.marketCalendar
+    marketCalendar: state.marketCalendar,
+    isInitialUserDataLoaded: state.isInitialUserDataLoaded
   })));
   
   const sourceData = useMemo(() => {
@@ -751,22 +754,16 @@ export default function PositionsView() {
         </div>
       </div>
       
-      {flatPositions.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
-          <div style={{ 
-            width: '120px', height: '100px', background: 'var(--bg-panel)', 
-            borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.2)', marginBottom: '24px'
-          }}>
-            <Activity size={40} color="var(--color-green-light)" />
-          </div>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
-            {viewMode === 'CLOSED' ? 'No closed positions yet' : viewMode === 'HOLDINGS' ? 'You have no active holdings' : 'You do not have any positions'}
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
-            {viewMode === 'CLOSED' ? 'Positions you close today will appear here.' : viewMode === 'HOLDINGS' ? 'Long-term delivery positions will appear here on T+1.' : 'List of all your positions for today will appear here.'}
-          </p>
+      {!isInitialUserDataLoaded && flatPositions.length === 0 ? (
+        <div style={{ padding: '24px 16px', width: '100%' }}>
+          <SkeletonLoader rows={6} type="table" />
         </div>
+      ) : flatPositions.length === 0 ? (
+        <EmptyState
+          icon={Activity}
+          title={viewMode === 'CLOSED' ? 'No closed positions yet' : viewMode === 'HOLDINGS' ? 'You have no active holdings' : 'You do not have any positions'}
+          subtitle={viewMode === 'CLOSED' ? 'Positions you close today will appear here.' : viewMode === 'HOLDINGS' ? 'Long-term delivery positions will appear here on T+1.' : 'List of all your positions for today will appear here.'}
+        />
       ) : (
         <>
           {!isMobile && (

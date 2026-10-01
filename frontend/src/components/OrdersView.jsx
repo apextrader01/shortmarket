@@ -3,6 +3,8 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
+import SkeletonLoader from './SkeletonLoader';
+import EmptyState from './EmptyState';
 import { isToday } from '../utils/pnlHelper';
 
 const formatOrderQty = (order, qty) => {
@@ -18,7 +20,14 @@ export default function OrdersView() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger, setBasketModalOpen: state.setBasketModalOpen })));
+  const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast } = useStore(useShallow(state => ({
+    orders: state.orders,
+    pendingTriggers: state.pendingTriggers,
+    removePendingTrigger: state.removePendingTrigger,
+    setBasketModalOpen: state.setBasketModalOpen,
+    isInitialUserDataLoaded: state.isInitialUserDataLoaded,
+    showToast: state.showToast
+  })));
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,13 +55,14 @@ export default function OrdersView() {
       });
       if (res.ok) {
         useStore.getState().fetchUserData();
+        showToast('Order tag and notes updated successfully.', 'success', 'Tag Saved');
         setTagModalOrder(null);
       } else {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.error || 'Failed to save tag. Please try again.');
+        showToast(errData.error || 'Failed to save tag. Please try again.', 'error', 'Tag Error');
       }
     } catch (e) {
-      alert('Error saving tag: ' + e.message);
+      showToast('Error saving tag: ' + e.message, 'error', 'Tag Error');
     } finally {
       setIsSavingTag(false);
     }
@@ -213,34 +223,27 @@ export default function OrdersView() {
       {/* Content Area */}
       {activeTab === 'Alerts' ? (
         <AlertsView />
+      ) : !isInitialUserDataLoaded && orders.length === 0 ? (
+        <div style={{ width: '100%', padding: '24px' }}>
+          <SkeletonLoader rows={6} type="table" />
+        </div>
       ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start', minHeight: 0, width: '100%' }}>
         {(activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? (
-          <div style={{ textAlign: 'center' }}>
-            {(() => {
-              let Icon = Box;
-              let subtitle = '';
-              if (activeTab === 'Open Orders') { Icon = Clock; subtitle = 'Limit and Stop orders waiting to be executed will appear here.'; }
-              else if (activeTab === 'Pending Triggers') { Icon = Target; subtitle = 'Bracket (BO) and Cover (CO) orders waiting for a price trigger will be listed here.'; }
-              else if (activeTab === 'Order History') { Icon = History; subtitle = 'Your executed, cancelled, and rejected orders for today will appear here.'; }
-              else if (activeTab === 'Basket Orders') { Icon = ShoppingBag; subtitle = 'Create and execute multiple orders simultaneously.'; }
-
-              return (
-                <>
-                  <div style={{ 
-                    width: '120px', height: '100px', background: 'var(--bg-panel)', 
-                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)', margin: '0 auto 24px', position: 'relative'
-                  }}>
-                    <Icon size={40} color="var(--color-green-light)" />
-                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
-                  </div>
-                  <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any {activeTab.toLowerCase()}</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '300px', margin: '0 auto', lineHeight: '1.5' }}>{subtitle}</p>
-                </>
-              );
-            })()}
-          </div>
+          <EmptyState
+            icon={
+              activeTab === 'Open Orders' ? Clock :
+              activeTab === 'Pending Triggers' ? Target :
+              activeTab === 'Order History' ? History : ShoppingBag
+            }
+            title={`No ${activeTab.toLowerCase()} found`}
+            subtitle={
+              activeTab === 'Open Orders' ? 'Limit and Stop orders waiting to be executed will appear here.' :
+              activeTab === 'Pending Triggers' ? 'Bracket (BO) and Cover (CO) orders waiting for a price trigger will be listed here.' :
+              activeTab === 'Order History' ? 'Your executed, cancelled, and rejected orders for today will appear here.' :
+              'Create and execute multiple orders simultaneously.'
+            }
+          />
         ) : (
           <div style={{ padding: window.innerWidth <= 1200 ? '12px' : '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -253,7 +256,7 @@ export default function OrdersView() {
                       return !sym.endsWith('-MF') && !sym.includes('MUTUALFUND');
                     });
                     if (cancellableOrders.length === 0) {
-                      alert('Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.');
+                      showToast('Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.', 'warning', 'Cancellation Blocked');
                       return;
                     }
                     if (window.confirm(`Are you sure you want to cancel all ${cancellableOrders.length} cancellable open orders? (Mutual Fund orders cannot be cancelled)`)) {
@@ -264,9 +267,9 @@ export default function OrdersView() {
                       const succeeded = results.filter(r => r.status === 'fulfilled' && r.value).length;
                       await useStore.getState().fetchUserData().catch(() => {});
                       if (succeeded > 0) {
-                        alert(`Successfully cancelled ${succeeded} order(s).`);
+                        showToast(`Successfully cancelled ${succeeded} order(s).`, 'success', 'Orders Cancelled');
                       } else {
-                        alert('Could not cancel orders. Please check their status.');
+                        showToast('Could not cancel orders. Please check their status.', 'error', 'Cancellation Failed');
                       }
                     }
                   }}
@@ -294,7 +297,7 @@ export default function OrdersView() {
 
                       await Promise.allSettled(backendCancels);
                       await useStore.getState().fetchUserData().catch(() => {});
-                      alert(`Cancelled ${displayTriggers.length} trigger(s).`);
+                      showToast(`Cancelled ${displayTriggers.length} trigger(s).`, 'info', 'Triggers Cancelled');
                     }
                   }}
                   style={{

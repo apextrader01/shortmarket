@@ -83,27 +83,120 @@ class ErrorBoundary extends React.Component {
       }
 
       return (
-        <div style={{ padding: '20px', background: '#330000', color: '#ffaaaa', borderRadius: '8px', margin: '20px' }}>
-          <h2>Component Crashed</h2>
-          <p><strong>Error:</strong> {this.state.error && this.state.error.toString()}</p>
-          <details style={{ whiteSpace: 'pre-wrap', marginTop: '10px' }}>
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
-          </details>
-          <button
-            onClick={() => window.location.reload()}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '60vh',
+            padding: '32px 16px',
+            textAlign: 'center',
+            color: 'var(--text-primary, #ffffff)'
+          }}
+        >
+          <div
             style={{
-              marginTop: '16px',
-              background: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontWeight: '600',
-              cursor: 'pointer'
+              background: 'var(--bg-card, #1e222d)',
+              border: '1px solid var(--border-color, #2a2e39)',
+              borderRadius: '16px',
+              padding: '28px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 16px 32px rgba(0,0,0,0.3)'
             }}
           >
-            Reload Platform
-          </button>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                fontSize: '26px'
+              }}
+            >
+              ⚠️
+            </div>
+
+            <h3
+              style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                marginBottom: '8px'
+              }}
+            >
+              Component Temporarily Unavailable
+            </h3>
+
+            <p
+              style={{
+                fontSize: '13.5px',
+                color: 'var(--text-secondary, #94a3b8)',
+                lineHeight: '1.5',
+                marginBottom: '20px'
+              }}
+            >
+              A temporary display error occurred. Your orders, portfolio, and funds remain fully secure and unaffected.
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: '10px 18px',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Reload Platform
+              </button>
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null, errorInfo: null });
+                  window.location.href = '/';
+                }}
+                style={{
+                  padding: '10px 18px',
+                  background: 'transparent',
+                  color: 'var(--text-primary, #ffffff)',
+                  border: '1px solid var(--border-color, #333)',
+                  borderRadius: '8px',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Go to Dashboard
+              </button>
+            </div>
+
+            {this.state.error && (
+              <details
+                style={{
+                  marginTop: '18px',
+                  textAlign: 'left',
+                  fontSize: '11px',
+                  color: 'var(--text-secondary, #64748b)',
+                  background: 'rgba(0,0,0,0.2)',
+                  padding: '8px 12px',
+                  borderRadius: '6px'
+                }}
+              >
+                <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Technical Details</summary>
+                <p style={{ margin: '6px 0 0 0', wordBreak: 'break-all' }}>{this.state.error.toString()}</p>
+              </details>
+            )}
+          </div>
         </div>
       );
     }

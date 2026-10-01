@@ -36,7 +36,24 @@ window.fetch = async function (url, options = {}) {
   }
 
   options.headers = headers;
-  return originalFetch(url, options);
+  const res = await originalFetch(url, options);
+
+  // State 9: Session Expiry (catch 401 Unauthorized on protected endpoints)
+  if (
+    res.status === 401 &&
+    typeof url === 'string' &&
+    url.includes('/api/') &&
+    !url.includes('/api/auth/login') &&
+    !url.includes('/api/auth/pre-login') &&
+    !url.includes('/api/auth/register') &&
+    !url.includes('/api/auth/verify-2fa')
+  ) {
+    if (typeof window !== 'undefined' && window.__triggerSessionExpired) {
+      window.__triggerSessionExpired();
+    }
+  }
+
+  return res;
 };
 
 export const socket = io(API, { 
@@ -149,6 +166,31 @@ try {
 } catch (e) {}
 
 export const useStore = create(persist((set, get) => ({
+
+  // ── Global UI Feedback & Session Management ─────────────────────────────────
+  isInitialUserDataLoaded: false,
+  toast: null,
+  showToast: (toastOrMessage, type = 'info', title = null) => {
+    let toastObj;
+    if (typeof toastOrMessage === 'string') {
+      toastObj = { message: toastOrMessage, type, title, id: Date.now() };
+    } else {
+      toastObj = { ...toastOrMessage, id: Date.now() };
+    }
+    set({ toast: toastObj });
+    if (get()._toastTimer) clearTimeout(get()._toastTimer);
+    const timer = setTimeout(() => {
+      set({ toast: null });
+    }, toastObj.duration || 4000);
+    set({ _toastTimer: timer });
+  },
+  hideToast: () => {
+    if (get()._toastTimer) clearTimeout(get()._toastTimer);
+    set({ toast: null, _toastTimer: null });
+  },
+
+  isSessionExpired: false,
+  setSessionExpired: (isExpired) => set({ isSessionExpired: Boolean(isExpired) }),
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
@@ -1041,11 +1083,16 @@ export const useStore = create(persist((set, get) => ({
           } catch (_) {}
         }
         
-        // Only trigger logout if both primary and fallback returned 401/403 AND we have no user in store
-        if (authFailed && !user && !get().user) {
-          console.error("Auth definitively failed during fetchUserData, logging out.");
-          get().logout();
-          return;
+        // Handle authentication failure: prompt session expiry if previously logged in
+        if (authFailed) {
+          if (!user && !get().user) {
+            console.error("Auth definitively failed during fetchUserData, logging out.");
+            get().logout();
+            return;
+          } else if (get().user && !get().isSessionExpired) {
+            console.warn("Session expired during fetchUserData, showing session expiry modal.");
+            get().setSessionExpired(true);
+          }
         }
         
         if (!get().user && !user) return;
@@ -1103,6 +1150,9 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {
       } finally {
         window._activeFetchUserDataPromise = null;
+        if (!get().isInitialUserDataLoaded) {
+          set({ isInitialUserDataLoaded: true });
+        }
       }
     })();
     return window._activeFetchUserDataPromise;
@@ -2044,6 +2094,8 @@ export const useStore = create(persist((set, get) => ({
       hasSkippedOnboarding: false,
       token: null,
       user: null,
+      isSessionExpired: false,
+      toast: null,
       positions: [],
       orders: [],
       holdings: [],
@@ -2938,6 +2990,17 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+
+if (typeof window !== 'undefined') {
+  window.__triggerSessionExpired = () => {
+    try {
+      const s = useStore.getState();
+      if (s.user && !s.isSessionExpired) {
+        s.setSessionExpired(true);
+      }
+    } catch (_) {}
+  };
+}
 
 
 

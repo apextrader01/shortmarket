@@ -64,6 +64,10 @@ const TabLoader = () => (
     <span style={{ fontSize: '12px', fontWeight: '600' }}>Loading module...</span>
   </div>
 );
+import NetworkStatusBanner from './components/NetworkStatusBanner';
+import SessionExpiredModal from './components/SessionExpiredModal';
+import PermissionDenied from './components/PermissionDenied';
+import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
@@ -104,6 +108,42 @@ const IndexChip = React.memo(({ label, price }) => {
   );
 });
 
+// ⚡ State 7: Partial Data / Live Stream Badge
+const DataStatusBadge = React.memo(() => {
+  const isConnected = useStore(state => state.isConnected);
+  return (
+    <div
+      title={isConnected ? "WebSocket connected: Real-time price feed active" : "WebSocket reconnecting: Running on REST fallback feed (Partial Data)"}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        padding: '2px 7px',
+        borderRadius: '12px',
+        background: isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+        border: `1px solid ${isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+        fontSize: '9.5px',
+        fontWeight: '700',
+        color: isConnected ? '#10b981' : '#f59e0b',
+        letterSpacing: '0.4px',
+        userSelect: 'none'
+      }}
+    >
+      <span
+        style={{
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: isConnected ? '#10b981' : '#f59e0b',
+          boxShadow: isConnected ? '0 0 6px #10b981' : '0 0 6px #f59e0b',
+          display: 'inline-block'
+        }}
+      />
+      <span>{isConnected ? 'LIVE' : 'PARTIAL DATA'}</span>
+    </div>
+  );
+});
+
 // ⚡ Top Index Ticker Container
 const TopIndexTicker = React.memo(() => {
   const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX']);
@@ -111,10 +151,11 @@ const TopIndexTicker = React.memo(() => {
   const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX']);
 
   return (
-    <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
+    <div className="hide-on-tablet" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
       <IndexChip label="NSE:NIFTY50" price={nifty} />
       <IndexChip label="NSE:NIFTYBANK" price={banknifty} />
       <IndexChip label="BSE:SENSEX" price={sensex} />
+      <DataStatusBadge />
     </div>
   );
 });
@@ -508,16 +549,32 @@ function App() {
   }
 
   if (!user) {
-    return <LoginView />;
+    return (
+      <>
+        <NetworkStatusBanner />
+        <GlobalToast />
+        <LoginView />
+      </>
+    );
   }
   if (user && !user.is_onboarded && !hasSkippedOnboarding && !user.is_admin && window.location.pathname !== '/adminpanel') {
-    return <OnboardingWizard />;
+    return (
+      <>
+        <NetworkStatusBanner />
+        <GlobalToast />
+        <SessionExpiredModal />
+        <OnboardingWizard />
+      </>
+    );
   }
 
   // ── Authenticated layout ─────────────────────────────────────────────────────
 
   return (
     <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
+      <NetworkStatusBanner />
+      <GlobalToast />
+      <SessionExpiredModal />
       <BackgroundPriceMonitor />
       {/* Real-time Global Announcement Banner */}
       {isAnnouncementVisible && (
@@ -770,12 +827,16 @@ function App() {
                   </Suspense>
                 </div>
               )}
-              {activeTab === 'AdminPanel' && user?.is_admin && (
-                <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                  <Suspense fallback={<TabLoader />}>
-                    <AdminDashboard />
-                  </Suspense>
-                </div>
+              {activeTab === 'AdminPanel' && (
+                user?.is_admin ? (
+                  <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    <Suspense fallback={<TabLoader />}>
+                      <AdminDashboard />
+                    </Suspense>
+                  </div>
+                ) : (
+                  <PermissionDenied onBack={() => setActiveTab('Markets')} />
+                )
               )}
               {(activeTab === 'Legal' || activeTab === 'Privacy') && (
                 <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-main)' }}>

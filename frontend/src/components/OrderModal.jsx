@@ -45,6 +45,7 @@ export default function OrderModal() {
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
+  const [validationError, setValidationError] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function OrderModal() {
   // Initialize modal state when it opens
   useEffect(() => {
     if (orderModal.isOpen) {
+      setValidationError(null);
       setSide(orderModal.type);
       const incomingProd = String(orderModal.productType || 'INT').toUpperCase();
       const initialProd = (incomingProd === 'MIS' || incomingProd === 'INTRADAY') ? 'INT' : (incomingProd === 'CNC' || incomingProd === 'DELIVERY') ? 'DEL' : (orderModal.productType || 'INT');
@@ -518,29 +520,34 @@ export default function OrderModal() {
   }, [orderModal.isOpen, orderModal.variety]);
 
   const handlePlaceOrder = async (bypassCaution = false) => {
+    const failValidation = (msg) => {
+      setValidationError(msg);
+      useStore.getState().showToast(msg, 'warning', 'Validation Error');
+    };
+
     if (marketSession.mode === 'CLOSED') {
-      alert(marketSession.reason);
+      failValidation(marketSession.reason);
       return;
     }
     if (isAmo && !marketSession.isAmoWindow) {
       const amoTimingMsg = isCommodity
         ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
         : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
-      alert(amoTimingMsg);
+      failValidation(amoTimingMsg);
       return;
     }
     if (!isAmo && !marketSession.open) {
       if (marketSession.reason) {
-        alert(marketSession.reason);
+        failValidation(marketSession.reason);
       } else {
         const hoursText = isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM";
         const marketName = isCommodity ? "MCX Commodity Market" : "Market";
-        alert(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
+        failValidation(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
       }
       return;
     }
     if (isIntradayBlocked && !isAmo) {
-       alert(marketSession.reason || "Intraday trading is closed for this segment. Please place a Delivery order or an After Market Order (AMO).");
+       failValidation(marketSession.reason || "Intraday trading is closed for this segment. Please place a Delivery order or an After Market Order (AMO).");
        return;
     }
     if (isRestricted && !bypassCaution && !showCautionPopup) {
@@ -549,7 +556,7 @@ export default function OrderModal() {
     }
 
     if (isAmo && (isBO || isCO)) {
-      alert("Bracket Orders (BO) and Cover Orders (CO) are not allowed in After Market Orders (AMO). Please place a regular Limit or Market AMO order.");
+      failValidation("Bracket Orders (BO) and Cover Orders (CO) are not allowed in After Market Orders (AMO). Please place a regular Limit or Market AMO order.");
       return;
     }
 
@@ -565,27 +572,27 @@ export default function OrderModal() {
       const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;
       const isLossLocked = maxLoss > 0 && todayRealizedPnl < 0 && Math.abs(todayRealizedPnl) >= maxLoss;
       if (isTradesLocked || isLossLocked) {
-        alert(`🛡️ Risk Guardian Active: Trading is locked for today (${isTradesLocked ? `Max trades limit of ${maxTrades} reached` : `Daily loss limit of ₹${maxLoss.toLocaleString('en-IN')} reached`}). Only exit orders are allowed.`);
+        failValidation(`🛡️ Risk Guardian Active: Trading is locked for today (${isTradesLocked ? `Max trades limit of ${maxTrades} reached` : `Daily loss limit of ₹${maxLoss.toLocaleString('en-IN')} reached`}). Only exit orders are allowed.`);
         return;
       }
     }
 
     if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
-      alert("Please enter a valid quantity greater than 0.");
+      failValidation("Please enter a valid quantity greater than 0.");
       return;
     }
     if (isExceedingFreezeLimit) {
-      alert(orderModal.lotsize > 1
+      failValidation(orderModal.lotsize > 1
         ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
         : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`);
       return;
     }
     if (orderType === 'LIMIT' && (!price || parseFloat(price) <= 0 || isNaN(parseFloat(price)))) {
-      alert("Please enter a valid limit price greater than 0.");
+      failValidation("Please enter a valid limit price greater than 0.");
       return;
     }
     if (orderType === 'MARKET' && (!livePrice || livePrice <= 0) && !isAmo) {
-      alert("Market feed is connecting. Please wait a moment or place a Limit order.");
+      failValidation("Market feed is connecting. Please wait a moment or place a Limit order.");
       return;
     }
 
@@ -593,7 +600,7 @@ export default function OrderModal() {
     if (isBO || isCO) {
       const entryPrice = orderType === 'MARKET' ? livePrice : parseFloat(price);
       if (!entryPrice || entryPrice <= 0) {
-        alert("Please enter a valid price to place a Bracket/Cover order.");
+        failValidation("Please enter a valid price to place a Bracket/Cover order.");
         return;
       }
       
@@ -601,30 +608,30 @@ export default function OrderModal() {
       const parsedTgt = tgtPrice ? parseFloat(tgtPrice) : 0;
       
       if (isCO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL))) {
-        alert("Please specify a valid positive Stop Loss price for your Cover Order (CO).");
+        failValidation("Please specify a valid positive Stop Loss price for your Cover Order (CO).");
         return;
       }
       if (isBO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL) || !parsedTgt || parsedTgt <= 0 || isNaN(parsedTgt))) {
-        alert("Please specify valid positive Stop Loss and Target prices for your Bracket Order (BO).");
+        failValidation("Please specify valid positive Stop Loss and Target prices for your Bracket Order (BO).");
         return;
       }
       
       if (side === 'BUY') {
         if (parsedSL && parsedSL >= entryPrice) {
-          alert(`Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
+          failValidation(`Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
           return;
         }
         if (parsedTgt && parsedTgt <= entryPrice) {
-          alert(`Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
+          failValidation(`Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
           return;
         }
       } else { // SELL
         if (parsedSL && parsedSL <= entryPrice) {
-          alert(`Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
+          failValidation(`Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
           return;
         }
         if (parsedTgt && parsedTgt >= entryPrice) {
-          alert(`Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
+          failValidation(`Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
           return;
         }
       }
@@ -665,25 +672,26 @@ export default function OrderModal() {
       if (result && result.success) {
         closeOrderModal();
         if (result.status === 'EXECUTED') {
-          alert("✅ Order Executed Successfully!");
+          useStore.getState().showToast("Order Executed Successfully!", "success", "Order Filled");
         } else if (result.status === 'AMO_PENDING') {
-          alert("🌙 " + (result.message || "After Market Order (AMO) Placed! Your order is queued for market open."));
+          useStore.getState().showToast(result.message || "After Market Order (AMO) Placed! Your order is queued for market open.", "info", "AMO Queued");
         } else if (result.status === 'PARTIAL_FILLED') {
-          alert("⚡ Order Partially Filled (Remaining quantity held in volume queue)");
+          useStore.getState().showToast("Order Partially Filled (Remaining quantity held in volume queue)", "warning", "Partially Filled");
         } else if (result.status === 'PENDING_TRIGGER') {
-          alert("⏳ Trigger Order Placed (Pending Trigger)");
+          useStore.getState().showToast("Trigger Order Placed (Pending Trigger)", "info", "Trigger Order Active");
         } else if (result.status === 'REJECTED') {
-          alert("❌ Order Rejected!");
+          useStore.getState().showToast("Order Rejected: " + (result.message || "Risk check failed"), "error", "Order Rejected");
         } else {
-          alert("⏳ Order Placed (Pending)");
+          useStore.getState().showToast("Order Placed (Pending)", "info", "Order Placed");
         }
       } else {
         const errorMsg = (result && result.error) || useStore.getState().authError || "Failed to place order. Please try again.";
-        alert(errorMsg);
+        failValidation(errorMsg);
       }
     } catch (err) {
       setIsPlacing(false);
-      alert("Error: " + (err.message || 'Failed to place order.'));
+      const errorMsg = "Error: " + (err.message || 'Failed to place order.');
+      failValidation(errorMsg);
     }
   };
 
@@ -1296,6 +1304,45 @@ export default function OrderModal() {
           </div>
         )}
 
+        {/* State 8: Validation Error Banner */}
+        {validationError && (
+          <div style={{
+            margin: '0 16px 12px 16px',
+            padding: '9px 14px',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            borderRadius: '8px',
+            color: '#ef4444',
+            fontSize: '12.5px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <span style={{ fontSize: '15px' }}>⚠️</span>
+              <span>{validationError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setValidationError(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '2px 6px',
+                opacity: 0.8
+              }}
+              title="Dismiss error"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Footer Bar */}
         <div style={{
