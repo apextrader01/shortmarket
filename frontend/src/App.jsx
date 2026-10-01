@@ -527,24 +527,25 @@ function App() {
 
   // ── Guard & Route Detection ──────────────────────────────────────────────────
   const currentPath = (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '');
+  const cleanFirstSegment = (currentPath.split('/')[1] || '').split('?')[0];
+
+  const knownAppRoutes = new Set([
+    '', 'login', 'register', 'signup', 'forgot', 'reset',
+    'markets', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
+    'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
+    'pricing', 'referrals', 'leaderboard', 'journal', 'tradingjournal', 'trading-journal',
+    'tradediary', 'trade-diary', 'adminpanel', 'clientdata', 'profile', 'account', 'settings',
+    'reports', 'aboutus', 'about', 'terms', 'privacy', 'privacy-policy', 'privacypolicy',
+    'risk', 'riskpolicy', 'risk-policy', 'delete', 'delete-account', 'deleteaccount',
+    'data', 'data-rights', 'datarights', 'legal', 'accessibility', 'manifest.webmanifest',
+    'manifest', 'sitemap.xml', 'sitemap', 'robots.txt', 'robots', 'sw.js', 'ref'
+  ]);
+
   const isKnownRoute = 
     !currentPath ||
     currentPath === '/' ||
-    currentPath === '/login' ||
-    currentPath === '/register' ||
-    currentPath.startsWith('/adminpanel') ||
-    currentPath.startsWith('/pricing') ||
-    currentPath.startsWith('/about') ||
-    currentPath.startsWith('/terms') ||
-    currentPath.startsWith('/privacy') ||
-    currentPath.startsWith('/risk') ||
-    currentPath.startsWith('/delete') ||
-    currentPath.startsWith('/data') ||
-    currentPath.startsWith('/legal') ||
-    currentPath.startsWith('/manifest') ||
-    currentPath.startsWith('/sitemap') ||
-    currentPath.startsWith('/robots') ||
-    currentPath.startsWith('/sw.js') ||
+    knownAppRoutes.has(cleanFirstSegment) ||
+    currentPath.startsWith('/ref/') ||
     currentPath.startsWith('/apple-touch-icon') ||
     currentPath.startsWith('/favicon') ||
     currentPath.startsWith('/pwa-') ||
@@ -601,12 +602,14 @@ function App() {
     currentPath.includes('riskpolicy') ||
     currentPath.includes('data-rights') ||
     currentPath.includes('datarights') ||
+    currentPath.includes('accessibility') ||
     currentPath.includes('legal')
   ) {
     const initialTab = currentPath.includes('terms') ? 'terms' : 
                        (currentPath.includes('delete') ? 'delete-account' : 
                        (currentPath.includes('risk') ? 'risk' : 
-                       (currentPath.includes('data') ? 'data-rights' : 'privacy')));
+                       (currentPath.includes('data') ? 'data-rights' : 
+                       (currentPath.includes('accessibility') ? 'accessibility' : 'privacy'))));
     return (
       <Suspense fallback={<TabLoader />}>
         <LegalView initialTab={initialTab} />

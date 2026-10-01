@@ -259,6 +259,27 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           >
             <AlertTriangle size={16} /> Risk Disclosure
           </button>
+
+          <button
+            onClick={() => setActiveTab('accessibility')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              backgroundColor: activeTab === 'accessibility' ? '#38bdf8' : '#111827',
+              color: activeTab === 'accessibility' ? '#000' : '#9ca3af',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <CheckCircle2 size={16} /> Accessibility
+          </button>
         </div>
 
         {/* Content Panel */}
@@ -780,6 +801,69 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 latency, server disruptions, or delays in quote refreshes. SkandX implements automatic square-off 
                 risk guardians, but traders should maintain independent stop-loss discipline.
               </p>
+            </div>
+          )}
+
+          {/* TAB 6: ACCESSIBILITY STATEMENT */}
+          {activeTab === 'accessibility' && (
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
+                Accessibility Statement & Digital Inclusion Policy
+              </h1>
+              <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '24px' }}>
+                Commitment to Universal Web & Terminal Usability (WCAG 2.1 Level AA)
+              </p>
+
+              <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+                <strong style={{ color: '#38bdf8' }}>♿ Our Inclusive Trading Commitment:</strong>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#d1d5db', lineHeight: '1.6' }}>
+                  SkandX is dedicated to providing an accessible, intuitive trading simulation environment for all users, 
+                  including those with visual, auditory, physical, speech, cognitive, or neurological disabilities. 
+                  Our digital interfaces strive to conform to the <strong>Web Content Accessibility Guidelines (WCAG) 2.1 Level AA</strong>.
+                </p>
+              </div>
+
+              <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#38bdf8', marginTop: '24px', marginBottom: '10px' }}>
+                1. High Contrast & Visual Comfort
+              </h2>
+              <p>
+                The platform features a carefully calibrated high-contrast OLED dark theme with a compliant contrast ratio 
+                exceeding 4.5:1 for standard text and 3:1 for large graphical components. Critical trading elements utilize 
+                distinct, recognizable color cues complemented by text and icon badges to assist color-blind traders.
+              </p>
+
+              <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#38bdf8', marginTop: '24px', marginBottom: '10px' }}>
+                2. Keyboard Execution & Navigation Hotkeys
+              </h2>
+              <p>
+                Traders can navigate and operate the trading terminal without requiring a mouse. Built-in global keyboard shortcuts include:
+              </p>
+              <ul style={{ paddingLeft: '20px', margin: '10px 0 16px', lineHeight: '1.8' }}>
+                <li><strong style={{ color: '#fff' }}>Shift + B:</strong> Instantly launch the Quick Buy Order modal for the active watchlist ticker.</li>
+                <li><strong style={{ color: '#fff' }}>Shift + S:</strong> Instantly launch the Quick Sell Order modal for the active watchlist ticker.</li>
+                <li><strong style={{ color: '#fff' }}>Escape (ESC):</strong> Close any open modal dialog or slide-over drawer immediately.</li>
+                <li><strong style={{ color: '#fff' }}>Tab / Shift + Tab:</strong> Logical focus navigation across all interactive buttons and inputs.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#38bdf8', marginTop: '24px', marginBottom: '10px' }}>
+                3. Screen Reader Compatibility & Assistive Tech
+              </h2>
+              <p>
+                Interactive controls, modal dialogs, and form inputs are engineered with semantic HTML5 elements, descriptive 
+                <code>aria-label</code> tags, and meaningful <code>alt</code> text attributes for screen reader compatibility (NVDA, JAWS, VoiceOver, and TalkBack).
+              </p>
+
+              <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#38bdf8', marginTop: '24px', marginBottom: '10px' }}>
+                4. Feedback & Accessibility Grievance Support
+              </h2>
+              <p>
+                We welcome suggestions to improve our usability. If you encounter any accessibility barrier or have questions, please reach out to our team:
+              </p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
+                <div>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:support@skandx.in" style={{ color: '#38bdf8', textDecoration: 'none' }}>support@skandx.in</a></div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Toll Free Assistance:</strong> <a href="tel:18001234567" style={{ color: 'inherit', textDecoration: 'none' }}>1800 123 4567</a></div>
+                <div style={{ marginTop: '6px' }}>🏢 <strong>Physical Address:</strong> Level 4, Trade Centre, Financial District, Mumbai - 400051</div>
+              </div>
             </div>
           )}
 
