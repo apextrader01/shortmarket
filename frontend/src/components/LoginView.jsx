@@ -445,7 +445,7 @@ export default function LoginView() {
               </span>
             </h1>
             <p style={{ fontSize: '15.5px', color: 'var(--text-secondary)', maxWidth: '420px', lineHeight: '1.6', marginBottom: '24px' }}>
-              India's fastest real-time stock & options demo simulator. Practice with live NSE/BSE ticks, option chains with Greeks, bracket orders, and institutional algo strategies.
+              India's fastest real-time stock & options demo simulator. Practice with live NSE/BSE ticks, option chains with Greeks, bracket orders, and customizable demo capital from ₹10 Lakh to ₹10 Crore.
             </p>
 
             {/* Feature Highlights Grid */}
@@ -457,7 +457,7 @@ export default function LoginView() {
                 <span style={{ color: '#10b981' }}>✔</span> Live Options with Greeks
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ color: '#10b981' }}>✔</span> ₹10L Virtual Demo Funds
+                <span style={{ color: '#10b981' }}>✔</span> ₹10L to ₹10Cr Demo Funds
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ color: '#10b981' }}>✔</span> Sub-MS Algo Engine
