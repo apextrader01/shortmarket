@@ -667,6 +667,8 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT FALSE').catch(() => {});
     await db.raw('ALTER TABLE orders_archive ADD COLUMN IF NOT EXISTS is_exit BOOLEAN DEFAULT FALSE').catch(() => {});
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS quoted_price DECIMAL(14,2)').catch(() => {});
+    await db.raw('ALTER TABLE orders_archive ADD COLUMN IF NOT EXISTS quoted_price DECIMAL(14,2)').catch(() => {});
 
     // 3. Positions table critical columns
     await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity DECIMAL(14,4) DEFAULT 0');

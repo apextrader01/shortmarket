@@ -59,10 +59,98 @@ async function spawnBracketOrders(trx, order, childQty) {
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
   const triggerEngine = require('./triggerEngine');
   
+  // ⚡ Dynamic Bracket Offset Protection (Prevents inverted targets/stops on Market orders or volume matching slippage)
+  const actualFillPrice = Number(order.price || order.average_price || 0);
+  const quoteAtPlacement = Number(order.quoted_price || order.trigger_price || 0);
+  const isMarket = order.type === 'MARKET' || Boolean(order.isMarket);
+
+  let finalSLPrice = hasSL ? Number(order.sl_price) : null;
+  let finalTgtPrice = hasTgt ? Number(order.tgt_price) : null;
+
+  if (actualFillPrice > 0) {
+    if (order.side === 'BUY') {
+      // 1. Calculate Target points offset for BUY
+      let tgtOffset = 0;
+      if (hasTgt) {
+        if (quoteAtPlacement > 0 && Number(order.tgt_price) > quoteAtPlacement) {
+          tgtOffset = Number(order.tgt_price) - quoteAtPlacement;
+        } else if (Number(order.tgt_price) > actualFillPrice) {
+          tgtOffset = Number(order.tgt_price) - actualFillPrice;
+        } else {
+          tgtOffset = Math.max(0.05, Math.round(actualFillPrice * 0.005 * 100) / 100);
+        }
+      }
+
+      // 2. Calculate Stop Loss points offset for BUY
+      let slOffset = 0;
+      if (hasSL) {
+        if (quoteAtPlacement > 0 && quoteAtPlacement > Number(order.sl_price)) {
+          slOffset = quoteAtPlacement - Number(order.sl_price);
+        } else if (actualFillPrice > Number(order.sl_price)) {
+          slOffset = actualFillPrice - Number(order.sl_price);
+        } else {
+          slOffset = Math.max(0.05, Math.round(actualFillPrice * 0.01 * 100) / 100);
+        }
+      }
+
+      // 3. For Market orders or whenever fill price reaches/exceeds target, maintain intended profit points
+      if (hasTgt) {
+        if (isMarket || finalTgtPrice <= actualFillPrice) {
+          finalTgtPrice = Number((actualFillPrice + tgtOffset).toFixed(2));
+        }
+      }
+
+      // 4. For Market orders or whenever fill price reaches/drops below SL, maintain intended risk cushion
+      if (hasSL) {
+        if (isMarket || finalSLPrice >= actualFillPrice) {
+          finalSLPrice = Number(Math.max(0.05, actualFillPrice - slOffset).toFixed(2));
+        }
+      }
+    } else if (order.side === 'SELL') {
+      // 1. Calculate Target points offset for SELL (target is lower than entry)
+      let tgtOffset = 0;
+      if (hasTgt) {
+        if (quoteAtPlacement > 0 && quoteAtPlacement > Number(order.tgt_price)) {
+          tgtOffset = quoteAtPlacement - Number(order.tgt_price);
+        } else if (actualFillPrice > Number(order.tgt_price)) {
+          tgtOffset = actualFillPrice - Number(order.tgt_price);
+        } else {
+          tgtOffset = Math.max(0.05, Math.round(actualFillPrice * 0.005 * 100) / 100);
+        }
+      }
+
+      // 2. Calculate Stop Loss points offset for SELL (SL is higher than entry)
+      let slOffset = 0;
+      if (hasSL) {
+        if (quoteAtPlacement > 0 && Number(order.sl_price) > quoteAtPlacement) {
+          slOffset = Number(order.sl_price) - quoteAtPlacement;
+        } else if (Number(order.sl_price) > actualFillPrice) {
+          slOffset = Number(order.sl_price) - actualFillPrice;
+        } else {
+          slOffset = Math.max(0.05, Math.round(actualFillPrice * 0.01 * 100) / 100);
+        }
+      }
+
+      // 3. For Market orders or whenever fill price drops to/below target, maintain intended profit points
+      if (hasTgt) {
+        if (isMarket || finalTgtPrice >= actualFillPrice) {
+          finalTgtPrice = Number(Math.max(0.05, actualFillPrice - tgtOffset).toFixed(2));
+        }
+      }
+
+      // 4. For Market orders or whenever fill price rises to/above SL, maintain intended risk cushion
+      if (hasSL) {
+        if (isMarket || finalSLPrice <= actualFillPrice) {
+          finalSLPrice = Number((actualFillPrice + slOffset).toFixed(2));
+        }
+      }
+    }
+  }
+
   let slOrder = null;
   let tgtOrder = null;
 
-  if (hasSL) {
+  if (hasSL && finalSLPrice) {
     slOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
@@ -75,7 +163,7 @@ async function spawnBracketOrders(trx, order, childQty) {
       order_variety: 'REGULAR',
       price: null,
       status: 'PENDING_TRIGGER',
-      trigger_price: order.sl_price,
+      trigger_price: finalSLPrice,
       trail_amount: order.trail_amount || null,
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
@@ -88,7 +176,7 @@ async function spawnBracketOrders(trx, order, childQty) {
     slOrder.id = typeof slId === 'object' ? slId.id : slId;
   }
 
-  if (hasTgt) {
+  if (hasTgt && finalTgtPrice) {
     tgtOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
@@ -99,9 +187,9 @@ async function spawnBracketOrders(trx, order, childQty) {
       pending_quantity: finalQty,
       average_price: null,
       order_variety: 'REGULAR',
-      price: order.tgt_price,
+      price: finalTgtPrice,
       status: 'PENDING_TRIGGER',
-      trigger_price: order.tgt_price,
+      trigger_price: finalTgtPrice,
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,
