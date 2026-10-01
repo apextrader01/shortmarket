@@ -102,6 +102,26 @@ async function runMigration() {
     `);
     console.log('  ✅ reward_withdrawals table verified');
 
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS broadcast_notifications (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(50) DEFAULT 'SIGNAL',
+        title VARCHAR(255),
+        message TEXT,
+        side VARCHAR(10),
+        symbol VARCHAR(100),
+        entry_price VARCHAR(50),
+        target_price VARCHAR(50),
+        stop_loss VARCHAR(50),
+        impact VARCHAR(50),
+        target_tier VARCHAR(50) DEFAULT 'ALL',
+        show_banner BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('  ✅ broadcast_notifications table verified');
+
     // 2. Orders table partial fill, average price, taxes, variety, and bracket columns
     const orderColumns = [
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS filled_quantity DECIMAL(14,4) DEFAULT 0',

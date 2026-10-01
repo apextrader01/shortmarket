@@ -10027,6 +10027,121 @@ app.post('/api/admin/announcement', authenticateToken, async (req, res) => {
   }
 });
 
+// ─── Broadcast Notifications & Trading Signals ─────────────────────────────
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
+    const isExpired = user?.subscription_expires && new Date(user.subscription_expires) <= new Date();
+    const activeTier = isExpired ? 'BASIC' : userTier;
+    
+    const hasHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const hasYearly = hasHighest || activeTier === 'YEARLY';
+    const hasMonthly = hasYearly || ['MONTHLY', 'PRO'].includes(activeTier);
+    
+    const allowedTiers = ['ALL'];
+    if (hasMonthly) allowedTiers.push('MONTHLY_PLUS');
+    if (hasYearly) allowedTiers.push('YEARLY_PLUS');
+    if (hasHighest) allowedTiers.push('HIGHEST_ONLY');
+
+    const hasTable = await db.schema.hasTable('broadcast_notifications');
+    if (!hasTable) {
+      return res.json({ success: true, notifications: [] });
+    }
+
+    const notifications = await db('broadcast_notifications')
+      .where('is_active', true)
+      .whereIn('target_tier', allowedTiers)
+      .orderBy('created_at', 'desc')
+      .limit(50);
+
+    res.json({ success: true, notifications });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const {
+      type, // 'SIGNAL', 'NEWS', 'ANNOUNCEMENT'
+      title,
+      message,
+      side, // 'BUY', 'SELL'
+      symbol,
+      entry_price,
+      target_price,
+      stop_loss,
+      impact, // 'BULLISH', 'BEARISH', 'NEUTRAL'
+      target_tier, // 'ALL', 'MONTHLY_PLUS', 'YEARLY_PLUS', 'HIGHEST_ONLY'
+      show_banner // boolean
+    } = req.body;
+
+    if (!title && !symbol && !message) {
+      return res.status(400).json({ error: 'Notification requires a title, symbol, or message.' });
+    }
+
+    const [inserted] = await db('broadcast_notifications').insert({
+      type: type || 'SIGNAL',
+      title: title || (type === 'SIGNAL' ? `${side || 'BUY'} ${symbol || 'SIGNAL'}` : 'Market Update'),
+      message: message || '',
+      side: side ? side.toUpperCase() : null,
+      symbol: symbol ? symbol.toUpperCase().trim() : null,
+      entry_price: entry_price ? String(entry_price).trim() : null,
+      target_price: target_price ? String(target_price).trim() : null,
+      stop_loss: stop_loss ? String(stop_loss).trim() : null,
+      impact: impact || null,
+      target_tier: target_tier || 'ALL',
+      show_banner: Boolean(show_banner),
+      is_active: true,
+      created_at: new Date().toISOString()
+    }).returning('*');
+
+    // Real-time WebSocket emission to all user clients
+    io.emit('broadcast_notification', inserted);
+
+    // If show_banner is enabled, also sync legacy banner
+    if (show_banner) {
+      const { generalClient } = require('./services/redisClient');
+      let bannerText = '';
+      if (type === 'SIGNAL') {
+        bannerText = `⚡ [${side || 'SIGNAL'}] ${symbol || ''} @ ₹${entry_price || 'CMP'} | Tgt: ₹${target_price || '—'} | SL: ₹${stop_loss || '—'}`;
+      } else {
+        bannerText = title ? `${title}: ${message}` : message;
+      }
+      const announcementData = {
+        text: bannerText,
+        type: side === 'SELL' ? 'alert' : (side === 'BUY' ? 'info' : 'warning'),
+        updated_at: new Date().toISOString()
+      };
+      if (generalClient && generalClient.isReady) {
+        await generalClient.hSet('platform:announcement', announcementData);
+      }
+      io.emit('announcement_update', announcementData);
+    }
+
+    res.json({ success: true, notification: inserted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/broadcast-notification/:id', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    await db('broadcast_notifications').where({ id: req.params.id }).update({ is_active: false });
+    io.emit('broadcast_notification_removed', { id: Number(req.params.id) });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Session & Device Security Manager Endpoints ─────────────────────────
 app.get('/api/user/sessions', authenticateToken, async (req, res) => {
   try {

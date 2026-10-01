@@ -556,6 +556,28 @@ async function initSchema() {
         console.log('Created audit_logs table');
       }
 
+      // 12. Broadcast Notifications Table (Buy/Sell Calls, Market News, Platform Alerts)
+      const hasBroadcastNotifications = await db.schema.hasTable('broadcast_notifications');
+      if (!hasBroadcastNotifications) {
+        await db.schema.createTable('broadcast_notifications', table => {
+          table.increments('id').primary();
+          table.string('type', 50).defaultTo('SIGNAL'); // 'SIGNAL', 'NEWS', 'ANNOUNCEMENT'
+          table.string('title', 255);
+          table.text('message');
+          table.string('side', 10); // 'BUY', 'SELL'
+          table.string('symbol', 100);
+          table.string('entry_price', 50);
+          table.string('target_price', 50);
+          table.string('stop_loss', 50);
+          table.string('impact', 50); // 'BULLISH', 'BEARISH', 'NEUTRAL'
+          table.string('target_tier', 50).defaultTo('ALL'); // 'ALL', 'MONTHLY_PLUS', 'YEARLY_PLUS', 'HIGHEST_ONLY'
+          table.boolean('show_banner').defaultTo(false);
+          table.boolean('is_active').defaultTo(true);
+          table.timestamp('created_at').defaultTo(db.fn.now()).index();
+        });
+        console.log('Created broadcast_notifications table');
+      }
+
       // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
@@ -751,6 +773,26 @@ async function ensureCriticalColumns() {
         value JSON NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure broadcast_notifications table always exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS broadcast_notifications (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(50) DEFAULT 'SIGNAL',
+        title VARCHAR(255),
+        message TEXT,
+        side VARCHAR(10),
+        symbol VARCHAR(100),
+        entry_price VARCHAR(50),
+        target_price VARCHAR(50),
+        stop_loss VARCHAR(50),
+        impact VARCHAR(50),
+        target_tier VARCHAR(50) DEFAULT 'ALL',
+        show_banner BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 

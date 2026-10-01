@@ -47,6 +47,9 @@ import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
 import BasketModal from './components/BasketModal';
+import BroadcastToast from './components/BroadcastToast';
+import NotificationDrawer from './components/NotificationDrawer';
+import BroadcastModal from './components/BroadcastModal';
 
 // ⚡ Lazy Loaded Secondary / Heavy Auxiliary Views
 const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard'));
@@ -77,7 +80,7 @@ import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -233,8 +236,10 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
 
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [hotkeyToast, setHotkeyToast] = useState(null);
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
     return localStorage.getItem('last_dismissed_announcement') || '';
@@ -366,6 +371,7 @@ function App() {
     setFontSize(fontSize);
     if (theme) setTheme(theme);
     if (fetchAnnouncement) fetchAnnouncement();
+    if (fetchBroadcastNotifications) fetchBroadcastNotifications();
   }, []);
 
 
@@ -808,6 +814,56 @@ function App() {
                   ))}
                 </div>
 
+                {/* Real-time Notification Bell (Desktop & Mobile) */}
+                <button
+                  onClick={() => {
+                    setNotificationDrawerOpen(prev => !prev);
+                    if (!notificationDrawerOpen && markAllNotificationsRead) {
+                      markAllNotificationsRead();
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: unreadNotificationsCount > 0 ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${unreadNotificationsCount > 0 ? 'rgba(56, 189, 248, 0.35)' : 'var(--border-color)'}`,
+                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: unreadNotificationsCount > 0 ? '#38bdf8' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease',
+                    height: '32px',
+                    minWidth: '34px'
+                  }}
+                  title="Notifications & Trade Signals"
+                >
+                  <Bell size={16} />
+                  {unreadNotificationsCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-5px',
+                      background: '#ef4444',
+                      color: '#fff',
+                      fontSize: '9.5px',
+                      fontWeight: '800',
+                      borderRadius: '10px',
+                      minWidth: '17px',
+                      height: '17px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px',
+                      boxShadow: '0 0 10px rgba(239, 68, 68, 0.9)',
+                      border: '1.5px solid var(--bg-dark, #0f172a)'
+                    }}>
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
                 {/* Hamburger Menu (Mobile Only) */}
                 <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
                   <Menu size={24} color="var(--text-primary)" />
@@ -988,6 +1044,27 @@ function App() {
           <BiometricLockModal onUnlock={() => setIsLocked(false)} />
         )}
       </Suspense>
+
+      {/* Real-time Broadcast Toast */}
+      <BroadcastToast />
+
+      {/* Slide-out Notification Drawer */}
+      <NotificationDrawer
+        isOpen={notificationDrawerOpen}
+        onClose={() => setNotificationDrawerOpen(false)}
+        onOpenBroadcastModal={() => {
+          setNotificationDrawerOpen(false);
+          setBroadcastModalOpen(true);
+        }}
+      />
+
+      {/* Broadcast Studio Modal for Admin */}
+      {broadcastModalOpen && (
+        <BroadcastModal
+          isOpen={broadcastModalOpen}
+          onClose={() => setBroadcastModalOpen(false)}
+        />
+      )}
       
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${showMobileMenu ? 'open' : ''}`}>
@@ -1017,6 +1094,7 @@ function App() {
         </div>
         <div className="mobile-menu-content">
           {[
+            { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Markets', key: 'Markets', icon: TrendingUp },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
@@ -1032,9 +1110,37 @@ function App() {
             { label: 'Privacy & Legal', key: 'Legal', icon: Shield },
             ...(user?.is_admin ? [{ label: 'Admin Panel', key: 'AdminPanel', icon: ShieldCheck }] : [])
           ].map(tab => (
-            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.key); setShowMobileMenu(false); }}>
-              <tab.icon size={20} />
-              {tab.label}
+            <div 
+              key={tab.label} 
+              className="mobile-menu-item" 
+              onClick={() => { 
+                if (tab.key === 'Notifications_Drawer') {
+                  setShowMobileMenu(false);
+                  setNotificationDrawerOpen(true);
+                  if (markAllNotificationsRead) markAllNotificationsRead();
+                } else {
+                  setActiveTab(tab.key); 
+                  setShowMobileMenu(false); 
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <tab.icon size={20} />
+                {tab.label}
+              </div>
+              {tab.badge > 0 && (
+                <span style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: '10.5px',
+                  fontWeight: '800',
+                  borderRadius: '12px',
+                  padding: '2px 8px'
+                }}>
+                  {tab.badge}
+                </span>
+              )}
             </div>
           ))}
           <div className="mobile-menu-item" onClick={logout} style={{ color: 'var(--color-red)', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>

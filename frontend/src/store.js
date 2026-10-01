@@ -891,6 +891,25 @@ export const useStore = create(persist((set, get) => ({
       set({ announcement: data || null });
     });
 
+    socket.off('broadcast_notification');
+    socket.on('broadcast_notification', (data) => {
+      if (!data) return;
+      const currentList = get().broadcastNotifications || [];
+      const updated = [data, ...currentList.filter(n => n.id !== data.id)];
+      set({ 
+        broadcastNotifications: updated,
+        activeBroadcastToast: data,
+        unreadNotificationsCount: (get().unreadNotificationsCount || 0) + 1
+      });
+      try { playOrderExecutedSound(); } catch(_) {}
+    });
+
+    socket.off('broadcast_notification_removed');
+    socket.on('broadcast_notification_removed', ({ id }) => {
+      const currentList = get().broadcastNotifications || [];
+      set({ broadcastNotifications: currentList.filter(n => n.id !== id) });
+    });
+
     socket.off('trade_alert');
     socket.on('trade_alert', (data) => {
       if (!data) return;
@@ -913,6 +932,7 @@ export const useStore = create(persist((set, get) => ({
       get().fetchMarketCalendar();
       get().fetchTodayMarketSchedule();
       get().fetchAnnouncement();
+      get().fetchBroadcastNotifications();
       // Force a fresh REST price fetch on every socket connect/reconnect
       get().refreshPrices(true);
       
@@ -2324,6 +2344,65 @@ export const useStore = create(persist((set, get) => ({
     }
   },
   setAnnouncement: (announcement) => set({ announcement }),
+
+  broadcastNotifications: [],
+  unreadNotificationsCount: 0,
+  activeBroadcastToast: null,
+  dismissBroadcastToast: () => set({ activeBroadcastToast: null }),
+  markAllNotificationsRead: () => set({ unreadNotificationsCount: 0 }),
+  fetchBroadcastNotifications: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/notifications`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.notifications)) {
+        set({ broadcastNotifications: data.notifications });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  },
+  sendBroadcastNotification: async (payload) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/broadcast-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data?.success && data?.notification) {
+        const currentList = get().broadcastNotifications || [];
+        set({ broadcastNotifications: [data.notification, ...currentList] });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+  deleteBroadcastNotification: async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/broadcast-notification/${id}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        const currentList = get().broadcastNotifications || [];
+        set({ broadcastNotifications: currentList.filter(n => n.id !== id) });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
 
   bannedEntities: [],
   fetchBannedEntities: async () => {

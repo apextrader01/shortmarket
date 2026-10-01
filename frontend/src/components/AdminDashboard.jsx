@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle, Trophy, Gift, Award, Send, ShieldAlert, Loader2, Save, Bell, Power } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
+import BroadcastModal from './BroadcastModal';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
   const now = new Date();
@@ -1612,6 +1613,7 @@ export default function AdminDashboard() {
   }, [adminTelemetry?.users, userSearch, userFilter, userSort]);
   const [announcementInput, setAnnouncementInput] = useState('');
   const [announcementType, setAnnouncementType] = useState('info');
+  const [showBroadcastStudio, setShowBroadcastStudio] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   // Client Management State & Date Filters
@@ -2748,47 +2750,52 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* Live Announcement Broadcast Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, maxWidth: isMobile ? '100%' : '520px' }}>
-          <span style={{ fontSize: '13px' }}>📢</span>
-          <input
-            type="text"
-            placeholder="Live announcement banner to traders..."
-            value={announcementInput}
-            onChange={(e) => setAnnouncementInput(e.target.value)}
-            style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '5px', padding: '3px 8px', color: '#fff', fontSize: '11px', height: '24px' }}
-          />
-          <select
-            value={announcementType}
-            onChange={(e) => setAnnouncementType(e.target.value)}
-            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '5px', padding: '2px 4px', color: '#fff', fontSize: '11px', height: '24px' }}
-          >
-            <option value="info">Info</option>
-            <option value="warning">Warn</option>
-            <option value="alert">Alert</option>
-          </select>
+        {/* Live Broadcast Studio Launcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <button
-            className="btn btn-primary"
-            onClick={async () => {
-              if (!announcementInput.trim()) return;
-              await setAdminAnnouncement(announcementInput, announcementType);
-              alert('Live announcement broadcasted!');
+            onClick={() => setShowBroadcastStudio(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 14px',
+              fontSize: '11.5px',
+              fontWeight: '700',
+              background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(37, 99, 235, 0.4)',
+              height: '26px'
             }}
-            style={{ padding: '2px 10px', fontSize: '11px', background: 'var(--color-blue)', color: '#fff', cursor: 'pointer', height: '24px', borderRadius: '5px' }}
           >
-            Broadcast
+            <span>📢</span> Broadcast Signals & News
           </button>
           {announcement && announcement.text && (
             <button
-              className="btn btn-secondary"
               onClick={async () => {
                 await setAdminAnnouncement('', 'info');
                 setAnnouncementInput('');
                 alert('Banner cleared!');
               }}
-              style={{ padding: '2px 6px', fontSize: '10px', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', height: '24px', borderRadius: '5px' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 8px',
+                fontSize: '10px',
+                fontWeight: '600',
+                background: 'rgba(239, 68, 68, 0.2)',
+                color: 'var(--color-red-light)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                cursor: 'pointer',
+                height: '26px',
+                borderRadius: '6px'
+              }}
+              title="Clear active top banner"
             >
-              Clear
+              Clear Banner
             </button>
           )}
         </div>
@@ -6207,6 +6214,14 @@ export default function AdminDashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Broadcast Studio Modal */}
+      {showBroadcastStudio && (
+        <BroadcastModal
+          isOpen={showBroadcastStudio}
+          onClose={() => setShowBroadcastStudio(false)}
+        />
       )}
     </div>
   );
