@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
-import { useStore } from '../store';
+import React, { useState, useEffect, useRef } from 'react';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { X, TrendingUp, TrendingDown, Newspaper, Bell, Send, Trash2, CheckCircle2, AlertTriangle, Eye } from 'lucide-react';
+import { 
+  X, TrendingUp, TrendingDown, Newspaper, Bell, Send, Trash2, 
+  CheckCircle2, AlertTriangle, Eye, Search, Layers, Sparkles, 
+  Loader2, Check, ArrowRight, CornerDownLeft, RotateCcw
+} from 'lucide-react';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract } from '../utils/lotsizeHelper';
+
+const POPULAR_INSTRUMENTS = [
+  { uniqueSymbol: 'NSE:NIFTY50-INDEX', symbol: 'NIFTY50', name: 'Nifty 50 Index', exchange: 'NSE', type: 'INDEX' },
+  { uniqueSymbol: 'NSE:NIFTYBANK-INDEX', symbol: 'BANKNIFTY', name: 'Bank Nifty Index', exchange: 'NSE', type: 'INDEX' },
+  { uniqueSymbol: 'NSE:RELIANCE', symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE', type: 'EQUITY' },
+  { uniqueSymbol: 'NSE:HDFCBANK', symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE', type: 'EQUITY' },
+  { uniqueSymbol: 'NSE:TATAMOTORS', symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', exchange: 'NSE', type: 'EQUITY' },
+  { uniqueSymbol: 'MCX:CRUDEOILM', symbol: 'CRUDEOILM', name: 'Crude Oil Mini Future', exchange: 'MCX', type: 'COMMODITY' },
+  { uniqueSymbol: 'MCX:GOLDM', symbol: 'GOLDM', name: 'Gold Mini Future', exchange: 'MCX', type: 'COMMODITY' },
+  { uniqueSymbol: 'MCX:SILVERM', symbol: 'SILVERM', name: 'Silver Mini Future', exchange: 'MCX', type: 'COMMODITY' },
+  { uniqueSymbol: 'MCX:NATURALGAS', symbol: 'NATURALGAS', name: 'Natural Gas Future', exchange: 'MCX', type: 'COMMODITY' },
+];
 
 export default function BroadcastModal({ isOpen, onClose }) {
-  const { sendBroadcastNotification, broadcastNotifications, deleteBroadcastNotification } = useStore(
+  const { sendBroadcastNotification, broadcastNotifications, deleteBroadcastNotification, prices } = useStore(
     useShallow(state => ({
       sendBroadcastNotification: state.sendBroadcastNotification,
       broadcastNotifications: state.broadcastNotifications || [],
-      deleteBroadcastNotification: state.deleteBroadcastNotification
+      deleteBroadcastNotification: state.deleteBroadcastNotification,
+      prices: state.prices || {}
     }))
   );
 
@@ -23,6 +41,14 @@ export default function BroadcastModal({ isOpen, onClose }) {
   const [stopLoss, setStopLoss] = useState('');
   const [message, setMessage] = useState('');
   
+  // Symbol search states
+  const [selectedStockData, setSelectedStockData] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchSegment, setSearchSegment] = useState('ALL'); // 'ALL', 'EQUITY', 'FNO', 'MCX'
+  const searchContainerRef = useRef(null);
+
   const [newsTitle, setNewsTitle] = useState('');
   const [newsImpact, setNewsImpact] = useState('BULLISH'); // 'BULLISH', 'BEARISH', 'NEUTRAL'
   const [newsBody, setNewsBody] = useState('');
@@ -33,7 +59,113 @@ export default function BroadcastModal({ isOpen, onClose }) {
   const [targetTier, setTargetTier] = useState('ALL'); // 'ALL', 'MONTHLY_PLUS', 'YEARLY_PLUS', 'HIGHEST_ONLY'
   const [showBanner, setShowBanner] = useState(false);
 
+  // Classification helpers
+  const isMcx = (item) => {
+    if (!item) return false;
+    const sym = (item.uniqueSymbol || item.symbol || '').toUpperCase();
+    const ex = (item.exchange || '').toUpperCase();
+    return ex === 'MCX' || isCommodityContract(sym);
+  };
+
+  const isFno = (item) => {
+    if (!item) return false;
+    const sym = (item.uniqueSymbol || item.symbol || '').toUpperCase();
+    return isDerivativeContract(sym) || /FUT|CE|PE/i.test(sym);
+  };
+
+  const isEquity = (item) => {
+    return !isMcx(item) && !isFno(item);
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced search query to backend
+  useEffect(() => {
+    if (!symbol || symbol.trim().length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    if (selectedStockData && (selectedStockData.uniqueSymbol === symbol || selectedStockData.symbol === symbol)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const cleanQuery = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(cleanQuery || symbol)}`, {
+          signal: controller.signal
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : [];
+          setSearchResults(list);
+          setIsSearchOpen(true);
+          if (list.length > 0) {
+            useStore.getState().fetchBatchPrices?.(list.map(d => d.uniqueSymbol || d.symbol));
+          }
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Symbol search error:', err);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [symbol, selectedStockData]);
+
   if (!isOpen) return null;
+
+  // Handle instrument select from autocomplete
+  const handleSelectInstrument = (item) => {
+    const targetSymbol = item.uniqueSymbol || item.symbol;
+    setSymbol(targetSymbol);
+    setSelectedStockData(item);
+    setIsSearchOpen(false);
+
+    // Live price resolution
+    const priceData = prices[targetSymbol] || prices[item.symbol];
+    const ltp = priceData?.ltp !== undefined ? Number(priceData.ltp) : (Number(item.ltp) || null);
+
+    if (ltp && (!entryPrice || entryPrice === 'CMP')) {
+      setEntryPrice(ltp.toFixed(2));
+      const factor = signalSide === 'BUY' ? 1.015 : 0.985;
+      const slFactor = signalSide === 'BUY' ? 0.99 : 1.01;
+      setTargetPrice((ltp * factor).toFixed(2));
+      setStopLoss((ltp * slFactor).toFixed(2));
+    }
+  };
+
+  const handleSideChange = (newSide) => {
+    setSignalSide(newSide);
+    const numEntry = parseFloat(entryPrice);
+    if (!isNaN(numEntry) && numEntry > 0) {
+      const factor = newSide === 'BUY' ? 1.015 : 0.985;
+      const slFactor = newSide === 'BUY' ? 0.99 : 1.01;
+      setTargetPrice((numEntry * factor).toFixed(2));
+      setStopLoss((numEntry * slFactor).toFixed(2));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +174,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
     let payload = {};
     if (activeTab === 'SIGNAL') {
       if (!symbol.trim()) {
-        alert('Please enter a trading symbol (e.g. NSE:RELIANCE or NIFTY24OCT25000CE)');
+        alert('Please enter a trading symbol (e.g. NSE:RELIANCE or NIFTY24OCT25000CE or MCX:CRUDEOILM)');
         setSubmitting(false);
         return;
       }
@@ -92,6 +224,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
         alert('Broadcast successfully sent in real-time to traders!');
         // Reset form
         setSymbol('');
+        setSelectedStockData(null);
         setEntryPrice('');
         setTargetPrice('');
         setStopLoss('');
@@ -112,6 +245,20 @@ export default function BroadcastModal({ isOpen, onClose }) {
     }
   };
 
+  // Compute segment breakdown for results
+  const baseList = searchResults.length > 0 ? searchResults : POPULAR_INSTRUMENTS;
+  const equityCount = baseList.filter(isEquity).length;
+  const fnoCount = baseList.filter(isFno).length;
+  const mcxCount = baseList.filter(isMcx).length;
+
+  const displayList = baseList.filter(item => {
+    if (searchSegment === 'ALL') return true;
+    if (searchSegment === 'EQUITY') return isEquity(item);
+    if (searchSegment === 'FNO') return isFno(item);
+    if (searchSegment === 'MCX') return isMcx(item);
+    return true;
+  });
+
   return (
     <div style={{
       position: 'fixed',
@@ -122,27 +269,27 @@ export default function BroadcastModal({ isOpen, onClose }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '16px',
-      animation: 'fadeIn 0.2s ease-out'
+      padding: '20px'
     }} onClick={onClose}>
       <div 
         style={{
           width: '100%',
           maxWidth: '680px',
-          maxHeight: '92vh',
-          background: 'var(--bg-panel, #1e293b)',
+          maxHeight: '90vh',
+          background: 'var(--bg-card, #131722)',
           border: '1px solid var(--border-color)',
           borderRadius: '16px',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          animation: 'scaleIn 0.2s ease-out'
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '16px 24px',
+          padding: '18px 24px',
           borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
@@ -250,28 +397,40 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             {n.title}
                           </span>
                         </div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-                          {n.message || `Entry: ₹${n.entry_price || 'CMP'} | Target: ₹${n.target_price || '—'} | SL: ₹${n.stop_loss || '—'}`}
-                        </div>
+                        {n.type === 'SIGNAL' && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', display: 'flex', gap: '12px' }}>
+                            <span>Entry: ₹{n.entry_price || '—'}</span>
+                            <span style={{ color: '#10B981' }}>Target: ₹{n.target_price || '—'}</span>
+                            <span style={{ color: '#EF4444' }}>SL: ₹{n.stop_loss || '—'}</span>
+                          </div>
+                        )}
+                        {n.message && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {n.message}
+                          </div>
+                        )}
                       </div>
                       <button
-                        onClick={() => deleteBroadcastNotification(n.id)}
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete and revoke this broadcast?')) {
+                            deleteBroadcastNotification(n.id);
+                          }
+                        }}
                         style={{
-                          background: 'rgba(239, 68, 68, 0.15)',
+                          background: 'rgba(239, 68, 68, 0.1)',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
                           color: '#EF4444',
                           padding: '6px 10px',
                           borderRadius: '6px',
                           cursor: 'pointer',
-                          fontSize: '11.5px',
-                          fontWeight: '700',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600'
                         }}
-                        className="hoverable"
                       >
-                        <Trash2 size={13} /> Delete
+                        <Trash2 size={13} /> Revoke
                       </button>
                     </div>
                   ))}
@@ -292,7 +451,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <button
                         type="button"
-                        onClick={() => setSignalSide('BUY')}
+                        onClick={() => handleSideChange('BUY')}
                         style={{
                           padding: '12px',
                           borderRadius: '8px',
@@ -305,14 +464,15 @@ export default function BroadcastModal({ isOpen, onClose }) {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px'
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
                         }}
                       >
                         <TrendingUp size={16} /> 🟢 BUY CALL
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSignalSide('SELL')}
+                        onClick={() => handleSideChange('SELL')}
                         style={{
                           padding: '12px',
                           borderRadius: '8px',
@@ -325,7 +485,8 @@ export default function BroadcastModal({ isOpen, onClose }) {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px'
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
                         }}
                       >
                         <TrendingDown size={16} /> 🔴 SELL CALL
@@ -333,20 +494,274 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     </div>
                   </div>
 
-                  {/* Symbol Input */}
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                      TRADING SYMBOL *
-                    </label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      placeholder="e.g. NSE:RELIANCE or NIFTY24OCT25000CE or MCX:CRUDEOILM"
-                      value={symbol}
-                      onChange={e => setSymbol(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '10px 12px', fontSize: '13.5px', textTransform: 'uppercase' }}
-                    />
+                  {/* Symbol Search & Autocomplete Input (Stocks, F&O Derivatives, MCX Commodities) */}
+                  <div ref={searchContainerRef} style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                        TRADING SYMBOL *
+                      </label>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Search Stocks, Derivatives (F&O) or MCX Commodities
+                      </span>
+                    </div>
+
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Search size={16} style={{ position: 'absolute', left: '12px', color: isSearchOpen ? '#38bdf8' : 'var(--text-secondary)', pointerEvents: 'none' }} />
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Search Symbol (e.g. RELIANCE, NIFTY 25000 CE, CRUDEOIL)..."
+                        value={symbol}
+                        onFocus={() => setIsSearchOpen(true)}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          setSymbol(val);
+                          setIsSearchOpen(true);
+                          if (selectedStockData && selectedStockData.uniqueSymbol !== val) {
+                            setSelectedStockData(null);
+                          }
+                        }}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '11px 40px 11px 36px',
+                          fontSize: '13.5px',
+                          textTransform: 'uppercase',
+                          fontWeight: '700',
+                          letterSpacing: '0.5px',
+                          borderRadius: '8px',
+                          border: isSearchOpen ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                          boxShadow: isSearchOpen ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none'
+                        }}
+                      />
+                      <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isSearching && (
+                          <Loader2 size={16} className="animate-spin" color="var(--color-blue)" />
+                        )}
+                        {symbol && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSymbol('');
+                              setSelectedStockData(null);
+                              setSearchResults([]);
+                              setEntryPrice('');
+                              setTargetPrice('');
+                              setStopLoss('');
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Clear Symbol"
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Verified Instrument Details Card */}
+                    {selectedStockData && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '10px 14px',
+                        background: 'rgba(30, 58, 138, 0.15)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: '800',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            background: isMcx(selectedStockData) ? 'rgba(245, 158, 11, 0.25)' : (isFno(selectedStockData) ? 'rgba(168, 85, 247, 0.25)' : 'rgba(59, 130, 246, 0.25)'),
+                            color: isMcx(selectedStockData) ? '#F59E0B' : (isFno(selectedStockData) ? '#C084FC' : '#60A5FA'),
+                            border: `1px solid ${isMcx(selectedStockData) ? 'rgba(245, 158, 11, 0.4)' : (isFno(selectedStockData) ? 'rgba(168, 85, 247, 0.4)' : 'rgba(59, 130, 246, 0.4)')}`
+                          }}>
+                            {isMcx(selectedStockData) ? '🪙 MCX COMMODITY' : (isFno(selectedStockData) ? '⚡ F&O DERIVATIVE' : '📈 CASH EQUITY')}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: '800', fontSize: '13px', color: '#fff' }}>
+                              {selectedStockData.uniqueSymbol || selectedStockData.symbol}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              {selectedStockData.name || selectedStockData.description || 'Verified Contract'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            Lot Size: <strong style={{ color: '#fff' }}>{getInstantLotsize(selectedStockData.uniqueSymbol || selectedStockData.symbol)}</strong>
+                          </div>
+                          {prices[selectedStockData.uniqueSymbol]?.ltp !== undefined && (
+                            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--color-green-light)' }}>
+                              CMP: ₹{Number(prices[selectedStockData.uniqueSymbol].ltp).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Autocomplete Dropdown List */}
+                    {isSearchOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        background: 'var(--bg-dark, #0f172a)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7)',
+                        zIndex: 1000,
+                        overflow: 'hidden',
+                        maxHeight: '340px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        backdropFilter: 'blur(12px)'
+                      }}>
+                        {/* Segment Filter Header Tabs */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          borderBottom: '1px solid var(--border-color)',
+                          background: 'rgba(0,0,0,0.3)',
+                          overflowX: 'auto'
+                        }} className="scrollbar-hide">
+                          {[
+                            { id: 'ALL', label: `All (${searchResults.length || POPULAR_INSTRUMENTS.length})` },
+                            { id: 'EQUITY', label: `📈 Stocks (${equityCount})` },
+                            { id: 'FNO', label: `⚡ F&O (${fnoCount})` },
+                            { id: 'MCX', label: `🪙 MCX (${mcxCount})` }
+                          ].map(seg => (
+                            <button
+                              key={seg.id}
+                              type="button"
+                              onClick={() => setSearchSegment(seg.id)}
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                borderRadius: '6px',
+                                border: searchSegment === seg.id ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                                background: searchSegment === seg.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.04)',
+                                color: searchSegment === seg.id ? '#60A5FA' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {seg.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* List of items */}
+                        <div style={{ flex: 1, overflowY: 'auto' }} className="scrollbar-dark">
+                          {displayList.length === 0 ? (
+                            <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                              {isSearching ? 'Searching instruments...' : `No instruments found matching "${symbol}"`}
+                            </div>
+                          ) : (
+                            displayList.map(item => {
+                              const itemSym = item.uniqueSymbol || item.symbol;
+                              const itemPrice = prices[itemSym] || prices[item.symbol];
+                              const ltp = itemPrice?.ltp !== undefined ? Number(itemPrice.ltp) : (Number(item.ltp) || null);
+                              const isItemMcx = isMcx(item);
+                              const isItemFno = isFno(item);
+                              const lot = getInstantLotsize(itemSym);
+
+                              return (
+                                <div
+                                  key={itemSym}
+                                  onClick={() => handleSelectInstrument(item)}
+                                  style={{
+                                    padding: '9px 14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s ease'
+                                  }}
+                                  className="hover:bg-blue-600/10"
+                                >
+                                  {/* Left: Badge, Symbol, Name */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: '800',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      minWidth: '42px',
+                                      textAlign: 'center',
+                                      background: isItemMcx ? 'rgba(245, 158, 11, 0.2)' : (isItemFno ? 'rgba(168, 85, 247, 0.2)' : 'rgba(59, 130, 246, 0.2)'),
+                                      color: isItemMcx ? '#F59E0B' : (isItemFno ? '#C084FC' : '#60A5FA'),
+                                      border: `1px solid ${isItemMcx ? 'rgba(245, 158, 11, 0.35)' : (isItemFno ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.35)')}`
+                                    }}>
+                                      {isItemMcx ? 'MCX' : (isItemFno ? 'F&O' : (item.exchange || 'NSE'))}
+                                    </span>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontWeight: '800', fontSize: '12.5px', color: '#fff' }}>
+                                          {item.symbol || itemSym}
+                                        </span>
+                                        {lot > 1 && (
+                                          <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '3px', color: 'var(--text-secondary)' }}>
+                                            Lot {lot}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                                        {item.name || item.description || itemSym}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: LTP Price and Action */}
+                                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {ltp !== null ? (
+                                      <div>
+                                        <div style={{ fontWeight: '700', fontSize: '12px', color: 'var(--text-primary)' }}>
+                                          ₹{ltp.toFixed(2)}
+                                        </div>
+                                        <div style={{ fontSize: '9px', color: 'var(--color-green-light)' }}>
+                                          ● Live
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                                    )}
+                                    <span style={{
+                                      fontSize: '11px',
+                                      color: 'var(--color-blue)',
+                                      fontWeight: '700',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '2px'
+                                    }}>
+                                      Select <ArrowRight size={12} />
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Price Levels Grid */}
@@ -392,9 +807,9 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     </div>
                   </div>
 
-                  {/* Notes / Strategy */}
+                  {/* Strategy Notes */}
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                       STRATEGY RATIONALE / REMARKS (OPTIONAL)
                     </label>
                     <textarea
@@ -403,7 +818,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                       value={message}
                       onChange={e => setMessage(e.target.value)}
                       rows={2}
-                      style={{ width: '100%', padding: '10px 12px', fontSize: '12.5px', resize: 'vertical' }}
+                      style={{ width: '100%', padding: '8px 10px', fontSize: '12px', resize: 'vertical' }}
                     />
                   </div>
                 </>
@@ -413,13 +828,13 @@ export default function BroadcastModal({ isOpen, onClose }) {
               {activeTab === 'NEWS' && (
                 <>
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                       NEWS HEADLINE *
                     </label>
                     <input
                       type="text"
                       className="input-field"
-                      placeholder="e.g. US Fed Signals Imminent Rate Cuts; Global Markets Rally"
+                      placeholder="e.g. RBI Keeps Repo Rate Unchanged at 6.50% in MPC Meet"
                       value={newsTitle}
                       onChange={e => setNewsTitle(e.target.value)}
                       required
@@ -428,43 +843,44 @@ export default function BroadcastModal({ isOpen, onClose }) {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                      MARKET IMPACT
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                      MARKET IMPACT / SENTIMENT
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                       {[
-                        { id: 'BULLISH', label: '📈 Bullish', color: '#10B981' },
-                        { id: 'BEARISH', label: '📉 Bearish', color: '#EF4444' },
-                        { id: 'NEUTRAL', label: '⚖️ Neutral', color: '#94A3B8' }
-                      ].map(imp => (
+                        { id: 'BULLISH', label: '🟢 Bullish Impact', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+                        { id: 'BEARISH', label: '🔴 Bearish Impact', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                        { id: 'NEUTRAL', label: '⚪ Neutral / Info', color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.15)' }
+                      ].map(item => (
                         <button
-                          key={imp.id}
+                          key={item.id}
                           type="button"
-                          onClick={() => setNewsImpact(imp.id)}
+                          onClick={() => setNewsImpact(item.id)}
                           style={{
-                            padding: '8px',
-                            borderRadius: '6px',
-                            border: newsImpact === imp.id ? `2px solid ${imp.color}` : '1px solid var(--border-color)',
-                            background: newsImpact === imp.id ? `${imp.color}22` : 'rgba(0,0,0,0.2)',
-                            color: newsImpact === imp.id ? imp.color : 'var(--text-secondary)',
+                            padding: '10px 8px',
+                            borderRadius: '8px',
+                            border: newsImpact === item.id ? `2px solid ${item.color}` : '1px solid var(--border-color)',
+                            background: newsImpact === item.id ? item.bg : 'rgba(0,0,0,0.2)',
+                            color: newsImpact === item.id ? item.color : 'var(--text-secondary)',
                             fontWeight: '700',
-                            fontSize: '12.5px',
-                            cursor: 'pointer'
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'center'
                           }}
                         >
-                          {imp.label}
+                          {item.label}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                      NEWS SUMMARY & DETAILS
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      NEWS DETAILS / KEY TAKEAWAYS
                     </label>
                     <textarea
                       className="input-field"
-                      placeholder="Enter detailed points, sectors affected, and key takeaways for traders..."
+                      placeholder="Summary of the news, key sectors affected (e.g. Banking, Auto), and what traders should watch for..."
                       value={newsBody}
                       onChange={e => setNewsBody(e.target.value)}
                       rows={3}
@@ -478,21 +894,21 @@ export default function BroadcastModal({ isOpen, onClose }) {
               {activeTab === 'ANNOUNCEMENT' && (
                 <>
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                       ANNOUNCEMENT TITLE (OPTIONAL)
                     </label>
                     <input
                       type="text"
                       className="input-field"
-                      placeholder="e.g. Scheduled System Maintenance / Tournament Launch"
+                      placeholder="e.g. Scheduled Platform Maintenance Tonight at 11:30 PM IST"
                       value={announcementTitle}
                       onChange={e => setAnnouncementTitle(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', fontSize: '13.5px' }}
+                      style={{ width: '100%', padding: '10px 12px', fontSize: '13px' }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                       MESSAGE BODY *
                     </label>
                     <textarea
