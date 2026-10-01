@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -20,3 +21,16 @@ const app = initializeApp(firebaseConfig);
 export const storage = getStorage(app);
 
 export const auth = getAuth(app);
+
+// Initialize Google Analytics conditionally (respecting environment and browser capabilities)
+let analytics = null;
+if (typeof window !== 'undefined') {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+      window.__SKANDX_FIREBASE_ANALYTICS__ = analytics;
+    }
+  }).catch(() => {});
+}
+
+export { analytics };

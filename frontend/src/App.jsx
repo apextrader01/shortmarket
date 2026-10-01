@@ -57,6 +57,7 @@ const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
 const MobileStockOverviewModal = lazyWithRetry(() => import('./components/MobileStockOverviewModal'));
 const LegalView = lazyWithRetry(() => import('./components/LegalView'));
 const ConsentBanner = lazyWithRetry(() => import('./components/ConsentBanner'));
+const NotFoundView = lazyWithRetry(() => import('./components/NotFoundView'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
@@ -544,6 +545,72 @@ function App() {
     return (
       <Suspense fallback={<TabLoader />}>
         <LegalView initialTab={initialTab} />
+        <Suspense fallback={null}>
+          <ConsentBanner />
+        </Suspense>
+      </Suspense>
+    );
+  }
+
+  // Public Pricing & About pages (Accessible directly without requiring login)
+  if (currentPath === '/pricing' && !user) {
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
+          <PricingView setActiveTab={() => { window.location.href = '/'; }} />
+          <Suspense fallback={null}>
+            <ConsentBanner />
+          </Suspense>
+        </div>
+      </Suspense>
+    );
+  }
+
+  if ((currentPath === '/aboutus' || currentPath === '/about') && !user) {
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
+          <AboutUsView setActiveTab={() => { window.location.href = '/'; }} />
+          <Suspense fallback={null}>
+            <ConsentBanner />
+          </Suspense>
+        </div>
+      </Suspense>
+    );
+  }
+
+  // Unrecognized route detection (Item 15: Custom 404 Page)
+  const isKnownRoute = 
+    !currentPath ||
+    currentPath === '/' ||
+    currentPath === '/login' ||
+    currentPath === '/register' ||
+    currentPath.startsWith('/adminpanel') ||
+    currentPath.startsWith('/pricing') ||
+    currentPath.startsWith('/about') ||
+    currentPath.startsWith('/terms') ||
+    currentPath.startsWith('/privacy') ||
+    currentPath.startsWith('/risk') ||
+    currentPath.startsWith('/delete') ||
+    currentPath.startsWith('/data') ||
+    currentPath.startsWith('/legal') ||
+    currentPath.startsWith('/manifest') ||
+    currentPath.startsWith('/sitemap') ||
+    currentPath.startsWith('/robots') ||
+    currentPath.startsWith('/sw.js') ||
+    currentPath.startsWith('/apple-touch-icon') ||
+    currentPath.startsWith('/favicon') ||
+    currentPath.startsWith('/pwa-') ||
+    currentPath.startsWith('/skandx-');
+
+  if (!isKnownRoute) {
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <NetworkStatusBanner />
+        <NotFoundView onNavigateHome={() => { window.location.href = '/'; }} initialRequestedPath={currentPath} />
+        <Suspense fallback={null}>
+          <ConsentBanner />
+        </Suspense>
       </Suspense>
     );
   }
@@ -554,6 +621,9 @@ function App() {
         <NetworkStatusBanner />
         <GlobalToast />
         <LoginView />
+        <Suspense fallback={null}>
+          <ConsentBanner />
+        </Suspense>
       </>
     );
   }
@@ -564,6 +634,9 @@ function App() {
         <GlobalToast />
         <SessionExpiredModal />
         <OnboardingWizard />
+        <Suspense fallback={null}>
+          <ConsentBanner />
+        </Suspense>
       </>
     );
   }
@@ -871,7 +944,7 @@ function App() {
         <div className="mobile-menu-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => { setActiveTab('ClientData'); setShowMobileMenu(false); }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              {user?.profile_picture_url ? <img src={user.profile_picture_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={20} />}
+              {user?.profile_picture_url ? <img src={user.profile_picture_url} alt="User Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={20} />}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
