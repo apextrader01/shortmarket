@@ -553,7 +553,7 @@ function App() {
   // Dynamic SEO Page Titles (Item 10)
   useEffect(() => {
     const tabTitleMap = {
-      Markets: 'Live Markets & Watchlist | SkandX',
+      Markets: 'Live Markets & Paper Trading | SkandX',
       Orders: 'Order Book & Executions | SkandX',
       Positions: 'Open Positions & P&L | SkandX',
       Portfolio: 'Portfolio & Holdings | SkandX',
@@ -584,10 +584,10 @@ function App() {
       } else if (!isKnownRoute && currentPath !== '') {
         document.title = '404 - Page Not Found | SkandX';
       } else {
-        document.title = 'SkandX | The Future of Algorithmic Trading';
+        document.title = "SkandX | India's #1 Real-Time Paper Trading & Algo Terminal";
       }
     } else {
-      document.title = tabTitleMap[activeTab] || 'SkandX | Algorithmic Trading Platform';
+      document.title = tabTitleMap[activeTab] || "SkandX | India's #1 Real-Time Paper Trading & Algo Terminal";
     }
   }, [activeTab, user, currentPath, isKnownRoute]);
 

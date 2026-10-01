@@ -421,22 +421,61 @@ export default function LoginView() {
             <span>Skand<span>X</span></span>
           </div>
           <div>
-            <h1 style={{ fontSize: '48px', fontWeight: '800', lineHeight: '1.1', marginBottom: '16px', color: '#fff' }}>
-              The future of<br />algorithmic trading.
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(56, 189, 248, 0.12)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '11.5px',
+              fontWeight: '700',
+              color: '#38bdf8',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              marginBottom: '16px'
+            }}>
+              ⚡ India's #1 Real-Time Paper Trading & Algo Terminal
+            </div>
+            <h1 style={{ fontSize: '44px', fontWeight: '900', lineHeight: '1.15', marginBottom: '16px', color: '#fff', letterSpacing: '-1px' }}>
+              Trade the markets.<br />
+              <span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                100% Risk-Free.
+              </span>
             </h1>
-            <p style={{ fontSize: '18px', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: '1.5' }}>
-              Experience sub-millisecond execution, advanced order routing, and a terminal designed for professional traders.
+            <p style={{ fontSize: '15.5px', color: 'var(--text-secondary)', maxWidth: '420px', lineHeight: '1.6', marginBottom: '24px' }}>
+              India's fastest real-time stock & options demo simulator. Practice with live NSE/BSE ticks, option chains with Greeks, bracket orders, and institutional algo strategies.
             </p>
+
+            {/* Feature Highlights Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', maxWidth: '420px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: '#10b981' }}>✔</span> Real-Time NSE / BSE Feeds
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: '#10b981' }}>✔</span> Live Options with Greeks
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: '#10b981' }}>✔</span> ₹10L Virtual Demo Funds
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: '#10b981' }}>✔</span> Sub-MS Algo Engine
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Right Form Panel */}
       <div className="login-form-panel">
-        <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
+        <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
             <img src="/pwa-192x192.png" alt="SkandX" style={{ width: '36px', height: '36px', borderRadius: '9px', boxShadow: '0 0 14px rgba(56, 189, 248, 0.45)' }} />
             <span>Skand<span>X</span></span>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#38bdf8' }}>
+            India's #1 Real-Time Paper Trading & Algo Terminal
           </div>
         </div>
         

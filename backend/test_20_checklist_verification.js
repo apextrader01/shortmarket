@@ -71,7 +71,7 @@ check('App.jsx mounts ConsentBanner across unauthenticated, onboarding, and dash
 console.log('\n▶ 6. META TITLES & DESCRIPTIONS');
 const indexHtml = fs.readFileSync(path.join(__dirname, '../frontend/index.html'), 'utf8');
 check('index.html contains descriptive title and meta description tag',
-  indexHtml.includes('<title>SkandX | Algorithmic Trading Platform</title>') &&
+  indexHtml.includes('SkandX') && indexHtml.includes('Paper Trading') &&
   indexHtml.includes('<meta name="description"'));
 
 // 7. Social Preview Image (OpenGraph & Twitter Card)

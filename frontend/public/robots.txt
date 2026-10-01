@@ -3,7 +3,18 @@ Allow: /
 Disallow: /adminpanel
 Disallow: /api/
 
-# OpenAI Search & Crawler Bots (Item 15)
+# Google Gemini & Search Generative AI Crawler
+User-agent: Google-Extended
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+User-agent: GoogleOther
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# OpenAI ChatGPT Search & Web Crawlers
 User-agent: GPTBot
 Allow: /
 Disallow: /adminpanel
@@ -22,6 +33,18 @@ Disallow: /api/
 
 # Anthropic Claude Search Crawler
 User-agent: ClaudeBot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# Microsoft Copilot & Bing Search Crawler
+User-agent: Bingbot
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+# Apple Intelligence & Siri Search Crawler
+User-agent: Applebot
 Allow: /
 Disallow: /adminpanel
 Disallow: /api/
