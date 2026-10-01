@@ -477,10 +477,10 @@ class TriggerEngine {
                     if (isLongHoldingOffset || isShortHoldingOffset) {
                         const hQty = Number(holding.quantity);
                         const hAvg = Number(holding.average_price);
-                        const offsetQty = Math.min(Math.abs(remainingQty), hQty);
+                        const offsetQty = Math.min(Math.abs(remainingQty), Math.abs(hQty));
                         
                         // Deduct from holding or remove row if fully closed
-                        const newHoldingQty = isLongHoldingOffset ? (hQty - offsetQty) : -(hQty - offsetQty);
+                        const newHoldingQty = isLongHoldingOffset ? (hQty - offsetQty) : (hQty + offsetQty);
                         if (newHoldingQty === 0) {
                             await trx('holdings').where({ id: holding.id }).del();
                         } else {

@@ -773,12 +773,13 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
   const groupMap = new Map();
   const executed = [];
 
-  // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+  // Pre-calculate 3-second rapid automated burst clusters for sliced orders without explicit slice IDs
   const timeClusters = new Map();
   for (const o of rawExecuted) {
     if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
-      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-      const cKey = `${o.symbol}_${o.side}_${tSec}`;
+      const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+      const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
       timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
     }
   }
@@ -794,8 +795,9 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
       groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
     }
     if (!groupId) {
-      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-      const cKey = `${o.symbol}_${o.side}_${tSec}`;
+      const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+      const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+      const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
       if ((timeClusters.get(cKey) || 0) > 1) {
         groupId = `cluster_${cKey}`;
       }

@@ -66,7 +66,11 @@ export default function OrdersView() {
   let displayOrders = orders.filter(order => {
     const isPendingOrOpen = order.status === 'PENDING' || order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED' || order.status === 'AMO_PENDING' || order.status === 'OPEN';
     if (activeTab === 'Open Orders') return isPendingOrOpen;
-    if (activeTab === 'Order History') return !isPendingOrOpen && order.status !== 'PENDING_TRIGGER' && isToday(order.updated_at || order.created_at);
+    if (activeTab === 'Order History') {
+      if (isPendingOrOpen || order.status === 'PENDING_TRIGGER') return false;
+      if (searchQuery && searchQuery.trim()) return true; // Allow searching across full historical orders
+      return isToday(order.updated_at || order.created_at);
+    }
     return false;
   });
   
@@ -116,15 +120,17 @@ export default function OrdersView() {
   }
 
   if (searchQuery) {
-    const lowerQuery = searchQuery.toLowerCase();
+    const lowerQuery = searchQuery.toLowerCase().trim();
     displayOrders = displayOrders.filter(order => 
-      order.symbol.toLowerCase().includes(lowerQuery) || 
-      order.status.toLowerCase().includes(lowerQuery) ||
+      String(order.id || '').toLowerCase().includes(lowerQuery) ||
+      (order.symbol || '').toLowerCase().includes(lowerQuery) || 
+      (order.status || '').toLowerCase().includes(lowerQuery) ||
       (order.type || '').toLowerCase().includes(lowerQuery)
     );
     displayTriggers = displayTriggers.filter(trigger =>
-      trigger.symbol.toLowerCase().includes(lowerQuery) ||
-      trigger.status.toLowerCase().includes(lowerQuery) ||
+      String(trigger.id || '').toLowerCase().includes(lowerQuery) ||
+      (trigger.symbol || '').toLowerCase().includes(lowerQuery) ||
+      (trigger.status || '').toLowerCase().includes(lowerQuery) ||
       (trigger.type || '').toLowerCase().includes(lowerQuery)
     );
   }

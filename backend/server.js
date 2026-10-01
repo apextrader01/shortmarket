@@ -1005,7 +1005,7 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { username, email, phone, password, referral_code, firebase_token, otp, consent_terms, consent_data_processing, consent_marketing } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
-  if (consent_terms === false || consent_data_processing === false) {
+  if (!consent_terms || !consent_data_processing) {
     return res.status(400).json({ error: 'You must accept the Terms of Service and Personal Data Processing agreement to register.' });
   }
 
@@ -2314,12 +2314,13 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
     const groupMap = new Map();
     const orders = [];
 
-    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    // Pre-calculate 3-second rapid automated burst clusters for sliced orders without explicit slice IDs
     const timeClusters = new Map();
     for (const o of rawOrders) {
       if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
       }
     }
@@ -2335,8 +2336,9 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
         groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
       }
       if (!groupId) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         if ((timeClusters.get(cKey) || 0) > 1) {
           groupId = `cluster_${cKey}`;
         }
@@ -5692,22 +5694,32 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 
     // For secondary paginated pages (offset > 0), only query the requested historical page
     if (offset > 0) {
-      const pagedOrders = await db('orders')
+      const totalActiveCountRow = await db('orders')
         .where({ user_id: req.user.id })
-        .orderBy('created_at', 'desc')
-        .limit(limit)
-        .offset(offset);
+        .count('id as cnt')
+        .first();
+      const totalActiveCount = parseInt(totalActiveCountRow?.cnt || 0, 10);
+
+      let pagedOrders = [];
+      if (offset < totalActiveCount) {
+        pagedOrders = await db('orders')
+          .where({ user_id: req.user.id })
+          .orderBy('created_at', 'desc')
+          .limit(limit)
+          .offset(offset);
+      }
 
       const pagedMap = new Map();
       (pagedOrders || []).forEach(o => pagedMap.set(o.id, o));
 
       if (pagedMap.size < limit) {
         try {
+          const archiveOffset = Math.max(0, offset - totalActiveCount);
           const archivedOrders = await db('orders_archive')
             .where({ user_id: req.user.id })
             .orderBy('created_at', 'desc')
             .limit(limit - pagedMap.size)
-            .offset(Math.max(0, offset - (pagedOrders?.length || 0)));
+            .offset(archiveOffset);
           (archivedOrders || []).forEach(o => {
             if (!pagedMap.has(o.id)) pagedMap.set(o.id, o);
           });
@@ -7322,12 +7334,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       
-      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-      const parts = formatter.formatToParts(new Date());
-      const year = parts.find(p => p.type === 'year').value;
-      const month = parts.find(p => p.type === 'month').value;
-      const day = parts.find(p => p.type === 'day').value;
-      const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+      const startOfToday = getTradingSessionStartIST();
 
       const activeHoldings = await trx('holdings')
         .where({ user_id: req.user.id })

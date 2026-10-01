@@ -61,15 +61,50 @@ async function main() {
             }
 
             if (underlying && strike > 0 && optType) {
-                const KNOWN_CLOSING_PRICES = {
-                    'NIFTY': 22716.20,
-                    'BANKNIFTY': 54259.95,
-                    'FINNIFTY': 24648.50,
-                    'MIDCPNIFTY': 13150.00,
-                    'SENSEX': 72529.07,
-                    'BANKEX': 57100.00
-                };
-                const spot = KNOWN_CLOSING_PRICES[underlying];
+                // Dynamically resolve spot price from live cache, executed orders, or CLI overrides
+                let spot = 0;
+                for (const arg of process.argv) {
+                    if (arg.toLowerCase().startsWith(`--spot-${underlying.toLowerCase()}=`)) {
+                        const val = parseFloat(arg.split('=')[1]);
+                        if (val > 0) spot = val;
+                    }
+                }
+
+                if (spot === 0) {
+                    let priceCache = {};
+                    try {
+                        const { getPriceFromCache } = require('../services/fyers');
+                        if (typeof getPriceFromCache === 'function') priceCache = getPriceFromCache() || {};
+                    } catch (e) {}
+
+                    const candidates = [
+                        `NSE:${underlying}50-INDEX`, `NSE:${underlying}BANK-INDEX`, `NSE:${underlying}-INDEX`,
+                        `BSE:${underlying}-INDEX`, `MCX:${underlying}`, `NSE:${underlying}`, `BSE:${underlying}`, underlying
+                    ];
+
+                    for (const cand of candidates) {
+                        if (priceCache[cand]?.ltp > 0) { spot = Number(priceCache[cand].ltp); break; }
+                        if (priceCache[cand]?.close > 0) { spot = Number(priceCache[cand].close); break; }
+                        if (priceCache[cand]?.prev_close_price > 0) { spot = Number(priceCache[cand].prev_close_price); break; }
+                    }
+
+                    if (spot === 0) {
+                        const lastSpotOrder = await db('orders')
+                            .whereIn('symbol', candidates)
+                            .where({ status: 'EXECUTED' })
+                            .orderBy('created_at', 'desc')
+                            .first();
+                        if (lastSpotOrder && Number(lastSpotOrder.price) > 0) {
+                            spot = Number(lastSpotOrder.price);
+                        }
+                    }
+                }
+
+                if (!spot || spot <= 0) {
+                    console.warn(`⚠️ [ITM Settlement] Skipping ${pos.symbol}: Cannot resolve spot close for ${underlying}. Pass --spot-${underlying}=<price> to settle.`);
+                    continue;
+                }
+
                 if (spot) {
                     const intrinsic = optType === 'CE' ? Math.max(0, spot - strike) : Math.max(0, strike - spot);
                     if (intrinsic > 0) {

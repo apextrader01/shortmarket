@@ -528,4 +528,30 @@ async function runMasterSquareOff() {
     }
 }
 
-module.exports = { runMasterSquareOff, startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };
+function getTradingSessionStartIST(refDate = new Date()) {
+  const d = new Date(refDate);
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const getPart = (type) => parts.find(p => p.type === type)?.value;
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = parseInt(getPart('hour') || '0', 10);
+  const minute = parseInt(getPart('minute') || '0', 10);
+
+  let sessionStart = new Date(`${year}-${month}-${day}T07:55:00+05:30`);
+  if (hour < 7 || (hour === 7 && minute < 55)) {
+    sessionStart = new Date(sessionStart.getTime() - 24 * 60 * 60 * 1000);
+  }
+  return sessionStart;
+}
+
+module.exports = { runMasterSquareOff, startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate, getTradingSessionStartIST };

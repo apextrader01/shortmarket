@@ -949,8 +949,8 @@ class VolumeMatchingEngine {
             const grossProceeds = Math.round((slicePrice * closeQty) * 100) / 100;
 
             // Record or consolidate closed position for today to avoid duplicate fragmented rows
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+            const { getTradingSessionStartIST } = require('./autoSquareOff');
+            const todayStart = getTradingSessionStartIST();
 
             const existingClosedPos = await trx('positions')
               .where({ user_id: order.user_id, symbol: order.symbol, quantity: 0 })

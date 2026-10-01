@@ -227,8 +227,11 @@ const LedgerStatement = () => {
         const b = openBuckets.get(bucketKey);
         b.sliceCount += 1;
         b.amount = Math.round((b.amount + Number(entry.amount || 0) + Number.EPSILON) * 100) / 100;
-        b.totalQty += qty;
-        b.running_balance = entry.running_balance; // latest authoritative running balance
+        const bTime = new Date(b.created_at || 0).getTime();
+        if (entryTime > bTime || b.running_balance === undefined) {
+          b.running_balance = entry.running_balance;
+          b.created_at = entry.created_at;
+        }
 
         if (isBlock) {
           b.description = `Margin blocked for ${b.side || side || ''} ${b.totalQty > 0 ? b.totalQty.toLocaleString('en-IN') + ' ' : ''}${b.symbol} (${b.sliceCount} Slices)`;
@@ -578,12 +581,13 @@ const TradesAndCharges = () => {
     const groupMap = new Map();
     const result = [];
 
-    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    // Pre-calculate 3-second rapid automated burst clusters for sliced orders without explicit slice IDs
     const timeClusters = new Map();
     for (const o of filteredOrders) {
       if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
       }
     }
@@ -599,8 +603,9 @@ const TradesAndCharges = () => {
         groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
       }
       if (!groupId) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         if ((timeClusters.get(cKey) || 0) > 1) {
           groupId = `cluster_${cKey}`;
         }
@@ -933,12 +938,13 @@ const ProfitAndLoss = () => {
     const groupMap = new Map();
     const result = [];
 
-    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    // Pre-calculate 3-second rapid automated burst clusters for sliced orders without explicit slice IDs
     const timeClusters = new Map();
     for (const o of filteredOrders) {
       if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
       }
     }
@@ -954,8 +960,9 @@ const ProfitAndLoss = () => {
         groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
       }
       if (!groupId) {
-        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
-        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        const pType = (o.product_type || o.productLabel || 'INT').toUpperCase();
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 3000);
+        const cKey = `${o.symbol}_${o.side}_${pType}_${tSec}`;
         if ((timeClusters.get(cKey) || 0) > 1) {
           groupId = `cluster_${cKey}`;
         }

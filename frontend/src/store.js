@@ -323,9 +323,9 @@ export const useStore = create(persist((set, get) => ({
         client_ip: publicInfo?.ip || undefined,
         client_city: publicInfo?.city || undefined,
         client_state: publicInfo?.state || undefined,
-        consent_terms: consents?.terms !== false,
-        consent_data_processing: consents?.dataProcessing !== false,
-        consent_marketing: !!consents?.marketing
+        consent_terms: Boolean(consents?.terms),
+        consent_data_processing: Boolean(consents?.dataProcessing),
+        consent_marketing: Boolean(consents?.marketing)
       };
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),

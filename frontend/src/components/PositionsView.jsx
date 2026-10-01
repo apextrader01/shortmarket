@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
-import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract } from '../utils/lotsizeHelper';
+import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract, getInstantLotsize } from '../utils/lotsizeHelper';
 import { calculateOrderSlices } from '../utils/freezeLimits';
 import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
 import { getMarketSession } from '../utils/marketTiming';
@@ -365,7 +365,7 @@ export default function PositionsView() {
       const realizedPnl = parseFloat(pos.realized_pnl || 0);
       const pnl = unrealizedPnl + realizedPnl;
           
-      const lotSize = priceData.lotsize || 1;
+      const lotSize = priceData.lotsize || getInstantLotsize(pos.symbol) || 1;
       
       let segment = 'Stock';
       if (isMutualFund(pos.symbol)) {
@@ -1060,7 +1060,7 @@ export default function PositionsView() {
                                   return;
                                 }
                                 setPartialExitPos(pos);
-                                const ls = pos.lotSize || 1;
+                                const ls = pos.lotSize || getInstantLotsize(pos.symbol) || 1;
                                 setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
                                 setPartialExitType('MARKET');
                                 setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
@@ -1498,7 +1498,7 @@ export default function PositionsView() {
                 <button
                   onClick={async () => {
                     const inputVal = parseFloat(partialExitQty);
-                    const ls = partialExitPos.lotSize || 1;
+                    const ls = partialExitPos.lotSize || getInstantLotsize(partialExitPos.symbol) || 1;
                     const isMfPos = (partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF');
                     const qtyToExit = isMfPos ? parseFloat((inputVal * ls).toFixed(4)) : Math.round(inputVal * ls);
                     const maxQty = Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty);

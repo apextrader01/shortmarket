@@ -129,9 +129,7 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
       (o.remarks && /exit|square-off|auto-square-off|close/i.test(o.remarks)) ||
       o.is_exit
     );
-    const isExitOrder = o.side === 'SELL' 
-      ? (hasExitRemarks || (orderPnl !== 0) || (Number(o.closed_quantity || 0) > 0))
-      : (hasExitRemarks || (Number(o.closed_quantity || 0) > 0));
+    const isExitOrder = Boolean(hasExitRemarks || (orderPnl !== 0) || (Number(o.closed_quantity || 0) > 0));
     const normSym = normalizeSym(o.symbol);
     const prod = normalizeProd(o.product_type);
     const key = `${normSym}-${prod}`;

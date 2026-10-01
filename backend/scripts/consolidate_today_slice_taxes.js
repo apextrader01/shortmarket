@@ -10,8 +10,8 @@ async function consolidateTodaySliceTaxes(knexInstance = db) {
   try {
     if (!knexInstance || typeof knexInstance !== 'function') return 0;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const { getTradingSessionStartIST } = require('../services/autoSquareOff');
+    const todayStart = getTradingSessionStartIST();
 
     let consolidatedRows = 0;
 
