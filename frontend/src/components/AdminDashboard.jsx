@@ -5904,10 +5904,10 @@ export default function AdminDashboard() {
                     onChange={e => setNewSubTier(e.target.value)}
                     style={{ flex: 1 }}
                   >
-                    <option value="BASIC">Normal / Basic (3 Watchlists - Free)</option>
-                    <option value="MONTHLY">Pro Monthly (5 Watchlists - ₹199/mo)</option>
-                    <option value="YEARLY">Pro Yearly (5 Watchlists - ₹1,999/yr)</option>
-                    <option value="HIGHEST">Feature Plan / VIP (10 Watchlists - ₹2,999/yr)</option>
+                    <option value="BASIC">Normal / Basic (2 Watchlists - Free)</option>
+                    <option value="MONTHLY">Pro Monthly (3 Watchlists - ₹199/mo)</option>
+                    <option value="YEARLY">Pro Yearly (4 Watchlists - ₹1,999/yr)</option>
+                    <option value="HIGHEST">Feature Plan / VIP (5 Watchlists - ₹2,999/yr)</option>
                   </select>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Tier'}

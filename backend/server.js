@@ -4351,9 +4351,10 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     
     // Check subscription tier
     const user = await db('users').where({ id: req.user.id }).first();
-    const isPro = ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const isHighest = ['HIGHEST', 'FEATURE'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const limit = isHighest ? 10 : (isPro ? 5 : 3);
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const limit = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
     
     if (watchlists.length > limit) {
       return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
