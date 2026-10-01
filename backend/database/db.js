@@ -569,6 +569,7 @@ async function initSchema() {
           table.string('entry_price', 50);
           table.string('target_price', 50);
           table.string('stop_loss', 50);
+          table.string('product_type', 20).defaultTo('INT'); // 'INT' (Intraday), 'DEL' (Delivery / Overnight)
           table.string('impact', 50); // 'BULLISH', 'BEARISH', 'NEUTRAL'
           table.string('target_tier', 50).defaultTo('ALL'); // 'ALL', 'MONTHLY_PLUS', 'YEARLY_PLUS', 'HIGHEST_ONLY'
           table.boolean('show_banner').defaultTo(false);
@@ -788,6 +789,7 @@ async function ensureCriticalColumns() {
         entry_price VARCHAR(50),
         target_price VARCHAR(50),
         stop_loss VARCHAR(50),
+        product_type VARCHAR(20) DEFAULT 'INT',
         impact VARCHAR(50),
         target_tier VARCHAR(50) DEFAULT 'ALL',
         show_banner BOOLEAN DEFAULT FALSE,
@@ -795,6 +797,9 @@ async function ensureCriticalColumns() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Ensure product_type column exists
+    await db.raw(`ALTER TABLE broadcast_notifications ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT 'INT'`);
 
 
     // Ensure referrals table always exists (guaranteed path - no migration needed)

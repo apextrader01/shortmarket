@@ -10075,6 +10075,7 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
       entry_price,
       target_price,
       stop_loss,
+      product_type, // 'INT' (Intraday) or 'DEL' (Delivery / Overnight)
       impact, // 'BULLISH', 'BEARISH', 'NEUTRAL'
       target_tier, // 'ALL', 'MONTHLY_PLUS', 'YEARLY_PLUS', 'HIGHEST_ONLY'
       show_banner // boolean
@@ -10083,6 +10084,8 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
     if (!title && !symbol && !message) {
       return res.status(400).json({ error: 'Notification requires a title, symbol, or message.' });
     }
+
+    const resolvedProductType = (product_type === 'DEL' || product_type === 'DELIVERY' || product_type === 'CNC' || product_type === 'NRML') ? 'DEL' : 'INT';
 
     const [inserted] = await db('broadcast_notifications').insert({
       type: type || 'SIGNAL',
@@ -10093,6 +10096,7 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
       entry_price: entry_price ? String(entry_price).trim() : null,
       target_price: target_price ? String(target_price).trim() : null,
       stop_loss: stop_loss ? String(stop_loss).trim() : null,
+      product_type: resolvedProductType,
       impact: impact || null,
       target_tier: target_tier || 'ALL',
       show_banner: Boolean(show_banner),
@@ -10108,7 +10112,8 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
       const { generalClient } = require('./services/redisClient');
       let bannerText = '';
       if (type === 'SIGNAL') {
-        bannerText = `⚡ [${side || 'SIGNAL'}] ${symbol || ''} @ ₹${entry_price || 'CMP'} | Tgt: ₹${target_price || '—'} | SL: ₹${stop_loss || '—'}`;
+        const prodLabel = resolvedProductType === 'DEL' ? 'DELIVERY' : 'INTRADAY';
+        bannerText = `⚡ [${side || 'SIGNAL'} • ${prodLabel}] ${symbol || ''} @ ₹${entry_price || 'CMP'} | Tgt: ₹${target_price || '—'} | SL: ₹${stop_loss || '—'}`;
       } else {
         bannerText = title ? `${title}: ${message}` : message;
       }

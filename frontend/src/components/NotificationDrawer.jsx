@@ -30,7 +30,8 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
   const handleTrade = (item) => {
     if (item.symbol) {
       setSelectedSymbol?.(item.symbol);
-      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY');
+      const effectiveProd = (item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? 'DEL' : 'INT';
+      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY', 1, effectiveProd);
       onClose();
     }
   };
@@ -236,6 +237,19 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
                       {isSell && (
                         <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#EF4444', padding: '2px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px' }}>
                           <TrendingDown size={11} /> SELL SIGNAL
+                        </span>
+                      )}
+                      {isSignal && (
+                        <span style={{
+                          background: (item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? 'rgba(168, 85, 247, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                          color: (item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? '#C084FC' : '#60A5FA',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: '800',
+                          border: `1px solid ${(item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? 'rgba(168, 85, 247, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`
+                        }}>
+                          {(item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? '📦 DELIVERY' : '⚡ INTRADAY'}
                         </span>
                       )}
                       {isNews && (

@@ -23,7 +23,7 @@ export default function BroadcastToast() {
 
   if (!activeBroadcastToast) return null;
 
-  const { type, side, symbol, entry_price, target_price, stop_loss, title, message, impact } = activeBroadcastToast;
+  const { type, side, symbol, entry_price, target_price, stop_loss, product_type, title, message, impact } = activeBroadcastToast;
   const isSignal = type === 'SIGNAL' || side === 'BUY' || side === 'SELL';
   const isBuy = side === 'BUY';
   const isSell = side === 'SELL';
@@ -32,7 +32,8 @@ export default function BroadcastToast() {
   const handleTradeAction = () => {
     if (symbol) {
       setSelectedSymbol?.(symbol);
-      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY');
+      const effectiveProd = (product_type === 'DEL' || product_type === 'DELIVERY') ? 'DEL' : 'INT';
+      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY', 1, effectiveProd);
     }
     dismissBroadcastToast();
   };
@@ -75,6 +76,19 @@ export default function BroadcastToast() {
           {isSell && (
             <div style={{ background: '#EF4444', color: '#fff', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <TrendingDown size={13} /> 🔴 SELL CALL
+            </div>
+          )}
+          {isSignal && (
+            <div style={{
+              background: (product_type === 'DEL' || product_type === 'DELIVERY') ? 'rgba(168, 85, 247, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+              color: (product_type === 'DEL' || product_type === 'DELIVERY') ? '#E9D5FF' : '#BFDBFE',
+              padding: '3px 7px',
+              borderRadius: '6px',
+              fontSize: '10.5px',
+              fontWeight: '800',
+              border: `1px solid ${(product_type === 'DEL' || product_type === 'DELIVERY') ? 'rgba(168, 85, 247, 0.5)' : 'rgba(59, 130, 246, 0.5)'}`
+            }}>
+              {(product_type === 'DEL' || product_type === 'DELIVERY') ? '📦 DELIVERY' : '⚡ INTRADAY'}
             </div>
           )}
           {isNews && (

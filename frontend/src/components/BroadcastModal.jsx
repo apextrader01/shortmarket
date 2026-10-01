@@ -35,6 +35,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
 
   // Form states
   const [signalSide, setSignalSide] = useState('BUY'); // 'BUY' or 'SELL'
+  const [productType, setProductType] = useState('INT'); // 'INT' (Intraday) or 'DEL' (Delivery / Overnight)
   const [symbol, setSymbol] = useState('');
   const [entryPrice, setEntryPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
@@ -185,6 +186,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
         entry_price: entryPrice,
         target_price: targetPrice,
         stop_loss: stopLoss,
+        product_type: productType,
         message: message.trim(),
         target_tier: targetTier,
         show_banner: showBanner
@@ -225,6 +227,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
         // Reset form
         setSymbol('');
         setSelectedStockData(null);
+        setProductType('INT');
         setEntryPrice('');
         setTargetPrice('');
         setStopLoss('');
@@ -393,6 +396,19 @@ export default function BroadcastModal({ isOpen, onClose }) {
                           }}>
                             {n.type === 'SIGNAL' ? `${n.side} ${n.symbol}` : n.type}
                           </span>
+                          {n.type === 'SIGNAL' && (
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: '800',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: (n.product_type === 'DEL' || n.product_type === 'DELIVERY') ? 'rgba(139, 92, 246, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                              color: (n.product_type === 'DEL' || n.product_type === 'DELIVERY') ? '#C084FC' : '#60A5FA',
+                              border: `1px solid ${(n.product_type === 'DEL' || n.product_type === 'DELIVERY') ? 'rgba(139, 92, 246, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`
+                            }}>
+                              {(n.product_type === 'DEL' || n.product_type === 'DELIVERY') ? '📦 DELIVERY' : '⚡ INTRADAY'}
+                            </span>
+                          )}
                           <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
                             {n.title}
                           </span>
@@ -443,54 +459,108 @@ export default function BroadcastModal({ isOpen, onClose }) {
               {/* SIGNAL TAB */}
               {activeTab === 'SIGNAL' && (
                 <>
-                  {/* BUY / SELL Toggle */}
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-                      CALL ACTION
-                    </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleSideChange('BUY')}
-                        style={{
-                          padding: '12px',
-                          borderRadius: '8px',
-                          border: signalSide === 'BUY' ? '2px solid #10B981' : '1px solid var(--border-color)',
-                          background: signalSide === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)',
-                          color: signalSide === 'BUY' ? '#10B981' : 'var(--text-secondary)',
-                          fontWeight: '800',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <TrendingUp size={16} /> 🟢 BUY CALL
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSideChange('SELL')}
-                        style={{
-                          padding: '12px',
-                          borderRadius: '8px',
-                          border: signalSide === 'SELL' ? '2px solid #EF4444' : '1px solid var(--border-color)',
-                          background: signalSide === 'SELL' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0,0,0,0.2)',
-                          color: signalSide === 'SELL' ? '#EF4444' : 'var(--text-secondary)',
-                          fontWeight: '800',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <TrendingDown size={16} /> 🔴 SELL CALL
-                      </button>
+                  {/* Call Action & Product Type Row (BUY/SELL & INTRADAY/DELIVERY) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    {/* BUY / SELL Toggle */}
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                        CALL ACTION
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSideChange('BUY')}
+                          style={{
+                            padding: '11px 8px',
+                            borderRadius: '8px',
+                            border: signalSide === 'BUY' ? '2px solid #10B981' : '1px solid var(--border-color)',
+                            background: signalSide === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)',
+                            color: signalSide === 'BUY' ? '#10B981' : 'var(--text-secondary)',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <TrendingUp size={15} /> 🟢 BUY
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSideChange('SELL')}
+                          style={{
+                            padding: '11px 8px',
+                            borderRadius: '8px',
+                            border: signalSide === 'SELL' ? '2px solid #EF4444' : '1px solid var(--border-color)',
+                            background: signalSide === 'SELL' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0,0,0,0.2)',
+                            color: signalSide === 'SELL' ? '#EF4444' : 'var(--text-secondary)',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <TrendingDown size={15} /> 🔴 SELL
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* PRODUCT TYPE (INTRADAY vs DELIVERY) */}
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                        TRADE TYPE (PRODUCT)
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setProductType('INT')}
+                          style={{
+                            padding: '11px 8px',
+                            borderRadius: '8px',
+                            border: productType === 'INT' ? '2px solid #3B82F6' : '1px solid var(--border-color)',
+                            background: productType === 'INT' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(0,0,0,0.2)',
+                            color: productType === 'INT' ? '#60A5FA' : 'var(--text-secondary)',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>⚡</span> INTRADAY
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProductType('DEL')}
+                          style={{
+                            padding: '11px 8px',
+                            borderRadius: '8px',
+                            border: productType === 'DEL' ? '2px solid #8B5CF6' : '1px solid var(--border-color)',
+                            background: productType === 'DEL' ? 'rgba(139, 92, 246, 0.18)' : 'rgba(0,0,0,0.2)',
+                            color: productType === 'DEL' ? '#A78BFA' : 'var(--text-secondary)',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>📦</span> DELIVERY
+                        </button>
+                      </div>
                     </div>
                   </div>
 

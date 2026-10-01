@@ -113,6 +113,7 @@ async function runMigration() {
         entry_price VARCHAR(50),
         target_price VARCHAR(50),
         stop_loss VARCHAR(50),
+        product_type VARCHAR(20) DEFAULT 'INT',
         impact VARCHAR(50),
         target_tier VARCHAR(50) DEFAULT 'ALL',
         show_banner BOOLEAN DEFAULT FALSE,
@@ -120,7 +121,8 @@ async function runMigration() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('  ✅ broadcast_notifications table verified');
+    await db.raw('ALTER TABLE broadcast_notifications ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT \'INT\'');
+    console.log('  ✅ broadcast_notifications table verified with product_type column');
 
     // 2. Orders table partial fill, average price, taxes, variety, and bracket columns
     const orderColumns = [
