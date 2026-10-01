@@ -33,7 +33,8 @@ const {
   verifyFirebasePhoneToken, 
   sendFirebasePasswordReset, 
   syncFirebaseUserPassword, 
-  sendFirebaseLoginEmail 
+  sendFirebaseLoginEmail,
+  verifyFirebasePasswordResetOobCode
 } = require('./services/firebaseAuth');
 const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
@@ -644,6 +645,8 @@ const allowedOrigins = [
   'https://www.skandx.in',
   'https://shortmarket-staging.web.app',
   'https://shortmarket-staging.firebaseapp.com',
+  'https://shortmarket.web.app',
+  'https://shortmarket.firebaseapp.com',
   'capacitor://localhost',
   'ionic://localhost',
   'https://localhost'
@@ -655,12 +658,11 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (
       allowedOrigins.includes(origin) ||
+      origin === 'https://skandx.in' ||
       origin.endsWith('.skandx.in') ||
-      origin.endsWith('.web.app') ||
-      origin.endsWith('.firebaseapp.com') ||
-      origin.endsWith('.sslip.io') ||
       /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
       /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) ||
+      (process.env.NODE_ENV !== 'production' && origin.endsWith('.sslip.io')) ||
       process.env.NODE_ENV !== 'production' ||
       process.env.CORS_ALLOW_ALL === 'true'
     ) {
@@ -1813,11 +1815,18 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
 });
 
 // ─── Reset Password ─────────────────────────────────────────────────────────
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-  if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  const { email, otp, newPassword, oobCode } = req.body;
+  const resetCode = String(otp || oobCode || '').trim();
+  if (!email || !resetCode || !newPassword) return res.status(400).json({ error: 'All fields required' });
 
-  const attemptRecord = passwordResetAttempts.get(String(email).toLowerCase().trim()) || { count: 0, lockedUntil: 0 };
+  // Disallow any forged or static bypass tokens entirely
+  if (resetCode === 'FIREBASE_VERIFIED' || resetCode === 'FIREBASE_ACTION') {
+    return res.status(400).json({ error: 'Invalid or forged verification code. Please request a fresh reset link.' });
+  }
+
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
   const now = Date.now();
 
   if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
@@ -1828,11 +1837,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const normalizedEmail = user.email ? user.email.toLowerCase().trim() : String(email).toLowerCase().trim();
+    const userEmail = user.email ? user.email.toLowerCase().trim() : normalizedEmail;
 
-    const isFirebaseAction = (otp === 'FIREBASE_VERIFIED' || otp === 'FIREBASE_ACTION');
+    // Check if the reset code is a 6-digit numeric OTP vs a Firebase OOB Action Code
+    const is6DigitOtp = /^\d{6}$/.test(resetCode);
 
-    if (!isFirebaseAction) {
+    if (is6DigitOtp) {
       if (!user.reset_otp || !user.reset_otp_expires) {
         return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
       }
@@ -1842,26 +1852,56 @@ app.post('/api/auth/reset-password', async (req, res) => {
       }
 
       const crypto = require('crypto');
-      const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
-      const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+      const inputHash = crypto.createHash('sha256').update(resetCode).digest('hex');
+      let isOtpMatch = false;
+
+      try {
+        const { generalClient } = require('./services/redisClient');
+        if (generalClient && generalClient.isOpen) {
+          const redisOtp = await generalClient.get(`otp:reset:${user.id}`).catch(() => null);
+          if (redisOtp && (redisOtp === inputHash || redisOtp === resetCode)) {
+            isOtpMatch = true;
+            generalClient.del(`otp:reset:${user.id}`).catch(() => {});
+          }
+        }
+      } catch (e) {}
+
+      if (!isOtpMatch) {
+        isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === resetCode);
+      }
 
       if (!isOtpMatch) {
         attemptRecord.count += 1;
         if (attemptRecord.count >= 5) {
           attemptRecord.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
-          passwordResetAttempts.set(normalizedEmail, attemptRecord);
+          passwordResetAttempts.set(userEmail, attemptRecord);
           // Invalidate OTP in DB to protect user
           await db('users').where({ id: user.id }).update({ reset_otp: null, reset_otp_expires: null });
           return res.status(429).json({ error: 'Too many incorrect OTP attempts. The OTP has been invalidated for security. Please request a new one after 15 minutes.' });
         }
-        passwordResetAttempts.set(normalizedEmail, attemptRecord);
+        passwordResetAttempts.set(userEmail, attemptRecord);
         const remaining = 5 - attemptRecord.count;
         return res.status(400).json({ error: `Invalid OTP. ${remaining} attempt(s) remaining.` });
+      }
+    } else {
+      // It's a Firebase OOB Code (action link from email)
+      try {
+        const fbResult = await verifyFirebasePasswordResetOobCode(resetCode, newPassword);
+        if (!fbResult || !fbResult.success) {
+          return res.status(400).json({ error: 'Invalid or expired Firebase reset link.' });
+        }
+        // Verify the email associated with the oobCode matches the requested user
+        if (fbResult.email && fbResult.email.toLowerCase().trim() !== userEmail) {
+          return res.status(403).json({ error: 'Reset link does not match the requested user account.' });
+        }
+      } catch (fbErr) {
+        console.warn('[RESET PASSWORD] Firebase OOB verification failed:', fbErr.message);
+        return res.status(400).json({ error: fbErr.message || 'Invalid or expired password reset link.' });
       }
     }
 
     // Success: clear rate limiter
-    passwordResetAttempts.delete(normalizedEmail);
+    passwordResetAttempts.delete(userEmail);
 
     const password_hash = await bcrypt.hash(newPassword, 10);
     await db('users').where({ id: user.id }).update({
@@ -1874,7 +1914,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     await db('user_sessions').where({ user_id: user.id }).del().catch(() => {});
 
     // Sync newly updated password to Firebase Auth
-    await syncFirebaseUserPassword(normalizedEmail, newPassword).catch(() => {});
+    await syncFirebaseUserPassword(userEmail, newPassword).catch(() => {});
 
     res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
@@ -2047,10 +2087,22 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
   }
 });
 
+function isValidMediaUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.length > 5 * 1024 * 1024) return false;
+  if (/^https?:\/\/[^\s<>"'`]+$/i.test(trimmed)) return true;
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(trimmed)) return true;
+  return false;
+}
+
 app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
   try {
     const { profile_picture_url } = req.body;
-    await db('users').where({ id: req.user.id }).update({ profile_picture_url });
+    if (profile_picture_url && !isValidMediaUrl(profile_picture_url)) {
+      return res.status(400).json({ error: 'Invalid profile picture format. Only HTTPS image URLs or Base64 images are supported.' });
+    }
+    await db('users').where({ id: req.user.id }).update({ profile_picture_url: profile_picture_url ? profile_picture_url.trim() : null });
     res.json({ success: true, profile_picture_url });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2357,7 +2409,16 @@ app.post('/api/user/details', authenticateToken, async (req, res) => {
 app.post('/api/user/kyc', authenticateToken, async (req, res) => {
   try {
     const { kyc_pan_url, kyc_aadhar_url } = req.body;
-    await db('users').where({ id: req.user.id }).update({ kyc_pan_url, kyc_aadhar_url });
+    if (kyc_pan_url && !isValidMediaUrl(kyc_pan_url)) {
+      return res.status(400).json({ error: 'Invalid PAN document URL or image format.' });
+    }
+    if (kyc_aadhar_url && !isValidMediaUrl(kyc_aadhar_url)) {
+      return res.status(400).json({ error: 'Invalid Aadhar document URL or image format.' });
+    }
+    await db('users').where({ id: req.user.id }).update({ 
+      kyc_pan_url: kyc_pan_url ? kyc_pan_url.trim() : null, 
+      kyc_aadhar_url: kyc_aadhar_url ? kyc_aadhar_url.trim() : null 
+    });
     res.json({ success: true, kyc_pan_url, kyc_aadhar_url });
   } catch (err) {
     res.status(500).json({ error: err.message });

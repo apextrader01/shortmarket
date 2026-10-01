@@ -327,8 +327,8 @@ async function verifyFirebasePhoneToken(idToken, submittedPhone) {
   if (!idToken) return { verified: false, reason: 'Missing verification token' };
 
   if (!authInstance) {
-    console.warn('[FIREBASE AUTH] Firebase admin not initialized with credentials. Bypassing server token verification.');
-    return { verified: true, unverifiedFallback: true };
+    console.warn('[FIREBASE AUTH] Firebase admin not initialized with credentials. Phone token verification rejected.');
+    return { verified: false, reason: 'Phone token verification unavailable. Please verify via 6-digit Email/SMS OTP.' };
   }
 
   try {
@@ -349,6 +349,28 @@ async function verifyFirebasePhoneToken(idToken, submittedPhone) {
   }
 }
 
+/**
+ * Cryptographically verify Firebase Password Reset OOB Code and update password via Google Identity Toolkit
+ */
+async function verifyFirebasePasswordResetOobCode(oobCode, newPassword) {
+  if (!oobCode || !newPassword) throw new Error('Missing reset code or new password');
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=${FIREBASE_WEB_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      oobCode: String(oobCode).trim(),
+      newPassword: String(newPassword)
+    })
+  });
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error.message || 'Invalid or expired Firebase reset code');
+  }
+  return { success: true, email: data.email };
+}
+
 module.exports = {
   getFirebaseAdminAuth,
   ensureFirebaseUser,
@@ -356,5 +378,6 @@ module.exports = {
   syncFirebaseUserPassword,
   sendFirebaseLoginEmail,
   sendEmailOtpViaService,
-  verifyFirebasePhoneToken
+  verifyFirebasePhoneToken,
+  verifyFirebasePasswordResetOobCode
 };

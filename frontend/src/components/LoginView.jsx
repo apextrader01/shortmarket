@@ -55,8 +55,10 @@ export default function LoginView() {
     }
     if (mode === 'resetPassword' || oobCode) {
       setView('reset');
-      setOtp('FIREBASE_VERIFIED');
-      setMessage('Firebase reset link verified. Please enter your new password below.');
+      if (oobCode) {
+        setOtp(oobCode);
+      }
+      setMessage('Password reset link detected. Please enter your new password below.');
     }
   }, []);
 
@@ -348,8 +350,12 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
-      const activeOtp = otp || 'FIREBASE_VERIFIED';
-      const res = await resetPassword(email, activeOtp, password);
+      if (!otp) {
+        useStore.setState({ authError: 'Missing OTP or reset verification code. Please request a new link.' });
+        setLoading(false);
+        return;
+      }
+      const res = await resetPassword(email, otp, password);
       if (res && res.success) {
         setMessage('Password reset successfully! Please log in with your new password.');
         setView('login');
