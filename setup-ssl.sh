@@ -50,12 +50,34 @@ server {
         application/x-javascript
         image/svg+xml;
 
+    # 1. High-Performance Static Asset Caching (Vite content-hashed bundles)
+    location ~* \.(?:css|js|woff2?|svg|png|jpg|jpeg|gif|ico|webp)$ {
+        proxy_pass http://localhost:$PORT;
+        proxy_set_header Host \$host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # 2. Dynamic Entry Points (HTML, manifest, sw) - never stale
+    location ~* \.(?:html|json)$ {
+        proxy_pass http://localhost:$PORT;
+        proxy_set_header Host \$host;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    # 3. Main API & WebSocket Proxy with Full Cloudflare & Real IP Forwarding
     location / {
         proxy_pass http://localhost:$PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;
+        proxy_set_header CF-IPCountry \$http_cf_ipcountry;
+        proxy_set_header CF-Visitor \$http_cf_visitor;
         proxy_cache_bypass \$http_upgrade;
 
         # WebSocket Long-Lived Connection Timeout (Keeps live ticks alive 24/7)

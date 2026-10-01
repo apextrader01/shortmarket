@@ -182,6 +182,20 @@ function getClientIp(req, optionalBodyIp) {
 
   return cleanRaw || '127.0.0.1';
 }
+
+function isRequestSecure(req) {
+  if (req.secure) return true;
+  if (req.headers['x-forwarded-proto'] === 'https') return true;
+  if (req.headers['host']?.includes('sslip.io')) return true;
+  if (req.headers['cf-visitor']) {
+    try {
+      const parsed = typeof req.headers['cf-visitor'] === 'string' ? JSON.parse(req.headers['cf-visitor']) : req.headers['cf-visitor'];
+      if (parsed && parsed.scheme === 'https') return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
 const priceCache = {};
 
 function isDerivativeContract(sym) {
@@ -864,7 +878,8 @@ const rateLimit = require('express-rate-limit');
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // limit each IP to 20 auth requests per windowMs
-  message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+  keyGenerator: (req) => getClientIp(req)
 });
 
 const orderLimiter = rateLimit({
@@ -1148,7 +1163,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         last_active_at: new Date()
       }).catch(() => {});
     }
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+    const isHttps = isRequestSecure(req);
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -1223,7 +1238,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
           }).catch(() => {});
         }
 
-        const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+        const isHttps = isRequestSecure(req);
         res.cookie('token', token, {
           httpOnly: true,
           secure: isHttps,
@@ -1408,7 +1423,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
       trustedDeviceToken = rawToken;
     }
 
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+    const isHttps = isRequestSecure(req);
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -1612,7 +1627,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+    const isHttps = isRequestSecure(req);
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -1708,7 +1723,7 @@ app.post('/api/auth/logout', async (req, res) => {
   } catch (err) {
     console.error('Error removing session on logout:', err);
   }
-  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+  const isHttps = isRequestSecure(req);
   res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
 });
