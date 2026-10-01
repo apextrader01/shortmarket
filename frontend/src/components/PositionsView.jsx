@@ -280,7 +280,7 @@ export default function PositionsView() {
   };
 
   // Group positions by Symbol + Product Type (Flat List)
-  const { flatPositions, globalMTM, totalInvested, totalCurrent } = useMemo(() => {
+  const { flatPositions, globalMTM, totalInvested, totalCurrent, hasDerivativeMargin } = useMemo(() => {
     let globalMTM = 0;
     let totalInvested = 0;
     let totalCurrent = 0;
@@ -304,6 +304,7 @@ export default function PositionsView() {
          const prevQty = agg.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
          agg.closed_quantity = (parseFloat(agg.closed_quantity) || 0) + (parseFloat(pos.closed_quantity) || 0);
+         agg.margin = (parseFloat(agg.margin) || 0) + (parseFloat(pos.margin) || 0);
          if (isOpen) {
             const prevNum = Number(agg.quantity);
             const isAdding = (prevNum >= 0 && posQty >= 0) || (prevNum <= 0 && posQty <= 0);
@@ -358,12 +359,16 @@ export default function PositionsView() {
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : (avg || 0);
       const qty = posQty;
       
-      const invested = avg * Math.abs(qty);
+      const contractValue = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       
       const isShort = Number(qty) < 0 || pos.side === 'SELL';
+      const blockedMargin = Number(pos.margin || 0);
+      // For BUY: entry price * qty; For SELL: actual blocked margin from funds (fallback to contract value if margin is 0)
+      const invested = (isShort && blockedMargin > 0) ? blockedMargin : contractValue;
+      
       const unrealizedPnl = (qty !== 0) 
-          ? (isShort ? (invested - currentValue) : (currentValue - invested))
+          ? (isShort ? (contractValue - currentValue) : (currentValue - contractValue))
           : 0;
       const realizedPnl = parseFloat(pos.realized_pnl || 0);
       const pnl = unrealizedPnl + realizedPnl;
@@ -399,7 +404,7 @@ export default function PositionsView() {
       const unencumberedQty = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 0 : Math.abs(posQty);
 
       flatList.push({ 
-        ...pos, unencumberedQty, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
+        ...pos, unencumberedQty, ltp, avg, qty, pnl, unrealizedPnl, invested, contractValue, lotSize, isOpen: qty !== 0,
         segment, exchange, productLabel, isMf: isMutualFund(pos.symbol, pos.asset_class)
       });
 
@@ -439,7 +444,9 @@ export default function PositionsView() {
       return String(a.symbol || '').localeCompare(String(b.symbol || ''));
     });
 
-    return { flatPositions: flatList, globalMTM, totalInvested, totalCurrent };
+    const hasDerivativeMargin = flatList.some(p => (Number(p.qty) < 0 || p.side === 'SELL') && Number(p.margin) > 0);
+
+    return { flatPositions: flatList, globalMTM, totalInvested, totalCurrent, hasDerivativeMargin };
   }, [sourceData, relevantPrices, viewMode]);
 
   const exitAllPositions = async () => {
@@ -610,7 +617,7 @@ export default function PositionsView() {
             </div>
             <div>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.1 }}>
-                {viewMode === 'CLOSED' ? 'Total Entry' : 'Total Invested'}
+                {viewMode === 'CLOSED' ? 'Total Entry' : hasDerivativeMargin ? 'Margin / Invested' : 'Total Invested'}
               </div>
               <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '800', color: 'var(--text-primary)', marginTop: '2px', lineHeight: 1.1 }}>
                 ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1136,7 +1143,7 @@ export default function PositionsView() {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                      {viewMode === 'CLOSED' ? 'Entry' : 'Invested'}
+                      {viewMode === 'CLOSED' ? 'Entry' : hasDerivativeMargin ? 'Margin / Invested' : 'Invested'}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
                       ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
