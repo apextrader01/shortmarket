@@ -302,7 +302,7 @@ export default function PortfolioView() {
       // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)
       if (isHolding) {
         investedSum += invested;
-        currentSum += current;
+        currentSum += isShort ? (invested + pnl) : current;
 
         const symbolStr = pos.symbol || '';
         const cleanSymbolStr = symbolStr.replace(/^(NSE:|BSE:|MCX:)/i, '');
@@ -411,8 +411,9 @@ export default function PortfolioView() {
       const qty = Math.abs(pos.quantity);
       const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
       const invested = avg * qty;
-      const current = ltp * qty;
-      const pnl = isShort ? (invested - current) : (current - invested);
+      const rawCurrent = ltp * qty;
+      const pnl = isShort ? (invested - rawCurrent) : (rawCurrent - invested);
+      const current = isShort ? (invested + pnl) : rawCurrent;
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
       const dayChangeVal = (isShort ? -chg : chg) * qty;
       const isMf = isMutualFund(pos.symbol, pos.asset_class);
