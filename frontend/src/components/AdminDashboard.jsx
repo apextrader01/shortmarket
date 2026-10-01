@@ -5905,9 +5905,9 @@ export default function AdminDashboard() {
                     style={{ flex: 1 }}
                   >
                     <option value="BASIC">Normal / Basic (3 Watchlists - Free)</option>
-                    <option value="MONTHLY">Pro Monthly (5 Watchlists - ₹99/mo)</option>
-                    <option value="YEARLY">Pro Yearly (5 Watchlists - ₹499/yr)</option>
-                    <option value="HIGHEST">Feature Plan / VIP (10 Watchlists - Highest Tier)</option>
+                    <option value="MONTHLY">Pro Monthly (5 Watchlists - ₹199/mo)</option>
+                    <option value="YEARLY">Pro Yearly (5 Watchlists - ₹1,999/yr)</option>
+                    <option value="HIGHEST">Feature Plan / VIP (10 Watchlists - ₹2,999/yr)</option>
                   </select>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Tier'}

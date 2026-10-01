@@ -198,7 +198,7 @@ export default function PricingView({ setActiveTab }) {
           </div>
           
           <div style={{ fontSize: isMobile ? '36px' : '44px', fontWeight: '900', marginBottom: '6px', color: '#60A5FA', display: 'flex', alignItems: 'baseline' }}>
-            ₹99
+            ₹199
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/mo</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '13px', lineHeight: '1.4' }}>
@@ -241,7 +241,7 @@ export default function PricingView({ setActiveTab }) {
           boxShadow: '0 12px 32px rgba(245, 158, 11, 0.15)' 
         }}>
           <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #F59E0B, #FCD34D)', color: '#000', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            <Star size={11} fill="#000" /> BEST VALUE - SAVE 58%
+            <Star size={11} fill="#000" /> BEST VALUE - SAVE 16%
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
@@ -252,7 +252,7 @@ export default function PricingView({ setActiveTab }) {
           </div>
           
           <div style={{ fontSize: isMobile ? '36px' : '44px', fontWeight: '900', marginBottom: '6px', color: '#FCD34D', display: 'flex', alignItems: 'baseline' }}>
-            ₹499
+            ₹1,999
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '13px', lineHeight: '1.4' }}>
@@ -306,7 +306,7 @@ export default function PricingView({ setActiveTab }) {
           </div>
           
           <div style={{ fontSize: isMobile ? '36px' : '44px', fontWeight: '900', marginBottom: '6px', color: '#C084FC', display: 'flex', alignItems: 'baseline' }}>
-            ₹999
+            ₹2,999
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '13px', lineHeight: '1.4' }}>

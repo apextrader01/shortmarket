@@ -2172,9 +2172,14 @@ const razorpay = new Razorpay({
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   try {
     const { plan } = req.body || {};
-    let amount = 999 * 100;
-    if (plan === 'monthly') amount = 99 * 100;
-    else if (plan === 'yearly') amount = 499 * 100;
+    let amount = 199 * 100;
+    if (plan === 'highest' || plan === 'feature') {
+      amount = 2999 * 100;
+    } else if (plan === 'yearly') {
+      amount = 1999 * 100;
+    } else {
+      amount = 199 * 100;
+    }
     
     const options = {
       amount,
