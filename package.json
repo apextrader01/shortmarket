@@ -4,6 +4,8 @@
   "scripts": {
     "install": "cd backend && npm install && cd ../frontend && npm install",
     "build": "cd frontend && npm run build",
-    "start": "cd backend && node server.js"
+    "start": "cd backend && node server.js",
+    "deploy": "bash deploy.sh",
+    "reload": "pm2 reload skandx-backend || pm2 reload shortmarket-backend || pm2 reload backend/ecosystem.config.js"
   }
 }

@@ -887,7 +887,7 @@ const orderLimiter = rateLimit({
   max: 1500, // limit each user/IP to 1500 orders per minute (allows high-concurrency iceberg slice bursts & exit-all)
   message: { error: 'Order rate limit exceeded (max 1500/min)' },
   keyGenerator: (req) => {
-    return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
+    return req.user?.id ? `user_${req.user.id}` : getClientIp(req);
   }
 });
 
@@ -896,7 +896,7 @@ const walletLimiter = rateLimit({
   max: 15, // limit each user to 15 wallet transactions per minute
   message: { error: 'Wallet transaction rate limit exceeded. Please wait a minute.' },
   keyGenerator: (req) => {
-    return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
+    return req.user?.id ? `user_${req.user.id}` : getClientIp(req);
   }
 });
 
