@@ -5921,6 +5921,40 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // ── Monthly Trade Quota Enforcement for Free / Basic Plan ──────────────────
+  // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
+  const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires').first();
+  const isPaidTier = userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date());
+  
+  if (!isPaidTier) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const orderSide = String(side).toUpperCase();
+    
+    // Check monthly order count for this specific side (BUY or SELL)
+    const monthlySideCount = await db('orders')
+      .where({ user_id: req.user.id })
+      .whereRaw('UPPER(side) = ?', [orderSide])
+      .where('created_at', '>=', startOfMonth)
+      .whereNotIn('status', ['CANCELLED', 'REJECTED'])
+      .count('* as count')
+      .first();
+
+    const currentCount = parseInt(monthlySideCount?.count || 0, 10);
+    const MONTHLY_FREE_TRADE_LIMIT = 25; // 25 Buy and 25 Sell per month
+
+    if (currentCount >= MONTHLY_FREE_TRADE_LIMIT) {
+      return res.status(403).json({
+        error: `Monthly trade quota reached: Free Plan allows maximum 25 ${orderSide} trades per month (used: ${currentCount}/${MONTHLY_FREE_TRADE_LIMIT}). Upgrade to Pro Monthly, Yearly, or Feature Plan for higher or unlimited trades.`,
+        limit_reached: true,
+        tier: 'BASIC',
+        quota: MONTHLY_FREE_TRADE_LIMIT,
+        used: currentCount,
+        side: orderSide
+      });
+    }
+  }
+
   // Real-Time Position Clamping for Explicit Exit Orders (Prevents over-exiting / position reversals)
   const isExplicitExit = Boolean(req.body.is_exit || (req.body.remarks && /exit|square-off|close/i.test(req.body.remarks)));
   if (isExplicitExit) {
