@@ -877,6 +877,7 @@ app.get('/api/stocks', async (req, res) => {
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { authenticateToken, requireAdmin, JWT_SECRET, hashToken } = require('./middleware/auth');
 const { logAuditEvent } = require('./services/auditLogger');
 const { parseDeviceDetails, parseIpLocation, syncBannedEntities, isIpBanned, isPhoneBanned } = require('./services/deviceSecurity');
