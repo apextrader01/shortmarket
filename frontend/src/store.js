@@ -382,13 +382,27 @@ export const useStore = create(persist((set, get) => ({
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
-        return { success: true };
+        return { success: true, message: data.message, needs_verification: data.needs_verification, email: data.email };
       } else {
         set({ authError: data.error });
         return { success: false, error: data.error };
       }
     } catch (err) {
       set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  resendVerificationEmail: async (email) => {
+    try {
+      const res = await fetch(`${API}/api/auth/resend-verification-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
       return { success: false, error: err.message };
     }
   },

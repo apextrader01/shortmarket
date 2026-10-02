@@ -1,5 +1,11 @@
 const path = require('path');
 const fs = require('fs');
+try {
+  const dns = require('dns');
+  if (typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch (_) {}
 
 let admin = null;
 let authInstance = null;
@@ -156,7 +162,8 @@ async function sendFirebaseVerificationEmail(email) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       requestType: 'VERIFY_EMAIL',
-      idToken: signInData.idToken
+      idToken: signInData.idToken,
+      continueUrl: 'https://skandx.in'
     })
   });
 

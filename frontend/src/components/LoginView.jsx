@@ -13,6 +13,7 @@ export default function LoginView() {
     verify2FA: state.verify2FA,
     register: state.register, 
     sendRegistrationOtp: state.sendRegistrationOtp,
+    resendVerificationEmail: state.resendVerificationEmail,
     forgotPassword: state.forgotPassword, 
     verifyResetOtp: state.verifyResetOtp, 
     resetPassword: state.resetPassword, 
@@ -47,14 +48,17 @@ export default function LoginView() {
       setView('register');
     }
 
-    // Support Firebase action links for password reset
+    // Support Firebase action links for email verification and password reset
     const mode = urlParams.get('mode');
     const oobCode = urlParams.get('oobCode');
     const paramEmail = urlParams.get('email');
     if (paramEmail) {
       setEmail(paramEmail);
     }
-    if (mode === 'resetPassword' || oobCode) {
+    if (mode === 'verifyEmail') {
+      setView('login');
+      setMessage('✓ Email verified successfully with Firebase! You can now log in.');
+    } else if (mode === 'resetPassword' || oobCode) {
       setView('reset');
       if (oobCode) {
         setOtp(oobCode);
@@ -284,26 +288,17 @@ export default function LoginView() {
         return;
       }
 
-      // Try Phone SMS first via Firebase, fallback to high-reliability Email OTP
-      try {
-        const verifier = setupRecaptchaVerifier();
-        const formattedPhone = '+91' + cleanPhone;
-        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
-        setConfirmationResult(confirmation);
-        setRegisterOtpMethod('phone');
-        setView('register_otp');
-        setMessage(`6-digit SMS verification code dispatched to +91 ${cleanPhone}.`);
-      } catch (error) {
-        console.warn('Phone SMS registration error, falling back to Email OTP:', error);
-        const res = await sendRegistrationOtp(username.trim(), email.trim().toLowerCase(), cleanPhone);
-        if (res && res.success) {
-          setRegisterOtpMethod('email');
-          setView('register_otp');
-          setMessage(res.message || `Verification code sent to ${email.trim().toLowerCase()}. Check your email inbox!`);
-        } else {
-          useStore.setState({ authError: res?.error || 'Failed to dispatch verification code. Please check your details.' });
-        }
+      // Register account and dispatch official Firebase verification email link
+      const consentsPayload = { terms: consentTerms, dataProcessing: consentDataProcessing, marketing: consentMarketing };
+      const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, null, consentsPayload);
+      if (res && res.success) {
+        setView('verify_email_sent');
+        setMessage(res.message || `An official verification link has been dispatched to ${email.trim().toLowerCase()}.`);
+      } else {
+        useStore.setState({ authError: res?.error || 'Failed to complete registration. Please check your details.' });
       }
+      setLoading(false);
+      return;
     }
     else if (view === 'register_otp') {
       const cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -503,6 +498,7 @@ export default function LoginView() {
           <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
             {view === 'login' && 'Welcome back'}
             {view === 'register' && 'Create your account'}
+            {view === 'verify_email_sent' && 'Verify your email'}
             {view === 'forgot' && 'Reset password'}
             {view === 'otp' && 'Verify identity'}
             {view === 'login_otp' && 'Two-Factor Authentication'}
@@ -512,6 +508,7 @@ export default function LoginView() {
           <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
             {view === 'login' && 'Enter your details to access your terminal.'}
             {view === 'register' && 'Join the edge in professional trading.'}
+            {view === 'verify_email_sent' && 'We dispatched an official verification link to your email.'}
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
             {view === 'login_otp' && (twoFactorMethod === 'totp' ? 'Enter the dynamic 6-digit code from Google Authenticator.' : (twoFactorMethod === 'email' ? 'Enter the 6-digit verification code sent to your email.' : 'Enter the 6-digit code sent to your registered phone number.'))}
@@ -558,8 +555,94 @@ export default function LoginView() {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Form or Email Verification Screen */}
+        {view === 'verify_email_sent' ? (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '28px'
+            }}>
+              ✉️
+            </div>
+
+            <h3 style={{ fontSize: '19px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>
+              Check your inbox
+            </h3>
+
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
+              An official verification link has been sent from Firebase to <strong style={{ color: '#fff' }}>{email}</strong>.
+            </p>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              fontSize: '13px',
+              color: '#d1d5db',
+              lineHeight: '1.5',
+              marginBottom: '24px',
+              textAlign: 'left'
+            }}>
+              📌 <strong>Next steps:</strong>
+              <ol style={{ margin: '8px 0 0 16px', padding: 0 }}>
+                <li>Open your email inbox (and check Spam/Promotions if delayed).</li>
+                <li>Click <strong>&quot;Verify your email for SkandX&quot;</strong>.</li>
+                <li>Once verified, click the button below to log in!</li>
+              </ol>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setView('login');
+                setMessage('Please log in with your email and password once verified.');
+              }}
+              className="premium-btn"
+              style={{ width: '100%', marginBottom: '16px' }}
+            >
+              CONTINUE TO LOGIN
+            </button>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                disabled={sendingRegOtp}
+                onClick={async () => {
+                  setSendingRegOtp(true);
+                  useStore.setState({ authError: null });
+                  const res = await resendVerificationEmail(email.trim().toLowerCase());
+                  setSendingRegOtp(false);
+                  if (res && res.success) {
+                    setMessage(`A fresh verification link has been sent to ${email.trim().toLowerCase()}.`);
+                  } else {
+                    useStore.setState({ authError: res?.error || 'Failed to resend verification link.' });
+                  }
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}
+              >
+                {sendingRegOtp ? 'Sending fresh link...' : 'Resend Verification Link'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setView('register')}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}
+              >
+                ← Edit Details
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {view === 'register' && (
             <div>
               <label style={labelStyle}>Full Name</label>
@@ -851,20 +934,25 @@ export default function LoginView() {
                view === 'otp' ? 'VERIFY CODE' : 'RESET PASSWORD')}
           </button>
         </form>
+        )}
 
         {/* Toggle */}
         <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
-          <span
-            onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
-            style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
-          >
-            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
-          </span>
-          {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') && (
-            <div style={{ marginTop: '16px' }}>
-              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
-            </div>
+          {view !== 'verify_email_sent' && (
+            <>
+              {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
+              <span
+                onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
+                style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
+              >
+                {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
+              </span>
+              {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') && (
+                <div style={{ marginTop: '16px' }}>
+                  <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
+                </div>
+              )}
+            </>
           )}
           
           <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: '#6b7280' }}>

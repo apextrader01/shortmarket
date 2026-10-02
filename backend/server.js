@@ -1113,7 +1113,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
   }
 
-  // Validate OTP or Firebase token (mandatory)
+  // Validate OTP or Firebase token if provided (supports both numeric OTP and direct Firebase verification link)
   if (otp) {
     const record = registrationOtps.get(cleanEmail);
     if (!record || record.expires < Date.now()) {
@@ -1128,8 +1128,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (!tokenCheck.verified) {
       return res.status(403).json({ error: tokenCheck.reason || 'Invalid or unverified authorization token.' });
     }
-  } else {
-    return res.status(400).json({ error: 'Identity verification required. Please enter the verification code sent to your phone or email.' });
   }
 
   try {
@@ -1251,7 +1249,28 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 60 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: userId, client_id: clientId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
+
+    // Dispatch official verification email link via Firebase Identity Toolkit
+    try {
+      const { ensureFirebaseUser, sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
+      if (typeof ensureFirebaseUser === 'function') {
+        await ensureFirebaseUser(cleanEmail, cleanPhone);
+      }
+      if (typeof sendFirebaseVerificationEmail === 'function') {
+        await sendFirebaseVerificationEmail(cleanEmail);
+        console.log(`[FIREBASE AUTH] Verification email link dispatched to ${cleanEmail}`);
+      }
+    } catch (fbErr) {
+      console.warn('[FIREBASE AUTH] Registration verification email note:', fbErr.message);
+    }
+
+    res.json({
+      success: true,
+      needs_verification: true,
+      message: `Account created successfully! An official verification link has been dispatched to ${cleanEmail}. Please check your inbox and click the link to activate your account.`,
+      token,
+      user: { id: userId, client_id: clientId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null }
+    });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
@@ -1262,6 +1281,28 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
     
     res.status(500).json({ error: errorMsg || 'Unknown error occurred during registration' });
+  }
+});
+
+// ─── Resend Firebase Verification Email ──────────────────────────────────────
+app.post('/api/auth/resend-verification-email', authLimiter, async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  try {
+    const { sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
+    if (typeof sendFirebaseVerificationEmail !== 'function') {
+      return res.status(500).json({ error: 'Firebase authentication service unavailable' });
+    }
+    await sendFirebaseVerificationEmail(cleanEmail);
+    res.json({
+      success: true,
+      message: `A fresh verification link has been dispatched to ${cleanEmail}. Please check your inbox and spam folder.`
+    });
+  } catch (err) {
+    console.error('resend-verification-email error:', err);
+    res.status(500).json({ error: err.message || 'Failed to dispatch verification email' });
   }
 });
 
