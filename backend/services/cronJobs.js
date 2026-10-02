@@ -259,17 +259,17 @@ function initCronJobs(priceCache, triggerEngine) {
     console.log('Initializing Cron Jobs...');
 
     // ─── 09:00 AM IST: MCX Commodity AMO Sweep ──────────────────────────────────
-    cron.schedule('0 9 * * 1-5', () => {
+    cron.schedule('0 9 * * *', () => {
         executeAmoOrders('COMMODITY', priceCache, triggerEngine);
     }, TZ);
 
     // ─── 09:08 AM IST: Pre-Market CAS Opening Price Match ───────────────────────
-    cron.schedule('8 9 * * 1-5', () => {
+    cron.schedule('8 9 * * *', () => {
         executeCasOpeningMatch(priceCache, triggerEngine);
     }, TZ);
 
     // ─── 09:15 AM IST: Equity & F&O Market Open AMO Sweep ───────────────────────
-    cron.schedule('15 9 * * 1-5', () => {
+    cron.schedule('15 9 * * *', () => {
         executeAmoOrders('EQUITY', priceCache, triggerEngine);
     }, TZ);
 
@@ -280,20 +280,20 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 1: Segment-Wise Intraday Entry Blocks ────────────────────────
     // 1A. Equity Cash (F&O Eligible Stocks): 03:05 PM IST
-    cron.schedule('5 15 * * 1-5', () => {
+    cron.schedule('5 15 * * *', () => {
         console.log('[CRON 03:05 PM] Phase 1A: Blocking new Intraday placements for F&O Cash Stocks.');
         isFnoEquityIntradayBlocked = true;
     }, TZ);
 
     // 1B. Equity Cash (Non-F&O Stocks): 03:15 PM IST
-    cron.schedule('15 15 * * 1-5', () => {
+    cron.schedule('15 15 * * *', () => {
         console.log('[CRON 03:15 PM] Phase 1B: Blocking new Intraday placements for Non-F&O Cash Stocks.');
         isNonFnoEquityIntradayBlocked = true;
         isEquityIntradayBlocked = true;
     }, TZ);
 
     // 1C. Futures & Options (Derivatives): 03:25 PM IST
-    cron.schedule('25 15 * * 1-5', () => {
+    cron.schedule('25 15 * * *', () => {
         console.log('[CRON 03:25 PM] Phase 1C: Blocking new Intraday placements for Futures & Options.');
         isDerivativesIntradayBlocked = true;
     }, TZ);
@@ -483,13 +483,13 @@ function initCronJobs(priceCache, triggerEngine) {
     };
 
     // Phase 2A: 03:09 PM - Sweep F&O Cash Stocks pending intraday
-    cron.schedule('9 15 * * 1-5', () => phase2Sweep('FNO_EQ'), TZ);
+    cron.schedule('9 15 * * *', () => phase2Sweep('FNO_EQ'), TZ);
 
     // Phase 2B: 03:19 PM - Sweep Non-F&O Cash Stocks pending intraday
-    cron.schedule('19 15 * * 1-5', () => phase2Sweep('NON_FNO_EQ'), TZ);
+    cron.schedule('19 15 * * *', () => phase2Sweep('NON_FNO_EQ'), TZ);
 
     // Phase 2C: 03:29 PM - Sweep Derivatives pending intraday
-    cron.schedule('29 15 * * 1-5', () => phase2Sweep('DERIVATIVE'), TZ);
+    cron.schedule('29 15 * * *', () => phase2Sweep('DERIVATIVE'), TZ);
 
     cron.schedule('59 22 * * *', () => {
         if (!isMCXWinterSession()) phase2Sweep('COM');
@@ -701,16 +701,16 @@ function initCronJobs(priceCache, triggerEngine) {
     };
 
     // Phase 3A: 03:10 PM - Auto Square-Off F&O Cash Stocks open intraday positions
-    cron.schedule('10 15 * * 1-5', () => phase3SquareOff('FNO_EQ'), TZ);
+    cron.schedule('10 15 * * *', () => phase3SquareOff('FNO_EQ'), TZ);
 
     // Phase 3B: 03:20 PM - Auto Square-Off Non-F&O Cash Stocks open intraday positions
-    cron.schedule('20 15 * * 1-5', () => phase3SquareOff('NON_FNO_EQ'), TZ);
+    cron.schedule('20 15 * * *', () => phase3SquareOff('NON_FNO_EQ'), TZ);
 
     // Phase 3C: 03:30 PM - Auto Square-Off Derivatives open intraday positions
-    cron.schedule('30 15 * * 1-5', () => phase3SquareOff('DERIVATIVE'), TZ);
+    cron.schedule('30 15 * * *', () => phase3SquareOff('DERIVATIVE'), TZ);
 
     // 03:31 PM: The 3:30 PM EOD Handler - Auto-Convert Unclosed Longs to CNC (with debit balance) & Settle Shorts via Auction
-    cron.schedule('31 15 * * 1-5', async () => {
+    cron.schedule('31 15 * * *', async () => {
         console.log('\n🏛️ [CRON 03:31 PM] Running EOD Reconciliation for any remaining open Cash Equity intraday positions...');
         const lockKey = 'cron_eod_equity_reconciliation_331';
         let connection = null;
@@ -774,19 +774,19 @@ function initCronJobs(priceCache, triggerEngine) {
     }, TZ);
 
     // 03:35 PM: Closing Auction Session (CAS) matching for F&O Cash stocks
-    cron.schedule('35 15 * * 1-5', () => {
+    cron.schedule('35 15 * * *', () => {
         executeClosingAuctionMatch(priceCache, triggerEngine);
     }, TZ);
 
     // 03:40 PM: Expiry Day Settlement for Equities & Derivatives (F&O, Index Options/Futures, CNC Holdings)
-    cron.schedule('40 15 * * 1-5', async () => {
+    cron.schedule('40 15 * * *', async () => {
         console.log('\n⏰ [CRON 03:40 PM] Expiry Day Settlement triggered for Equities & Derivatives...');
         const positionsEngine = require('./positionsEngine');
         await positionsEngine.settleExpiries(false, false).catch(e => console.error('03:40 PM Expiry settlement error:', e));
     }, TZ);
 
     // 04:00 PM: Final EOD Safety Net Expiry Settlement for Equities & Derivatives
-    cron.schedule('0 16 * * 1-5', async () => {
+    cron.schedule('0 16 * * *', async () => {
         console.log('\n⏰ [CRON 04:00 PM] Final 04:00 PM Expiry Settlement Safety Net...');
         const positionsEngine = require('./positionsEngine');
         await positionsEngine.settleExpiries(false, false).catch(e => console.error('04:00 PM Expiry settlement error:', e));

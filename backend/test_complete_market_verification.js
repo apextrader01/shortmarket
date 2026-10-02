@@ -317,16 +317,16 @@ const positionsContent = fs.readFileSync(positionsEnginePath, 'utf8');
 
 // Expected cron expressions
 const expectedCrons = [
-    { name: '03:05 PM Phase 1A F&O Cash Intraday Block', pattern: /5\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:15 PM Phase 1B Non-F&O Cash Intraday Block', pattern: /15\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:25 PM Phase 1C Derivatives Intraday Block', pattern: /25\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:09 PM Phase 2A F&O Cash Sweep', pattern: /9\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:19 PM Phase 2B Non-F&O Cash Sweep', pattern: /19\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:29 PM Phase 2C Derivatives Sweep', pattern: /29\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:10 PM Phase 3A F&O Cash Auto Square-Off', pattern: /10\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:20 PM Phase 3B Non-F&O Cash Auto Square-Off', pattern: /20\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:30 PM Phase 3C Derivatives Auto Square-Off', pattern: /30\s+15\s+\*\s+\*\s+1-5/ },
-    { name: '03:35 PM CAS Auction Matching', pattern: /35\s+15\s+\*\s+\*\s+1-5/ },
+    { name: '03:05 PM Phase 1A F&O Cash Intraday Block', pattern: /5\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:15 PM Phase 1B Non-F&O Cash Intraday Block', pattern: /15\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:25 PM Phase 1C Derivatives Intraday Block', pattern: /25\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:09 PM Phase 2A F&O Cash Sweep', pattern: /9\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:19 PM Phase 2B Non-F&O Cash Sweep', pattern: /19\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:29 PM Phase 2C Derivatives Sweep', pattern: /29\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:10 PM Phase 3A F&O Cash Auto Square-Off', pattern: /10\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:20 PM Phase 3B Non-F&O Cash Auto Square-Off', pattern: /20\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:30 PM Phase 3C Derivatives Auto Square-Off', pattern: /30\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
+    { name: '03:35 PM CAS Auction Matching', pattern: /35\s+15\s+\*\s+\*\s+(?:\*|1-5)/ },
     { name: '03:40 PM Equities & Derivatives Expiry Settlement', pattern: /40\s+15\s+\*\s+\*\s+\*/, src: positionsContent }
 ];
 

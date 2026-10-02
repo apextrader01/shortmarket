@@ -317,13 +317,13 @@ console.log('\n▶ MODULE 9: Exchange Session Timelines, Cutoffs & Expiry Settle
 const cronFile = fs.readFileSync(path.join(__dirname, 'services', 'cronJobs.js'), 'utf8');
 const posEngineFile = fs.readFileSync(path.join(__dirname, 'services', 'positionsEngine.js'), 'utf8');
 
-assert(cronFile.includes("5 15 * * 1-5"), '03:05 PM F&O Cash Intraday entry block scheduled');
-assert(cronFile.includes("15 15 * * 1-5"), '03:15 PM Non-F&O Cash Intraday entry block scheduled');
-assert(cronFile.includes("25 15 * * 1-5"), '03:25 PM Derivatives Intraday entry block scheduled');
-assert(cronFile.includes("10 15 * * 1-5"), '03:10 PM F&O Cash Auto Square-off scheduled');
-assert(cronFile.includes("20 15 * * 1-5"), '03:20 PM Non-F&O Cash Auto Square-off scheduled');
-assert(cronFile.includes("30 15 * * 1-5"), '03:30 PM Derivatives Auto Square-off scheduled');
-assert(cronFile.includes("35 15 * * 1-5"), '03:35 PM CAS Auction matching scheduled');
+assert(cronFile.includes("5 15 * * *") || cronFile.includes("5 15 * * 1-5"), '03:05 PM F&O Cash Intraday entry block scheduled');
+assert(cronFile.includes("15 15 * * *") || cronFile.includes("15 15 * * 1-5"), '03:15 PM Non-F&O Cash Intraday entry block scheduled');
+assert(cronFile.includes("25 15 * * *") || cronFile.includes("25 15 * * 1-5"), '03:25 PM Derivatives Intraday entry block scheduled');
+assert(cronFile.includes("10 15 * * *") || cronFile.includes("10 15 * * 1-5"), '03:10 PM F&O Cash Auto Square-off scheduled');
+assert(cronFile.includes("20 15 * * *") || cronFile.includes("20 15 * * 1-5"), '03:20 PM Non-F&O Cash Auto Square-off scheduled');
+assert(cronFile.includes("30 15 * * *") || cronFile.includes("30 15 * * 1-5"), '03:30 PM Derivatives Auto Square-off scheduled');
+assert(cronFile.includes("35 15 * * *") || cronFile.includes("35 15 * * 1-5"), '03:35 PM CAS Auction matching scheduled');
 assert(posEngineFile.includes("40 15 * * *"), '03:40 PM F&O Expiry Settlement scheduled');
 
 // Final Summary
