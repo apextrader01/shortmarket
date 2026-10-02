@@ -447,6 +447,11 @@ async function runWatchlistCleanup() {
                 }
             }
 
+            if (modified) {
+                await db('users').where({ id: user.id }).update({ watchlists: JSON.stringify(watchlists) });
+            }
+        }
+
         // Also deactivate past-day intraday trade signals and expired contracts from broadcast notifications
         try {
             const hasBroadcastTable = await db.schema.hasTable('broadcast_notifications');
