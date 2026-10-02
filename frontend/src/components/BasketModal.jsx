@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
-import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
+import { getFuturesMarginRate } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 function extractOptionStrike(symbol) {
@@ -150,7 +150,7 @@ export default function BasketModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [, setIsSearching] = useState(false);
   
   // Strategy & Underlying selection
   const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
@@ -525,9 +525,7 @@ export default function BasketModal() {
       const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
       const isOption = item.isOption || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
       const isFuture = !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || isCommodity);
-      const isEquity = !isOption && !isFuture && !isCommodity;
 
-      const freezeLimit = getFreezeLimit(sym, item.lotsize);
       const slicesCount = getOrderSlicesCount(sym, qty, item.lotsize) || 1;
 
       let legBrokerage = 0;
@@ -1997,7 +1995,6 @@ export default function BasketModal() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {enhancedItems.map((item, idx) => {
                         const slices = calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize);
-                        const limit = getFreezeLimit(item.symbol, item.lotsize);
                         if (slices.length <= 1) return null;
                         return (
                           <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '11px' }}>

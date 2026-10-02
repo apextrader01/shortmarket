@@ -1,10 +1,10 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
-import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag, AlertTriangle } from 'lucide-react';
-import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
-import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
-import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
+import { X, Maximize2, FileText, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, getAssetSubsegment } from '../utils/lotsizeHelper';
+import { getFreezeLimit, getOrderSlicesCount } from '../utils/freezeLimits';
+import { calculateOrderMargin } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 export default function OrderModal() {

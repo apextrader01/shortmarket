@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
 import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
-import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound, playRiskAlertSound } from './utils/soundManager';
+import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {

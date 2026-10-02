@@ -2,9 +2,8 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { 
-  FileText, PieChart, BarChart2, Download, Search, Filter, ArrowLeft, 
-  Calendar, FileDown, TrendingUp, TrendingDown, Target, Clock, Activity, 
-  AlertCircle, ChevronDown, Check, X, Shield, Layers, Receipt, Briefcase
+  FileText, PieChart, Download, ArrowLeft, 
+  Calendar, FileDown, Target, Layers, Receipt, Briefcase
 } from 'lucide-react';
 import {
   calculateIndianCharges,
@@ -14,8 +13,7 @@ import {
   generateLedgerReport,
   generateContractNoteReport,
   generateDPHoldingReport,
-  getISTDateString,
-  filterRecordsByPeriod
+  getISTDateString
 } from '../utils/clientReportGenerator';
 import TradingJournalView from './TradingJournalView';
 
@@ -29,7 +27,6 @@ const LedgerStatement = () => {
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('Broking');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -527,15 +524,10 @@ const LedgerStatement = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const TradesAndCharges = () => {
   const [filterPeriod, setFilterPeriod] = useState('All');
-  const [tradesPage, setTradesPage] = useState(1);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Date-Wise View');
-
-  useEffect(() => {
-    setTradesPage(1);
-  }, [filterPeriod, customStart, customEnd, viewMode]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);

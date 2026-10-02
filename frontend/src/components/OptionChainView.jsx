@@ -1,11 +1,10 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
-import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
-import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock, ChevronLeft } from 'lucide-react';
+import { Clock, ChevronLeft } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {

@@ -1274,7 +1274,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
 
     const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
     // Standard password login: trust user immediately unless they explicitly enabled Google Authenticator (TOTP)
-    let isTrusted = isGoogleReviewTester || !Boolean(user.totp_enabled);
+    let isTrusted = isGoogleReviewTester || !user.totp_enabled;
 
     // 🛡️ CHECK IF DEVICE IS TRUSTED (30-Day Device Trust / Remember Me)
     if (!isTrusted && trusted_device_token && typeof trusted_device_token === 'string' && trusted_device_token.length >= 32) {
@@ -9549,7 +9549,6 @@ app.get('/api/diagnostics/logs', (req, res) => {
   const fs = require('fs');
   const path = require('path');
   try {
-    const today = new Date().toISOString().split('T')[0];
     const logFile = path.join(__dirname, 'error.log');
     if (fs.existsSync(logFile)) {
       const content = fs.readFileSync(logFile, 'utf8');
@@ -10013,7 +10012,6 @@ app.get('/api/leaderboard', async (req, res) => {
     if (contest_id) {
       contest = await db('contests').where({ id: contest_id }).first();
     }
-    const tierKey = contest?.access_tier ? contest.access_tier.toUpperCase() : 'ALL';
     const contestKey = contest_id ? `contest_${contest_id}` : (timeframe === 'all_time' ? 'all_time' : 'daily');
     const cacheKey = `leaderboard:${contestKey}:${segKey}:top50`;
 

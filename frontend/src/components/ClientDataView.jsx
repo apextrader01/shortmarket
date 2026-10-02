@@ -1,9 +1,9 @@
 import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
-import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
-import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
+import { Bell, ShieldAlert } from 'lucide-react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, ShieldCheck, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
@@ -36,7 +36,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const { 
-    user, orders, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, 
+    user, orders, logout, updateProfilePicture, theme, setTheme, resetAccount, 
     fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode,
     telegramSettings, fetchTelegramSettings
   } = useStore(useShallow(state => ({ 
@@ -45,7 +45,6 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     logout: state.logout, 
     updateProfilePicture: state.updateProfilePicture, 
     theme: state.theme, 
-    toggleTheme: state.toggleTheme, 
     setTheme: state.setTheme, 
     resetAccount: state.resetAccount,
     fontSize: state.fontSize,

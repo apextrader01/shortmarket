@@ -3,8 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { 
   X, TrendingUp, TrendingDown, Newspaper, Bell, Send, Trash2, 
-  CheckCircle2, AlertTriangle, Eye, Search, Layers, Sparkles, 
-  Loader2, Check, ArrowRight, CornerDownLeft, RotateCcw
+  AlertTriangle, Eye, Search, Loader2, ArrowRight
 } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract, isCommodityContract } from '../utils/lotsizeHelper';
 

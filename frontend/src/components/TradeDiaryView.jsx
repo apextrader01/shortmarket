@@ -52,11 +52,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { 
   LayoutDashboard, CheckSquare, ListOrdered, TrendingUp, Scale, AlertTriangle, 
   Sparkles, BarChart2, ShieldCheck, Zap, Users, Trophy, Calendar, Share2, 
-  Plus, Settings, Sun, Moon, User, ChevronDown, ChevronUp,
-  ArrowUpRight, ArrowDownRight, Wallet, Award, BarChart3, Clock, 
-  Flame, Check, X, Edit3, Trash2, Search, Filter, RefreshCw, ExternalLink,
-  BookOpen, ChevronRight, ChevronLeft, Lock, Star, ThumbsUp, AlertCircle, Menu,
-  Copy, CheckCircle, DollarSign, PieChart, Target, MessageSquare, Download, Play, ShieldAlert, Heart, Share, LogOut,
+  Plus, Sun, Moon, User, ChevronDown,
+  ArrowUpRight, Wallet, Award, BarChart3, Clock, 
+  Flame, Check, X, Edit3, Trash2, Search,
+  BookOpen, ChevronRight, ChevronLeft, Star, ThumbsUp, Menu,
+  Copy, CheckCircle, DollarSign, Target, MessageSquare, Download, ShieldAlert, LogOut,
   Loader2
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
@@ -158,7 +158,6 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfi
   // Responsive Breakpoints
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
   const isMobile = windowWidth <= 850;
-  const isSmallMobile = windowWidth <= 520;
   const isTinyMobile = windowWidth <= 380;
 
   useEffect(() => {
@@ -611,8 +610,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfi
   // Risk Calculator State
   
   // Extended Risk Management State
-  const [riskAssetPreset, setRiskAssetPreset] = useState('NIFTY');
-  const [cryptoLeverage, setCryptoLeverage] = useState(1);
+
   const [atrValue, setAtrValue] = useState(25);
   const [circuitBreaker, setCircuitBreaker] = useState({ maxDailyLoss: 4000, maxTrades: 3, streakLockout: 2, enabled: true });
   const [circuitBreakerToast, setCircuitBreakerToast] = useState(null);
@@ -628,9 +626,7 @@ const [riskCalc, setRiskCalc] = useState({
   });
 
   // Calendar State
-  const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [calendarDayFilter, setCalendarDayFilter] = useState('ALL'); // 'ALL' | 'WINS' | 'LOSSES'
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayStr);
 
   // Challenge State
   
@@ -638,7 +634,7 @@ const [riskCalc, setRiskCalc] = useState({
   const [showDailyPledgeModal, setShowDailyPledgeModal] = useState(false);
   const [challengeType, setChallengeType] = useState('PROP_30');
   const [dailyPledgeItems, setDailyPledgeItems] = useState({ planFollowed: true, riskRespected: true, noRevenge: true, loggedCompletely: true });
-const [challengeDay, setChallengeDay] = useState(14);
+  const [challengeDay] = useState(14);
   const [claimedToday, setClaimedToday] = useState(false);
 
   // Affiliate State
@@ -678,7 +674,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const [referralWithdrawAmount, setReferralWithdrawAmount] = useState('');
   const [referralWithdrawLoading, setReferralWithdrawLoading] = useState(false);
   const [referralWithdrawMsg, setReferralWithdrawMsg] = useState({ type: '', text: '' });
-  const [riskProfilePreset, setRiskProfilePreset] = useState('STANDARD');
 
   const [communityPosts, setCommunityPosts] = useState([
     {
@@ -1051,24 +1046,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     setTodayChecklist(prev => ({ ...prev, notes: text }));
   };
 
-  const handleSaveChecklistNotes = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      await fetch(`${API}/api/journal/checklists`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          date: todayStr,
-          pre_market_data: todayChecklist.preMarket,
-          post_market_data: todayChecklist.postMarket,
-          notes: todayChecklist.notes
-        })
-      });
-    } catch (e) {
-      console.error('Save checklist notes error:', e);
-    }
-  };
 
   // Compile trades list (strictly from Trade Diary database records - isolated from paper trading)
   const allTrades = useMemo(() => {
@@ -4743,7 +4720,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               if (rulesCategoryFilter === 'CRITICAL' && rule.severity !== 'CRITICAL') return false;
               if (rulesCategoryFilter !== 'ALL' && rulesCategoryFilter !== 'CRITICAL' && rule.category !== rulesCategoryFilter) return false;
               
-              const f = rule.followed || 0;
               const b = rule.broken || 0;
               if (rulesAdherenceFilter === 'FLAWLESS' && b > 0) return false;
               if (rulesAdherenceFilter === 'BREACHED' && b === 0) return false;
@@ -5780,7 +5756,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             const tradesAnalyzedCount = filteredTrades.length > 0 ? filteredTrades.length : allTrades.length;
             const winRate = metrics.winRate || 65;
             const profitFactor = metrics.profitFactor || '0.00';
-            const totalMistakesLoss = mistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0);
             
             // Dynamic Grade Calculation
             let letterGrade = 'A-';
@@ -7848,7 +7823,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
             const totalGreenDays = daysData.filter(d => d.isGreen).length;
             const totalRedDays = daysData.filter(d => d.isRed).length;
-            const totalFlatDays = daysData.filter(d => !d.isGreen && !d.isRed).length;
 
             // Calculate weekly row totals (5 weeks)
             const weekTotals = [

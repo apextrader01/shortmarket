@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -21,11 +21,6 @@ import {
   PieChart as PieChartIcon, 
   ArrowUpRight, 
   ArrowDownRight,
-  PlusCircle,
-  ExternalLink,
-  ShieldCheck,
-  Zap,
-  SlidersHorizontal,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';

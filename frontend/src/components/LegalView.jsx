@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, Mail, Phone, MapPin, ExternalLink, HelpCircle, ArrowUp } from 'lucide-react';
+import { Shield, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function LegalView({ initialTab = 'privacy', onBack }) {

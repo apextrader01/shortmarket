@@ -8,7 +8,7 @@ import SkeletonLoader from './SkeletonLoader';
 import EmptyState from './EmptyState';
 import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract, getInstantLotsize } from '../utils/lotsizeHelper';
 import { calculateOrderSlices } from '../utils/freezeLimits';
-import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
+import { getTodayClosedPositions, isToday } from '../utils/pnlHelper';
 import { getMarketSession } from '../utils/marketTiming';
 
 const EMPTY_PRICES = {};
@@ -41,12 +41,10 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, orders, marketStatus, marketCalendar, isInitialUserDataLoaded } = useStore(useShallow(state => ({
+  const { positions, holdings, orders, isInitialUserDataLoaded } = useStore(useShallow(state => ({
     positions: state.positions,
     holdings: state.holdings,
     orders: state.orders,
-    marketStatus: state.marketStatus,
-    marketCalendar: state.marketCalendar,
     isInitialUserDataLoaded: state.isInitialUserDataLoaded
   })));
   
@@ -260,7 +258,6 @@ export default function PositionsView() {
     }
     return map;
   }));
-  const prices = relevantPrices;
 
   const renderExitPrice = (pos) => {
     if (pos.exit_price !== null && pos.exit_price !== undefined && !isNaN(Number(pos.exit_price))) {
@@ -301,7 +298,6 @@ export default function PositionsView() {
       
       const agg = symbolAgg[key];
       if (agg.id !== pos.id) { // Merge
-         const prevQty = agg.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
          agg.closed_quantity = (parseFloat(agg.closed_quantity) || 0) + (parseFloat(pos.closed_quantity) || 0);
          agg.margin = (parseFloat(agg.margin) || 0) + (parseFloat(pos.margin) || 0);
@@ -823,7 +819,6 @@ export default function PositionsView() {
                   const isShort = rawQty < 0 || pos.side === 'SELL';
                   const isBuy = !isShort;
                   const sideText = isShort ? 'SELL' : 'BUY';
-                  const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
                   const isMf = isMutualFund(pos.symbol);
                   const mfName = isMf ? getMfName(pos.symbol) : null;
@@ -1168,7 +1163,6 @@ export default function PositionsView() {
                   const isShort = rawQty < 0 || pos.side === 'SELL';
                   const isBuy = !isShort;
                   const sideText = isShort ? 'SELL' : 'BUY';
-                  const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
                   const isMf = isMutualFund(pos.symbol, pos.asset_class) || Boolean(pos.isMf);
                   const mfName = isMf ? getMfName(pos.symbol) : null;

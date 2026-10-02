@@ -1,4 +1,4 @@
-import { getInstantLotsize, isDerivativeContract, isCommodityContract } from './lotsizeHelper';
+import { isCommodityContract } from './lotsizeHelper';
 
 let dynamicMarginOverrides = {};
 

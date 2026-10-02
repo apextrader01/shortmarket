@@ -9,10 +9,7 @@ import {
   Layers, 
   Bell, 
   ChevronRight, 
-  Activity, 
-  ShieldCheck, 
-  Sliders, 
-  ExternalLink 
+  Activity
 } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 
@@ -223,11 +220,6 @@ export default function MobileStockOverviewModal() {
   const handleOpenFullChart = () => {
     handleClose();
     setChartModalSymbol(symbol);
-  };
-
-  const handleOpenDepthModal = () => {
-    handleClose();
-    openMarketDepthModal(symbol, lotsize);
   };
 
   const handleSetAlert = () => {
