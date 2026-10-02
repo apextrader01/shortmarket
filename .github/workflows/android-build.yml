@@ -56,6 +56,11 @@ jobs:
             cap.appId = process.env.APP_ID;
             cap.server.url = process.env.API_URL;
             fs.writeFileSync("capacitor.config.json", JSON.stringify(cap, null, 2));
+
+            const assetConfig = "android/app/src/main/assets/capacitor.config.json";
+            if (fs.existsSync(assetConfig)) {
+              fs.writeFileSync(assetConfig, JSON.stringify(cap, null, 2));
+            }
           '
           sed -i "s/applicationId \"com.skandx.app\"/applicationId \"$APP_ID\"/" android/app/build.gradle
           sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml
