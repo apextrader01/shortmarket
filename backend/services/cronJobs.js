@@ -1054,6 +1054,24 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     }, TZ);
 
+    // 🌅 08:19 AM IST: Daily Price Alert Purge
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Purges all daily price alerts across active sessions before market open
+    cron.schedule('19 8 * * *', async () => {
+        console.log('\n🌅 [CRON 08:19 AM] Purging all daily price alerts across active client sessions...');
+        try {
+            if (triggerEngine && triggerEngine.io) {
+                triggerEngine.io.emit('purge_daily_alerts', {
+                    timestamp: new Date().toISOString(),
+                    message: 'Daily price alerts reset at 08:19 AM IST'
+                });
+                console.log('✅ [CRON 08:19 AM] Broadcasted purge_daily_alerts to all connected clients.');
+            }
+        } catch (err) {
+            console.error('❌ [CRON 08:19 AM] Alert purge broadcast error:', err.message);
+        }
+    }, TZ);
+
     // 🗓️ 00:05 AM IST on 1st of Every Month: Synchronize Database Monthly Partitions
     cron.schedule('5 0 1 * *', async () => {
         try {

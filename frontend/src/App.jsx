@@ -4,6 +4,7 @@ import MarketWatch from './components/MarketWatch';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
+import { playTargetHitSound } from './utils/soundManager';
 
 // ⚡ Resilient Lazy Loader: Auto-reloads on deployment chunk hash changes
 const lazyWithRetry = (importFn) => lazy(async () => {
@@ -188,12 +189,28 @@ const ActiveAlertChecker = React.memo(() => {
     return map;
   }));
 
+  // Ensure active alert symbols are actively streaming ticks and have current price snapshots
+  useEffect(() => {
+    if (activeAlertSymbols.length > 0) {
+      const { subscribeToSymbol, fetchBatchPrices, pingSubscriptions } = useStore.getState();
+      activeAlertSymbols.forEach(sym => {
+        if (typeof subscribeToSymbol === 'function') subscribeToSymbol(sym);
+      });
+      if (typeof fetchBatchPrices === 'function') {
+        fetchBatchPrices(activeAlertSymbols);
+      }
+      if (typeof pingSubscriptions === 'function') {
+        pingSubscriptions();
+      }
+    }
+  }, [activeAlertSymbols]);
+
   useEffect(() => {
     if (!alerts || alerts.length === 0) return;
     const activeAlerts = alerts.filter(a => !a.triggered);
     activeAlerts.forEach(alert => {
       const clean = alert.symbol.includes(':') ? alert.symbol.split(':')[1] : alert.symbol;
-      const priceData = alertPrices[alert.symbol] || alertPrices[clean];
+      const priceData = alertPrices[alert.symbol] || alertPrices[clean] || alertPrices[`NSE:${clean}`] || alertPrices[`BSE:${clean}`] || alertPrices[`MCX:${clean}`];
       if (!priceData) return;
       
       const ltp = parseFloat(priceData.ltp || 0);
@@ -210,8 +227,9 @@ const ActiveAlertChecker = React.memo(() => {
       
       if (triggered) {
         updateAlert(alert.id, { triggered: true, triggeredAt: new Date().toISOString(), triggerPrice: ltp });
+        try { playTargetHitSound(); } catch (_) {}
         useStore.getState().showToast(
-          `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
+          `${alert.symbol} reached target ₹${alert.targetPrice} (${alert.condition.toLowerCase()} trigger). Current price: ₹${ltp.toFixed(2)}`,
           'info',
           '🚨 Price Alert Triggered!'
         );
@@ -250,7 +268,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
 
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
@@ -483,7 +501,7 @@ function App() {
 
   // Initialise socket and start polling
   useEffect(() => {
-    clearOldAlerts();
+    purgeStaleDailyAlerts();
     initSocket();
     if (user) fetchUserData();
     refreshPrices();

@@ -6,6 +6,7 @@ import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from '.
 import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
 import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
 import { setAppLocked } from './utils/biometricAuth';
+import { filterStaleAlerts } from './utils/alertUtils';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -611,9 +612,17 @@ export const useStore = create(persist((set, get) => ({
   setMarketDepthData: (data) => set({ marketDepthData: data }),
 
   alerts: [],
-  addAlert: (alert) => set((state) => ({ 
-    alerts: [...state.alerts, { ...alert, id: Date.now().toString(), triggered: false, createdAt: new Date().toISOString() }] 
-  })),
+  addAlert: (alert) => {
+    const sym = alert.symbol;
+    if (sym) {
+      if (typeof get().subscribeToSymbol === 'function') get().subscribeToSymbol(sym);
+      if (typeof get().fetchBatchPrices === 'function') get().fetchBatchPrices([sym]);
+      if (typeof get().pingSubscriptions === 'function') get().pingSubscriptions();
+    }
+    set((state) => ({ 
+      alerts: [...state.alerts, { ...alert, id: Date.now().toString(), triggered: false, createdAt: new Date().toISOString() }] 
+    }));
+  },
   removeAlert: (id) => set((state) => ({ alerts: state.alerts.filter(a => a.id !== id) })),
   updateAlert: (id, updates) => set((state) => ({ 
     alerts: state.alerts.map(a => a.id === id ? { ...a, ...updates } : a) 
@@ -624,6 +633,10 @@ export const useStore = create(persist((set, get) => ({
       alerts: state.alerts.filter(a => !a.triggered && a.status !== 'TRIGGERED')
     };
   }),
+  purgeDailyAlerts: () => set({ alerts: [] }),
+  purgeStaleDailyAlerts: () => set((state) => ({
+    alerts: filterStaleAlerts(state.alerts)
+  })),
   
   alertModalSymbol: null,
   setAlertModalSymbol: (symbol) => set({ alertModalSymbol: symbol }),
@@ -750,6 +763,16 @@ export const useStore = create(persist((set, get) => ({
 
     if (selectedSymbol) {
       symbols.add(selectedSymbol);
+    }
+
+    // Add active alert symbols so price ticks always stream even if instrument is not on active watchlist
+    const alerts = get().alerts;
+    if (alerts && alerts.length > 0) {
+      alerts.forEach(a => {
+        if (!a.triggered && a.symbol) {
+          symbols.add(a.symbol);
+        }
+      });
     }
     
     // Add temporary options
@@ -981,6 +1004,12 @@ export const useStore = create(persist((set, get) => ({
     socket.off('broadcast_notifications_refreshed');
     socket.on('broadcast_notifications_refreshed', () => {
       get().fetchBroadcastNotifications();
+    });
+
+    socket.off('purge_daily_alerts');
+    socket.on('purge_daily_alerts', (data) => {
+      console.log('🌅 [SOCKET] 08:19 AM Daily alerts purge received:', data);
+      set({ alerts: [] });
     });
 
     socket.off('trade_alert');
@@ -1232,7 +1261,8 @@ export const useStore = create(persist((set, get) => ({
         
         const posSymbols = get().positions.map(p => p.symbol);
         const holdSymbols = get().holdings.map(h => h.symbol);
-        const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
+        const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
+        const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols, ...alertSymbols])];
         if (allSymbolsToSubscribe.length > 0) {
           if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
           const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));
