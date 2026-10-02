@@ -938,9 +938,20 @@ export const useStore = create(persist((set, get) => ({
     });
 
     socket.off('market_calendar_updated');
-    socket.on('market_calendar_updated', () => {
-      get().fetchMarketCalendar();
-      get().fetchTodayMarketSchedule();
+    socket.on('market_calendar_updated', (payload) => {
+      if (payload && payload.date) {
+        const dStr = typeof payload.date === 'string' ? payload.date.split('T')[0] : payload.date;
+        const current = get().marketCalendar || [];
+        if (payload.deleted) {
+          set({ marketCalendar: current.filter(r => (r.date || '').split('T')[0] !== dStr) });
+        } else {
+          const next = current.filter(r => (r.date || '').split('T')[0] !== dStr).concat({ ...payload, date: dStr });
+          next.sort((a, b) => ((a.date || '') > (b.date || '') ? 1 : -1));
+          set({ marketCalendar: next });
+        }
+      }
+      get().fetchMarketCalendar(null, true);
+      get().fetchTodayMarketSchedule(true);
     });
 
     socket.off('announcement_update');
@@ -2676,7 +2687,7 @@ export const useStore = create(persist((set, get) => ({
 
   fetchMarketCalendar: async (month, force = false) => {
     const now = Date.now();
-    if (!month && !force && (now - (get()._lastMarketCalendarFetch || 0) < 300000) && get().marketCalendar.length > 0) {
+    if (!month && !force && (now - (get()._lastMarketCalendarFetch || 0) < 60000) && get().marketCalendar.length > 0) {
       return get().marketCalendar;
     }
     try {
@@ -2684,18 +2695,24 @@ export const useStore = create(persist((set, get) => ({
       const res = await fetch(url);
       const data = await res.json();
       if (data && data.success) {
-        set({ marketCalendar: data.calendar || [], _lastMarketCalendarFetch: now });
-        return data.calendar || [];
+        const rawCalendar = data.calendar || [];
+        const normalized = rawCalendar.map(r => ({
+          ...r,
+          date: typeof r.date === 'string' ? r.date.split('T')[0] : r.date
+        }));
+        normalized.sort((a, b) => ((a.date || '') > (b.date || '') ? 1 : -1));
+        set({ marketCalendar: normalized, _lastMarketCalendarFetch: now });
+        return normalized;
       }
     } catch (e) {
       console.error('fetchMarketCalendar error', e);
     }
-    return [];
+    return get().marketCalendar || [];
   },
 
   fetchTodayMarketSchedule: async (force = false) => {
     const now = Date.now();
-    if (!force && (now - (get()._lastTodayScheduleFetch || 0) < 300000) && get().todayMarketSchedule) {
+    if (!force && (now - (get()._lastTodayScheduleFetch || 0) < 60000) && get().todayMarketSchedule) {
       return get().todayMarketSchedule;
     }
     try {
@@ -2706,7 +2723,7 @@ export const useStore = create(persist((set, get) => ({
         return data;
       }
     } catch (e) {}
-    return null;
+    return get().todayMarketSchedule;
   },
 
   saveMarketCalendarDate: async (entry) => {
@@ -2722,9 +2739,18 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data && data.success) {
-        get().fetchMarketCalendar();
-        get().fetchTodayMarketSchedule();
-        return { success: true };
+        const savedEntry = data.entry || entry;
+        const dStr = typeof savedEntry.date === 'string' ? savedEntry.date.split('T')[0] : savedEntry.date;
+        const normalizedEntry = { ...savedEntry, date: dStr };
+        const current = get().marketCalendar || [];
+        const next = current.filter(r => (r.date || '').split('T')[0] !== dStr).concat(normalizedEntry);
+        next.sort((a, b) => ((a.date || '') > (b.date || '') ? 1 : -1));
+        set({ marketCalendar: next, _lastMarketCalendarFetch: Date.now() });
+
+        // Force fetch fresh from server to ensure 100% parity
+        get().fetchMarketCalendar(null, true);
+        get().fetchTodayMarketSchedule(true);
+        return { success: true, entry: normalizedEntry };
       }
       return { success: false, error: data?.error || 'Failed to save calendar rule' };
     } catch (e) {
@@ -2743,8 +2769,14 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data && data.success) {
-        get().fetchMarketCalendar();
-        get().fetchTodayMarketSchedule();
+        const dStr = typeof date === 'string' ? date.split('T')[0] : date;
+        const current = get().marketCalendar || [];
+        const next = current.filter(r => (r.date || '').split('T')[0] !== dStr);
+        set({ marketCalendar: next, _lastMarketCalendarFetch: Date.now() });
+
+        // Force fetch fresh from server to ensure 100% parity
+        get().fetchMarketCalendar(null, true);
+        get().fetchTodayMarketSchedule(true);
         return { success: true };
       }
       return { success: false, error: data?.error || 'Failed to delete calendar rule' };
@@ -2764,8 +2796,8 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data && data.success) {
-        get().fetchMarketCalendar();
-        get().fetchTodayMarketSchedule();
+        await get().fetchMarketCalendar(null, true);
+        await get().fetchTodayMarketSchedule(true);
         return { success: true, count: data.count };
       }
       return { success: false, error: data?.error || 'Failed to seed holidays' };

@@ -537,7 +537,7 @@ function MarketCalendarTab({ isMobile }) {
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
 
   useEffect(() => {
-    fetchMarketCalendar?.();
+    fetchMarketCalendar?.(null, true);
   }, [monthStr]);
 
   const monthNames = [
@@ -563,7 +563,11 @@ function MarketCalendarTab({ isMobile }) {
   const calendarMap = React.useMemo(() => {
     const map = {};
     (marketCalendar || []).forEach(rule => {
-      map[rule.date] = rule;
+      if (rule && rule.date) {
+        const dStr = typeof rule.date === 'string' ? rule.date.split('T')[0] : rule.date;
+        map[dStr] = rule;
+        map[rule.date] = rule;
+      }
     });
     return map;
   }, [marketCalendar]);
@@ -763,6 +767,23 @@ function MarketCalendarTab({ isMobile }) {
               }}
             >
               📋 Scheduled Rules ({(marketCalendar || []).length})
+            </button>
+            <button
+              onClick={() => fetchMarketCalendar?.(null, true)}
+              title="Refresh Market Calendar"
+              style={{
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              🔄
             </button>
           </div>
         </div>

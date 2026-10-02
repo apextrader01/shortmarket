@@ -262,7 +262,8 @@ async function loadMarketCalendarFromDb() {
     const rows = await db('market_calendar').select('*');
     marketCalendarCache.clear();
     rows.forEach(r => {
-      marketCalendarCache.set(r.date, r);
+      const dStr = typeof r.date === 'string' ? r.date.split('T')[0] : (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date));
+      marketCalendarCache.set(dStr, { ...r, date: dStr });
     });
     console.log(`📅 Loaded ${marketCalendarCache.size} rules into Market Calendar Cache`);
   } catch (e) {
@@ -4350,7 +4351,11 @@ app.get('/api/market-calendar', async (req, res) => {
       query = query.whereRaw('date LIKE ?', [`${month}%`]);
     }
     const rows = await query;
-    res.json({ success: true, calendar: rows });
+    const formatted = rows.map(r => ({
+      ...r,
+      date: typeof r.date === 'string' ? r.date.split('T')[0] : (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date))
+    }));
+    res.json({ success: true, calendar: formatted });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
