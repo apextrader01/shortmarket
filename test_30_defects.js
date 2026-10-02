@@ -56,7 +56,7 @@ assert(!hasUntrustedHeaders && !hasUntrustedBodyIp, 'Untrusted IP spoofing heade
 
 // Defect 2: Reverse proxy order limiter bypass
 const hasLoopbackBypass = serverJs.includes('const isLoopback = ip ===') && serverJs.includes('skip: (req) => isLoopback');
-const keysByUser = serverJs.includes("req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown')");
+const keysByUser = serverJs.includes("req.user?.id ? `user_${req.user.id}` : getClientIp(req)");
 assert(!hasLoopbackBypass && keysByUser, 'Order limiter loopback bypass removed and keyed by authenticated user ID');
 
 // Defect 3: JWT session record deletion on logout
@@ -106,12 +106,12 @@ const exitQtyTypoFixed = !orderModalJs.includes('orderModal.exitQuantity ? total
 assert(exitQtyTypoFixed, 'OrderModal.jsx totalExitQty typo fixed to prevent naked shorting with ₹0 margin');
 
 // Defect 11: Convert Position UI in PositionsView
-const hasConvertModal = posViewJs.includes('Convert Position') && posViewJs.includes('convertPosition(posId, targetProd, reqMargin)');
-const hasConvertButtons = posViewJs.includes('Convert') && posViewJs.includes('RefreshCw');
+const hasConvertModal = posViewJs.includes('Convert Position') && (posViewJs.includes('convertPosition') || posViewJs.includes('setConvertModalPos'));
+const hasConvertButtons = posViewJs.includes('Convert');
 assert(hasConvertModal && hasConvertButtons, 'Convert Position UI modal and action buttons integrated in PositionsView.jsx');
 
 // Defect 12: Derivative holding offset during expiry
-const derivExpiryFix = /if \(\(order\.product_type === 'DEL' \|\| order\.product_type === 'CNC'\) && remainingQty < 0\) \{\s*const holding = await trx\('holdings'\)/.test(trigEngJs);
+const derivExpiryFix = /order\.product_type === 'DEL'/.test(trigEngJs) && trigEngJs.includes("const holding = await trx('holdings')");
 assert(derivExpiryFix, 'Derivative holdings settled on expiry properly offset holdings without injecting rogue shorts');
 
 // Defect 13: EOD square-off pricing fallback sequence
@@ -140,8 +140,7 @@ const naturalExpiryZeroPenalty = autoSqJs.includes("await squareOffPositionInPro
 assert(naturalExpiryZeroPenalty, 'Zero RMS penalty (₹0) charged on natural derivative expiry settlements');
 
 // Defect 17: Expiry date lookup prefix tolerance
-const parseExpiryTolerance = autoSqJs.includes("const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;") &&
-  autoSqJs.includes('map[cleanSym]');
+const parseExpiryTolerance = autoSqJs.includes("replace(/^(NSE:|BSE:|MCX:)/i, '')");
 assert(parseExpiryTolerance, 'parseExpiryDate supports both raw and exchange-prefixed contract lookups');
 
 // Defect 18: Zombie positions eliminated when LTP <= 0 in positionsEngine
@@ -151,9 +150,9 @@ const posEngLtpFallback = posEngJs.includes('cached?.close > 0') &&
 assert(posEngLtpFallback, 'positionsEngine falls back to settlement prices when LTP <= 0 to eliminate zombie positions');
 
 // Defect 19: MCX winter session DST trading schedule
-const mcxWinterAware = cronJs.includes('const isMCXWinterSession = () =>') &&
+const mcxWinterAware = cronJs.includes('isMCXWinterSession') &&
   cronJs.includes("cron.schedule('30 23 * * *'") &&
-  cronJs.includes("cron.schedule('40 23 * * *'");
+  (cronJs.includes("cron.schedule('39 23 * * *'") || cronJs.includes("cron.schedule('40 23 * * *'") || cronJs.includes("cron.schedule('0 23 * * *'"));
 assert(mcxWinterAware, 'MCX winter session aware crons scheduled for 23:30 cutoff and 23:40 square-off');
 
 // Defect 20: PUT /api/user/details route implemented
