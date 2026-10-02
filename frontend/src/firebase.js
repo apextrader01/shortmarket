@@ -5,7 +5,7 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "skandx-1020f.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "skandx-1020f",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "skandx-1020f.firebasestorage.app",

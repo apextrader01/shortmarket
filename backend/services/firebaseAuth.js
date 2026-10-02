@@ -3,7 +3,7 @@ const fs = require('fs');
 
 let admin = null;
 let authInstance = null;
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I';
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I';
 
 try {
   admin = require('firebase-admin');
@@ -196,7 +196,7 @@ try {
 } catch (_) {}
 
 /**
- * Send branded HTML verification email via Gmail SMTP or fallback to EmailJS
+ * Send branded HTML verification email via Gmail SMTP
  */
 async function sendEmailOtpViaService(email, code) {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
