@@ -3,7 +3,7 @@ const fs = require('fs');
 
 let admin = null;
 let authInstance = null;
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I';
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyA3MUmCRRKbiXZUc9W37wXoHa_elo2hcUI';
 
 try {
   admin = require('firebase-admin');
@@ -126,6 +126,51 @@ async function sendFirebasePasswordReset(email) {
 }
 
 /**
+ * Send official Email Verification message via Firebase's Mail Service
+ */
+async function sendFirebaseVerificationEmail(email) {
+  if (!email) throw new Error('Email is required');
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  // 1. Ensure user exists in Firebase Auth
+  const user = await ensureFirebaseUser(cleanEmail);
+  if (!user || !user.uid) throw new Error('Could not create or find Firebase user for ' + cleanEmail);
+
+  if (!authInstance) throw new Error('Firebase Admin Auth instance not initialized');
+
+  // 2. Mint custom token and exchange for idToken to trigger official verify email
+  const customToken = await authInstance.createCustomToken(user.uid);
+  const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_WEB_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: customToken, returnSecureToken: true })
+  });
+  const signInData = await signInRes.json();
+  if (!signInData.idToken) {
+    throw new Error('Failed to acquire Firebase ID token: ' + (signInData.error?.message || JSON.stringify(signInData)));
+  }
+
+  // 3. Dispatch official Firebase verification email via Google Identity Toolkit REST API
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestType: 'VERIFY_EMAIL',
+      idToken: signInData.idToken
+    })
+  });
+
+  const data = await response.json();
+  if (data.error) {
+    console.error('[FIREBASE AUTH] sendOobCode VERIFY_EMAIL failed:', data.error);
+    throw new Error(data.error.message || 'Firebase failed to dispatch verification email');
+  }
+
+  console.log(`[FIREBASE AUTH] Official verification email dispatched to ${cleanEmail} via Firebase Identity Toolkit`);
+  return { success: true, email: cleanEmail };
+}
+
+/**
  * Synchronize newly updated password into Firebase Auth
  */
 async function syncFirebaseUserPassword(email, newPassword) {
@@ -223,55 +268,8 @@ async function sendEmailOtpViaService(email, code) {
     }
   }
 
-  // 2. Secondary Fallback: EmailJS
-  const serviceId = process.env.EMAILJS_SERVICE_ID;
-  const templateId = process.env.EMAILJS_TEMPLATE_ID;
-  const userId = process.env.EMAILJS_USER_ID;
-  const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
-
-  if (!serviceId || !templateId || !userId || !accessToken) {
-    console.warn('[TRANSACTIONAL EMAIL] Missing email delivery configuration (neither Gmail SMTP nor EmailJS configured).');
-    return false;
-  }
-
-  const emailData = {
-    service_id: serviceId,
-    template_id: templateId,
-    user_id: userId,
-    accessToken: accessToken,
-    template_params: {
-      to_email: email,
-      user_email: email,
-      email: email,
-      to_name: email.split('@')[0],
-      name: email.split('@')[0],
-      otp: code,
-      otp_code: code,
-      passcode: code,
-      code: code,
-      message: `Your SkandX verification code is: ${code}. This code is valid for 10 minutes. Do not share it with anyone.`
-    }
-  };
-
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailData)
-      });
-      if (res.ok) {
-        console.log(`[TRANSACTIONAL EMAIL] Login OTP email successfully dispatched to ${email} (via EmailJS)`);
-        return true;
-      } else {
-        const errText = await res.text();
-        console.warn(`[TRANSACTIONAL EMAIL] EmailJS attempt ${attempt} response ${res.status}: ${errText}`);
-      }
-    } catch (err) {
-      console.warn(`[TRANSACTIONAL EMAIL] EmailJS attempt ${attempt} error:`, err.message, err.cause?.code || '');
-      if (attempt < 2) await new Promise(r => setTimeout(r, 600));
-    }
-  }
+  // 2. Fallback: Log info if Gmail SMTP credentials are not yet set
+  console.log(`[EMAIL DISPATCH] Gmail SMTP not configured in .env (GMAIL_USER / GMAIL_APP_PASSWORD). To deliver branded 6-digit HTML OTPs directly via Google, please set these credentials in .env.`);
   return false;
 }
 
@@ -282,48 +280,27 @@ async function sendFirebaseLoginEmail(email, code = null) {
   if (!email) throw new Error('Email is required');
   const cleanEmail = String(email).trim().toLowerCase();
 
-  // 1. Deliver the 6-digit numeric OTP directly to the user's inbox IMMEDIATELY
+  // 1. Deliver official verification/sign-in notification via Firebase
+  try {
+    await sendFirebaseVerificationEmail(cleanEmail);
+  } catch (fbErr) {
+    console.warn('[FIREBASE AUTH] sendFirebaseLoginEmail note:', fbErr.message);
+  }
+
+  // 2. Deliver branded 6-digit numeric OTP via Google/Gmail SMTP if configured
   let emailSent = false;
   if (code) {
     emailSent = await sendEmailOtpViaService(cleanEmail, code);
   }
 
-  // Non-blocking user sync for Firebase
-  ensureFirebaseUser(cleanEmail).catch(() => {});
-
-  // 2. Try sending Firebase Email Sign-In link if provider is enabled
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        requestType: 'EMAIL_SIGNIN',
-        email: cleanEmail,
-        continueUrl: 'https://www.skandx.in/login?email=' + encodeURIComponent(cleanEmail)
-      })
-    });
-    clearTimeout(timeoutId);
-    const data = await response.json();
-    if (!data.error) {
-      console.log(`[FIREBASE AUTH] Sign-in email link dispatched to ${cleanEmail}`);
-      return { success: true, method: 'EMAIL_LINK', email: cleanEmail, code, emailSent: true };
-    }
-  } catch (err) {
-    // Non-fatal if passwordless sign-in link is disabled
-  }
-
-  // Return code status
-  return { success: true, method: 'OTP', email: cleanEmail, code, emailSent };
+  return { success: true, method: 'FIREBASE_AUTH', email: cleanEmail, code, emailSent };
 }
 
 /**
  * Verify Firebase Phone Authentication ID token
  * Returns decoded token { uid, phone_number, ... } if valid, or null if unconfigured
  */
-async function verifyFirebasePhoneToken(idToken, submittedPhone) {
+async function verifyFirebasePhoneToken(idToken, submittedPhone = null, submittedEmail = null) {
   if (!idToken) return { verified: false, reason: 'Missing verification token' };
 
   if (!authInstance) {
@@ -338,11 +315,19 @@ async function verifyFirebasePhoneToken(idToken, submittedPhone) {
     const tokenPhone = String(decoded.phone_number || '').replace(/\D/g, '');
     const cleanPhone = String(submittedPhone || '').replace(/\D/g, '');
 
-    if (tokenPhone && cleanPhone && !tokenPhone.endsWith(cleanPhone) && !cleanPhone.endsWith(tokenPhone)) {
-      return { verified: false, reason: 'Phone number does not match OTP token verification.' };
+    if (tokenPhone && cleanPhone && (tokenPhone.endsWith(cleanPhone) || cleanPhone.endsWith(tokenPhone))) {
+      return { verified: true, decoded };
     }
 
-    return { verified: true, decoded };
+    if (submittedEmail && decoded.email && decoded.email.toLowerCase().trim() === String(submittedEmail).toLowerCase().trim()) {
+      return { verified: true, decoded };
+    }
+
+    if (!cleanPhone && decoded.uid) {
+      return { verified: true, decoded };
+    }
+
+    return { verified: false, reason: 'Verification token does not match registered phone number or email.' };
   } catch (err) {
     console.error('[FIREBASE AUTH] Token verification error:', err.message);
     return { verified: false, reason: err.message || 'Expired or invalid token' };
@@ -375,6 +360,7 @@ module.exports = {
   getFirebaseAdminAuth,
   ensureFirebaseUser,
   sendFirebasePasswordReset,
+  sendFirebaseVerificationEmail,
   syncFirebaseUserPassword,
   sendFirebaseLoginEmail,
   sendEmailOtpViaService,

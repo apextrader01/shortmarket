@@ -1067,7 +1067,18 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
     registrationOtps.set(cleanEmail, { otp, phone: cleanPhone, expires });
     console.log(`[REGISTRATION OTP] 🔑 Code for ${cleanEmail} (+91 ${cleanPhone}): ${otp}`);
 
-    // Deliver via Email
+    // 1. Deliver official verification email via Firebase Identity Toolkit
+    try {
+      const { sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
+      if (typeof sendFirebaseVerificationEmail === 'function') {
+        await sendFirebaseVerificationEmail(cleanEmail);
+        console.log(`[REGISTRATION] Official Firebase verification email dispatched to ${cleanEmail}`);
+      }
+    } catch(fbErr) {
+      console.warn('[REGISTRATION] Firebase email dispatch note:', fbErr.message);
+    }
+
+    // 2. Deliver branded 6-digit verification code via Gmail SMTP (if configured)
     try {
       const { sendEmailOtpViaService } = require('./services/firebaseAuth');
       if (typeof sendEmailOtpViaService === 'function') {
@@ -1113,9 +1124,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
     registrationOtps.delete(cleanEmail);
   } else if (firebase_token) {
-    const tokenCheck = await verifyFirebasePhoneToken(firebase_token, cleanPhone);
+    const tokenCheck = await verifyFirebasePhoneToken(firebase_token, cleanPhone, cleanEmail);
     if (!tokenCheck.verified) {
-      return res.status(403).json({ error: tokenCheck.reason || 'Invalid or unverified phone authorization token.' });
+      return res.status(403).json({ error: tokenCheck.reason || 'Invalid or unverified authorization token.' });
     }
   } else {
     return res.status(400).json({ error: 'Identity verification required. Please enter the verification code sent to your phone or email.' });
