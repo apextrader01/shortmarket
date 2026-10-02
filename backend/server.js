@@ -1254,7 +1254,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     try {
       const { ensureFirebaseUser, sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
       if (typeof ensureFirebaseUser === 'function') {
-        await ensureFirebaseUser(cleanEmail, cleanPhone);
+        await ensureFirebaseUser(cleanEmail, cleanPhone, password);
       }
       if (typeof sendFirebaseVerificationEmail === 'function') {
         await sendFirebaseVerificationEmail(cleanEmail);
@@ -1308,24 +1308,59 @@ app.post('/api/auth/resend-verification-email', authLimiter, async (req, res) =>
 
 // ─── Password Verification & Firebase Sync Helper ─────────────────────────
 async function verifyUserPasswordWithFallback(user, password) {
-  if (!user || !user.password_hash || !password) return false;
-  let valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid && user.email) {
+  if (!user || !password) return false;
+
+  const isGoogleReviewTester = Boolean(
+    user.email && (
+      user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' ||
+      user.email.toLowerCase().trim() === 'demo@skandx.in'
+    )
+  );
+
+  // 1. Firebase Auth is the primary authority for registered email accounts (non-admin, non-tester)
+  if (user.email && !user.is_admin && !isGoogleReviewTester) {
     try {
       const { verifyFirebasePassword } = require('./services/firebaseAuth');
       const fbCheck = await verifyFirebasePassword(user.email, password);
+
       if (fbCheck && fbCheck.success) {
-        valid = true;
-        const newHash = await bcrypt.hash(password, 10);
-        await db('users').where({ id: user.id }).update({ password_hash: newHash });
-        user.password_hash = newHash;
-        console.log(`[AUTH] Synced new Firebase password to PostgreSQL for ${user.email}`);
+        // Password is correct in Firebase Auth!
+        // Sync new password hash into local PostgreSQL so DB hash stays up-to-date
+        try {
+          const newHash = await bcrypt.hash(password, 10);
+          await db('users').where({ id: user.id }).update({ password_hash: newHash });
+          user.password_hash = newHash;
+          console.log(`[AUTH] Synced new Firebase password to PostgreSQL for ${user.email}`);
+        } catch (hashErr) {
+          console.warn('[AUTH] Error syncing hash to PostgreSQL:', hashErr.message);
+        }
+        return true;
+      }
+
+      // Explicitly reject if Firebase Auth reported incorrect password or credentials
+      // This strictly blocks old / revoked passwords after an email password reset!
+      if (fbCheck && (fbCheck.error === 'INVALID_LOGIN_CREDENTIALS' || fbCheck.error === 'INVALID_PASSWORD')) {
+        console.warn(`[AUTH] Strictly rejected invalid/revoked password for ${user.email} via Firebase Auth`);
+        return false;
       }
     } catch (fbErr) {
-      console.warn('[AUTH] Firebase password fallback check note:', fbErr.message);
+      console.warn('[AUTH] Firebase password check exception, falling back to local hash:', fbErr.message);
     }
   }
-  return valid;
+
+  // 2. Fallback to local bcrypt (admins, test accounts, offline fallback, or legacy accounts)
+  if (user.password_hash) {
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (valid && user.email && !user.is_admin && !isGoogleReviewTester) {
+      try {
+        const { ensureFirebaseUser } = require('./services/firebaseAuth');
+        ensureFirebaseUser(user.email, user.phone, password).catch(() => {});
+      } catch (_) {}
+    }
+    return valid;
+  }
+
+  return false;
 }
 
 // ─── 2FA & Authentication with 30-Day Device Trust ──────────────────────────
@@ -1676,7 +1711,7 @@ app.post('/api/user/totp/disable', authenticateToken, async (req, res) => {
   try {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid password' });
 
     await db('users').where({ id: req.user.id }).update({
@@ -2852,12 +2887,17 @@ app.post('/api/user/password', authenticateToken, async (req, res) => {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    const valid = await bcrypt.compare(oldPassword, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, oldPassword);
     if (!valid) return res.status(400).json({ error: 'Incorrect old password' });
     
     const newHash = await bcrypt.hash(newPassword, 10);
     await db('users').where({ id: req.user.id }).update({ password_hash: newHash });
     
+    try {
+      const { syncFirebaseUserPassword } = require('./services/firebaseAuth');
+      await syncFirebaseUserPassword(user.email, newPassword);
+    } catch (_) {}
+
     // Revoke all active sessions for this user across all devices to prevent unauthorized access
     await db('user_sessions').where({ user_id: req.user.id }).del().catch(() => {});
     

@@ -80,7 +80,7 @@ function getFirebaseAdminAuth() {
  * Ensure user exists in Firebase Auth.
  * If user does not exist, creates the user account in Firebase.
  */
-async function ensureFirebaseUser(email, phone = null) {
+async function ensureFirebaseUser(email, phone = null, password = null) {
   if (!email) return null;
   const cleanEmail = String(email).trim().toLowerCase();
   const auth = getFirebaseAdminAuth();
@@ -88,11 +88,15 @@ async function ensureFirebaseUser(email, phone = null) {
 
   try {
     const existing = await auth.getUserByEmail(cleanEmail);
+    if (password) {
+      await auth.updateUser(existing.uid, { password }).catch(() => {});
+    }
     return existing;
   } catch (err) {
     if (err.code === 'auth/user-not-found') {
       try {
         const createPayload = { email: cleanEmail };
+        if (password) createPayload.password = password;
         if (phone) {
           const cleanPhone = String(phone).replace(/\D/g, '');
           if (cleanPhone.length >= 10) {
@@ -105,7 +109,9 @@ async function ensureFirebaseUser(email, phone = null) {
       } catch (createErr) {
         // If phone already exists on another account, create without phone
         if (createErr.code === 'auth/phone-number-already-exists') {
-          const created = await auth.createUser({ email: cleanEmail });
+          const createPayload = { email: cleanEmail };
+          if (password) createPayload.password = password;
+          const created = await auth.createUser(createPayload);
           return created;
         }
         console.warn(`[FIREBASE AUTH] Could not create Firebase user for ${cleanEmail}:`, createErr.message);
@@ -202,13 +208,15 @@ async function sendFirebaseVerificationEmail(email) {
  * Synchronize newly updated password into Firebase Auth
  */
 async function syncFirebaseUserPassword(email, newPassword) {
-  if (!email || !newPassword || !authInstance) return false;
+  if (!email || !newPassword) return false;
+  const auth = getFirebaseAdminAuth();
+  if (!auth) return false;
   const cleanEmail = String(email).trim().toLowerCase();
 
   try {
-    const user = await ensureFirebaseUser(cleanEmail);
+    const user = await ensureFirebaseUser(cleanEmail, null, newPassword);
     if (user && user.uid) {
-      await authInstance.updateUser(user.uid, { password: newPassword });
+      await auth.updateUser(user.uid, { password: newPassword });
       console.log(`[FIREBASE AUTH] Password updated in Firebase Auth for ${cleanEmail}`);
       return true;
     }
