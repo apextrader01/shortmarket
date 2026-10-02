@@ -1106,6 +1106,7 @@ export const useStore = create(persist((set, get) => ({
 
         let positions, orders, user, holdData, sipsList;
         let authFailed = false;
+        let isAccountDeleted = false;
 
         try {
           const bootRes = await fetch(`${API}/api/user/bootstrap`, { credentials: 'include', headers });
@@ -1116,15 +1117,19 @@ export const useStore = create(persist((set, get) => ({
             orders = data.orders;
             holdData = data.holdings;
             sipsList = data.sips;
-          } else if (bootRes.status === 401 || bootRes.status === 403) {
+          } else if (bootRes.status === 401 || bootRes.status === 403 || bootRes.status === 404) {
             authFailed = true;
+            const bData = await bootRes.json().catch(() => ({}));
+            if (bData?.account_deleted || bootRes.status === 404 || bootRes.status === 401) {
+              isAccountDeleted = true;
+            }
           }
         } catch (_) {
           // Network or parsing error on bootstrap, will fallback below
         }
 
         // Graceful Fallback to individual requests if bootstrap endpoint fails or returns error
-        if (!user) {
+        if (!user && !isAccountDeleted) {
           try {
             const userRes = await fetch(`${API}/api/user`, { credentials: 'include', headers });
             if (userRes.ok) {
@@ -1149,13 +1154,20 @@ export const useStore = create(persist((set, get) => ({
                 holdData = hData;
                 sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
               }
-            } else if (userRes.status === 401 || userRes.status === 403) {
+            } else if (userRes.status === 401 || userRes.status === 403 || userRes.status === 404) {
               authFailed = true;
+              isAccountDeleted = true;
             }
           } catch (_) {}
         }
         
-        // Handle authentication failure: prompt session expiry if previously logged in
+        // Handle authentication failure: instant logout if account deleted, prompt session expiry if temporary
+        if (isAccountDeleted) {
+          console.warn("User account not found or permanently deleted. Wiping local session.");
+          get().logout();
+          return;
+        }
+
         if (authFailed) {
           if (!user && !get().user) {
             console.error("Auth definitively failed during fetchUserData, logging out.");
@@ -1676,6 +1688,9 @@ export const useStore = create(persist((set, get) => ({
           message: slices && slices.length > 1 ? `Successfully placed order (${quantity} total qty across ${slices.length} exchange freeze slices)` : (data.message || 'Order placed successfully')
         };
       }
+      if (res.status === 401 && (data?.account_deleted || data?.error?.toLowerCase().includes('deleted') || data?.error?.toLowerCase().includes('not found'))) {
+        get().logout();
+      }
       console.error('[placeOrder FAILED]', data);
       return { success: false, error: data.error || 'Order failed' };
     } catch (err) { 
@@ -1691,6 +1706,9 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) { get().fetchUserData(); return data; }
+      if (res.status === 401 && (data?.account_deleted || data?.error?.toLowerCase().includes('deleted') || data?.error?.toLowerCase().includes('not found'))) {
+        get().logout();
+      }
       console.error('[setupSip FAILED]', data);
       return data;
     } catch (err) {

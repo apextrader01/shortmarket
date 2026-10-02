@@ -86,21 +86,27 @@ async function authenticateToken(req, res, next) {
   const user = authResult.user;
   const token = activeToken;
 
-  // Check if user is banned (cached for 60 seconds to eliminate DB query on every HTTP request)
+  // Check if user is banned or deleted (cached for 60 seconds to eliminate DB query on every HTTP request)
   try {
     const now = Date.now();
     let cachedBan = banCache.get(user.id);
     if (!cachedBan || (now - cachedBan.ts > 60000)) {
-      const dbUser = await db('users').select('is_banned').where({ id: user.id }).first();
-      cachedBan = { is_banned: !!(dbUser && dbUser.is_banned), ts: now };
+      const dbUser = await db('users').select('id', 'is_banned').where({ id: user.id }).first();
+      cachedBan = { exists: !!dbUser, is_banned: !!(dbUser && dbUser.is_banned), ts: now };
       if (banCache.size > 10000) banCache.clear();
       banCache.set(user.id, cachedBan);
+    }
+    if (!cachedBan.exists) {
+      return res.status(401).json({ error: 'User account has been deleted or does not exist.', account_deleted: true });
     }
     if (cachedBan && cachedBan.is_banned) {
       return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
     }
   } catch (e) {
     const fallbackBan = banCache.get(user.id);
+    if (fallbackBan && !fallbackBan.exists) {
+      return res.status(401).json({ error: 'User account has been deleted or does not exist.', account_deleted: true });
+    }
     if (fallbackBan && fallbackBan.is_banned) {
       return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
     }
@@ -239,4 +245,4 @@ async function requireAdmin(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken, requireAdmin, JWT_SECRET, hashToken };
+module.exports = { authenticateToken, requireAdmin, JWT_SECRET, hashToken, banCache };

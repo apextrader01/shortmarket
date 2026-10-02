@@ -2155,7 +2155,7 @@ app.get('/api/debug-db', authenticateToken, async (req, res) => {
 app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await db('users').where({ id: req.user.id }).first();
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(401).json({ error: 'User account not found or has been deleted.', account_deleted: true });
     delete user.password_hash;
     if (!user.client_id) {
       user.client_id = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
@@ -2230,7 +2230,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
 
     const ordersRows = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-    if (!userRow) return res.status(404).json({ error: 'User not found' });
+    if (!userRow) return res.status(401).json({ error: 'User account not found or has been deleted.', account_deleted: true });
 
     delete userRow.password_hash;
     if (!userRow.client_id) {
@@ -3711,6 +3711,12 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
       await trx('user_sessions').where({ user_id: targetUserId }).del();
       await trx('users').where({ id: targetUserId }).del();
     });
+
+    const { banCache } = require('./middleware/auth');
+    if (banCache) {
+      banCache.set(Number(targetUserId), { exists: false, is_banned: false, ts: Date.now() });
+      banCache.set(String(targetUserId), { exists: false, is_banned: false, ts: Date.now() });
+    }
 
     const triggerEngine = require('./services/triggerEngine');
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');
@@ -7001,6 +7007,9 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const user = await trx('users').where({ id: req.user.id }).first();
+      if (!user) {
+        throw Object.assign(new Error('User account not found or has been deleted.'), { statusCode: 401 });
+      }
       if (Number(user.balance) < finalMargin) {
          throw Object.assign(new Error(`Insufficient funds for SIP installment. Required: ₹${finalMargin.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`), { statusCode: 400 });
       }
