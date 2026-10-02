@@ -10177,7 +10177,16 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
       .orderBy('created_at', 'desc')
       .limit(50);
 
-    res.json({ success: true, notifications });
+    const formattedNotifications = notifications.map(n => ({
+      ...n,
+      created_at: n.created_at instanceof Date ? n.created_at.toISOString() : (
+        typeof n.created_at === 'string' && !n.created_at.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(n.created_at)
+          ? `${n.created_at.replace(' ', 'T')}Z`
+          : n.created_at
+      )
+    }));
+
+    res.json({ success: true, notifications: formattedNotifications });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -10226,8 +10235,17 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
       created_at: new Date().toISOString()
     }).returning('*');
 
+    const formattedInserted = {
+      ...inserted,
+      created_at: inserted.created_at instanceof Date ? inserted.created_at.toISOString() : (
+        typeof inserted.created_at === 'string' && !inserted.created_at.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(inserted.created_at)
+          ? `${inserted.created_at.replace(' ', 'T')}Z`
+          : inserted.created_at
+      )
+    };
+
     // Real-time WebSocket emission to all user clients
-    io.emit('broadcast_notification', inserted);
+    io.emit('broadcast_notification', formattedInserted);
 
     // If show_banner is enabled, also sync legacy banner
     if (show_banner) {
@@ -10250,7 +10268,67 @@ app.post('/api/admin/broadcast-notification', authenticateToken, async (req, res
       io.emit('announcement_update', announcementData);
     }
 
-    res.json({ success: true, notification: inserted });
+    res.json({ success: true, notification: formattedInserted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/broadcast-notifications/clear-old', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { parseExpiryDate } = require('./services/autoSquareOff');
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const istMidnight = new Date(`${todayIST}T00:00:00+05:30`);
+
+    // 1. Deactivate intraday signals created before today's IST midnight
+    const updatedIntraday = await db('broadcast_notifications')
+      .where('is_active', true)
+      .where('type', 'SIGNAL')
+      .where(function() {
+        this.where('product_type', 'INT').orWhere('product_type', 'MIS');
+      })
+      .where('created_at', '<', istMidnight)
+      .update({ is_active: false });
+
+    // 2. Deactivate expired derivative contract signals
+    const activeContractSignals = await db('broadcast_notifications')
+      .where('is_active', true)
+      .whereNotNull('symbol');
+
+    let expiredContractsCount = 0;
+    for (const item of activeContractSignals) {
+      if (item.symbol) {
+        const exp = parseExpiryDate(item.symbol);
+        if (exp && exp.getTime() < istMidnight.getTime()) {
+          await db('broadcast_notifications').where({ id: item.id }).update({ is_active: false });
+          expiredContractsCount++;
+        }
+      }
+    }
+
+    io.emit('broadcast_notifications_refreshed');
+    res.json({ 
+      success: true, 
+      message: `Cleared ${updatedIntraday} past intraday signals and ${expiredContractsCount} expired contract signals.`,
+      clearedIntraday: updatedIntraday,
+      clearedExpiredContracts: expiredContractsCount
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/broadcast-notifications/clear-all', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    await db('broadcast_notifications').where({ is_active: true }).update({ is_active: false });
+    io.emit('broadcast_notifications_refreshed');
+    res.json({ success: true, message: 'All broadcast notifications deactivated.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

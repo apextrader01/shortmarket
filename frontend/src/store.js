@@ -939,6 +939,11 @@ export const useStore = create(persist((set, get) => ({
       set({ broadcastNotifications: currentList.filter(n => n.id !== id) });
     });
 
+    socket.off('broadcast_notifications_refreshed');
+    socket.on('broadcast_notifications_refreshed', () => {
+      get().fetchBroadcastNotifications();
+    });
+
     socket.off('trade_alert');
     socket.on('trade_alert', (data) => {
       if (!data) return;
@@ -2396,12 +2401,38 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data?.success && Array.isArray(data.notifications)) {
-        set({ broadcastNotifications: data.notifications });
+        let clearedIds = [];
+        try {
+          clearedIds = JSON.parse(localStorage.getItem('skandx_cleared_notifications') || '[]');
+        } catch (_) {}
+        const clearedSet = new Set(clearedIds);
+        const activeList = data.notifications.filter(n => !clearedSet.has(n.id));
+        set({ broadcastNotifications: activeList });
       }
       return data;
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
     }
+  },
+  dismissNotification: (id) => {
+    try {
+      const clearedIds = JSON.parse(localStorage.getItem('skandx_cleared_notifications') || '[]');
+      if (!clearedIds.includes(id)) clearedIds.push(id);
+      localStorage.setItem('skandx_cleared_notifications', JSON.stringify(clearedIds.slice(-200)));
+    } catch (_) {}
+    const currentList = get().broadcastNotifications || [];
+    set({ broadcastNotifications: currentList.filter(n => n.id !== id) });
+  },
+  clearAllNotifications: () => {
+    try {
+      const currentList = get().broadcastNotifications || [];
+      const clearedIds = JSON.parse(localStorage.getItem('skandx_cleared_notifications') || '[]');
+      currentList.forEach(n => {
+        if (!clearedIds.includes(n.id)) clearedIds.push(n.id);
+      });
+      localStorage.setItem('skandx_cleared_notifications', JSON.stringify(clearedIds.slice(-200)));
+    } catch (_) {}
+    set({ broadcastNotifications: [], unreadNotificationsCount: 0 });
   },
   sendBroadcastNotification: async (payload) => {
     try {
@@ -2435,6 +2466,38 @@ export const useStore = create(persist((set, get) => ({
       if (data?.success) {
         const currentList = get().broadcastNotifications || [];
         set({ broadcastNotifications: currentList.filter(n => n.id !== id) });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+  clearOldBroadcasts: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/broadcast-notifications/clear-old`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        await get().fetchBroadcastNotifications();
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+  revokeAllBroadcasts: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/broadcast-notifications/clear-all`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        set({ broadcastNotifications: [], unreadNotificationsCount: 0 });
       }
       return data;
     } catch (err) {

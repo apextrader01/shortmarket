@@ -447,9 +447,38 @@ async function runWatchlistCleanup() {
                 }
             }
 
-            if (modified) {
-                await db('users').where({ id: user.id }).update({ watchlists: JSON.stringify(watchlists) });
+        // Also deactivate past-day intraday trade signals and expired contracts from broadcast notifications
+        try {
+            const hasBroadcastTable = await db.schema.hasTable('broadcast_notifications');
+            if (hasBroadcastTable) {
+                const deactivatedIntraday = await db('broadcast_notifications')
+                    .where('is_active', true)
+                    .where('type', 'SIGNAL')
+                    .where(function() {
+                        this.where('product_type', 'INT').orWhere('product_type', 'MIS');
+                    })
+                    .where('created_at', '<', istTime)
+                    .update({ is_active: false });
+
+                const activeContractSignals = await db('broadcast_notifications')
+                    .where('is_active', true)
+                    .whereNotNull('symbol');
+                let expiredSignalsCount = 0;
+                for (const item of activeContractSignals) {
+                    if (item.symbol) {
+                        const exp = parseExpiryDate(item.symbol);
+                        if (exp && exp.getTime() < istTime.getTime()) {
+                            await db('broadcast_notifications').where({ id: item.id }).update({ is_active: false });
+                            expiredSignalsCount++;
+                        }
+                    }
+                }
+                if (deactivatedIntraday > 0 || expiredSignalsCount > 0) {
+                    console.log(`✅ Broadcast Alerts Cleanup: Deactivated ${deactivatedIntraday} past intraday signals and ${expiredSignalsCount} expired contract alerts.`);
+                }
             }
+        } catch (bErr) {
+            console.error('⚠️ Broadcast Alerts Cleanup Error:', bErr.message);
         }
         
         console.log(`✅ Watchlist Cleanup Complete. Removed ${totalRemoved} expired contracts.\n`);

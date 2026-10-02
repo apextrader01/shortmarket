@@ -493,9 +493,59 @@ export default function BroadcastModal({ isOpen, onClose }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {activeTab === 'HISTORY' ? (
             <div>
-              <h4 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-primary)' }}>
-                Active Broadcast Notifications ({broadcastNotifications.length})
-              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                  Active Broadcast Notifications ({broadcastNotifications.length})
+                </h4>
+                {broadcastNotifications.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm('Clear all past-day intraday signals and expired contract alerts platform-wide?')) {
+                          const res = await useStore.getState().clearOldBroadcasts?.();
+                          if (res?.message) alert(res.message);
+                        }
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'rgba(234, 179, 8, 0.12)',
+                        border: '1px solid rgba(234, 179, 8, 0.3)',
+                        borderRadius: '6px',
+                        color: '#FBBF24',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      className="hoverable"
+                    >
+                      🧹 Clear Old Signals
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm('Revoke and delete ALL active broadcasts across the platform?')) {
+                          const res = await useStore.getState().revokeAllBroadcasts?.();
+                          if (res?.message) alert(res.message);
+                        }
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '6px',
+                        color: '#EF4444',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      className="hoverable"
+                    >
+                      🗑️ Revoke All
+                    </button>
+                  </div>
+                )}
+              </div>
               {broadcastNotifications.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)', fontSize: '13px' }}>
                   No active broadcasts found.

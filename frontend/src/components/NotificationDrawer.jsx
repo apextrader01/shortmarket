@@ -5,12 +5,25 @@ import { X, TrendingUp, TrendingDown, Newspaper, Bell, CheckCheck, Zap, Trash2, 
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastModal }) {
-  const { user, broadcastNotifications, markAllNotificationsRead, deleteBroadcastNotification, openOrderModal, setSelectedSymbol } = useStore(
+  const { 
+    user, 
+    broadcastNotifications, 
+    markAllNotificationsRead, 
+    deleteBroadcastNotification, 
+    dismissNotification,
+    clearAllNotifications,
+    clearOldBroadcasts,
+    openOrderModal, 
+    setSelectedSymbol 
+  } = useStore(
     useShallow(state => ({
       user: state.user,
       broadcastNotifications: state.broadcastNotifications || [],
       markAllNotificationsRead: state.markAllNotificationsRead,
       deleteBroadcastNotification: state.deleteBroadcastNotification,
+      dismissNotification: state.dismissNotification,
+      clearAllNotifications: state.clearAllNotifications,
+      clearOldBroadcasts: state.clearOldBroadcasts,
       openOrderModal: state.openOrderModal,
       setSelectedSymbol: state.setSelectedSymbol
     }))
@@ -44,7 +57,13 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
   const formatTime = (isoString) => {
     if (!isoString) return '';
     try {
-      const d = new Date(isoString);
+      let raw = String(isoString).trim();
+      // If the string does not specify timezone (no Z and no +/- offset), treat it as UTC
+      if (!raw.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(raw)) {
+        raw = raw.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return '';
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch (_) {
       return '';
@@ -98,7 +117,29 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {broadcastNotifications.length > 0 && (
+              <button
+                onClick={clearAllNotifications}
+                title="Clear all alerts from view"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
+                  color: '#EF4444',
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                className="hoverable"
+              >
+                <Trash2 size={12} /> Clear All
+              </button>
+            )}
             <button
               onClick={markAllNotificationsRead}
               title="Mark all as read"
@@ -174,28 +215,55 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
             ))}
           </div>
 
-          {user?.is_admin && onOpenBroadcastModal && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenBroadcastModal();
-              }}
-              style={{
-                padding: '5px 10px',
-                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-              className="hoverable"
-            >
-              + Broadcast
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {user?.is_admin && (
+              <button
+                onClick={async () => {
+                  if (confirm('Clean up past-day intraday signals and expired contract alerts platform-wide?')) {
+                    const res = await clearOldBroadcasts?.();
+                    if (res?.message) alert(res.message);
+                  }
+                }}
+                title="Purge past-day intraday signals & expired contracts platform-wide"
+                style={{
+                  padding: '5px 8px',
+                  background: 'rgba(234, 179, 8, 0.12)',
+                  color: '#FBBF24',
+                  border: '1px solid rgba(234, 179, 8, 0.3)',
+                  borderRadius: '6px',
+                  fontSize: '10.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                className="hoverable"
+              >
+                🧹 Clear Old
+              </button>
+            )}
+            {user?.is_admin && onOpenBroadcastModal && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenBroadcastModal();
+                }}
+                style={{
+                  padding: '5px 10px',
+                  background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                className="hoverable"
+              >
+                + Broadcast
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Notification List */}
@@ -279,14 +347,23 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
                       <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <Clock size={10} /> {formatTime(item.created_at)}
                       </span>
-                      {user?.is_admin && (
+                      {user?.is_admin ? (
                         <button
                           onClick={() => deleteBroadcastNotification(item.id)}
-                          title="Delete broadcast"
+                          title="Delete broadcast for all traders"
                           style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px' }}
                           className="hoverable"
                         >
                           <Trash2 size={13} style={{ color: 'var(--color-red-light)' }} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => dismissNotification(item.id)}
+                          title="Dismiss notification"
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px' }}
+                          className="hoverable"
+                        >
+                          <X size={13} style={{ color: 'var(--text-muted)' }} />
                         </button>
                       )}
                     </div>
