@@ -699,6 +699,24 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(compression()); // Compress all API responses to fix frontend loading lag
 
+// 🛡️ Prototype Pollution & Parameter Sanitization Middleware (OWASP A03 / Checks #18, #34, #53)
+app.use((req, res, next) => {
+  const sanitize = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        delete obj[key];
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        sanitize(obj[key]);
+      }
+    }
+  };
+  if (req.body) sanitize(req.body);
+  if (req.query) sanitize(req.query);
+  if (req.params) sanitize(req.params);
+  next();
+});
+
 const recordTelemetry = require('./middleware/telemetry');
 app.use(recordTelemetry);
 

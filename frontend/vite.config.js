@@ -57,6 +57,7 @@ export default defineConfig({
   ],
   build: {
     emptyOutDir: false,
+    sourcemap: false,
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       external: ['@capacitor/push-notifications'],
