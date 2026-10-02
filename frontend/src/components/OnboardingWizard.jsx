@@ -281,9 +281,7 @@ export default function OnboardingWizard() {
               <ChevronLeft size={16} /> Back
             </button>
           ) : (
-            <button type="button" onClick={skipOnboarding} style={{ padding: '12px 24px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
-              Skip for now
-            </button>
+            <div />
           )}
           
           {step < 3 ? (

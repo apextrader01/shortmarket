@@ -1325,6 +1325,28 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
     }
 
     const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
+
+    // 🔒 STRICT EMAIL VERIFICATION GATEKEEPER
+    // Block login if user email has not been verified in Firebase
+    if (!user.is_admin && !isGoogleReviewTester && user.email) {
+      try {
+        const { getFirebaseAdminAuth } = require('./services/firebaseAuth');
+        const auth = getFirebaseAdminAuth();
+        if (auth) {
+          const fbUser = await auth.getUserByEmail(user.email.toLowerCase().trim()).catch(() => null);
+          if (fbUser && fbUser.emailVerified === false) {
+            return res.status(403).json({
+              error: `Please verify your email address to log in. An activation link was sent to ${user.email}. Check your inbox and spam folder.`,
+              needs_email_verification: true,
+              email: user.email
+            });
+          }
+        }
+      } catch (authErr) {
+        console.warn('[AUTH] Firebase email verification check note:', authErr.message);
+      }
+    }
+
     // Standard password login: trust user immediately unless they explicitly enabled Google Authenticator (TOTP)
     let isTrusted = isGoogleReviewTester || !user.totp_enabled;
 

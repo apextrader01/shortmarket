@@ -235,7 +235,7 @@ export const useStore = create(persist((set, get) => ({
         };
       }
       set({ authError: data.error });
-      return { success: false, error: data.error };
+      return { success: false, error: data.error, needs_email_verification: data.needs_email_verification, email: data.email };
     } catch (err) {
       set({ authError: err.message });
       return { success: false, error: err.message };

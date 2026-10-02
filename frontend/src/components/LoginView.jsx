@@ -207,7 +207,13 @@ export default function LoginView() {
           triggerEmailOtp();
         }
       } else {
-        useStore.setState({ authError: res?.error || 'Invalid email or password. Please check your credentials.' });
+        if (res?.needs_email_verification) {
+          if (res.email) setEmail(res.email);
+          setView('verify_email_sent');
+          setMessage(res.error || 'Please verify your email address before logging in.');
+        } else {
+          useStore.setState({ authError: res?.error || 'Invalid email or password. Please check your credentials.' });
+        }
       }
     } 
     else if (view === 'login_otp') {
