@@ -45,6 +45,34 @@ try {
 }
 
 function getFirebaseAdminAuth() {
+  if (!authInstance && admin) {
+    try {
+      const { cert } = require('firebase-admin/app');
+      const { getAuth } = require('firebase-admin/auth');
+      if (admin.apps && admin.apps.length > 0) {
+        authInstance = getAuth(admin.apps[0]);
+      } else {
+        const serviceAccountPath = path.join(__dirname, '../config/firebase-service-account.json');
+        let credential = null;
+        if (fs.existsSync(serviceAccountPath)) {
+          const sa = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+          credential = cert ? cert(sa) : (admin.credential?.cert ? admin.credential.cert(sa) : null);
+        } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+          try {
+            const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            credential = cert ? cert(sa) : (admin.credential?.cert ? admin.credential.cert(sa) : null);
+          } catch (_) {}
+        }
+        if (credential) {
+          const app = admin.initializeApp({ credential });
+          authInstance = getAuth(app);
+          console.log('[FIREBASE AUTH] Firebase Admin SDK dynamically initialized.');
+        }
+      }
+    } catch (err) {
+      console.warn('[FIREBASE AUTH] Dynamic init note:', err.message);
+    }
+  }
   return authInstance;
 }
 
@@ -55,10 +83,11 @@ function getFirebaseAdminAuth() {
 async function ensureFirebaseUser(email, phone = null) {
   if (!email) return null;
   const cleanEmail = String(email).trim().toLowerCase();
-  if (!authInstance) return null;
+  const auth = getFirebaseAdminAuth();
+  if (!auth) return null;
 
   try {
-    const existing = await authInstance.getUserByEmail(cleanEmail);
+    const existing = await auth.getUserByEmail(cleanEmail);
     return existing;
   } catch (err) {
     if (err.code === 'auth/user-not-found') {
@@ -70,13 +99,13 @@ async function ensureFirebaseUser(email, phone = null) {
             createPayload.phoneNumber = cleanPhone.startsWith('+') ? cleanPhone : '+91' + cleanPhone.slice(-10);
           }
         }
-        const created = await authInstance.createUser(createPayload);
+        const created = await auth.createUser(createPayload);
         console.log(`[FIREBASE AUTH] Created Firebase Auth user for ${cleanEmail}: ${created.uid}`);
         return created;
       } catch (createErr) {
         // If phone already exists on another account, create without phone
         if (createErr.code === 'auth/phone-number-already-exists') {
-          const created = await authInstance.createUser({ email: cleanEmail });
+          const created = await auth.createUser({ email: cleanEmail });
           return created;
         }
         console.warn(`[FIREBASE AUTH] Could not create Firebase user for ${cleanEmail}:`, createErr.message);
@@ -142,10 +171,11 @@ async function sendFirebaseVerificationEmail(email) {
   const user = await ensureFirebaseUser(cleanEmail);
   if (!user || !user.uid) throw new Error('Could not create or find Firebase user for ' + cleanEmail);
 
-  if (!authInstance) throw new Error('Firebase Admin Auth instance not initialized');
+  const auth = getFirebaseAdminAuth();
+  if (!auth) throw new Error('Firebase Admin Auth instance not initialized');
 
   // 2. Mint custom token and exchange for idToken to trigger official verify email
-  const customToken = await authInstance.createCustomToken(user.uid);
+  const customToken = await auth.createCustomToken(user.uid);
   const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_WEB_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

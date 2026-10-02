@@ -374,6 +374,10 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
+        if (data.needs_verification) {
+          // Keep user in unauthenticated state until email link is verified
+          return { success: true, message: data.message, needs_verification: true, email: data.email };
+        }
         if (data.token) localStorage.setItem('token', data.token);
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
@@ -382,7 +386,7 @@ export const useStore = create(persist((set, get) => ({
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
-        return { success: true, message: data.message, needs_verification: data.needs_verification, email: data.email };
+        return { success: true, message: data.message, needs_verification: false, email: data.email };
       } else {
         set({ authError: data.error });
         return { success: false, error: data.error };
