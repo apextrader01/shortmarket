@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Tablet, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy, ChevronDown, ChevronUp, Layers, Cpu, History, Sparkles, CheckCheck } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -877,7 +877,7 @@ export default function SettingsView() {
 export function BiometricSettingsSection({ user }) {
   const userId = user?.id || 'default';
   const { 
-    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession, cleanDuplicateSessions,
     fetchTotpSetup, enableTotp, disableTotp, totpLoading,
     trustedDevices, trustedDevicesLoading, fetchTrustedDevices, revokeTrustedDevice
   } = useStore(useShallow(state => ({ 
@@ -886,6 +886,7 @@ export function BiometricSettingsSection({ user }) {
     fetchUserSessions: state.fetchUserSessions,
     revokeOtherSessions: state.revokeOtherSessions,
     revokeSession: state.revokeSession,
+    cleanDuplicateSessions: state.cleanDuplicateSessions,
     fetchTotpSetup: state.fetchTotpSetup,
     enableTotp: state.enableTotp,
     disableTotp: state.disableTotp,
@@ -899,6 +900,11 @@ export function BiometricSettingsSection({ user }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+  const [sessionViewMode, setSessionViewMode] = useState('DEVICES'); // 'DEVICES' or 'RAW_LOGS'
+  const [expandedDeviceKey, setExpandedDeviceKey] = useState(null);
+  const [showAllLogs, setShowAllLogs] = useState(false);
+  const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
+  const [copiedIp, setCopiedIp] = useState(null);
 
   // TOTP & 30-day Trusted Devices States
   const [showTotpSetup, setShowTotpSetup] = useState(false);
@@ -1055,6 +1061,153 @@ export function BiometricSettingsSection({ user }) {
   const handleTestLock = () => {
     setAppLocked(true);
     window.location.reload();
+  };
+
+  const formatRelativeTime = (dateStr) => {
+    if (!dateStr) return 'Just now';
+    try {
+      const date = new Date(dateStr);
+      const diffMs = Date.now() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-GB');
+    } catch {
+      return 'Just now';
+    }
+  };
+
+  const getDeviceIconDetails = (device) => {
+    const model = (device?.device_model || '').toLowerCase();
+    const os = (device?.os_name || '').toLowerCase();
+
+    if (model.includes('iphone') || model.includes('android') || model.includes('phone') || model.includes('mobile') || model.includes('sm-')) {
+      return {
+        icon: Smartphone,
+        color: '#3B82F6',
+        bg: 'rgba(59, 130, 246, 0.12)',
+        typeLabel: 'Mobile Phone'
+      };
+    }
+    if (model.includes('ipad') || model.includes('tablet')) {
+      return {
+        icon: Tablet,
+        color: '#A855F7',
+        bg: 'rgba(168, 85, 247, 0.12)',
+        typeLabel: 'Tablet'
+      };
+    }
+    if (os.includes('mac')) {
+      return {
+        icon: Laptop,
+        color: '#F43F5E',
+        bg: 'rgba(244, 63, 94, 0.12)',
+        typeLabel: 'Mac OS'
+      };
+    }
+    if (os.includes('linux')) {
+      return {
+        icon: Cpu,
+        color: '#F59E0B',
+        bg: 'rgba(245, 158, 11, 0.12)',
+        typeLabel: 'Linux System'
+      };
+    }
+    return {
+      icon: Monitor,
+      color: '#06B6D4',
+      bg: 'rgba(6, 182, 212, 0.12)',
+      typeLabel: os.includes('windows') ? 'Windows PC' : 'Desktop PC'
+    };
+  };
+
+  const deviceGroups = useMemo(() => {
+    if (!Array.isArray(userSessions) || userSessions.length === 0) return [];
+    const map = new Map();
+
+    userSessions.forEach(session => {
+      const key = `${session.device_model || 'Unknown'}_${session.os_name || 'Unknown'}_${session.browser_name || 'Browser'}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          device_model: session.device_model || 'Desktop PC',
+          os_name: session.os_name || 'Unknown OS',
+          browser_name: session.browser_name || 'Browser',
+          city: session.city || '',
+          state: session.state || '',
+          ip_address: session.ip_address || '',
+          is_current: !!session.is_current,
+          latest_active: session.last_active_at,
+          sessions: [session]
+        });
+      } else {
+        const group = map.get(key);
+        group.sessions.push(session);
+        if (session.is_current) group.is_current = true;
+        if (!group.city && session.city) group.city = session.city;
+        if (!group.state && session.state) group.state = session.state;
+        if (!group.ip_address && session.ip_address) group.ip_address = session.ip_address;
+        if (new Date(session.last_active_at) > new Date(group.latest_active)) {
+          group.latest_active = session.last_active_at;
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.is_current) return -1;
+      if (b.is_current) return 1;
+      return new Date(b.latest_active) - new Date(a.latest_active);
+    });
+  }, [userSessions]);
+
+  const currentDeviceGroup = useMemo(() => {
+    return deviceGroups.find(g => g.is_current) || null;
+  }, [deviceGroups]);
+
+  const otherDeviceGroups = useMemo(() => {
+    return deviceGroups.filter(g => !g.is_current);
+  }, [deviceGroups]);
+
+  const duplicateSessionsCount = useMemo(() => {
+    return Math.max(0, userSessions.length - deviceGroups.length);
+  }, [userSessions, deviceGroups]);
+
+  const handleRevokeDevice = async (device) => {
+    if (!device?.sessions?.length) return;
+    const count = device.sessions.length;
+    if (!window.confirm(`Revoke all ${count} active session token(s) for "${device.device_model}"? This device will be signed out.`)) {
+      return;
+    }
+    try {
+      await Promise.all(device.sessions.map(s => revokeSession(s.id)));
+      setSessionMsg({ type: 'success', text: `Revoked ${count} session(s) on ${device.device_model}.` });
+      setTimeout(() => setSessionMsg({ type: '', text: '' }), 4000);
+      if (fetchUserSessions) fetchUserSessions();
+    } catch (err) {
+      setSessionMsg({ type: 'error', text: 'Failed to revoke device sessions' });
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    setCleaningDuplicates(true);
+    setSessionMsg({ type: '', text: '' });
+    try {
+      const res = await cleanDuplicateSessions();
+      if (res && res.success) {
+        setSessionMsg({ type: 'success', text: res.message || 'Duplicate sessions cleaned successfully!' });
+      } else {
+        setSessionMsg({ type: 'error', text: res?.error || 'Failed to clean duplicate sessions' });
+      }
+    } catch (err) {
+      setSessionMsg({ type: 'error', text: err.message || 'Failed to clean duplicate sessions' });
+    } finally {
+      setCleaningDuplicates(false);
+      setTimeout(() => setSessionMsg({ type: '', text: '' }), 4000);
+    }
   };
 
   return (
@@ -1441,39 +1594,88 @@ export function BiometricSettingsSection({ user }) {
         </div>
       )}
 
-      {/* ─── Session & Device Security Manager ───────────────────────── */}
+      {/* ─── Session & Device Security Command Center ───────────────────────── */}
       <div style={{
         background: 'var(--bg-panel)',
-        borderRadius: '12px',
+        borderRadius: '16px',
         border: '1px solid var(--border-color)',
-        padding: '24px',
+        padding: isMobile ? '16px' : '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '18px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+        gap: '20px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+        {/* Header with Title & Action Buttons */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '14px',
+          borderBottom: '1px solid var(--border-color)',
+          paddingBottom: '18px'
+        }}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
-              <ShieldAlert size={18} color="var(--color-blue)" /> Active Devices & Login Sessions
-            </h3>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-              Review and manage all web, desktop, and mobile devices authorized to access your trading account.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                padding: '8px',
+                borderRadius: '10px',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '17px', fontWeight: '800', margin: 0, color: '#fff', letterSpacing: '-0.3px' }}>
+                  Device & Session Security Center
+                </h3>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12.5px', marginTop: '2px' }}>
+                  Manage authorized hardware, monitor active logins, and safeguard your trading account
+                </div>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => fetchUserSessions()}
               disabled={userSessionsLoading}
               className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '7px 12px' }}
               title="Refresh sessions list"
             >
               <RefreshCw size={13} className={userSessionsLoading ? 'animate-spin' : ''} />
               Refresh
             </button>
+
+            {duplicateSessionsCount > 0 && (
+              <button
+                type="button"
+                onClick={handleCleanDuplicates}
+                disabled={cleaningDuplicates}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(139, 92, 246, 0.15)',
+                  border: '1px solid rgba(139, 92, 246, 0.4)',
+                  color: '#C084FC',
+                  padding: '7px 13px',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: cleaningDuplicates ? 'not-allowed' : 'pointer'
+                }}
+                title="Consolidate duplicate login tokens into unique recognized devices"
+              >
+                {cleaningDuplicates ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                Clean {duplicateSessionsCount} Duplicates
+              </button>
+            )}
 
             {userSessions.filter(s => !s.is_current).length > 0 && (
               <button
@@ -1494,14 +1696,16 @@ export function BiometricSettingsSection({ user }) {
                 }}
                 disabled={revokingOthers}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.35)',
-                  color: '#ef4444',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.25) 100%)',
+                  border: '1px solid rgba(239, 68, 68, 0.5)',
+                  color: '#F87171',
+                  padding: '7px 14px',
+                  borderRadius: '7px',
                   fontSize: '12px',
-                  fontWeight: '700',
+                  fontWeight: '800',
                   cursor: revokingOthers ? 'not-allowed' : 'pointer'
                 }}
               >
@@ -1512,197 +1716,651 @@ export function BiometricSettingsSection({ user }) {
           </div>
         </div>
 
+        {/* Status notification banner if any */}
         {sessionMsg.text && (
           <div style={{
-            padding: '10px 14px',
-            borderRadius: '6px',
-            fontSize: '12px',
+            padding: '11px 16px',
+            borderRadius: '8px',
+            fontSize: '12.5px',
             fontWeight: '600',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             background: sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-            border: `1px solid ${sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            border: `1px solid ${sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
             color: sessionMsg.type === 'success' ? '#4ade80' : '#ef4444'
           }}>
-            {sessionMsg.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+            {sessionMsg.type === 'success' ? <Check size={15} /> : <AlertCircle size={15} />}
             {sessionMsg.text}
           </div>
         )}
 
-        {/* Sessions List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {userSessionsLoading && userSessions.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
-              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
-              Loading active sessions...
-            </div>
-          ) : userSessions.length === 0 ? (
+        {/* ─── Security Overview Metrics Bar (3 Glass Cards) ─── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: '12px'
+        }}>
+          {/* Card 1: Account Defense Level */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
             <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '16px 20px',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '10px',
+              padding: '10px',
+              color: '#10B981',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '14px'
+              justifyContent: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'rgba(34, 197, 94, 0.15)', padding: '10px', borderRadius: '50%', color: '#22c55e' }}>
-                  <Monitor size={20} />
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Protection Status
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#10B981', marginTop: '1px' }}>
+                High Security Active
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                2FA & Token Isolation Guard
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Connected Hardware Summary */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '10px',
+              padding: '10px',
+              color: '#60A5FA',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Layers size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Recognized Devices
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginTop: '1px' }}>
+                {deviceGroups.length} Unique {deviceGroups.length === 1 ? 'Device' : 'Devices'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {userSessions.length} total active session tokens
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Quick Security Status */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{
+              background: 'rgba(168, 85, 247, 0.15)',
+              border: '1px solid rgba(168, 85, 247, 0.3)',
+              borderRadius: '10px',
+              padding: '10px',
+              color: '#C084FC',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Lock size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Session Isolation
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#C084FC', marginTop: '1px' }}>
+                Single-Device Bound
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Automatic expiry in 30 days
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Hero Showcase: CURRENT DEVICE (Active Now) ─── */}
+        {currentDeviceGroup && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '14px',
+            padding: isMobile ? '16px' : '18px 22px',
+            display: 'flex',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            justifyContent: 'space-between',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: '16px',
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.18)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                padding: '14px',
+                borderRadius: '12px',
+                color: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(16, 185, 129, 0.2)'
+              }}>
+                {(() => {
+                  const details = getDeviceIconDetails(currentDeviceGroup);
+                  const Icon = details.icon;
+                  return <Icon size={26} color="#10B981" />;
+                })()}
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h4 style={{ fontSize: '15.5px', fontWeight: '800', margin: 0, color: '#fff' }}>
+                    {currentDeviceGroup.device_model || 'Windows PC'}
+                  </h4>
+                  <span style={{
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    border: '1px solid #10B981',
+                    color: '#34D399',
+                    fontSize: '10.5px',
+                    fontWeight: '900',
+                    padding: '3px 9px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    letterSpacing: '0.4px'
+                  }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', display: 'inline-block', boxShadow: '0 0 8px #10B981' }} />
+                    THIS DEVICE (CURRENT SESSION)
+                  </span>
                 </div>
-                <div>
-                  <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Current Device
-                    <span style={{ background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.4)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '800' }}>
-                      THIS DEVICE
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  marginTop: '6px',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <span style={{ color: '#E2E8F0', fontWeight: '600' }}>
+                    {currentDeviceGroup.os_name} · {currentDeviceGroup.browser_name}
+                  </span>
+                  {(currentDeviceGroup.city || currentDeviceGroup.state) && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#93C5FD' }}>
+                      <MapPin size={12} /> {[currentDeviceGroup.city, currentDeviceGroup.state].filter(Boolean).join(', ')}
                     </span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                    Active session
-                  </div>
+                  )}
+                  {currentDeviceGroup.ip_address && (
+                    <span 
+                      onClick={() => {
+                        navigator.clipboard?.writeText(currentDeviceGroup.ip_address);
+                        setCopiedIp(currentDeviceGroup.ip_address);
+                        setTimeout(() => setCopiedIp(null), 2000);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.06)',
+                        padding: '1px 7px',
+                        borderRadius: '4px',
+                        color: 'var(--text-muted)'
+                      }}
+                      title="Click to copy IP"
+                    >
+                      IP: {currentDeviceGroup.ip_address}
+                      {copiedIp === currentDeviceGroup.ip_address ? <Check size={11} color="#34D399" /> : <Copy size={11} />}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-          ) : (
-            userSessions.map((session) => {
-              const isPhone = (session.device_model || '').toLowerCase().includes('phone') || (session.os_name || '').toLowerCase().includes('android') || (session.os_name || '').toLowerCase().includes('ios');
-              const isMac = (session.device_model || '').toLowerCase().includes('mac') || (session.os_name || '').toLowerCase().includes('mac');
-              
-              const formatRelativeTime = (dateStr) => {
-                if (!dateStr) return 'Recently active';
-                const diff = Date.now() - new Date(dateStr).getTime();
-                const mins = Math.floor(diff / 60000);
-                if (mins < 2) return 'Active now';
-                if (mins < 60) return `${mins}m ago`;
-                const hrs = Math.floor(mins / 60);
-                if (hrs < 24) return `${hrs}h ago`;
-                const days = Math.floor(hrs / 24);
-                return `${days}d ago`;
-              };
 
-              return (
-                <div
-                  key={session.id}
-                  style={{
-                    background: session.is_current ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-                    border: session.is_current ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#34D399',
+                fontSize: '11.5px',
+                fontWeight: '800',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                ● Active Now
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Primary session token
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── View Switcher Tabs ─── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid var(--border-color)',
+          paddingBottom: '10px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setSessionViewMode('DEVICES')}
+              style={{
+                background: sessionViewMode === 'DEVICES' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                border: sessionViewMode === 'DEVICES' ? '1px solid var(--color-blue)' : '1px solid transparent',
+                color: sessionViewMode === 'DEVICES' ? '#60A5FA' : 'var(--text-secondary)',
+                fontWeight: '700',
+                fontSize: '12.5px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: '0.15s'
+              }}
+            >
+              <Smartphone size={14} /> Recognized Hardware ({deviceGroups.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSessionViewMode('RAW_LOGS')}
+              style={{
+                background: sessionViewMode === 'RAW_LOGS' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                border: sessionViewMode === 'RAW_LOGS' ? '1px solid var(--color-blue)' : '1px solid transparent',
+                color: sessionViewMode === 'RAW_LOGS' ? '#60A5FA' : 'var(--text-secondary)',
+                fontWeight: '700',
+                fontSize: '12.5px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: '0.15s'
+              }}
+            >
+              <History size={14} /> Session History ({userSessions.length})
+            </button>
+          </div>
+
+          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            Auto-prunes after 30 days
+          </div>
+        </div>
+
+        {/* ─── Tab Content 1: GROUPED RECOGNIZED DEVICES (Clean & Organized!) ─── */}
+        {sessionViewMode === 'DEVICES' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {userSessionsLoading && userSessions.length === 0 ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+                Loading authorized devices...
+              </div>
+            ) : otherDeviceGroups.length === 0 ? (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '24px',
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                fontSize: '13px'
+              }}>
+                <CheckCheck size={24} color="#10B981" style={{ margin: '0 auto 8px auto' }} />
+                <div style={{ fontWeight: '700', color: '#fff', fontSize: '14px', marginBottom: '2px' }}>
+                  No other active devices
+                </div>
+                Your trading account is only signed in on this current device.
+              </div>
+            ) : (
+              otherDeviceGroups.map((device) => {
+                const details = getDeviceIconDetails(device);
+                const Icon = details.icon;
+                const isExpanded = expandedDeviceKey === device.key;
+
+                return (
+                  <div
+                    key={device.key}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
                     <div style={{
-                      background: session.is_current ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      padding: '10px',
-                      borderRadius: '50%',
-                      color: session.is_current ? 'var(--color-blue-light)' : 'var(--text-secondary)'
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px'
                     }}>
-                      {isPhone ? <Smartphone size={20} /> : isMac ? <Laptop size={20} /> : <Monitor size={20} />}
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {session.device_model || 'Desktop / Browser'}
-                        {session.is_current && (
-                          <span style={{
-                            background: 'rgba(34, 197, 94, 0.18)',
-                            border: '1px solid rgba(34, 197, 94, 0.45)',
-                            color: '#4ade80',
-                            fontSize: '10px',
-                            padding: '2px 7px',
-                            borderRadius: '12px',
-                            fontWeight: '800',
-                            letterSpacing: '0.4px'
-                          }}>
-                            🟢 THIS DEVICE (Current)
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
-                        <span>{session.os_name || 'OS'} · {session.browser_name || 'Browser'}</span>
-                        {(session.city || session.state) && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)' }}>
-                            <MapPin size={11} /> {[session.city, session.state].filter(Boolean).join(', ')}
-                          </span>
-                        )}
-                        {session.ip_address && (
-                          <span style={{ color: 'var(--text-muted)' }}>
-                            • IP: {session.ip_address}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: isMobile ? '0' : 'auto' }}>
-                    <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                      <div style={{ fontSize: '11px', color: session.is_current ? '#4ade80' : 'var(--text-secondary)', fontWeight: '600' }}>
-                        {session.is_current ? 'Active now' : `Last active: ${formatRelativeTime(session.last_active_at)}`}
-                      </div>
-                    </div>
-
-                    {!session.is_current && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm(`Revoke session for ${session.device_model || 'this device'}?`)) {
-                            const res = await revokeSession(session.id);
-                            if (res.success) {
-                              setSessionMsg({ type: 'success', text: 'Device session revoked.' });
-                              setTimeout(() => setSessionMsg({ type: '', text: '' }), 3000);
-                            } else {
-                              setSessionMsg({ type: 'error', text: res.error || 'Failed to revoke session' });
-                            }
-                          }
-                        }}
-                        style={{
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          border: '1px solid rgba(239, 68, 68, 0.25)',
-                          color: '#ef4444',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{
+                          background: details.bg,
+                          border: `1px solid ${details.color}40`,
+                          padding: '11px',
+                          borderRadius: '10px',
+                          color: details.color,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
-                        }}
-                        title="Log out this device"
-                      >
-                        <Trash2 size={12} /> Revoke
-                      </button>
+                          justifyContent: 'center'
+                        }}>
+                          <Icon size={20} />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>
+                              {device.device_model}
+                            </span>
+                            <span style={{
+                              fontSize: '10.5px',
+                              fontWeight: '700',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              background: details.bg,
+                              color: details.color
+                            }}>
+                              {details.typeLabel}
+                            </span>
+                            {device.sessions.length > 1 && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(255,255,255,0.06)',
+                                color: 'var(--text-secondary)'
+                              }}>
+                                {device.sessions.length} active sessions
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                            fontSize: '11.5px',
+                            color: 'var(--text-secondary)',
+                            marginTop: '3px'
+                          }}>
+                            <span>{device.os_name} · {device.browser_name}</span>
+                            {(device.city || device.state) && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)' }}>
+                                <MapPin size={11} /> {[device.city, device.state].filter(Boolean).join(', ')}
+                              </span>
+                            )}
+                            {device.ip_address && (
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                • IP: {device.ip_address}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: isMobile ? '0' : 'auto' }}>
+                        <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                            Last active: {formatRelativeTime(device.latest_active)}
+                          </div>
+                        </div>
+
+                        {device.sessions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedDeviceKey(isExpanded ? null : device.key)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-secondary)',
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px'
+                            }}
+                            title="Toggle session details"
+                          >
+                            <span>{isExpanded ? 'Hide' : 'Details'}</span>
+                            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeDevice(device)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          className="hoverable"
+                          title="Sign out this device"
+                        >
+                          <Trash2 size={12} /> Revoke Device
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expandable Session Details Tray */}
+                    {isExpanded && device.sessions.length > 1 && (
+                      <div style={{
+                        background: 'rgba(0,0,0,0.25)',
+                        borderTop: '1px solid var(--border-color)',
+                        padding: '12px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>
+                          Active Login Tokens on this Device:
+                        </div>
+                        {device.sessions.map((sess, idx) => (
+                          <div
+                            key={sess.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '11.5px',
+                              padding: '6px 10px',
+                              background: 'rgba(255,255,255,0.02)',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(255,255,255,0.04)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>#{idx + 1}</span>
+                              <span style={{ color: '#fff' }}>IP: {sess.ip_address || '—'}</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>· {formatRelativeTime(sess.last_active_at)}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const res = await revokeSession(sess.id);
+                                if (res.success) {
+                                  setSessionMsg({ type: 'success', text: 'Session revoked.' });
+                                  setTimeout(() => setSessionMsg({ type: '', text: '' }), 3000);
+                                }
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#EF4444',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                padding: '2px 6px'
+                              }}
+                            >
+                              Revoke Token
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* ─── Tab Content 2: RAW SESSION AUDIT LOGS (Capped with Show More) ─── */}
+        {sessionViewMode === 'RAW_LOGS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(() => {
+              const displayLogs = showAllLogs ? userSessions : userSessions.slice(0, 5);
+              return (
+                <>
+                  {displayLogs.map((session) => {
+                    const isPhone = (session.device_model || '').toLowerCase().includes('phone') || (session.os_name || '').toLowerCase().includes('android');
+                    return (
+                      <div
+                        key={session.id}
+                        style={{
+                          background: session.is_current ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                          border: session.is_current ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {session.is_current ? <Monitor size={16} color="#10B981" /> : (isPhone ? <Smartphone size={16} color="#94A3B8" /> : <Monitor size={16} color="#94A3B8" />)}
+                          <div>
+                            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {session.device_model}
+                              {session.is_current && (
+                                <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px' }}>
+                                  CURRENT
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              {session.os_name} · {session.browser_name} · IP: {session.ip_address || '—'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: session.is_current ? '#34D399' : 'var(--text-secondary)' }}>
+                            {session.is_current ? 'Active now' : formatRelativeTime(session.last_active_at)}
+                          </span>
+                          {!session.is_current && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await revokeSession(session.id);
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '2px' }}
+                              title="Revoke session"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {userSessions.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllLogs(!showAllLogs)}
+                      style={{
+                        padding: '8px',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        color: 'var(--color-blue)',
+                        fontWeight: '700',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        marginTop: '4px'
+                      }}
+                    >
+                      {showAllLogs ? '▲ Collapse Sessions' : `▼ Show All ${userSessions.length} Sessions (+${userSessions.length - 5} more)`}
+                    </button>
+                  )}
+                </>
               );
-            })
-          )}
-        </div>
+            })()}
+          </div>
+        )}
 
         {/* Security Footnote */}
         <div style={{
           background: 'rgba(59, 130, 246, 0.05)',
           border: '1px solid rgba(59, 130, 246, 0.15)',
-          borderRadius: '8px',
-          padding: '10px 14px',
-          fontSize: '11.5px',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          fontSize: '12px',
           color: 'var(--text-secondary)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '10px'
         }}>
-          <span>🛡️</span>
+          <Shield size={18} color="var(--color-blue)" style={{ flexShrink: 0 }} />
           <span>
-            <strong>Security Recommendation:</strong> If you notice an unfamiliar device or location, immediately click <strong>Log Out All Other Devices</strong> and change your account password.
+            <strong>Security Recommendation:</strong> If you see an unrecognized device or suspicious IP location, immediately click <strong>Log Out All Other Devices</strong> to terminate all external sessions and reset your password.
           </span>
         </div>
       </div>

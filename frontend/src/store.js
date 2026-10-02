@@ -2797,6 +2797,24 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  cleanDuplicateSessions: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions/clean-duplicates`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchUserSessions();
+        return { success: true, message: data.message, count: data.cleanedCount };
+      }
+      return { success: false, error: data?.error || 'Failed to clean duplicate sessions' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
   revokeSession: async (sessionId) => {
     try {
       const token = localStorage.getItem('token');

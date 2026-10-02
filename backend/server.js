@@ -909,6 +909,49 @@ const walletLimiter = rateLimit({
   }
 });
 
+async function upsertUserSession({ userId, tokenHash, deviceModel, browserName, osName, clientIp, city, state }) {
+  if (!userId || !tokenHash) return;
+  try {
+    const existing = await db('user_sessions')
+      .where({ user_id: userId, device_model: deviceModel, browser_name: browserName, os_name: osName })
+      .orderBy('last_active_at', 'desc')
+      .first();
+
+    if (existing) {
+      await db('user_sessions')
+        .where({ id: existing.id })
+        .update({
+          token_hash: tokenHash,
+          ip_address: clientIp || existing.ip_address,
+          city: city || existing.city || '',
+          state: state || existing.state || '',
+          last_active_at: new Date()
+        });
+    } else {
+      await db('user_sessions').insert({
+        user_id: userId,
+        token_hash: tokenHash,
+        device_model: deviceModel,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        city: city || '',
+        state: state || '',
+        last_active_at: new Date()
+      });
+    }
+
+    // Auto-prune stale sessions older than 30 days
+    await db('user_sessions')
+      .where({ user_id: userId })
+      .where('last_active_at', '<', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+      .del()
+      .catch(() => {});
+  } catch (err) {
+    console.error('upsertUserSession error:', err);
+  }
+}
+
 app.post('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const data = req.body;
@@ -1236,15 +1279,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
         const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
         const tokenHash = hashToken(token);
         if (tokenHash) {
-          await db('user_sessions').insert({
-            user_id: user.id,
-            token_hash: tokenHash,
-            device_model: deviceModel,
-            browser_name: browserName,
-            os_name: osName,
-            ip_address: clientIp,
-            last_active_at: new Date()
-          }).catch(() => {});
+          await upsertUserSession({ userId: user.id, tokenHash, deviceModel, browserName, osName, clientIp });
         }
 
         const isHttps = isRequestSecure(req);
@@ -1401,15 +1436,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
     const sessionHash = hashToken(token);
     if (sessionHash) {
-      await db('user_sessions').insert({
-        user_id: user.id,
-        token_hash: sessionHash,
-        device_model: deviceModel,
-        browser_name: browserName,
-        os_name: osName,
-        ip_address: clientIp,
-        last_active_at: new Date()
-      }).catch(() => {});
+      await upsertUserSession({ userId: user.id, tokenHash: sessionHash, deviceModel, browserName, osName, clientIp });
     }
 
     let trustedDeviceToken = null;
@@ -1601,17 +1628,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
     const tokenHash = hashToken(token);
     if (tokenHash) {
-      await db('user_sessions').insert({
-        user_id: user.id,
-        token_hash: tokenHash,
-        device_model: deviceModel,
-        browser_name: browserName,
-        os_name: osName,
-        ip_address: clientIp,
-        city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
-        state: (state && state !== 'Local') ? state : '',
-        last_active_at: new Date()
-      }).catch(() => {});
+      await upsertUserSession({ userId: user.id, tokenHash, deviceModel, browserName, osName, clientIp, city, state });
     }
 
     let trustedDeviceToken = null;
@@ -10151,6 +10168,14 @@ app.delete('/api/admin/broadcast-notification/:id', authenticateToken, async (re
 app.get('/api/user/sessions', authenticateToken, async (req, res) => {
   try {
     const currentHash = req.tokenHash || '';
+
+    // Auto-prune sessions older than 30 days
+    await db('user_sessions')
+      .where({ user_id: req.user.id })
+      .where('last_active_at', '<', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+      .del()
+      .catch(() => {});
+
     const sessions = await db('user_sessions')
       .where({ user_id: req.user.id })
       .orderBy('last_active_at', 'desc');
@@ -10172,6 +10197,43 @@ app.get('/api/user/sessions', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error fetching user sessions:', err);
     res.status(500).json({ error: 'Failed to fetch active login sessions' });
+  }
+});
+
+app.post('/api/user/sessions/clean-duplicates', authenticateToken, async (req, res) => {
+  try {
+    const currentHash = req.tokenHash || '';
+    const sessions = await db('user_sessions')
+      .where({ user_id: req.user.id })
+      .orderBy('last_active_at', 'desc');
+
+    const toDeleteIds = [];
+    const seenKeys = new Set();
+
+    for (const s of sessions) {
+      const isCurrent = s.token_hash === currentHash;
+      const key = `${s.device_model || 'Unknown'}_${s.os_name || 'Unknown'}_${s.browser_name || 'Browser'}`;
+      
+      if (isCurrent) {
+        seenKeys.add(key);
+      } else if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+      } else {
+        toDeleteIds.push(s.id);
+      }
+    }
+
+    if (toDeleteIds.length > 0) {
+      await db('user_sessions')
+        .whereIn('id', toDeleteIds)
+        .where({ user_id: req.user.id })
+        .del();
+    }
+
+    res.json({ success: true, cleanedCount: toDeleteIds.length, message: `Successfully cleaned ${toDeleteIds.length} duplicate session(s).` });
+  } catch (err) {
+    console.error('Error cleaning duplicate sessions:', err);
+    res.status(500).json({ error: 'Failed to clean duplicate sessions' });
   }
 });
 
