@@ -231,6 +231,15 @@ const BackgroundPriceMonitor = React.memo(() => {
 });
 
 function App() {
+  const isStagingEnv = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.hostname.includes('staging') ||
+      window.location.port === '5001' ||
+      Boolean(import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('staging'))
+    );
+  }, []);
+
   useEffect(() => {
     registerServiceWorker();
   }, []);
@@ -770,6 +779,22 @@ function App() {
                     <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
                       Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
                     </span>
+                    {isStagingEnv && (
+                      <span style={{
+                        background: 'rgba(245, 158, 11, 0.18)',
+                        color: '#f59e0b',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        letterSpacing: '0.6px',
+                        textTransform: 'uppercase',
+                        lineHeight: '1.2'
+                      }}>
+                        STAGING
+                      </span>
+                    )}
                   </div>
                 </div>
 

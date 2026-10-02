@@ -24,11 +24,44 @@ jobs:
         working-directory: ./frontend
         run: npm install
 
+      - name: Configure Environment (Staging vs Production)
+        run: |
+          if [ "${{ github.ref_name }}" = "development" ]; then
+            echo "ENV_NAME=Staging" >> $GITHUB_ENV
+            echo "APP_NAME=SkandX Staging" >> $GITHUB_ENV
+            echo "APP_ID=com.skandx.app.staging" >> $GITHUB_ENV
+            echo "API_URL=https://staging.skandx.in" >> $GITHUB_ENV
+            echo "ARTIFACT_PREFIX=SkandX-Staging" >> $GITHUB_ENV
+          else
+            echo "ENV_NAME=Production" >> $GITHUB_ENV
+            echo "APP_NAME=SkandX" >> $GITHUB_ENV
+            echo "APP_ID=com.skandx.app" >> $GITHUB_ENV
+            echo "API_URL=https://www.skandx.in" >> $GITHUB_ENV
+            echo "ARTIFACT_PREFIX=SkandX-Production" >> $GITHUB_ENV
+          fi
+
       - name: Build React App
         working-directory: ./frontend
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ env.API_URL }}
         run: npm run build
+
+      - name: Configure Capacitor & Android Identifiers
+        working-directory: ./frontend
+        run: |
+          node -e '
+            const fs = require("fs");
+            const cap = JSON.parse(fs.readFileSync("capacitor.config.json"));
+            cap.appName = process.env.APP_NAME;
+            cap.appId = process.env.APP_ID;
+            cap.server.url = process.env.API_URL;
+            fs.writeFileSync("capacitor.config.json", JSON.stringify(cap, null, 2));
+          '
+          sed -i "s/applicationId \"com.skandx.app\"/applicationId \"$APP_ID\"/" android/app/build.gradle
+          sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml
+          sed -i "s/<string name=\"title_activity_main\">.*<\/string>/<string name=\"title_activity_main\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml
+          sed -i "s/<string name=\"package_name\">.*<\/string>/<string name=\"package_name\">$APP_ID<\/string>/" android/app/src/main/res/values/strings.xml
+          sed -i "s/<string name=\"custom_url_scheme\">.*<\/string>/<string name=\"custom_url_scheme\">$APP_ID<\/string>/" android/app/src/main/res/values/strings.xml
 
       - name: Sync Capacitor
         working-directory: ./frontend
@@ -68,11 +101,12 @@ jobs:
       - name: Upload Direct Installable Android APK (.apk)
         uses: actions/upload-artifact@v4
         with:
-          name: SkandX-DirectInstall-APK
+          name: ${{ env.ARTIFACT_PREFIX }}-APK
           path: frontend/android/app/build/outputs/apk/release/
           if-no-files-found: warn
 
       - name: Upload Play Store Release Bundle (.aab)
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: SkandX-GooglePlay-AAB
