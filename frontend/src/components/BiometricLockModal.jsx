@@ -55,7 +55,7 @@ export default function BiometricLockModal({ onUnlock }) {
     try {
       const isValid = await verifyUserPin(enteredPin, userId);
       if (isValid) {
-        setAppLocked(false);
+        setAppLocked(false, userId);
         onUnlock();
       } else {
         triggerShake('Incorrect PIN. Please try again.');
@@ -72,7 +72,7 @@ export default function BiometricLockModal({ onUnlock }) {
     try {
       const success = await verifyBiometrics(userId);
       if (success) {
-        setAppLocked(false);
+        setAppLocked(false, userId);
         onUnlock();
       }
     } catch (err) {
@@ -307,7 +307,7 @@ export default function BiometricLockModal({ onUnlock }) {
             type="button"
             onClick={() => {
               if (window.confirm('Log out and return to password login screen?')) {
-                setAppLocked(false);
+                setAppLocked(false, userId);
                 logout();
               }
             }}

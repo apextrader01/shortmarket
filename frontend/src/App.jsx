@@ -75,7 +75,7 @@ import NetworkStatusBanner from './components/NetworkStatusBanner';
 import SessionExpiredModal from './components/SessionExpiredModal';
 import PermissionDenied from './components/PermissionDenied';
 import GlobalToast from './components/GlobalToast';
-import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration } from './utils/biometricAuth';
+import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell } from 'lucide-react';
@@ -270,7 +270,7 @@ function App() {
     try {
       const u = JSON.parse(userStr);
       if (u && isUserPinEnabled(u.id)) {
-        return isAppLocked();
+        return isAppLocked(u.id);
       }
     } catch (e) {}
     return false;
@@ -280,23 +280,23 @@ function App() {
   useEffect(() => {
     if (!user || !isUserPinEnabled(user.id)) return;
 
-    let lastActivity = Date.now();
-    let bgTime = null;
+    recordUserActivity(user.id);
 
+    let lastActivityThrottled = Date.now();
     const updateActivity = () => {
       const now = Date.now();
-      if (now - lastActivity > 5000) {
-        lastActivity = now;
+      if (now - lastActivityThrottled > 5000) {
+        lastActivityThrottled = now;
+        recordUserActivity(user.id);
       }
     };
 
     const checkInactivity = () => {
       const lockMinutes = getAutoLockDuration(user.id);
-      if (lockMinutes === -1 || lockMinutes === 0) return; // -1 = Off, 0 = only on background
+      if (lockMinutes === -1) return; // -1 = Off
 
-      const limitMs = lockMinutes * 60 * 1000;
-      if (Date.now() - lastActivity >= limitMs) {
-        setAppLocked(true);
+      if (isAppLocked(user.id)) {
+        setAppLocked(true, user.id);
         setIsLocked(true);
       }
     };
@@ -306,31 +306,41 @@ function App() {
       if (lockMinutes === -1) return; // Disabled
 
       if (document.hidden) {
-        bgTime = Date.now();
-      } else {
-        if (bgTime) {
-          const bgDuration = Date.now() - bgTime;
-          const limitMs = lockMinutes * 60 * 1000;
-          if (lockMinutes === 0 || bgDuration >= limitMs) {
-            setAppLocked(true);
-            setIsLocked(true);
-          }
-          bgTime = null;
+        recordUserActivity(user.id);
+        if (lockMinutes === 0) {
+          setAppLocked(true, user.id);
+          setIsLocked(true);
         }
-        lastActivity = Date.now();
+      } else {
+        if (isAppLocked(user.id)) {
+          setAppLocked(true, user.id);
+          setIsLocked(true);
+        } else {
+          recordUserActivity(user.id);
+        }
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      recordUserActivity(user.id);
+      const lockMinutes = getAutoLockDuration(user.id);
+      if (lockMinutes === 0) {
+        setAppLocked(true, user.id);
       }
     };
 
     const handleCustomLock = () => {
+      setAppLocked(true, user.id);
       setIsLocked(true);
     };
 
     const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
     activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }));
 
-    const interval = setInterval(checkInactivity, 10000); // Check every 10s
+    const interval = setInterval(checkInactivity, 5000); // Check every 5s
 
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('skandx_lock_app', handleCustomLock);
     window.addEventListener('shortmarket_lock_app', handleCustomLock);
 
@@ -338,6 +348,7 @@ function App() {
       activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity));
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('skandx_lock_app', handleCustomLock);
       window.removeEventListener('shortmarket_lock_app', handleCustomLock);
     };

@@ -5,6 +5,7 @@ import { getInstantLotsize } from './utils/lotsizeHelper';
 import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
 import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
 import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
+import { setAppLocked } from './utils/biometricAuth';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -216,7 +217,10 @@ export const useStore = create(persist((set, get) => ({
       if (data.success) {
         if (data.trusted && data.token && data.user) {
           localStorage.setItem('token', data.token);
-          if (data.user?.id) socket.emit('register_user', data.user.id);
+          if (data.user?.id) {
+            setAppLocked(false, data.user.id);
+            socket.emit('register_user', data.user.id);
+          }
           set({
             token: data.token,
             user: data.user,
@@ -270,7 +274,10 @@ export const useStore = create(persist((set, get) => ({
         if (data.trusted_device_token) {
           localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
         }
-        if (data.user?.id) socket.emit('register_user', data.user.id);
+        if (data.user?.id) {
+          setAppLocked(false, data.user.id);
+          socket.emit('register_user', data.user.id);
+        }
         set({
           token: data.token,
           user: data.user,
@@ -310,7 +317,10 @@ export const useStore = create(persist((set, get) => ({
         if (data.trusted_device_token) {
           localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
         }
-        if (data.user?.id) socket.emit('register_user', data.user.id);
+        if (data.user?.id) {
+          setAppLocked(false, data.user.id);
+          socket.emit('register_user', data.user.id);
+        }
         set({
           token: data.token,
           user:       data.user,
@@ -2187,6 +2197,10 @@ export const useStore = create(persist((set, get) => ({
   setToken: (token) => set({ token }),
   setUser:  (user)  => set({ user }),
   logout: () => {
+    const u = get().user;
+    if (u?.id) {
+      setAppLocked(false, u.id);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('hasSkippedOnboarding');
     set({

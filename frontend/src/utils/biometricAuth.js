@@ -9,6 +9,8 @@ const OLD_BIOMETRIC_KEY_PREFIX = 'shortmarket_bio_cred_';
 
 const LOCK_STATE_KEY = 'skandx_app_locked';
 const OLD_LOCK_STATE_KEY = 'shortmarket_app_locked';
+const SESSION_UNLOCKED_PREFIX = 'skandx_session_unlocked_';
+const LAST_ACTIVE_PREFIX = 'skandx_last_active_';
 
 // Base64URL helper utilities for binary WebAuthn credentials
 function bufferToBase64Url(buffer) {
@@ -64,6 +66,10 @@ export async function saveUserPin(pin, userId = 'default') {
   if (!pin || pin.length !== 4) throw new Error('PIN must be exactly 4 digits');
   const hashed = await hashPin(pin, userId);
   localStorage.setItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`, hashed);
+  try {
+    sessionStorage.setItem(`${SESSION_UNLOCKED_PREFIX}${userId}`, 'true');
+    localStorage.setItem(`${LAST_ACTIVE_PREFIX}${userId}`, String(Date.now()));
+  } catch (e) {}
   return true;
 }
 
@@ -108,8 +114,10 @@ export function removeUserPin(userId = 'default') {
   localStorage.removeItem(`${OLD_PIN_KEY_PREFIX}${userId}`);
   localStorage.removeItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`);
   localStorage.removeItem(`${OLD_BIOMETRIC_KEY_PREFIX}${userId}`);
+  localStorage.removeItem(`${LAST_ACTIVE_PREFIX}${userId}`);
   sessionStorage.removeItem(LOCK_STATE_KEY);
   sessionStorage.removeItem(OLD_LOCK_STATE_KEY);
+  sessionStorage.removeItem(`${SESSION_UNLOCKED_PREFIX}${userId}`);
 }
 
 /**
@@ -249,18 +257,84 @@ export async function verifyBiometrics(userId = 'default') {
 }
 
 /**
- * Lock / Unlock Session Management
+ * Record user activity timestamp in localStorage
  */
-export function isAppLocked() {
-  return sessionStorage.getItem(LOCK_STATE_KEY) === 'true' || sessionStorage.getItem(OLD_LOCK_STATE_KEY) === 'true';
+export function recordUserActivity(userId = 'default') {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`${LAST_ACTIVE_PREFIX}${userId}`, String(Date.now()));
+  } catch (e) {}
 }
 
-export function setAppLocked(locked = true) {
+export function getLastActiveTime(userId = 'default') {
+  if (typeof window === 'undefined') return Date.now();
+  try {
+    const val = localStorage.getItem(`${LAST_ACTIVE_PREFIX}${userId}`);
+    return val ? Number(val) : 0;
+  } catch (e) {
+    return Date.now();
+  }
+}
+
+/**
+ * Lock / Unlock Session Management
+ */
+export function isAppLocked(userId = 'default') {
+  if (typeof window === 'undefined') return false;
+
+  // If user has not enabled a PIN/biometrics, never lock
+  if (!isUserPinEnabled(userId)) return false;
+
+  // Explicit lock (e.g. Test Lock button or manual trigger)
+  if (sessionStorage.getItem(LOCK_STATE_KEY) === 'true' || sessionStorage.getItem(OLD_LOCK_STATE_KEY) === 'true') {
+    return true;
+  }
+
+  const lockMinutes = getAutoLockDuration(userId);
+
+  // If Auto-Lock is completely Off (-1), only lock if explicitly locked
+  if (lockMinutes === -1) {
+    return false;
+  }
+
+  // If Auto-Lock is "Immediately on Background / Close" (0 minutes):
+  // Any brand new tab, reopened browser, or backgrounded session that isn't unlocked MUST lock!
+  if (lockMinutes === 0) {
+    const isUnlocked = sessionStorage.getItem(`${SESSION_UNLOCKED_PREFIX}${userId}`) === 'true';
+    return !isUnlocked;
+  }
+
+  // If timed auto-lock (e.g. 1m, 5m, 10m, 15m, 30m, 1h):
+  const isUnlocked = sessionStorage.getItem(`${SESSION_UNLOCKED_PREFIX}${userId}`) === 'true';
+  const lastActive = getLastActiveTime(userId);
+  const limitMs = lockMinutes * 60 * 1000;
+
+  if (lastActive > 0 && (Date.now() - lastActive) >= limitMs) {
+    // Time expired! Invalidate session unlock
+    sessionStorage.removeItem(`${SESSION_UNLOCKED_PREFIX}${userId}`);
+    return true;
+  }
+
+  // If this is a fresh tab / reopened browser and was never unlocked in this session
+  if (!isUnlocked) {
+    if (lastActive === 0 || (Date.now() - lastActive) >= limitMs) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function setAppLocked(locked = true, userId = 'default') {
+  if (typeof window === 'undefined') return;
   if (locked) {
     sessionStorage.setItem(LOCK_STATE_KEY, 'true');
+    sessionStorage.removeItem(`${SESSION_UNLOCKED_PREFIX}${userId}`);
   } else {
     sessionStorage.removeItem(LOCK_STATE_KEY);
     sessionStorage.removeItem(OLD_LOCK_STATE_KEY);
+    sessionStorage.setItem(`${SESSION_UNLOCKED_PREFIX}${userId}`, 'true');
+    recordUserActivity(userId);
   }
 }
 

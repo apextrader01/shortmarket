@@ -1059,8 +1059,8 @@ export function BiometricSettingsSection({ user }) {
   };
 
   const handleTestLock = () => {
-    setAppLocked(true);
-    window.location.reload();
+    setAppLocked(true, userId);
+    window.dispatchEvent(new CustomEvent('skandx_lock_app'));
   };
 
   const formatRelativeTime = (dateStr) => {
