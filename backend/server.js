@@ -1200,7 +1200,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
 
-    const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '60d' });
     const tokenHash = hashToken(token);
     if (tokenHash) {
       await db('user_sessions').insert({
@@ -1220,7 +1220,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       httpOnly: true,
       secure: isHttps,
       sameSite: isHttps ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 60 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: userId, client_id: clientId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
   } catch (err) {
@@ -4428,9 +4428,16 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
     const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
     const limit = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
+    const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));
     
     if (watchlists.length > limit) {
       return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
+    }
+
+    for (const wl of watchlists) {
+      if (Array.isArray(wl.symbols) && wl.symbols.length > maxSymbols) {
+        return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${maxSymbols} symbols per watchlist ("${wl.name}" has ${wl.symbols.length}). Please upgrade to add more.` });
+      }
     }
 
     await db('users').where({ id: req.user.id }).update({ watchlists: JSON.stringify(watchlists) });
@@ -7912,6 +7919,28 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     const { items, total_margin } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Basket is empty' });
+  }
+
+  // 🛡️ Subscription Tier Eligibility & Leg Limits for Basket Orders (Multi-Leg)
+  const user = await db('users').where({ id: req.user.id }).first();
+  const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isPaidTier = isHighest || isYearly || isMonthly;
+
+  if (!isPaidTier) {
+    return res.status(403).json({
+      error: 'Basket Orders (Multi-Leg) are a Pro feature. Please upgrade to Pro Monthly (up to 5 legs), Yearly (up to 15 legs), or Feature Plan (unlimited legs) to place basket orders.',
+      tier_required: true
+    });
+  }
+
+  const maxLegs = isHighest ? Infinity : (isYearly ? 15 : 5);
+  if (items.length > maxLegs) {
+    return res.status(403).json({
+      error: `Your ${user?.subscription_tier || 'PRO'} plan allows a maximum of ${maxLegs} legs per basket order (${items.length} submitted). Please upgrade to add more legs.`,
+      max_legs: maxLegs
+    });
   }
 
   // Block new orders when market is closed

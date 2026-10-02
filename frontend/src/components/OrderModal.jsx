@@ -105,8 +105,13 @@ export default function OrderModal() {
         setSlPrice('');
       }
       if ((orderModal.target && Number(orderModal.target) > 0) || (orderModal.stopLoss && Number(orderModal.stopLoss) > 0)) {
-        setIsBO(true);
-        setIsCO(false);
+        if (initialProd === 'INT' || initialProd === 'MIS') {
+          setIsBO(true);
+          setIsCO(false);
+        } else {
+          setIsBO(false);
+          setIsCO(false);
+        }
       } else {
         setIsBO(false);
         setIsCO(false);
@@ -1214,6 +1219,47 @@ export default function OrderModal() {
                   <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: '#2563eb' }} /> 
                   BO (Bracket Order)
                 </label>
+              </div>
+            </div>
+          )}
+
+          {/* Advisory Target & Stop Loss Card for Delivery / CNC Orders (from Trade Signal) */}
+          {(productType === 'DEL' || productType === 'CNC') && (orderModal.target || orderModal.stopLoss) && (
+            <div style={{
+              margin: '0 0 12px 0',
+              padding: '10px 14px',
+              background: 'rgba(139, 92, 246, 0.08)',
+              border: '1px solid rgba(139, 92, 246, 0.25)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px' }}>🎯</span>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Signal Advisory Levels (Delivery / Positional)
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                    Reference levels from trade broadcast. Delivery positions are held until manually exited.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                {orderModal.target && (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>TARGET</div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#10B981' }}>₹{Number(orderModal.target).toFixed(2)}</div>
+                  </div>
+                )}
+                {orderModal.stopLoss && (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>STOP LOSS</div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#EF4444' }}>₹{Number(orderModal.stopLoss).toFixed(2)}</div>
+                  </div>
+                )}
               </div>
             </div>
           )}

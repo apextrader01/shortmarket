@@ -446,6 +446,20 @@ export const useStore = create(persist((set, get) => ({
   lastWatchlistEdit: 0, // Timestamp to prevent background fetchUserData from overwriting optimistic UI
 
   createWatchlist: (name) => {
+    const user = get().user;
+    const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
+    const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+    const activeTier = isExpired ? 'BASIC' : tier;
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearly = activeTier === 'YEARLY';
+    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
+    const maxWatchlists = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
+
+    if (get().watchlists.length >= maxWatchlists) {
+      alert(`Your ${activeTier} plan allows a maximum of ${maxWatchlists} custom watchlists. Please upgrade to Pro Monthly (3), Pro Yearly (4), or Feature Plan (5) to create more watchlists.`);
+      return;
+    }
+
     if (get().watchlists.some(w => w.name.toLowerCase() === name.toLowerCase())) {
       alert(`Watchlist "${name}" already exists!`);
       return;
@@ -485,7 +499,22 @@ export const useStore = create(persist((set, get) => ({
   },
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
+    const user = get().user;
+    const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
+    const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+    const activeTier = isExpired ? 'BASIC' : tier;
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearly = activeTier === 'YEARLY';
+    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
+    const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));
+
     const targetWlId = String(watchlistId);
+    const targetWl = get().watchlists.find(w => String(w.id) === targetWlId);
+    if (targetWl && (targetWl.symbols || []).length >= maxSymbols && !(targetWl.symbols || []).includes(uniqueSymbol)) {
+      alert(`Your ${activeTier} plan allows up to ${maxSymbols} symbols per watchlist. Please upgrade your plan to add more symbols.`);
+      return;
+    }
+
     const newWatchlists = get().watchlists.map(w => {
       if (String(w.id) === targetWlId && !(w.symbols || []).includes(uniqueSymbol)) {
         return { ...w, symbols: [...(w.symbols || []), uniqueSymbol] };
@@ -1831,13 +1860,22 @@ export const useStore = create(persist((set, get) => ({
   },
 
   syncWatchlists: async (watchlists) => {
-    
-    
     try {
-      await fetch(`${API}/api/user/watchlists`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/watchlists`, { credentials: 'include', method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ watchlists })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data && data.error) {
+          get().showToast(data.error, 'error', 'Watchlist Limit');
+          get().fetchUserData();
+        }
+      }
     } catch (err) {}
   },
 

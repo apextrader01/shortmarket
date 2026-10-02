@@ -11,6 +11,8 @@ import { getInstantLotsize, isDerivativeContract, isCommodityContract } from '..
 const POPULAR_INSTRUMENTS = [
   { uniqueSymbol: 'NSE:NIFTY50-INDEX', symbol: 'NIFTY50', name: 'Nifty 50 Index', exchange: 'NSE', type: 'INDEX' },
   { uniqueSymbol: 'NSE:NIFTYBANK-INDEX', symbol: 'BANKNIFTY', name: 'Bank Nifty Index', exchange: 'NSE', type: 'INDEX' },
+  { uniqueSymbol: 'NSE:NIFTY-FUT', symbol: 'NIFTY-FUT', name: 'Nifty Current Month Future', exchange: 'NSE', type: 'FNO' },
+  { uniqueSymbol: 'NSE:BANKNIFTY-FUT', symbol: 'BANKNIFTY-FUT', name: 'Bank Nifty Current Month Future', exchange: 'NSE', type: 'FNO' },
   { uniqueSymbol: 'NSE:RELIANCE', symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE', type: 'EQUITY' },
   { uniqueSymbol: 'NSE:HDFCBANK', symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE', type: 'EQUITY' },
   { uniqueSymbol: 'NSE:TATAMOTORS', symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', exchange: 'NSE', type: 'EQUITY' },
@@ -137,12 +139,19 @@ export default function BroadcastModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const isSelectedEquity = selectedStockData ? isEquity(selectedStockData) : (!isDerivativeContract(symbol) && !isCommodityContract(symbol));
+  const isDeliveryDisabled = signalSide === 'SELL' && isSelectedEquity;
+
   // Handle instrument select from autocomplete
   const handleSelectInstrument = (item) => {
     const targetSymbol = item.uniqueSymbol || item.symbol;
     setSymbol(targetSymbol);
     setSelectedStockData(item);
     setIsSearchOpen(false);
+
+    if (signalSide === 'SELL' && isEquity(item)) {
+      setProductType('INT');
+    }
 
     // Live price resolution
     const priceData = prices[targetSymbol] || prices[item.symbol];
@@ -159,6 +168,9 @@ export default function BroadcastModal({ isOpen, onClose }) {
 
   const handleSideChange = (newSide) => {
     setSignalSide(newSide);
+    if (newSide === 'SELL' && isSelectedEquity) {
+      setProductType('INT');
+    }
     const numEntry = parseFloat(entryPrice);
     if (!isNaN(numEntry) && numEntry > 0) {
       const factor = newSide === 'BUY' ? 1.015 : 0.985;
@@ -290,6 +302,11 @@ export default function BroadcastModal({ isOpen, onClose }) {
       }
       if (stopLossError) {
         alert(`Stop Loss Error: ${stopLossError}`);
+        setSubmitting(false);
+        return;
+      }
+      if (signalSide === 'SELL' && productType === 'DEL' && isSelectedEquity) {
+        alert('Short selling cash equity shares is strictly prohibited in Delivery (CNC) by SEBI rules. Please select Intraday (MIS).');
         setSubmitting(false);
         return;
       }
@@ -655,7 +672,12 @@ export default function BroadcastModal({ isOpen, onClose }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setProductType('DEL')}
+                          disabled={isDeliveryDisabled}
+                          onClick={() => {
+                            if (isDeliveryDisabled) return;
+                            setProductType('DEL');
+                          }}
+                          title={isDeliveryDisabled ? "Short selling cash equity shares is strictly prohibited in Delivery (CNC). Intraday (MIS) only." : "Delivery / Positional Trade"}
                           style={{
                             padding: '11px 8px',
                             borderRadius: '8px',
@@ -664,7 +686,8 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             color: productType === 'DEL' ? '#A78BFA' : 'var(--text-secondary)',
                             fontWeight: '800',
                             fontSize: '13px',
-                            cursor: 'pointer',
+                            cursor: isDeliveryDisabled ? 'not-allowed' : 'pointer',
+                            opacity: isDeliveryDisabled ? 0.35 : 1,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

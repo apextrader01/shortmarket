@@ -674,6 +674,26 @@ export default function BasketModal() {
   const handleExecute = async () => {
     if (basketItems.length === 0) return;
 
+    // 🛡️ Subscription Tier Check for Basket Orders
+    const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
+    const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+    const activeTier = isExpired ? 'BASIC' : userTier;
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearly = activeTier === 'YEARLY';
+    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
+    const isPaid = isHighest || isYearly || isMonthly;
+
+    if (!isPaid) {
+      alert('Basket Orders (Multi-Leg) are a Pro feature. Please upgrade to Pro Monthly (up to 5 legs), Pro Yearly (up to 15 legs), or Feature Plan (unlimited legs) to place basket orders.');
+      return;
+    }
+
+    const maxLegs = isHighest ? Infinity : (isYearly ? 15 : 5);
+    if (basketItems.length > maxLegs) {
+      alert(`Your ${activeTier} plan allows a maximum of ${maxLegs} legs per basket order (${basketItems.length} in basket). Please upgrade to add more legs.`);
+      return;
+    }
+
     for (const item of enhancedItems) {
       const limit = getFreezeLimit(item.symbol, item.lotsize);
       if (limit && item.totalQuantity > limit) {
