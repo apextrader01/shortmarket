@@ -111,7 +111,7 @@ export default function OrderModal() {
           }).catch(console.error);
       }
     }
-  }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
+  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, orderModal.productType, orderModal.initialPrice]);
 
   const balanceNum = Number(user?.balance) || 0;
   const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);

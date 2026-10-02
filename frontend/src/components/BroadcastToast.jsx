@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, TrendingUp, TrendingDown, Newspaper, Bell, ArrowRight, Zap } from 'lucide-react';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function BroadcastToast() {
   const { activeBroadcastToast, dismissBroadcastToast, openOrderModal, setSelectedSymbol } = useStore(
@@ -33,7 +34,9 @@ export default function BroadcastToast() {
     if (symbol) {
       setSelectedSymbol?.(symbol);
       const effectiveProd = (product_type === 'DEL' || product_type === 'DELIVERY') ? 'DEL' : 'INT';
-      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY', 1, effectiveProd);
+      const effectiveLotsize = getInstantLotsize(symbol);
+      const initPrice = (entry_price && !isNaN(Number(entry_price)) && Number(entry_price) > 0) ? Number(entry_price) : null;
+      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice);
     }
     dismissBroadcastToast();
   };

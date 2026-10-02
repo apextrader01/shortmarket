@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, TrendingUp, TrendingDown, Newspaper, Bell, CheckCheck, Zap, Trash2, Clock, ShieldAlert } from 'lucide-react';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastModal }) {
   const { user, broadcastNotifications, markAllNotificationsRead, deleteBroadcastNotification, openOrderModal, setSelectedSymbol } = useStore(
@@ -31,7 +32,9 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
     if (item.symbol) {
       setSelectedSymbol?.(item.symbol);
       const effectiveProd = (item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? 'DEL' : 'INT';
-      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY', 1, effectiveProd);
+      const effectiveLotsize = getInstantLotsize(item.symbol);
+      const initPrice = (item.entry_price && !isNaN(Number(item.entry_price)) && Number(item.entry_price) > 0) ? Number(item.entry_price) : null;
+      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice);
       onClose();
     }
   };

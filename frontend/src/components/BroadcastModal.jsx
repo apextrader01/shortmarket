@@ -168,6 +168,95 @@ export default function BroadcastModal({ isOpen, onClose }) {
     }
   };
 
+  // Real-time price resolution, risk-reward metrics & validation
+  const currentLtp = prices[symbol]?.ltp !== undefined 
+    ? Number(prices[symbol].ltp) 
+    : (selectedStockData?.ltp ? Number(selectedStockData.ltp) : null);
+
+  const numEntry = (entryPrice && entryPrice.trim().toUpperCase() === 'CMP')
+    ? (currentLtp || null)
+    : parseFloat(entryPrice);
+  const numTarget = parseFloat(targetPrice);
+  const numSL = parseFloat(stopLoss);
+
+  const hasValidEntry = !isNaN(numEntry) && numEntry !== null && numEntry > 0;
+  const hasValidTarget = !isNaN(numTarget) && numTarget > 0;
+  const hasValidSL = !isNaN(numSL) && numSL > 0;
+
+  let targetError = null;
+  let stopLossError = null;
+
+  if (hasValidEntry) {
+    if (signalSide === 'BUY') {
+      if (hasValidTarget && numTarget <= numEntry) {
+        targetError = `Target (₹${numTarget.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a BUY call.`;
+      }
+      if (hasValidSL && numSL >= numEntry) {
+        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a BUY call.`;
+      }
+    } else { // SELL
+      if (hasValidTarget && numTarget >= numEntry) {
+        targetError = `Target (₹${numTarget.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a SELL call.`;
+      }
+      if (hasValidSL && numSL <= numEntry) {
+        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a SELL call.`;
+      }
+    }
+  }
+
+  // Calculated gains, risks and Risk-Reward ratio
+  let potentialGainAmt = null;
+  let potentialGainPct = null;
+  let potentialRiskAmt = null;
+  let potentialRiskPct = null;
+  let riskRewardRatio = null;
+
+  if (hasValidEntry && hasValidTarget && !targetError) {
+    const gain = signalSide === 'BUY' ? (numTarget - numEntry) : (numEntry - numTarget);
+    potentialGainAmt = gain.toFixed(2);
+    potentialGainPct = ((gain / numEntry) * 100).toFixed(2);
+  }
+
+  if (hasValidEntry && hasValidSL && !stopLossError) {
+    const risk = signalSide === 'BUY' ? (numEntry - numSL) : (numSL - numEntry);
+    potentialRiskAmt = risk.toFixed(2);
+    potentialRiskPct = ((risk / numEntry) * 100).toFixed(2);
+  }
+
+  if (hasValidEntry && hasValidTarget && hasValidSL && !targetError && !stopLossError) {
+    const gain = signalSide === 'BUY' ? (numTarget - numEntry) : (numEntry - numTarget);
+    const risk = signalSide === 'BUY' ? (numEntry - numSL) : (numSL - numEntry);
+    if (risk > 0) {
+      riskRewardRatio = (gain / risk).toFixed(2);
+    }
+  }
+
+  const applyPresetLevels = (targetPct = 0.02, slPct = 0.01) => {
+    const base = hasValidEntry ? numEntry : (currentLtp || 100);
+    if (signalSide === 'BUY') {
+      setTargetPrice((base * (1 + targetPct)).toFixed(2));
+      setStopLoss((base * (1 - slPct)).toFixed(2));
+    } else {
+      setTargetPrice((base * (1 - targetPct)).toFixed(2));
+      setStopLoss((base * (1 + slPct)).toFixed(2));
+    }
+    if (!entryPrice || entryPrice === 'CMP') {
+      setEntryPrice(base.toFixed(2));
+    }
+  };
+
+  const autoFixSL = () => {
+    const base = hasValidEntry ? numEntry : (currentLtp || 100);
+    const sl = signalSide === 'BUY' ? base * 0.985 : base * 1.015;
+    setStopLoss(sl.toFixed(2));
+  };
+
+  const autoFixTarget = () => {
+    const base = hasValidEntry ? numEntry : (currentLtp || 100);
+    const tgt = signalSide === 'BUY' ? base * 1.03 : base * 0.97;
+    setTargetPrice(tgt.toFixed(2));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -176,6 +265,31 @@ export default function BroadcastModal({ isOpen, onClose }) {
     if (activeTab === 'SIGNAL') {
       if (!symbol.trim()) {
         alert('Please enter a trading symbol (e.g. NSE:RELIANCE or NIFTY24OCT25000CE or MCX:CRUDEOILM)');
+        setSubmitting(false);
+        return;
+      }
+      if (!entryPrice || !entryPrice.trim()) {
+        alert('Please specify an Entry Price (or enter CMP for Current Market Price)');
+        setSubmitting(false);
+        return;
+      }
+      if (!targetPrice || !targetPrice.trim()) {
+        alert('Please specify a Target Price for traders');
+        setSubmitting(false);
+        return;
+      }
+      if (!stopLoss || !stopLoss.trim()) {
+        alert('Please specify a Stop Loss Price to protect trader capital');
+        setSubmitting(false);
+        return;
+      }
+      if (targetError) {
+        alert(`Target Price Error: ${targetError}`);
+        setSubmitting(false);
+        return;
+      }
+      if (stopLossError) {
+        alert(`Stop Loss Error: ${stopLossError}`);
         setSubmitting(false);
         return;
       }
@@ -837,9 +951,23 @@ export default function BroadcastModal({ isOpen, onClose }) {
                   {/* Price Levels Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        ENTRY PRICE (₹)
-                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                          ENTRY PRICE (₹) *
+                        </label>
+                        {currentLtp && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEntryPrice(currentLtp.toFixed(2));
+                              applyPresetLevels(0.02, 0.01);
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--color-blue)', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                          >
+                            Use CMP (₹{currentLtp.toFixed(2)})
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="text"
                         className="input-field"
@@ -850,31 +978,187 @@ export default function BroadcastModal({ isOpen, onClose }) {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: '#10B981', display: 'block', marginBottom: '4px' }}>
-                        TARGET (₹)
-                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '11.5px', fontWeight: '700', color: '#10B981' }}>
+                          TARGET (₹) *
+                        </label>
+                        {potentialGainPct && !targetError && (
+                          <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#10B981' }}>
+                            +{potentialGainPct}%
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         className="input-field"
                         placeholder="2500.00"
                         value={targetPrice}
                         onChange={e => setTargetPrice(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', fontSize: '13px' }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '13px',
+                          borderColor: targetError ? '#EF4444' : undefined,
+                          background: targetError ? 'rgba(239, 68, 68, 0.1)' : undefined
+                        }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: '#EF4444', display: 'block', marginBottom: '4px' }}>
-                        STOP LOSS (₹)
-                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '11.5px', fontWeight: '700', color: '#EF4444' }}>
+                          STOP LOSS (₹) *
+                        </label>
+                        {potentialRiskPct && !stopLossError && (
+                          <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#EF4444' }}>
+                            -{potentialRiskPct}%
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         className="input-field"
                         placeholder="2420.00"
                         value={stopLoss}
                         onChange={e => setStopLoss(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', fontSize: '13px' }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '13px',
+                          borderColor: stopLossError ? '#EF4444' : undefined,
+                          background: stopLossError ? 'rgba(239, 68, 68, 0.1)' : undefined
+                        }}
                       />
                     </div>
+                  </div>
+
+                  {/* Real-time Validation Alerts */}
+                  {(stopLossError || targetError) && (
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      {stopLossError && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FCA5A5' }}>
+                            <AlertTriangle size={15} color="#EF4444" style={{ flexShrink: 0 }} />
+                            <span>{stopLossError}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={autoFixSL}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.3)',
+                              border: '1px solid #EF4444',
+                              color: '#fff',
+                              borderRadius: '5px',
+                              padding: '3px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Auto-Fix SL
+                          </button>
+                        </div>
+                      )}
+                      {targetError && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FCA5A5' }}>
+                            <AlertTriangle size={15} color="#EF4444" style={{ flexShrink: 0 }} />
+                            <span>{targetError}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={autoFixTarget}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.3)',
+                              border: '1px solid #EF4444',
+                              color: '#fff',
+                              borderRadius: '5px',
+                              padding: '3px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Auto-Fix Target
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Level Presets & Live Metrics Bar */}
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    {/* Quick Presets */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => applyPresetLevels(0.02, 0.01)}
+                        style={{ padding: '3px 7px', fontSize: '10.5px', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        ⚡ 1:2 R:R (+2% / -1%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyPresetLevels(0.045, 0.015)}
+                        style={{ padding: '3px 7px', fontSize: '10.5px', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        ⚡ 1:3 R:R (+4.5% / -1.5%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyPresetLevels(0.015, 0.008)}
+                        style={{ padding: '3px 7px', fontSize: '10.5px', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        ⚡ Scalp (+1.5% / -0.8%)
+                      </button>
+                    </div>
+
+                    {/* Calculated R:R & Profit/Risk */}
+                    {hasValidEntry && !targetError && !stopLossError && (potentialGainPct || potentialRiskPct) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' }}>
+                        {potentialGainAmt && (
+                          <span style={{ color: '#10B981', fontWeight: '700' }}>
+                            Gain: +₹{potentialGainAmt} (+{potentialGainPct}%)
+                          </span>
+                        )}
+                        {potentialRiskAmt && (
+                          <span style={{ color: '#EF4444', fontWeight: '700' }}>
+                            Risk: -₹{potentialRiskAmt} (-{potentialRiskPct}%)
+                          </span>
+                        )}
+                        {riskRewardRatio && (
+                          <span style={{
+                            background: Number(riskRewardRatio) >= 1.5 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(234, 179, 8, 0.2)',
+                            color: Number(riskRewardRatio) >= 1.5 ? '#34D399' : '#FBBF24',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: '800'
+                          }}>
+                            R:R 1:{riskRewardRatio}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Strategy Notes */}
