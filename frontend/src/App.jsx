@@ -210,11 +210,18 @@ const ActiveAlertChecker = React.memo(() => {
       
       if (triggered) {
         updateAlert(alert.id, { triggered: true, triggeredAt: new Date().toISOString(), triggerPrice: ltp });
+        useStore.getState().showToast(
+          `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
+          'info',
+          '🚨 Price Alert Triggered!'
+        );
         if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Price Alert Triggered! 🚨", {
-            body: `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
-            icon: '/logo.png'
-          });
+          try {
+            new Notification("Price Alert Triggered! 🚨", {
+              body: `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
+              icon: '/logo.png'
+            });
+          } catch (_) {}
         }
       }
     });

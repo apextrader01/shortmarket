@@ -148,19 +148,35 @@ export default function OrdersView() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-main)', minHeight: 0 }}>
       {/* Sub Navigation */}
-      <div style={{ display: 'flex', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '24px' }}>
+      <div 
+        className="orders-subnav-container"
+        style={{ 
+          display: 'flex', 
+          padding: '0 16px', 
+          borderBottom: '1px solid var(--border-color)', 
+          background: 'var(--bg-panel)', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch',
+          gap: '12px'
+        }}
+      >
+        <div style={{ display: 'flex', gap: '18px', flexShrink: 0 }}>
           {tabs.map(tab => (
             <div
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                padding: '16px 4px',
+                padding: '14px 4px',
                 fontSize: '13px',
                 fontWeight: activeTab === tab ? '600' : '500',
                 color: activeTab === tab ? '#2563eb' : 'var(--text-secondary)',
                 borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
                 transition: 'all 0.2s ease'
               }}
             >
@@ -168,15 +184,15 @@ export default function OrdersView() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
           {activeTab === 'Order History' && (
             <select 
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{
                 background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
-                padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
-                outline: 'none', cursor: 'pointer'
+                padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                outline: 'none', cursor: 'pointer', flexShrink: 0
               }}
             >
               <option value="ALL">All Statuses</option>
@@ -192,29 +208,33 @@ export default function OrdersView() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'rgba(37, 99, 235, 0.12)',
-              border: '1px solid rgba(37, 99, 235, 0.3)',
-              color: '#2563eb',
-              borderRadius: '4px',
+              background: 'rgba(37, 99, 235, 0.16)',
+              border: '1px solid rgba(37, 99, 235, 0.45)',
+              color: '#3b82f6',
+              borderRadius: '6px',
               padding: '6px 14px',
               fontSize: '12px',
               fontWeight: '700',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
+              flexShrink: 0,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
               transition: 'all 0.15s ease'
             }}
+            title="Open Basket Order Book"
           >
             <ShoppingBag size={14} /> Basket Orders
           </button>
           <input
             type="text"
+            className="hide-on-mobile"
             placeholder="Filter orders..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
               padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
-              width: '200px', outline: 'none'
+              width: '180px', outline: 'none'
             }}
           />
         </div>
