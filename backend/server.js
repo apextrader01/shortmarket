@@ -274,15 +274,13 @@ loadMarketCalendarFromDb();
 
 function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, isClosingOrder = false) {
   const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
-  if (globalStatus === 'OPEN') {
-    const isIntraday = (product_type === 'INT' || product_type === 'MIS' || product_type === 'INTRADAY' || product_type === 'BO' || product_type === 'CO');
-    if (!isIntraday || isClosingOrder) {
-      return { open: true, session: 'OPEN' };
-    }
-    // For non-closing intraday orders, proceed down to evaluate segment cutoff rules
-  }
   if (globalStatus === 'CLOSED') {
     return { open: false, isTotalBlock: true, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
+  }
+
+  // Position exits/closing orders are always permitted
+  if (isClosingOrder) {
+    return { open: true, session: 'OPEN' };
   }
   
   // Evaluate date in Asia/Kolkata (IST)
@@ -303,7 +301,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
     const segmentStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
     const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
 
-    if (segmentStatus === 'CLOSED') {
+    if (segmentStatus === 'CLOSED' && globalStatus !== 'OPEN') {
       return {
         open: false,
         isTotalBlock: true,
@@ -331,8 +329,8 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
     }
   }
 
-  // 2. Weekend Check (Saturday & Sunday)
-  if (day === 0 || day === 6) {
+  // 2. Weekend Check (Saturday & Sunday) - bypassed when admin explicitly turns market OPEN
+  if ((day === 0 || day === 6) && globalStatus !== 'OPEN') {
     return { 
       open: false, 
       isTotalBlock: false, 

@@ -257,7 +257,6 @@ export default function OrderModal() {
   
   const getMarketSession = () => {
     const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
-    if (status === 'OPEN') return { open: true, mode: 'OPEN', session: 'OPEN' };
     if (status === 'CLOSED') {
       return { 
         open: false, 
@@ -280,7 +279,7 @@ export default function OrderModal() {
       const segStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
       const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
       
-      if (segStatus === 'CLOSED') {
+      if (segStatus === 'CLOSED' && status !== 'OPEN') {
         return {
           open: false,
           mode: 'CLOSED',
@@ -310,13 +309,13 @@ export default function OrderModal() {
       }
     }
 
-    // 2. AUTO mode: Check weekend & normal hours
+    // 2. AUTO mode: Check weekend & normal hours (bypassed if status === 'OPEN')
     const day = istTime.getDay(); // 0 = Sun, 6 = Sat
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
     const curMins = hours * 60 + minutes;
 
-    if (day === 0 || day === 6) {
+    if ((day === 0 || day === 6) && status !== 'OPEN') {
       return { 
         open: false, 
         mode: 'AUTO', 

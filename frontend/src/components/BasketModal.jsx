@@ -602,7 +602,6 @@ export default function BasketModal() {
     const isCommodity = (item.symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
     const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
     
-    if (status === 'OPEN') return false;
     if (status === 'CLOSED') {
       blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked CLOSED / Holiday by Administrator.`;
       return true;
@@ -621,7 +620,7 @@ export default function BasketModal() {
       const segStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
       const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
       
-      if (segStatus === 'CLOSED') {
+      if (segStatus === 'CLOSED' && status !== 'OPEN') {
         blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`;
         return true;
       }
@@ -643,27 +642,37 @@ export default function BasketModal() {
       }
     }
 
-    // 2. AUTO mode: Check weekend & normal hours
+    // 2. AUTO mode: Check weekend & normal hours (bypassed if status === 'OPEN')
     const day = istTime.getDay();
-    if (day === 0 || day === 6) {
+    if ((day === 0 || day === 6) && status !== 'OPEN') {
       blockedMarketReason = 'Markets are closed on weekends (Saturday & Sunday).';
       return true;
     }
     
-    if (productType === 'INT') {
-      const hours = istTime.getHours();
-      const minutes = istTime.getMinutes();
-      if (isCommodity) {
-        const isClosed = hours < 9 || hours > 22 || (hours === 22 && minutes >= 50);
-        if (isClosed) blockedMarketReason = 'Intraday trading for Commodities is allowed only between 9:00 AM and 10:50 PM IST.';
-        return isClosed;
-      } else {
-        const isClosed = hours < 9 || (hours === 9 && minutes < 15) || hours > 15 || (hours === 15 && minutes >= 15);
-        if (isClosed) blockedMarketReason = 'Intraday trading for Equities is allowed only between 9:15 AM and 3:15 PM IST.';
-        return isClosed;
+    const hours = istTime.getHours();
+    const minutes = istTime.getMinutes();
+
+    if (isCommodity) {
+      if (hours < 9 || hours > 23 || (hours === 23 && minutes >= 30)) {
+        blockedMarketReason = 'MCX Commodity market is closed (Trading hours: 09:00 AM - 11:30 PM IST).';
+        return true;
       }
+      if (productType === 'INT' && (hours > 22 || (hours === 22 && minutes >= 50))) {
+        blockedMarketReason = 'Intraday trading for Commodities is allowed only between 9:00 AM and 10:50 PM IST.';
+        return true;
+      }
+      return false;
+    } else {
+      if (hours < 9 || (hours === 9 && minutes < 15) || hours > 15 || (hours === 15 && minutes >= 30)) {
+        blockedMarketReason = 'Equity & Derivatives market is closed (Trading hours: 09:15 AM - 03:30 PM IST).';
+        return true;
+      }
+      if (productType === 'INT' && (hours > 15 || (hours === 15 && minutes >= 15))) {
+        blockedMarketReason = 'Intraday trading for Equities is allowed only between 9:15 AM and 3:15 PM IST.';
+        return true;
+      }
+      return false;
     }
-    return false;
   });
 
   const isAnyRestricted = enhancedItems.some(item => restrictedStocks.includes(item.symbol));
