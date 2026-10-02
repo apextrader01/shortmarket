@@ -342,11 +342,10 @@ export default function LoginView() {
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
       if (res && res.success) {
-        setMessage(res.message || 'Password reset email sent! Check your inbox (and spam folder) for the verification code.');
-        setOtp('');
-        setView('otp');
+        setMessage(res.message || 'Password reset link sent! Check your inbox.');
+        setView('reset_email_sent');
       } else {
-        useStore.setState({ authError: res?.error || 'Failed to send reset code.' });
+        useStore.setState({ authError: res?.error || 'Failed to send reset link.' });
       }
     }
     else if (view === 'otp') {
@@ -562,7 +561,89 @@ export default function LoginView() {
         )}
 
         {/* Form or Email Verification Screen */}
-        {view === 'verify_email_sent' ? (
+        {view === 'reset_email_sent' ? (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(59, 130, 246, 0.12)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '28px'
+            }}>
+              🔑
+            </div>
+
+            <h3 style={{ fontSize: '19px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>
+              Reset Link Sent
+            </h3>
+
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
+              An official password reset link has been dispatched to <strong style={{ color: '#fff' }}>{email}</strong>.
+            </p>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              fontSize: '13px',
+              color: '#d1d5db',
+              lineHeight: '1.5',
+              marginBottom: '24px',
+              textAlign: 'left'
+            }}>
+              📌 <strong>Next steps:</strong>
+              <ol style={{ margin: '8px 0 0 16px', padding: 0 }}>
+                <li>Check your inbox (and spam folder if not seen within 1 minute).</li>
+                <li>Click the <strong>&quot;Reset your password for SkandX&quot;</strong> link.</li>
+                <li>Set your new password and return here to log in!</li>
+              </ol>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setView('login');
+                setMessage('Enter your email and new password to log in.');
+              }}
+              className="premium-btn"
+              style={{ width: '100%', marginBottom: '16px' }}
+            >
+              CONTINUE TO LOGIN
+            </button>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  useStore.setState({ authError: null });
+                  const res = await forgotPassword(email.trim().toLowerCase());
+                  if (res && res.success) {
+                    setMessage(`A fresh reset link has been sent to ${email.trim().toLowerCase()}.`);
+                  } else {
+                    useStore.setState({ authError: res?.error || 'Failed to resend reset link.' });
+                  }
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}
+              >
+                Resend Reset Link
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setView('login')}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}
+              >
+                ← Back to Login
+              </button>
+            </div>
+          </div>
+        ) : view === 'verify_email_sent' ? (
           <div style={{ textAlign: 'center', padding: '8px 0' }}>
             <div style={{
               width: '64px',
@@ -944,7 +1025,7 @@ export default function LoginView() {
 
         {/* Toggle */}
         <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {view !== 'verify_email_sent' && (
+          {view !== 'verify_email_sent' && view !== 'reset_email_sent' && (
             <>
               {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
               <span

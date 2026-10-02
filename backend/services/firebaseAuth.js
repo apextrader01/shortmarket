@@ -134,7 +134,8 @@ async function sendFirebasePasswordReset(email) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       requestType: 'PASSWORD_RESET',
-      email: cleanEmail
+      email: cleanEmail,
+      continueUrl: 'https://skandx.in'
     })
   });
 
@@ -144,19 +145,9 @@ async function sendFirebasePasswordReset(email) {
     throw new Error(data.error.message || 'Firebase failed to dispatch password reset email');
   }
 
-  // 3. Also generate backup reset link using Admin SDK for server logs / admin verification
-  let backupLink = null;
-  if (authInstance) {
-    try {
-      backupLink = await authInstance.generatePasswordResetLink(cleanEmail);
-      console.log(`[FIREBASE AUTH] Password reset link generated for ${cleanEmail}: ${backupLink}`);
-    } catch (_) {}
-  }
-
   return {
     success: true,
-    email: cleanEmail,
-    backupLink
+    email: cleanEmail
   };
 }
 
@@ -393,6 +384,33 @@ async function verifyFirebasePasswordResetOobCode(oobCode, newPassword) {
   return { success: true, email: data.email };
 }
 
+/**
+ * Verify user password directly against Firebase Identity Toolkit
+ * Used when a user reset their password externally via the Firebase email link
+ */
+async function verifyFirebasePassword(email, password) {
+  if (!email || !password) return { success: false };
+  try {
+    const cleanEmail = String(email).trim().toLowerCase();
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password: String(password),
+        returnSecureToken: true
+      })
+    });
+    const data = await response.json();
+    if (data.idToken) {
+      return { success: true, email: data.email, uid: data.localId };
+    }
+    return { success: false, error: data.error?.message };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   getFirebaseAdminAuth,
   ensureFirebaseUser,
@@ -402,5 +420,6 @@ module.exports = {
   sendFirebaseLoginEmail,
   sendEmailOtpViaService,
   verifyFirebasePhoneToken,
-  verifyFirebasePasswordResetOobCode
+  verifyFirebasePasswordResetOobCode,
+  verifyFirebasePassword
 };

@@ -1306,6 +1306,28 @@ app.post('/api/auth/resend-verification-email', authLimiter, async (req, res) =>
   }
 });
 
+// ─── Password Verification & Firebase Sync Helper ─────────────────────────
+async function verifyUserPasswordWithFallback(user, password) {
+  if (!user || !user.password_hash || !password) return false;
+  let valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid && user.email) {
+    try {
+      const { verifyFirebasePassword } = require('./services/firebaseAuth');
+      const fbCheck = await verifyFirebasePassword(user.email, password);
+      if (fbCheck && fbCheck.success) {
+        valid = true;
+        const newHash = await bcrypt.hash(password, 10);
+        await db('users').where({ id: user.id }).update({ password_hash: newHash });
+        user.password_hash = newHash;
+        console.log(`[AUTH] Synced new Firebase password to PostgreSQL for ${user.email}`);
+      }
+    } catch (fbErr) {
+      console.warn('[AUTH] Firebase password fallback check note:', fbErr.message);
+    }
+  }
+  return valid;
+}
+
 // ─── 2FA & Authentication with 30-Day Device Trust ──────────────────────────
 app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   const { email, password, trusted_device_token } = req.body || {};
@@ -1313,7 +1335,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   try {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const clientIp = getClientIp(req);
@@ -1428,7 +1450,7 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
   try {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const crypto = require('crypto');
@@ -1479,7 +1501,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
   try {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const crypto = require('crypto');
@@ -1723,7 +1745,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const clientIp = getClientIp(req);
@@ -1965,7 +1987,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: 'Password reset link and verification code sent! Please check your inbox (and spam folder).'
+      message: 'Password reset link sent! Please check your inbox (and spam folder).'
     });
   } catch (error) {
     console.error('Forgot Password Error:', error);
