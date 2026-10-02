@@ -611,13 +611,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null },
-  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null) => {
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null },
+  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null) => {
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
-    set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice } });
+    set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
   },
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
-  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null } }),
+  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),

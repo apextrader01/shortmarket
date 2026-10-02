@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-const AnalyticsView = lazy(() => import('./AnalyticsView'));
-const TradingJournalView = lazy(() => import('./TradingJournalView'));
+import AnalyticsView from './AnalyticsView';
+import TradingJournalView from './TradingJournalView';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 import { 

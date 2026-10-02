@@ -5994,12 +5994,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Real-Time Position Clamping for Explicit Exit Orders (Prevents over-exiting / position reversals)
+  const isExplicitExit = Boolean(req.body.is_exit || req.body.is_system_close || (req.body.remarks && /exit|square-off|close/i.test(req.body.remarks)));
+
   // ── Monthly Trade Quota Enforcement for Free / Basic Plan ──────────────────
   // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
+  // Exits and square-off orders are NEVER blocked so traders can always close open positions.
   const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires').first();
   const isPaidTier = userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date());
   
-  if (!isPaidTier) {
+  if (!isPaidTier && !isExplicitExit) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const orderSide = String(side).toUpperCase();
@@ -6028,8 +6032,6 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
-  // Real-Time Position Clamping for Explicit Exit Orders (Prevents over-exiting / position reversals)
-  const isExplicitExit = Boolean(req.body.is_exit || (req.body.remarks && /exit|square-off|close/i.test(req.body.remarks)));
   if (isExplicitExit) {
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
     const isIntProduct = (effectiveProductType === 'INT' || effectiveProductType === 'MIS' || effectiveProductType === 'BO' || effectiveProductType === 'CO');

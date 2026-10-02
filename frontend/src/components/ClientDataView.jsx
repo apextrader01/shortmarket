@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, ShieldCheck, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
-const ReferralsView = lazy(() => import('./ReferralsView'));
+import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';

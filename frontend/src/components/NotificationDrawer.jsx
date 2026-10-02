@@ -34,7 +34,9 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
       const effectiveProd = (item.product_type === 'DEL' || item.product_type === 'DELIVERY') ? 'DEL' : 'INT';
       const effectiveLotsize = getInstantLotsize(item.symbol);
       const initPrice = (item.entry_price && !isNaN(Number(item.entry_price)) && Number(item.entry_price) > 0) ? Number(item.entry_price) : null;
-      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice);
+      const tgt = (item.target_price && !isNaN(Number(item.target_price)) && Number(item.target_price) > 0) ? Number(item.target_price) : null;
+      const sl = (item.stop_loss && !isNaN(Number(item.stop_loss)) && Number(item.stop_loss) > 0) ? Number(item.stop_loss) : null;
+      openOrderModal?.(item.symbol, item.side === 'SELL' ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice, tgt, sl);
       onClose();
     }
   };

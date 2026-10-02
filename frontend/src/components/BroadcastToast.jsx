@@ -36,7 +36,9 @@ export default function BroadcastToast() {
       const effectiveProd = (product_type === 'DEL' || product_type === 'DELIVERY') ? 'DEL' : 'INT';
       const effectiveLotsize = getInstantLotsize(symbol);
       const initPrice = (entry_price && !isNaN(Number(entry_price)) && Number(entry_price) > 0) ? Number(entry_price) : null;
-      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice);
+      const tgt = (target_price && !isNaN(Number(target_price)) && Number(target_price) > 0) ? Number(target_price) : null;
+      const sl = (stop_loss && !isNaN(Number(stop_loss)) && Number(stop_loss) > 0) ? Number(stop_loss) : null;
+      openOrderModal?.(symbol, isSell ? 'SELL' : 'BUY', effectiveLotsize, effectiveProd, false, 0, initPrice, tgt, sl);
     }
     dismissBroadcastToast();
   };

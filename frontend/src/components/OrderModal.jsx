@@ -93,6 +93,25 @@ export default function OrderModal() {
         setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
       }
       
+      // Target and Stop Loss prefill (e.g. from Trading Signal Broadcast)
+      if (orderModal.target && Number(orderModal.target) > 0) {
+        setTgtPrice(Number(orderModal.target).toFixed(2));
+      } else {
+        setTgtPrice('');
+      }
+      if (orderModal.stopLoss && Number(orderModal.stopLoss) > 0) {
+        setSlPrice(Number(orderModal.stopLoss).toFixed(2));
+      } else {
+        setSlPrice('');
+      }
+      if ((orderModal.target && Number(orderModal.target) > 0) || (orderModal.stopLoss && Number(orderModal.stopLoss) > 0)) {
+        setIsBO(true);
+        setIsCO(false);
+      } else {
+        setIsBO(false);
+        setIsCO(false);
+      }
+      
       // Background sync lotsize if still 1 and looks like a derivative (contains numbers)
       if (effectiveLotsize === 1 && /\d/.test(orderModal.symbol)) {
         fetch(`${API}/api/stocks/lotsizes?symbols=${orderModal.symbol}`)
@@ -111,7 +130,7 @@ export default function OrderModal() {
           }).catch(console.error);
       }
     }
-  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, orderModal.productType, orderModal.initialPrice]);
+  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, orderModal.productType, orderModal.initialPrice, orderModal.target, orderModal.stopLoss]);
 
   const balanceNum = Number(user?.balance) || 0;
   const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
