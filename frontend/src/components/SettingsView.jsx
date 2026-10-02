@@ -1841,7 +1841,7 @@ export function BiometricSettingsSection({ user }) {
                 Single-Device Bound
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Automatic expiry in 30 days
+                Automatic expiry in 60 days
               </div>
             </div>
           </div>
@@ -2020,7 +2020,7 @@ export function BiometricSettingsSection({ user }) {
           </div>
 
           <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            Auto-prunes after 30 days
+            Auto-prunes after 60 days
           </div>
         </div>
 
@@ -2365,7 +2365,7 @@ export function BiometricSettingsSection({ user }) {
         </div>
       </div>
 
-      {/* ─── 30-Day Trusted Devices (Bypass Daily 2FA) ───────────────── */}
+      {/* ─── 60-Day Trusted Devices (Bypass Daily 2FA) ───────────────── */}
       <div style={{
         background: 'var(--bg-panel)',
         borderRadius: '12px',
@@ -2379,10 +2379,10 @@ export function BiometricSettingsSection({ user }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
-              <ShieldCheck size={18} color="var(--color-blue)" /> 30-Day Trusted Devices (Bypass Daily 2FA)
+              <ShieldCheck size={18} color="var(--color-blue)" /> 60-Day Trusted Devices (Bypass Daily 2FA)
             </h3>
             <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-              These browsers & devices are authorized to bypass daily SMS/OTP challenges for 30 days.
+              These browsers & devices are authorized to bypass daily SMS/OTP challenges for 60 days.
             </div>
           </div>
 
@@ -2407,7 +2407,7 @@ export function BiometricSettingsSection({ user }) {
             </div>
           ) : trustedDevices.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              No trusted devices registered yet. Check <strong>"Trust this device for 30 days"</strong> during login to remember this device.
+              No trusted devices registered yet. Check <strong>"Trust this device for 60 days"</strong> during login to remember this device.
             </div>
           ) : (
             trustedDevices.map((device) => {

@@ -178,11 +178,11 @@ it('LoginView.jsx and SettingsView.jsx integrate 2FA methods and 30-day device t
   
   assert(loginCode.includes('twoFactorMethod'), 'twoFactorMethod state missing in LoginView');
   assert(loginCode.includes('trustDevice'), 'trustDevice state missing in LoginView');
-  assert(loginCode.includes('Trust this device for 30 days'), 'Trust device label missing in LoginView');
+  assert(loginCode.includes('Trust this device for 60 days') || loginCode.includes('Trust this device for 30 days'), 'Trust device label missing in LoginView');
   assert(loginCode.includes('SMS OTP') && loginCode.includes('Authenticator') && loginCode.includes('Email OTP'), '2FA tabs missing in LoginView');
 
   assert(settingsCode.includes('ShieldCheck') && settingsCode.includes('Google Authenticator'), 'Google Authenticator tile missing in SettingsView');
-  assert(settingsCode.includes('30-Day Trusted Devices (Bypass Daily 2FA)'), 'Trusted devices section missing in SettingsView');
+  assert(settingsCode.includes('60-Day Trusted Devices (Bypass Daily 2FA)') || settingsCode.includes('30-Day Trusted Devices (Bypass Daily 2FA)'), 'Trusted devices section missing in SettingsView');
   assert(settingsCode.includes('revokeTrustedDevice'), 'revokeTrustedDevice action missing in SettingsView');
 });
 

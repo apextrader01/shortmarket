@@ -941,10 +941,10 @@ async function upsertUserSession({ userId, tokenHash, deviceModel, browserName, 
       });
     }
 
-    // Auto-prune stale sessions older than 30 days
+    // Auto-prune stale sessions older than 60 days
     await db('user_sessions')
       .where({ user_id: userId })
-      .where('last_active_at', '<', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+      .where('last_active_at', '<', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
       .del()
       .catch(() => {});
   } catch (err) {
@@ -1276,7 +1276,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
 
     if (isTrusted) {
       const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
-        const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+        const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '60d' });
         const tokenHash = hashToken(token);
         if (tokenHash) {
           await upsertUserSession({ userId: user.id, tokenHash, deviceModel, browserName, osName, clientIp });
@@ -1287,7 +1287,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
           httpOnly: true,
           secure: isHttps,
           sameSite: isHttps ? 'none' : 'lax',
-          maxAge: 30 * 24 * 60 * 60 * 1000
+          maxAge: 60 * 24 * 60 * 60 * 1000
         });
 
         let clientId = user.client_id;
@@ -1433,7 +1433,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
     const clientIp = getClientIp(req);
     const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
 
-    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '60d' });
     const sessionHash = hashToken(token);
     if (sessionHash) {
       await upsertUserSession({ userId: user.id, tokenHash: sessionHash, deviceModel, browserName, osName, clientIp });
@@ -1443,18 +1443,33 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
     if (trust_device) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const deviceHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days
 
-      await db('trusted_devices').insert({
-        user_id: user.id,
-        device_token_hash: deviceHash,
-        device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
-        browser_name: browserName,
-        os_name: osName,
-        ip_address: clientIp,
-        expires_at: expiresAt,
-        last_used_at: new Date()
-      }).catch(() => {});
+      // Upsert so same device/browser updates its token instead of duplicating
+      const existing = await db('trusted_devices')
+        .where({ user_id: user.id, browser_name: browserName, os_name: osName })
+        .first();
+
+      if (existing) {
+        await db('trusted_devices').where({ id: existing.id }).update({
+          device_token_hash: deviceHash,
+          device_name: device_name || existing.device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+          ip_address: clientIp,
+          expires_at: expiresAt,
+          last_used_at: new Date()
+        }).catch(() => {});
+      } else {
+        await db('trusted_devices').insert({
+          user_id: user.id,
+          device_token_hash: deviceHash,
+          device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+          browser_name: browserName,
+          os_name: osName,
+          ip_address: clientIp,
+          expires_at: expiresAt,
+          last_used_at: new Date()
+        }).catch(() => {});
+      }
 
       trustedDeviceToken = rawToken;
     }
@@ -1464,7 +1479,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
       httpOnly: true,
       secure: isHttps,
       sameSite: isHttps ? 'none' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 60 * 24 * 60 * 60 * 1000
     });
 
     let clientId = user.client_id;
@@ -1564,10 +1579,36 @@ app.post('/api/user/totp/disable', authenticateToken, async (req, res) => {
 // 💻 Trusted Devices Management 💻
 app.get('/api/user/trusted-devices', authenticateToken, async (req, res) => {
   try {
-    const devices = await db('trusted_devices')
+    // Auto-prune expired trusted devices
+    await db('trusted_devices')
+      .where('expires_at', '<=', new Date())
+      .del()
+      .catch(() => {});
+
+    const rawDevices = await db('trusted_devices')
       .where({ user_id: req.user.id })
       .where('expires_at', '>', new Date())
       .orderBy('last_used_at', 'desc');
+
+    // Deduplicate in memory and cleanup DB duplicates
+    const seen = new Set();
+    const devices = [];
+    const dupesToDelete = [];
+
+    for (const d of rawDevices) {
+      const key = `${d.browser_name || 'Browser'}_${d.os_name || 'Device'}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        devices.push(d);
+      } else {
+        dupesToDelete.push(d.id);
+      }
+    }
+
+    if (dupesToDelete.length > 0) {
+      await db('trusted_devices').whereIn('id', dupesToDelete).del().catch(() => {});
+    }
+
     res.json({ success: true, devices });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1625,7 +1666,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     await db('users').where({ id: user.id }).update(updateFields).catch(e => console.error('Failed to update user login meta:', e));
     
-    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '60d' });
     const tokenHash = hashToken(token);
     if (tokenHash) {
       await upsertUserSession({ userId: user.id, tokenHash, deviceModel, browserName, osName, clientIp, city, state });
@@ -1636,18 +1677,33 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       const crypto = require('crypto');
       const rawToken = crypto.randomBytes(32).toString('hex');
       const deviceHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days
 
-      await db('trusted_devices').insert({
-        user_id: user.id,
-        device_token_hash: deviceHash,
-        device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
-        browser_name: browserName,
-        os_name: osName,
-        ip_address: clientIp,
-        expires_at: expiresAt,
-        last_used_at: new Date()
-      }).catch(() => {});
+      // Upsert so same device/browser updates its token instead of duplicating
+      const existing = await db('trusted_devices')
+        .where({ user_id: user.id, browser_name: browserName, os_name: osName })
+        .first();
+
+      if (existing) {
+        await db('trusted_devices').where({ id: existing.id }).update({
+          device_token_hash: deviceHash,
+          device_name: device_name || existing.device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+          ip_address: clientIp,
+          expires_at: expiresAt,
+          last_used_at: new Date()
+        }).catch(() => {});
+      } else {
+        await db('trusted_devices').insert({
+          user_id: user.id,
+          device_token_hash: deviceHash,
+          device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+          browser_name: browserName,
+          os_name: osName,
+          ip_address: clientIp,
+          expires_at: expiresAt,
+          last_used_at: new Date()
+        }).catch(() => {});
+      }
 
       trustedDeviceToken = rawToken;
     }
@@ -1658,7 +1714,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       httpOnly: true,
       secure: isHttps,
       sameSite: isHttps ? 'none' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 60 * 24 * 60 * 60 * 1000
     });
     let clientId = user.client_id;
     if (!clientId) {
@@ -10169,10 +10225,10 @@ app.get('/api/user/sessions', authenticateToken, async (req, res) => {
   try {
     const currentHash = req.tokenHash || '';
 
-    // Auto-prune sessions older than 30 days
+    // Auto-prune sessions older than 60 days
     await db('user_sessions')
       .where({ user_id: req.user.id })
-      .where('last_active_at', '<', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+      .where('last_active_at', '<', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
       .del()
       .catch(() => {});
 

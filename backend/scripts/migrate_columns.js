@@ -311,6 +311,36 @@ async function runMigration() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_date ON journal_trades(user_id, trade_date DESC)').catch(() => {});
     console.log('  ✅ Performance indexes verified');
 
+    // Extend active trusted devices to 60 days & remove duplicate entries
+    try {
+      const hasTrusted = await db.schema.hasTable('trusted_devices');
+      if (hasTrusted) {
+        const updated = await db('trusted_devices')
+          .where('expires_at', '>', new Date())
+          .update({
+            expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+          });
+
+        const allTrusted = await db('trusted_devices').orderBy('last_used_at', 'desc');
+        const seen = new Set();
+        const dupesToDelete = [];
+        for (const td of allTrusted) {
+          const key = `${td.user_id}_${td.browser_name || ''}_${td.os_name || ''}`;
+          if (seen.has(key)) {
+            dupesToDelete.push(td.id);
+          } else {
+            seen.add(key);
+          }
+        }
+        if (dupesToDelete.length > 0) {
+          await db('trusted_devices').whereIn('id', dupesToDelete).del();
+        }
+        console.log(`  ✅ Trusted devices extended to 60 days (updated ${updated}, cleaned ${dupesToDelete.length} duplicates)`);
+      }
+    } catch (e) {
+      console.warn('  ⚠️ Trusted devices 60-day migration notice:', e.message);
+    }
+
     console.log('\n🎉 ALL DATABASE MIGRATIONS APPLIED SUCCESSFULLY!');
     process.exit(0);
   } catch (err) {

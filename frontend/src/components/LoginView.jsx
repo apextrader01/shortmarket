@@ -689,9 +689,9 @@ export default function LoginView() {
                   style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
                 />
                 <div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 30 days</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 60 days</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                    Don't ask for 2FA verification on this device again for 30 days
+                    Don't ask for 2FA verification on this device again for 60 days
                   </div>
                 </div>
               </label>
@@ -775,9 +775,9 @@ export default function LoginView() {
                     style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
                   />
                   <div>
-                    <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 30 days</div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 60 days</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      Stay signed in without repeated daily OTP logins
+                      Stay signed in without repeated daily OTP logins for 60 days
                     </div>
                   </div>
                 </label>
