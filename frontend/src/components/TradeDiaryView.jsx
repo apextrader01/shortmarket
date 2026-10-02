@@ -1950,9 +1950,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     { id: 'COMMUNITY', label: 'Community', icon: Users },
     { id: 'CHALLENGE', label: 'Challenge', icon: Trophy },
     { id: 'CALENDAR', label: 'Calendar', icon: Calendar },
-    { id: 'AFFILIATE', label: 'Invite & Earn', icon: Share2, badge: '10%' },
-    { id: 'TRADING_QUIZ', label: 'Trading Quiz', icon: HelpCircle },
-    { id: 'TUTORIALS', label: 'Tutorials', icon: Video }
+    { id: 'AFFILIATE', label: 'Invite & Earn', icon: Share2, badge: '10%' }
   ];
 
   // Helper for index ticker pills
