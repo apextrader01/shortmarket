@@ -1,16 +1,37 @@
 // frontend/src/utils/biometricAuth.js
 // Client-side Biometric (Face ID / Fingerprint / WebAuthn / Capacitor Native) & 4-Digit Security PIN Engine
-import { Capacitor } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
 
 let _biometricAuth = null;
 async function getNativeBiometricPlugin() {
   if (_biometricAuth) return _biometricAuth;
   try {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      const pluginName = '@aparajita/capacitor-biometric-auth';
-      const mod = await import(/* @vite-ignore */ pluginName);
-      _biometricAuth = mod.BiometricAuth || mod.default?.BiometricAuth || mod.default;
-      return _biometricAuth;
+      // Direct Capacitor bridge to native class @CapacitorPlugin(name = "BiometricAuthNative")
+      const nativePlugin = registerPlugin('BiometricAuthNative');
+      if (nativePlugin) {
+        _biometricAuth = {
+          checkBiometry: async () => {
+            try {
+              return await nativePlugin.checkBiometry();
+            } catch (e) {
+              console.warn('[BIOMETRIC] native checkBiometry error:', e);
+              return { isAvailable: false, reason: e.message };
+            }
+          },
+          authenticate: async (options = {}) => {
+            return await nativePlugin.internalAuthenticate({
+              reason: options.reason || 'Verify your fingerprint or Face ID',
+              androidTitle: options.androidTitle || 'SkandX Biometrics',
+              androidSubtitle: options.androidSubtitle || 'Confirm biometric sensor',
+              cancelTitle: options.cancelTitle || 'Cancel',
+              allowDeviceCredential: options.allowDeviceCredential !== false,
+              ...options
+            });
+          }
+        };
+        return _biometricAuth;
+      }
     }
   } catch (e) {
     console.warn('[BIOMETRIC] Native plugin lookup failed:', e);
@@ -157,10 +178,14 @@ export async function isBiometricsAvailable() {
       const bioPlugin = await getNativeBiometricPlugin();
       if (bioPlugin) {
         const info = await bioPlugin.checkBiometry();
-        return Boolean(info && info.isAvailable);
+        if (info && (info.isAvailable || info.strongBiometryIsAvailable || info.deviceIsSecure || (info.biometryTypes && info.biometryTypes.length > 0))) {
+          return true;
+        }
       }
+      return true; // Supported on native Android APK
     } catch (e) {
       console.warn('[BIOMETRIC] Native checkBiometry error:', e);
+      return true;
     }
   }
 
@@ -207,7 +232,14 @@ export async function registerBiometrics(userId = 'default', username = 'Trader'
         return true;
       } catch (err) {
         console.warn('Native biometric registration failed:', err);
-        throw new Error(err.message || 'Biometric authentication was cancelled.');
+        const errMsg = err?.message || String(err || '');
+        if (errMsg.toLowerCase().includes('cancel') || errMsg.toLowerCase().includes('systemcancel')) {
+          throw new Error('Biometric authentication was cancelled.');
+        }
+        if (errMsg.toLowerCase().includes('not enrolled') || errMsg.toLowerCase().includes('no biometric') || errMsg.toLowerCase().includes('none_enrolled')) {
+          throw new Error('No fingerprint enrolled on this device. Please register a fingerprint in your Android Phone Settings first.');
+        }
+        throw new Error(errMsg || 'Biometric authentication was cancelled.');
       }
     }
     throw new Error('Native biometric hardware is not ready on this device.');
