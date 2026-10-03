@@ -6,6 +6,7 @@ import {
   isUserPinEnabled,
   saveUserPin,
   removeUserPin,
+  removeBiometrics,
   isBiometricsAvailable,
   isBiometricsEnabled,
   registerBiometrics,
@@ -1028,7 +1029,7 @@ export function BiometricSettingsSection({ user }) {
 
   const handleToggleBiometrics = async () => {
     if (bioEnabled) {
-      removeUserPin(userId);
+      removeBiometrics(userId);
       setBioEnabled(false);
       setStatusMsg({ type: 'success', text: 'Biometrics disabled.' });
       return;
@@ -1036,6 +1037,14 @@ export function BiometricSettingsSection({ user }) {
 
     if (!pinEnabled) {
       setStatusMsg({ type: 'error', text: 'Please configure a 4-Digit PIN first as a fallback before enabling Biometrics.' });
+      return;
+    }
+
+    if (!bioAvailable) {
+      setStatusMsg({ 
+        type: 'error', 
+        text: '💡 Biometric sensors are restricted inside the Android WebView app. Your 4-Digit PIN is active and fully secures your account!' 
+      });
       return;
     }
 
@@ -1050,7 +1059,7 @@ export function BiometricSettingsSection({ user }) {
       if (isBrowserLimitation) {
         setStatusMsg({ 
           type: 'error', 
-          text: '💡 Web biometrics requires Google Chrome / Safari. Your 4-Digit PIN is active and protects your account!' 
+          text: '💡 Biometrics requires Google Chrome / Safari on Web. Your 4-Digit PIN is active and protects your account!' 
         });
       } else {
         setStatusMsg({ type: 'error', text: 'Biometric setup: ' + (err.message || String(err)) });
@@ -1342,8 +1351,8 @@ export function BiometricSettingsSection({ user }) {
             </div>
             <div>
               <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
-              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
-                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Tap below to link Biometrics')}
+              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : (bioAvailable ? 'var(--text-secondary)' : '#94a3b8'), fontWeight: '600', marginTop: '2px' }}>
+                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Requires Chrome/Safari or Native APK')}
               </div>
             </div>
           </div>
@@ -1366,7 +1375,7 @@ export function BiometricSettingsSection({ user }) {
                 opacity: (!pinEnabled && !bioEnabled) ? 0.5 : 1
               }}
             >
-              {bioEnabled ? 'Disable Biometrics' : 'Enable Touch ID / Face ID'}
+              {bioEnabled ? 'Disable Biometrics' : (bioAvailable ? 'Enable Touch ID / Face ID' : 'Link Biometrics (Chrome/Safari)')}
             </button>
           </div>
         </div>

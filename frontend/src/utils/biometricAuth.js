@@ -121,6 +121,14 @@ export function removeUserPin(userId = 'default') {
 }
 
 /**
+ * Remove Biometrics only (retaining 4-Digit PIN)
+ */
+export function removeBiometrics(userId = 'default') {
+  localStorage.removeItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`);
+  localStorage.removeItem(`${OLD_BIOMETRIC_KEY_PREFIX}${userId}`);
+}
+
+/**
  * Check if platform authenticator (TouchID, FaceID, Windows Hello, Fingerprint) is available
  */
 export async function isBiometricsAvailable() {
@@ -165,10 +173,15 @@ export async function registerBiometrics(userId = 'default', username = 'Trader'
 
   const userIdBytes = new TextEncoder().encode(String(userId));
 
+  const domain = window.location.hostname;
+  const isSkandx = domain.endsWith('skandx.in');
+  const rpId = isSkandx ? 'skandx.in' : domain;
+
   const publicKeyCredentialCreationOptions = {
     challenge,
     rp: {
-      name: 'SkandX Trading'
+      name: 'SkandX Trading',
+      ...(rpId ? { id: rpId } : {})
     },
     user: {
       id: userIdBytes,
@@ -231,8 +244,13 @@ export async function verifyBiometrics(userId = 'default') {
   const challenge = new Uint8Array(32);
   crypto.getRandomValues(challenge);
 
+  const domain = window.location.hostname;
+  const isSkandx = domain.endsWith('skandx.in');
+  const rpId = isSkandx ? 'skandx.in' : domain;
+
   const publicKeyCredentialRequestOptions = {
     challenge,
+    ...(rpId ? { rpId } : {}),
     timeout: 60000,
     userVerification: 'preferred',
     allowCredentials: [{
