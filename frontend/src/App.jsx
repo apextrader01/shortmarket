@@ -69,6 +69,7 @@ const PrimaryMarketsView = lazyWithRetry(() => import('./components/PrimaryMarke
 const FinancialCalculatorsModal = lazyWithRetry(() => import('./components/FinancialCalculatorsModal'));
 const BrokerConnectModal = lazyWithRetry(() => import('./components/BrokerConnectModal'));
 const WealthPersonalFinanceModal = lazyWithRetry(() => import('./components/WealthPersonalFinanceModal'));
+const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/MutualFundsExplorerModal'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -420,6 +421,7 @@ function App() {
   const [showBrokerConnectModal, setShowBrokerConnectModal] = useState(false);
   const [showWealthModal, setShowWealthModal] = useState(false);
   const [wealthInitialTab, setWealthInitialTab] = useState('AI_COPILOT');
+  const [showMutualFundsModal, setShowMutualFundsModal] = useState(false);
 
   // Apply persisted UI settings on load
   useEffect(() => {
@@ -826,7 +828,7 @@ function App() {
               setWealthInitialTab(tab || 'AI_COPILOT');
               setShowWealthModal(true);
             }} 
-            onOpenMutualFunds={() => setActiveTab('MutualFunds')} 
+            onOpenMutualFunds={() => setShowMutualFundsModal(true)} 
             onOpenLeaderboard={() => setActiveTab('Leaderboard')} 
           />
         </Suspense>
@@ -1176,6 +1178,21 @@ function App() {
               onClose={() => setShowBrokerConnectModal(false)} 
               onOpenMutualFunds={() => {
                 setShowBrokerConnectModal(false);
+                setShowMutualFundsModal(true);
+              }}
+            />
+          )}
+          {showMutualFundsModal && (
+            <MutualFundsExplorerModal 
+              isOpen={showMutualFundsModal} 
+              onClose={() => setShowMutualFundsModal(false)} 
+              onOpenSipCalculator={(fund) => {
+                setShowMutualFundsModal(false);
+                setCalculatorsInitialTab('SIP');
+                setShowCalculatorsModal(true);
+              }}
+              onOpenPaperTradingMf={(fund) => {
+                setShowMutualFundsModal(false);
                 setActiveTab('MutualFunds');
               }}
             />

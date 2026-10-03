@@ -9,15 +9,165 @@ import {
 } from 'lucide-react';
 import { API } from '../store';
 
+const SEED_BHAVCOPY_DATA = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', ltp: 2984.50, change: 1.45, volume: 8452100, delivQty: 6339075, delivPct: 75.0, surgeMult: 2.4, is52wHigh: true, sector: 'Energy / Oil & Gas' },
+  { symbol: 'TCS', name: 'Tata Consultancy Services', ltp: 4210.20, change: -0.35, volume: 2950000, delivQty: 2242000, delivPct: 76.0, surgeMult: 1.8, is52wHigh: false, sector: 'Information Tech' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', ltp: 1682.40, change: 0.90, volume: 15420000, delivQty: 12490200, delivPct: 81.0, surgeMult: 3.1, is52wHigh: false, sector: 'Banking' },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', ltp: 1248.80, change: 1.80, volume: 11200000, delivQty: 8736000, delivPct: 78.0, surgeMult: 2.6, is52wHigh: true, sector: 'Banking' },
+  { symbol: 'INFY', name: 'Infosys Ltd', ltp: 1912.10, change: 0.40, volume: 6420000, delivQty: 4622400, delivPct: 72.0, surgeMult: 1.5, is52wHigh: false, sector: 'Information Tech' },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', ltp: 1720.60, change: 2.10, volume: 7890000, delivQty: 6469800, delivPct: 82.0, surgeMult: 3.8, is52wHigh: true, sector: 'Telecom' },
+  { symbol: 'ITC', name: 'ITC Ltd', ltp: 512.30, change: -0.20, volume: 14200000, delivQty: 11644000, delivPct: 82.0, surgeMult: 1.9, is52wHigh: true, sector: 'FMCG' },
+  { symbol: 'LT', name: 'Larsen & Toubro Ltd', ltp: 3675.00, change: 1.25, volume: 3120000, delivQty: 2308800, delivPct: 74.0, surgeMult: 2.2, is52wHigh: false, sector: 'Infrastructure' },
+  { symbol: 'SBIN', name: 'State Bank of India', ltp: 812.50, change: 0.85, volume: 18450000, delivQty: 12915000, delivPct: 70.0, surgeMult: 1.7, is52wHigh: false, sector: 'Banking' },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', ltp: 985.40, change: -1.10, volume: 12400000, delivQty: 7440000, delivPct: 60.0, surgeMult: 1.4, is52wHigh: false, sector: 'Automobile' },
+  { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', ltp: 1845.00, change: 0.60, volume: 4200000, delivQty: 3276000, delivPct: 78.0, surgeMult: 1.6, is52wHigh: false, sector: 'Banking' },
+  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever Ltd', ltp: 2950.00, change: -0.45, volume: 2800000, delivQty: 2156000, delivPct: 77.0, surgeMult: 1.3, is52wHigh: false, sector: 'FMCG' },
+  { symbol: 'BAJFINANCE', name: 'Bajaj Finance Ltd', ltp: 7420.00, change: 1.50, volume: 2100000, delivQty: 1491000, delivPct: 71.0, surgeMult: 2.0, is52wHigh: false, sector: 'NBFC / Finance' },
+  { symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical Ltd', ltp: 1895.00, change: 1.95, volume: 3800000, delivQty: 2964000, delivPct: 78.0, surgeMult: 2.9, is52wHigh: true, sector: 'Pharma' },
+  { symbol: 'TITAN', name: 'Titan Company Ltd', ltp: 3740.00, change: 0.70, volume: 1950000, delivQty: 1384500, delivPct: 71.0, surgeMult: 1.5, is52wHigh: false, sector: 'Consumer Goods' },
+  { symbol: 'COALINDIA', name: 'Coal India Ltd', ltp: 512.00, change: 2.30, volume: 19500000, delivQty: 15405000, delivPct: 79.0, surgeMult: 3.4, is52wHigh: true, sector: 'Metals & Mining' },
+  { symbol: 'NTPC', name: 'NTPC Ltd', ltp: 428.50, change: 1.80, volume: 22100000, delivQty: 17238000, delivPct: 78.0, surgeMult: 2.8, is52wHigh: true, sector: 'Power / Utilities' },
+  { symbol: 'ONGC', name: 'Oil & Natural Gas Corp', ltp: 312.40, change: 1.15, volume: 25400000, delivQty: 18034000, delivPct: 71.0, surgeMult: 2.1, is52wHigh: false, sector: 'Energy / Oil' },
+  { symbol: 'POWERGRID', name: 'Power Grid Corp', ltp: 352.00, change: 0.90, volume: 16700000, delivQty: 12859000, delivPct: 77.0, surgeMult: 2.3, is52wHigh: true, sector: 'Power / Utilities' },
+  { symbol: 'ZOMATO', name: 'Zomato Ltd', ltp: 275.50, change: 3.40, volume: 48900000, delivQty: 34230000, delivPct: 70.0, surgeMult: 4.2, is52wHigh: true, sector: 'Internet / Consumer Tech' }
+];
+
+const SEED_DEALS_DATA = [
+  { id: 1, date: '2026-10-02', symbol: 'ZOMATO', company: 'Zomato Ltd', client: 'Morgan Stanley Asia Singapore', type: 'BUY', qty: 12500000, price: 272.50, valueCr: 340.62, dealType: 'BULK_DEAL' },
+  { id: 2, date: '2026-10-02', symbol: 'HDFCBANK', company: 'HDFC Bank Ltd', client: 'Government of Singapore (GIC)', type: 'BUY', qty: 4500000, price: 1678.00, valueCr: 755.10, dealType: 'BLOCK_DEAL' },
+  { id: 3, date: '2026-10-01', symbol: 'INFY', company: 'Infosys Ltd', client: 'LIC of India', type: 'BUY', qty: 2100000, price: 1905.00, valueCr: 400.05, dealType: 'BULK_DEAL' },
+  { id: 4, date: '2026-10-01', symbol: 'BHARTIARTL', company: 'Bharti Airtel Ltd', client: 'Singtel International Investments', type: 'SELL', qty: 3200000, price: 1715.00, valueCr: 548.80, dealType: 'BLOCK_DEAL' },
+  { id: 5, date: '2026-09-30', symbol: 'TATAMOTORS', company: 'Tata Motors Ltd', client: 'Promoter: Tata Sons Pvt Ltd', type: 'BUY', qty: 1500000, price: 980.00, valueCr: 147.00, dealType: 'INSIDER_PROMOTER' },
+  { id: 6, date: '2026-09-30', symbol: 'RELIANCE', company: 'Reliance Industries', client: 'Norges Bank Investment Management', type: 'BUY', qty: 1800000, price: 2975.00, valueCr: 535.50, dealType: 'BULK_DEAL' },
+  { id: 7, date: '2026-09-29', symbol: 'ICICIBANK', company: 'ICICI Bank Ltd', client: 'Fidelity Emerging Markets Fund', type: 'BUY', qty: 3100000, price: 1242.00, valueCr: 385.02, dealType: 'BLOCK_DEAL' }
+];
+
+const SEED_IPO_DATA = [
+  {
+    id: 1,
+    name: 'Hyundai Motor India Ltd',
+    category: 'MAINBOARD',
+    status: 'OPEN',
+    priceBand: '₹1,865 - ₹1,960',
+    minPrice: 1865,
+    maxPrice: 1960,
+    lotSize: 7,
+    issueSizeCr: 27870,
+    openDate: '2026-10-15',
+    closeDate: '2026-10-17',
+    listingDate: '2026-10-22',
+    gmp: 125,
+    gmpPct: 6.4,
+    subscription: { qib: 6.9, nii: 1.8, retail: 1.5, total: 2.37 },
+    registrar: 'KFintech',
+    registrarUrl: 'https://kosmic.kfintech.com/ipostatus/'
+  },
+  {
+    id: 2,
+    name: 'Swiggy Limited',
+    category: 'MAINBOARD',
+    status: 'UPCOMING',
+    priceBand: '₹371 - ₹390',
+    minPrice: 371,
+    maxPrice: 390,
+    lotSize: 38,
+    issueSizeCr: 11327,
+    openDate: '2026-11-06',
+    closeDate: '2026-11-08',
+    listingDate: '2026-11-13',
+    gmp: 45,
+    gmpPct: 11.5,
+    subscription: { qib: 0, nii: 0, retail: 0, total: 0 },
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html'
+  },
+  {
+    id: 3,
+    name: 'NTPC Green Energy Ltd',
+    category: 'MAINBOARD',
+    status: 'UPCOMING',
+    priceBand: '₹102 - ₹108',
+    minPrice: 102,
+    maxPrice: 108,
+    lotSize: 138,
+    issueSizeCr: 10000,
+    openDate: '2026-11-19',
+    closeDate: '2026-11-22',
+    listingDate: '2026-11-27',
+    gmp: 18,
+    gmpPct: 16.7,
+    subscription: { qib: 0, nii: 0, retail: 0, total: 0 },
+    registrar: 'KFintech',
+    registrarUrl: 'https://kosmic.kfintech.com/ipostatus/'
+  },
+  {
+    id: 4,
+    name: 'Waaree Energies Ltd',
+    category: 'MAINBOARD',
+    status: 'CLOSED',
+    priceBand: '₹1,427 - ₹1,503',
+    minPrice: 1427,
+    maxPrice: 1503,
+    lotSize: 9,
+    issueSizeCr: 4321,
+    openDate: '2026-10-21',
+    closeDate: '2026-10-23',
+    listingDate: '2026-10-28',
+    gmp: 1480,
+    gmpPct: 98.5,
+    subscription: { qib: 208.6, nii: 62.5, retail: 10.8, total: 76.34 },
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html'
+  },
+  {
+    id: 5,
+    name: 'TechMatrix Solutions SME',
+    category: 'SME',
+    status: 'OPEN',
+    priceBand: '₹115 - ₹122',
+    minPrice: 115,
+    maxPrice: 122,
+    lotSize: 1000,
+    issueSizeCr: 45.2,
+    openDate: '2026-10-02',
+    closeDate: '2026-10-05',
+    listingDate: '2026-10-08',
+    gmp: 68,
+    gmpPct: 55.7,
+    subscription: { qib: 14.5, nii: 28.2, retail: 42.1, total: 31.8 },
+    registrar: 'Bigshare Services',
+    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
+  },
+  {
+    id: 6,
+    name: 'Apex Green Hydrogen SME',
+    category: 'SME',
+    status: 'UPCOMING',
+    priceBand: '₹85 - ₹90',
+    minPrice: 85,
+    maxPrice: 90,
+    lotSize: 1600,
+    issueSizeCr: 32.5,
+    openDate: '2026-10-14',
+    closeDate: '2026-10-16',
+    listingDate: '2026-10-21',
+    gmp: 42,
+    gmpPct: 46.6,
+    subscription: { qib: 0, nii: 0, retail: 0, total: 0 },
+    registrar: 'Bigshare Services',
+    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
+  }
+];
+
 export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
   const [activeTab, setActiveTab] = useState('BHAVCOPY'); // 'BHAVCOPY' | 'DEALS' | 'IPOS'
-  const [bhavcopyData, setBhavcopyData] = useState([]);
-  const [dealsData, setDealsData] = useState([]);
-  const [ipoData, setIpoData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [bhavcopyData, setBhavcopyData] = useState(SEED_BHAVCOPY_DATA);
+  const [dealsData, setDealsData] = useState(SEED_DEALS_DATA);
+  const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
+  const [loading, setLoading] = useState(false);
 
   // Bhavcopy filters
-  const [minDelivery, setMinDelivery] = useState(60);
+  const [minDelivery, setMinDelivery] = useState(50);
   const [bhavSearch, setBhavSearch] = useState('');
   const [onlySurge, setOnlySurge] = useState(false);
   const [onlyBreakout, setOnlyBreakout] = useState(false);
@@ -34,14 +184,20 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
     setLoading(true);
     try {
       const [bhavRes, dealsRes, iposRes] = await Promise.all([
-        API.get('/api/bhavcopy/delivery').catch(() => ({ data: { data: [] } })),
-        API.get('/api/market-deals').catch(() => ({ data: { deals: [] } })),
-        API.get('/api/ipos').catch(() => ({ data: { ipos: [] } }))
+        fetch(`${API}/api/bhavcopy/delivery`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API}/api/market-deals`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API}/api/ipos`).then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
 
-      if (bhavRes?.data?.data) setBhavcopyData(bhavRes.data.data);
-      if (dealsRes?.data?.deals) setDealsData(dealsRes.data.deals);
-      if (iposRes?.data?.ipos) setIpoData(iposRes.data.ipos);
+      if (bhavRes?.data && Array.isArray(bhavRes.data) && bhavRes.data.length > 0) {
+        setBhavcopyData(bhavRes.data);
+      }
+      if (dealsRes?.deals && Array.isArray(dealsRes.deals) && dealsRes.deals.length > 0) {
+        setDealsData(dealsRes.deals);
+      }
+      if (iposRes?.ipos && Array.isArray(iposRes.ipos) && iposRes.ipos.length > 0) {
+        setIpoData(iposRes.ipos);
+      }
     } catch (err) {
       console.warn('Failed to fetch primary market data:', err);
     } finally {
@@ -55,13 +211,17 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
 
   const filteredBhavcopy = useMemo(() => {
     return bhavcopyData.filter(item => {
-      if (item.delivPct < minDelivery) return false;
+      if (bhavSearch.trim()) {
+        const q = bhavSearch.toLowerCase().trim();
+        const matchesQuery = item.symbol.toLowerCase().includes(q) || 
+                             (item.name && item.name.toLowerCase().includes(q)) ||
+                             (item.sector && item.sector.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
+      } else {
+        if (item.delivPct < minDelivery) return false;
+      }
       if (onlySurge && item.surgeMult < 2.0) return false;
       if (onlyBreakout && !item.is52wHigh) return false;
-      if (bhavSearch) {
-        const q = bhavSearch.toLowerCase();
-        return item.symbol.toLowerCase().includes(q) || (item.name && item.name.toLowerCase().includes(q));
-      }
       return true;
     });
   }, [bhavcopyData, minDelivery, onlySurge, onlyBreakout, bhavSearch]);
@@ -304,24 +464,32 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredDeals.map((deal) => (
-                  <tr key={deal.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '12px 16px', color: '#64748b' }}>{deal.date}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fff' }}>{deal.symbol}</td>
-                    <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                      <div style={{ fontWeight: '600' }}>{deal.client}</div>
-                      <div style={{ fontSize: '10.5px', color: '#64748b' }}>{deal.dealType}</div>
+                {filteredDeals.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                      No institutional deals match this filter category. Try switching to "All Institutional Deals".
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{ background: deal.type === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: deal.type === 'BUY' ? '#22c55e' : '#ef4444', border: `1px solid ${deal.type === 'BUY' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px' }}>
-                        {deal.type}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>{deal.qty?.toLocaleString('en-IN')}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600' }}>₹{deal.price?.toFixed(2)}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f8fafc' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredDeals.map((deal) => (
+                    <tr key={deal.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{deal.date}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fff' }}>{deal.symbol}</td>
+                      <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                        <div style={{ fontWeight: '600' }}>{deal.client}</div>
+                        <div style={{ fontSize: '10.5px', color: '#64748b' }}>{deal.dealType}</div>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span style={{ background: deal.type === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: deal.type === 'BUY' ? '#22c55e' : '#ef4444', border: `1px solid ${deal.type === 'BUY' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px' }}>
+                          {deal.type}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>{deal.qty?.toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600' }}>₹{deal.price?.toFixed(2)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f8fafc' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -353,12 +521,17 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
           </div>
 
           {/* IPO Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {filteredIpos.map((ipo) => (
-              <div 
-                key={ipo.id} 
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}
-              >
+          {filteredIpos.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '40px', textAlign: 'center', color: '#64748b' }}>
+              No IPOs found in this category. Switch to "All IPOs" to view active and upcoming issues.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+              {filteredIpos.map((ipo) => (
+                <div 
+                  key={ipo.id} 
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}
+                >
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
@@ -417,6 +590,7 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 

@@ -127,41 +127,41 @@ export default function LandingHomeView({
       id: 5,
       hubNum: '05',
       category: 'TRADING',
-      title: 'Multi-Broker & MF Connect',
-      shortDesc: 'Connect Zerodha, Fyers V3 OAuth, Upstox, INDmoney and CAMS/KFintech e-CAS.',
+      title: 'Multi-Broker & Depository Connect',
+      shortDesc: 'Connect 100+ Indian brokers & depositories via SEBI Account Aggregator OTP consent flow.',
       icon: Link2,
       color: '#06b6d4',
       gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.22), rgba(34, 211, 238, 0.05))',
       border: 'rgba(6, 182, 212, 0.35)',
-      badge: 'Read-Only Sync',
+      badge: '100+ SEBI Brokers',
       badgeColor: '#06b6d4',
-      tags: ['Zerodha Kite', 'Fyers OAuth', 'Upstox v2', 'INDmoney', 'MF Central CAS'],
-      actionLabel: 'Connect Accounts',
+      tags: ['100+ Brokers', 'AA OTP Consent', 'Zerodha & Groww', 'HDFC & ICICI', 'CDSL & NSDL'],
+      actionLabel: 'Connect 100+ Brokers',
       primaryAction: onOpenBrokerConnect,
       quickLinks: [
-        { label: 'Fyers OAuth', action: onOpenBrokerConnect },
-        { label: 'Zerodha Kite', action: onOpenBrokerConnect },
-        { label: 'MF Central CAS', action: onOpenBrokerConnect }
+        { label: 'Discount Brokers', action: onOpenBrokerConnect },
+        { label: 'Bank Demats', action: onOpenBrokerConnect },
+        { label: 'Depositories & CAS', action: onOpenBrokerConnect }
       ]
     },
     {
       id: 6,
       hubNum: '06',
       category: 'MARKETS',
-      title: 'Mutual Funds & SIP Explorer',
-      shortDesc: 'Discover top direct mutual funds across 44 AMCs with zero expense distributor fees.',
+      title: 'Mutual Funds & Direct SIP Explorer',
+      shortDesc: 'Compare top direct mutual funds across 44 AMCs with zero expense distributor fees.',
       icon: BarChart2,
       color: '#3b82f6',
       gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(96, 165, 250, 0.05))',
       border: 'rgba(59, 130, 246, 0.35)',
       badge: '44 Indian AMCs',
       badgeColor: '#3b82f6',
-      tags: ['Direct vs Regular', 'Rolling Returns', 'Alpha Comparison', 'NAV History'],
+      tags: ['Direct vs Regular', 'Fee Savings Calculator', 'Top 5Y CAGR', 'Zero Commission'],
       actionLabel: 'Explore Mutual Funds',
       primaryAction: onOpenMutualFunds,
       quickLinks: [
-        { label: 'Top SIPs', action: onOpenMutualFunds },
-        { label: 'Index Funds', action: onOpenMutualFunds }
+        { label: 'Direct vs Regular Calculator', action: onOpenMutualFunds },
+        { label: 'Top SIP Funds', action: onOpenMutualFunds }
       ]
     },
     {
