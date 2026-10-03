@@ -15,7 +15,6 @@ if [ -d "/home/centralasp123/shortmarket-staging" ]; then
     git checkout development
     git reset --hard origin/development
     chmod +x deploy.sh deploy-all.sh 2>/dev/null || true
-    cd frontend && (npm install --prefer-offline || npm install || true) && cd ..
     ./deploy.sh
 else
     echo "⚠️ Directory /home/centralasp123/shortmarket-staging not found! Skipping staging."
@@ -33,7 +32,6 @@ if [ -d "/home/centralasp123/shortmarket" ]; then
     git checkout main
     git reset --hard origin/main
     chmod +x deploy.sh deploy-all.sh 2>/dev/null || true
-    cd frontend && (npm install --prefer-offline || npm install || true) && cd ..
     ./deploy.sh
 else
     echo "⚠️ Directory /home/centralasp123/shortmarket not found! Skipping production."

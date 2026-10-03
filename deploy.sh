@@ -17,33 +17,17 @@ git fetch origin "$CURRENT_BRANCH"
 git reset --hard "origin/$CURRENT_BRANCH"
 NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
 
-# 2. Smart Frontend Build (Skips npm install if package.json hasn't changed)
-echo "🌐 Building Frontend..."
+# 2. Frontend Build (Full, complete installation)
+echo "🌐 Installing Frontend Dependencies & Building..."
 cd frontend
-if [ ! -d "node_modules" ] || [ ! -d "node_modules/@aparajita/capacitor-biometric-auth" ] || ([ -n "$PREV_HEAD" ] && [ "$PREV_HEAD" != "$NEW_HEAD" ] && git diff --name-only "$PREV_HEAD" "$NEW_HEAD" | grep -q "frontend/package"); then
-    echo "📦 Frontend dependencies changed or missing, running npm install..."
-    npm ci --prefer-offline || npm install --prefer-offline
-else
-    echo "⚡ Frontend dependencies unchanged. Skipping npm install (saving ~800 KiB/s bandwidth)."
-fi
-
-# Run Vite build with lower process priority to protect live user traffic
-if command -v nice >/dev/null 2>&1; then
-    nice -n 15 npm run build
-else
-    npm run build
-fi
+npm install
+npm run build
 cd ..
 
-# 3. Smart Backend Dependencies (Skips npm install if package.json hasn't changed)
-echo "⚙️  Updating Backend Dependencies..."
+# 3. Backend Dependencies (Full, complete installation)
+echo "⚙️  Installing Backend Dependencies..."
 cd backend
-if [ -n "$PREV_HEAD" ] && [ "$PREV_HEAD" != "$NEW_HEAD" ] && git diff --name-only "$PREV_HEAD" "$NEW_HEAD" | grep -q "backend/package"; then
-    echo "📦 Backend dependencies changed, running npm ci..."
-    npm ci --omit=dev --prefer-offline || npm install --omit=dev
-else
-    echo "⚡ Backend dependencies unchanged. Skipping npm install."
-fi
+npm install --omit=dev
 
 # 4. Run Critical Database Schema Migrations
 echo "🗄️ Running Database Schema Migrations..."
