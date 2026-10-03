@@ -53,7 +53,7 @@ node scripts/migrate_columns.js || node -e "const db = require('./database/db');
 APP_NAME=$(node -e "try { const c = require('./ecosystem.config.js'); console.log(c.apps[0].name); } catch(e) { console.log('skandx-backend'); }" 2>/dev/null || echo "skandx-backend")
 echo "🔄 Reloading PM2 Application: $APP_NAME (Zero Downtime)..."
 pm2 delete shortmarket-backend 2>/dev/null || true
-pm2 reload "$APP_NAME" --update-env 2>/dev/null || pm2 start ecosystem.config.js
+pm2 reload "$APP_NAME" --update-env 2>/dev/null || pm2 restart "$APP_NAME" --update-env 2>/dev/null || pm2 start ecosystem.config.js
 pm2 save 2>/dev/null || true
 
 echo "✅ Deployment Successful! [$APP_NAME] is running cleanly."
