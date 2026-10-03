@@ -21,13 +21,15 @@ const TIMEFRAMES = [
   { label: '1Y', value: 'ONE_DAY', days: 365 },
 ];
 
+const EMPTY_OBJECT = Object.freeze({});
+const EMPTY_ARRAY = Object.freeze([]);
+
 export default function MobileStockOverviewModal() {
   const {
     mobileStockOverviewSymbol,
     setMobileStockOverviewSymbol,
     openOrderModal,
     setChartModalSymbol,
-    openMarketDepthModal,
     setAlertModalSymbol,
     stocks
   } = useStore(useShallow(state => ({
@@ -35,9 +37,8 @@ export default function MobileStockOverviewModal() {
     setMobileStockOverviewSymbol: state.setMobileStockOverviewSymbol,
     openOrderModal: state.openOrderModal,
     setChartModalSymbol: state.setChartModalSymbol,
-    openMarketDepthModal: state.openMarketDepthModal,
     setAlertModalSymbol: state.setAlertModalSymbol,
-    stocks: state.stocks || []
+    stocks: state.stocks || EMPTY_ARRAY
   })));
 
   const symbol = mobileStockOverviewSymbol;
@@ -71,14 +72,19 @@ export default function MobileStockOverviewModal() {
 
   // Live price object from store — fine-grained selector eliminates hundreds of re-renders per second
   const livePrice = useStore(state => {
-    if (!symbol) return {};
+    if (!symbol) return EMPTY_OBJECT;
     return state.prices[symbol] || 
       state.prices[rawSymbol] || 
       state.prices[`${exchange}:${rawSymbol}`] || 
-      {};
+      EMPTY_OBJECT;
   });
 
   const currentLtp = livePrice.ltp !== undefined ? Number(livePrice.ltp) : (stockMeta?.ltp || 0);
+  const currentLtpRef = useRef(currentLtp);
+  useEffect(() => {
+    currentLtpRef.current = currentLtp;
+  }, [currentLtp]);
+
   const change = livePrice.change !== undefined ? Number(livePrice.change) : 0;
   const pct = livePrice.pct !== undefined ? Number(livePrice.pct) : 0;
   const isUp = pct >= 0;
@@ -86,7 +92,7 @@ export default function MobileStockOverviewModal() {
     ? Number(stockMeta.lotsize) 
     : (livePrice.lotsize && Number(livePrice.lotsize) > 1) 
       ? Number(livePrice.lotsize) 
-      : getInstantLotsize(symbol);
+      : (symbol ? getInstantLotsize(symbol) : 1);
 
   // Subscribe to live market depth for this symbol while modal is open
   useEffect(() => {
@@ -128,37 +134,21 @@ export default function MobileStockOverviewModal() {
           setCandles(data.slice(-sliceCount));
         } else {
           // Generate realistic placeholder curve if candle history is unavailable
-          setCandles(generateFallbackCandles(currentLtp, tf.days));
+          setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
         }
         setLoadingCandles(false);
       })
       .catch(() => {
         if (isMounted) {
-          setCandles(generateFallbackCandles(currentLtp, tf.days));
+          setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
           setLoadingCandles(false);
         }
       });
 
     return () => { isMounted = false; };
-  }, [symbol, selectedTimeframe, currentLtp]);
+  }, [symbol, selectedTimeframe]);
 
-  if (!symbol) return null;
-
-  // Compute stats
-  const stats = stockDetails?.stats || {};
-  const dayLow = livePrice.low || stockDetails?.header?.dayLow || (currentLtp ? currentLtp * 0.985 : 0);
-  const dayHigh = livePrice.high || stockDetails?.header?.dayHigh || (currentLtp ? currentLtp * 1.015 : 0);
-  const low52 = stats.low52 || stats.yearLowPrice || (currentLtp ? currentLtp * 0.75 : 0);
-  const high52 = stats.high52 || stats.yearHighPrice || (currentLtp ? currentLtp * 1.35 : 0);
-  const openPrice = livePrice.open || stockDetails?.header?.open || (currentLtp ? currentLtp * 0.995 : 0);
-  const prevClose = livePrice.close || livePrice.prev_close_price || (currentLtp - change) || currentLtp;
-  const volume = livePrice.volume || stockDetails?.header?.volume || 0;
-
-  // Price Action Analysis (Bullish / Neutral / Bearish)
-  const priceAnalysis = pct > 0.5 ? 'Bullish' : pct < -0.5 ? 'Bearish' : 'Neutral';
-  const analysisColor = priceAnalysis === 'Bullish' ? 'var(--color-green-light, #10b981)' : priceAnalysis === 'Bearish' ? 'var(--color-red-light, #ef4444)' : 'var(--text-secondary, #94a3b8)';
-
-  // Chart SVG Calculations
+  // Chart SVG Calculations - strictly unconditional to preserve Rules of Hooks
   const chartPoints = useMemo(() => {
     if (!candles || candles.length < 2) return [];
     const closes = candles.map(c => Number(c.close || c.ltp || c[4] || 0)).filter(p => p > 0);
@@ -190,6 +180,22 @@ export default function MobileStockOverviewModal() {
     const area = `${line} L ${last.x.toFixed(1)} 140 L ${first.x.toFixed(1)} 140 Z`;
     return { line, area };
   }, [chartPoints]);
+
+  if (!symbol) return null;
+
+  // Compute stats
+  const stats = stockDetails?.stats || {};
+  const dayLow = livePrice.low || stockDetails?.header?.dayLow || (currentLtp ? currentLtp * 0.985 : 0);
+  const dayHigh = livePrice.high || stockDetails?.header?.dayHigh || (currentLtp ? currentLtp * 1.015 : 0);
+  const low52 = stats.low52 || stats.yearLowPrice || (currentLtp ? currentLtp * 0.75 : 0);
+  const high52 = stats.high52 || stats.yearHighPrice || (currentLtp ? currentLtp * 1.35 : 0);
+  const openPrice = livePrice.open || stockDetails?.header?.open || (currentLtp ? currentLtp * 0.995 : 0);
+  const prevClose = livePrice.close || livePrice.prev_close_price || (currentLtp - change) || currentLtp;
+  const volume = livePrice.volume || stockDetails?.header?.volume || 0;
+
+  // Price Action Analysis (Bullish / Neutral / Bearish)
+  const priceAnalysis = pct > 0.5 ? 'Bullish' : pct < -0.5 ? 'Bearish' : 'Neutral';
+  const analysisColor = priceAnalysis === 'Bullish' ? 'var(--color-green-light, #10b981)' : priceAnalysis === 'Bearish' ? 'var(--color-red-light, #ef4444)' : 'var(--text-secondary, #94a3b8)';
 
   // Touch scrubbing on mini chart
   const handleTouchChart = (clientX) => {

@@ -1090,18 +1090,20 @@ function App() {
       )}
 
       <Suspense fallback={null}>
-        {orderModal?.isOpen && <OrderModal />}
-        {editOrderModal?.isOpen && <EditOrderModal />}
-        {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
-        {marketDepthModal?.isOpen && <MarketDepthModal />}
-        {domLadderModal?.isOpen && <DOMLadderModal />}
-        {chartModalSymbol && <ChartModal />}
-        {mobileStockOverviewSymbol && <MobileStockOverviewModal />}
-        {alertModalSymbol && <AlertModal />}
-        {basketModalOpen && <BasketModal />}
-        {user && isLocked && isUserPinEnabled(user.id) && (
-          <BiometricLockModal onUnlock={() => setIsLocked(false)} />
-        )}
+        <ErrorBoundary>
+          {orderModal?.isOpen && <OrderModal />}
+          {editOrderModal?.isOpen && <EditOrderModal />}
+          {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
+          {marketDepthModal?.isOpen && <MarketDepthModal />}
+          {domLadderModal?.isOpen && <DOMLadderModal />}
+          {chartModalSymbol && <ChartModal />}
+          {mobileStockOverviewSymbol && <MobileStockOverviewModal />}
+          {alertModalSymbol && <AlertModal />}
+          {basketModalOpen && <BasketModal />}
+          {user && isLocked && isUserPinEnabled(user.id) && (
+            <BiometricLockModal onUnlock={() => setIsLocked(false)} />
+          )}
+        </ErrorBoundary>
       </Suspense>
 
       {/* Real-time Broadcast Toast */}
