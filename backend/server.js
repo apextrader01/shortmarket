@@ -4401,6 +4401,39 @@ app.get('/api/market-calendar/today', (req, res) => {
   }
 });
 
+// 🏛️ Primary Markets & Institutional Intelligence (₹0 Architecture)
+const primaryMarketsService = require('./services/primaryMarketsService');
+if (typeof primaryMarketsService.initPrimaryMarketCrons === 'function') {
+  primaryMarketsService.initPrimaryMarketCrons();
+}
+
+app.get('/api/bhavcopy/delivery', apiLimiter, (req, res) => {
+  try {
+    const list = primaryMarketsService.getBhavcopyDeliveryScreener(req.query);
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/market-deals', apiLimiter, (req, res) => {
+  try {
+    const list = primaryMarketsService.getMarketDeals(req.query.type || 'ALL');
+    res.json({ success: true, count: list.length, deals: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/ipos', apiLimiter, (req, res) => {
+  try {
+    const list = primaryMarketsService.getIpoList(req.query.category || 'ALL');
+    res.json({ success: true, count: list.length, ipos: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/admin/market-calendar', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();

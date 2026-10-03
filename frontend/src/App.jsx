@@ -64,6 +64,11 @@ const TradeDiaryView = lazyWithRetry(() => import('./components/TradeDiaryView')
 const TradingJournalView = lazyWithRetry(() => import('./components/TradingJournalView'));
 const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
 const NotFoundView = lazyWithRetry(() => import('./components/NotFoundView'));
+const LandingHomeView = lazyWithRetry(() => import('./components/LandingHomeView'));
+const PrimaryMarketsView = lazyWithRetry(() => import('./components/PrimaryMarketsView'));
+const FinancialCalculatorsModal = lazyWithRetry(() => import('./components/FinancialCalculatorsModal'));
+const BrokerConnectModal = lazyWithRetry(() => import('./components/BrokerConnectModal'));
+const WealthPersonalFinanceModal = lazyWithRetry(() => import('./components/WealthPersonalFinanceModal'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -79,7 +84,7 @@ import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell } from 'lucide-react';
+import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -390,11 +395,13 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
-    if (!path) return 'TradeDiary';
+    if (!path || path === 'home') return 'Home';
     
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
+      'home': 'Home',
       'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
+      'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
       'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
@@ -404,10 +411,15 @@ function App() {
       'reports': 'Reports',
       'aboutus': 'AboutUs'
     };
-    return tabsMap[path.toLowerCase()] || 'TradeDiary';
+    return tabsMap[path.toLowerCase()] || 'Home';
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showCalculatorsModal, setShowCalculatorsModal] = useState(false);
+  const [calculatorsInitialTab, setCalculatorsInitialTab] = useState('SIP');
+  const [showBrokerConnectModal, setShowBrokerConnectModal] = useState(false);
+  const [showWealthModal, setShowWealthModal] = useState(false);
+  const [wealthInitialTab, setWealthInitialTab] = useState('AI_COPILOT');
 
   // Apply persisted UI settings on load
   useEffect(() => {
@@ -421,7 +433,12 @@ function App() {
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
-      const newPath = activeTab === 'TradeDiary' ? '/' : `/${activeTab.toLowerCase()}`;
+      let newPath = '/';
+      if (activeTab === 'Home') newPath = '/';
+      else if (activeTab === 'TradeDiary') newPath = '/trade-diary';
+      else if (activeTab === 'PrimaryMarkets') newPath = '/primary-markets';
+      else newPath = `/${activeTab.toLowerCase()}`;
+
       if (window.location.pathname !== newPath) {
         window.history.pushState(null, '', newPath);
       }
@@ -431,12 +448,14 @@ function App() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname.replace('/', '');
-      if (!path) {
-        setActiveTab('TradeDiary');
+      if (!path || path === 'home') {
+        setActiveTab('Home');
         return;
       }
       const tabsMap = {
+        'home': 'Home',
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
+        'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
@@ -446,7 +465,7 @@ function App() {
         'reports': 'Reports',
         'aboutus': 'AboutUs'
       };
-      setActiveTab(tabsMap[path.toLowerCase()] || 'TradeDiary');
+      setActiveTab(tabsMap[path.toLowerCase()] || 'Home');
     };
     window.addEventListener('popstate', handlePopState);
     const handleOpenDeposit = () => setShowDepositModal(true);
@@ -585,11 +604,12 @@ function App() {
   const cleanFirstSegment = (currentPath.split('/')[1] || '').split('?')[0];
 
   const knownAppRoutes = new Set([
-    '', 'login', 'register', 'signup', 'forgot', 'reset',
+    '', 'home', 'login', 'register', 'signup', 'forgot', 'reset',
     'markets', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
     'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
     'pricing', 'referrals', 'leaderboard', 'journal', 'tradingjournal', 'trading-journal',
-    'tradediary', 'trade-diary', 'adminpanel', 'clientdata', 'profile', 'account', 'settings',
+    'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
+    'adminpanel', 'clientdata', 'profile', 'account', 'settings',
     'reports', 'aboutus', 'about', 'terms', 'privacy', 'privacy-policy', 'privacypolicy',
     'risk', 'riskpolicy', 'risk-policy', 'delete', 'delete-account', 'deleteaccount',
     'data', 'data-rights', 'datarights', 'legal', 'accessibility', 'manifest.webmanifest',
@@ -609,7 +629,9 @@ function App() {
   // Dynamic SEO Page Titles (Item 10)
   useEffect(() => {
     const tabTitleMap = {
+      Home: 'SkandX | Next-Gen Paper Trading & Wealth Operating System',
       Markets: 'Live Markets & Paper Trading | SkandX',
+      PrimaryMarkets: 'Primary Markets, Bhavcopy & IPO Hub | SkandX',
       Orders: 'Order Book & Executions | SkandX',
       Positions: 'Open Positions & P&L | SkandX',
       Portfolio: 'Portfolio & Holdings | SkandX',
@@ -776,11 +798,37 @@ function App() {
         </div>
       )}
 
-      {activeTab === 'TradeDiary' ? (
+      {activeTab === 'Home' ? (
+        <Suspense fallback={<TabLoader />}>
+          <LandingHomeView 
+            onOpenPaperTrading={() => setActiveTab('Markets')} 
+            onOpenTradeDiary={() => setActiveTab('TradeDiary')} 
+            onOpenPrimaryMarkets={() => setActiveTab('PrimaryMarkets')} 
+            onOpenCalculators={(tab) => {
+              setCalculatorsInitialTab(tab || 'SIP');
+              setShowCalculatorsModal(true);
+            }} 
+            onOpenBrokerConnect={() => setShowBrokerConnectModal(true)} 
+            onOpenWealthFinance={(tab) => {
+              setWealthInitialTab(tab || 'AI_COPILOT');
+              setShowWealthModal(true);
+            }} 
+            onOpenMutualFunds={() => setActiveTab('MutualFunds')} 
+            onOpenLeaderboard={() => setActiveTab('Leaderboard')} 
+          />
+        </Suspense>
+      ) : activeTab === 'PrimaryMarkets' ? (
+        <Suspense fallback={<TabLoader />}>
+          <PrimaryMarketsView 
+            onOpenPaperTrading={() => setActiveTab('Markets')} 
+            onBack={() => setActiveTab('Home')} 
+          />
+        </Suspense>
+      ) : activeTab === 'TradeDiary' ? (
         <Suspense fallback={<TabLoader />}>
           <TradeDiaryView 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
-            onBack={() => setActiveTab('Markets')} 
+            onBack={() => setActiveTab('Home')} 
             onOpenProfile={() => setActiveTab('ClientData')}
             onNavigate={(tab) => setActiveTab(tab)}
           />
@@ -792,7 +840,7 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
                   <div 
-                    onClick={() => setActiveTab('Markets')}
+                    onClick={() => setActiveTab('Home')}
                     style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', userSelect: 'none' }}
                     title="SkandX Trading Platform"
                   >
@@ -847,8 +895,10 @@ function App() {
                   fontSize: '10px', fontWeight: '700', marginRight: '4px',
                 }}>
                   {[
+                    { key: 'Home', label: 'Home' },
+                    { key: 'Markets', label: 'Paper Trading' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
-                    { key: 'Markets', label: 'Markets' },
+                    { key: 'PrimaryMarkets', label: 'Bhavcopy & IPO' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
                     { key: 'Portfolio', label: 'Portfolio' },
@@ -1100,6 +1150,30 @@ function App() {
           {mobileStockOverviewSymbol && <MobileStockOverviewModal />}
           {alertModalSymbol && <AlertModal />}
           {basketModalOpen && <BasketModal />}
+          {showCalculatorsModal && (
+            <FinancialCalculatorsModal 
+              isOpen={showCalculatorsModal} 
+              initialTab={calculatorsInitialTab}
+              onClose={() => setShowCalculatorsModal(false)} 
+            />
+          )}
+          {showBrokerConnectModal && (
+            <BrokerConnectModal 
+              isOpen={showBrokerConnectModal} 
+              onClose={() => setShowBrokerConnectModal(false)} 
+              onOpenMutualFunds={() => {
+                setShowBrokerConnectModal(false);
+                setActiveTab('MutualFunds');
+              }}
+            />
+          )}
+          {showWealthModal && (
+            <WealthPersonalFinanceModal 
+              isOpen={showWealthModal} 
+              initialTab={wealthInitialTab}
+              onClose={() => setShowWealthModal(false)} 
+            />
+          )}
           {user && isLocked && isUserPinEnabled(user.id) && (
             <BiometricLockModal onUnlock={() => setIsLocked(false)} />
           )}
@@ -1156,8 +1230,10 @@ function App() {
         <div className="mobile-menu-content">
           {[
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
+            { label: 'Home', key: 'Home', icon: Home },
+            { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
-            { label: 'Markets', key: 'Markets', icon: TrendingUp },
+            { label: 'Bhavcopy & IPO Hub', key: 'PrimaryMarkets', icon: Building2 },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
             { label: 'Portfolio', key: 'Portfolio', icon: Briefcase },
@@ -1212,7 +1288,7 @@ function App() {
       </div>
       
       {/* Mobile Bottom Navigation (Only for Paper Trading Terminal) */}
-      {activeTab !== 'TradeDiary' && (
+      {!['Home', 'TradeDiary', 'PrimaryMarkets'].includes(activeTab) && (
         <div className="mobile-bottom-nav">
           <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
             <List size={20} />
