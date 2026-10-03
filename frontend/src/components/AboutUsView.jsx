@@ -92,7 +92,7 @@ export default function AboutUsView({ setActiveTab }) {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                <a href="mailto:support@skandx.in" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>support@skandx.in</a>
+                <a href="mailto:skandx.in@gmail.com" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>skandx.in@gmail.com</a>
               </div>
             </div>
           </div>

@@ -412,7 +412,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Official Email:</span><br />
-                    <a href="mailto:grievance@skandx.in" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>grievance@skandx.in</a> / <a href="mailto:dpo@skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>dpo@skandx.in</a>
+                    <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>skandx.in@gmail.com</a>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Office Address:</span><br />
@@ -475,7 +475,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   <strong>5.1 Obligations of the Data Fiduciary:</strong> SkandX acts as a responsible Data Fiduciary under the Digital Personal Data Protection Act, 2023. We implement reasonable technical and organizational safeguards—including 256-bit TLS transit encryption, bcrypt password hashing, advisory transaction locking, and VPC firewalling—to safeguard user data against unauthorized access, destruction, or disclosure.
                 </p>
                 <p style={{ margin: '0 0 10px 0', fontSize: '13.5px' }}>
-                  <strong>5.2 Data Principal Rights:</strong> Users maintain the right to access, review, port, and rectify their personal records, and to request account erasure in accordance with statutory rules. Requests may be lodged via our interactive Data Rights Portal or by emailing <a href="mailto:grievance@skandx.in" style={{ color: '#38bdf8' }}>grievance@skandx.in</a>.
+                  <strong>5.2 Data Principal Rights:</strong> Users maintain the right to access, review, port, and rectify their personal records, and to request account erasure in accordance with statutory rules. Requests may be lodged via our interactive Data Rights Portal or by emailing <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8' }}>skandx.in@gmail.com</a>.
                 </p>
                 <p style={{ margin: '0 0 10px 0', fontSize: '13.5px' }}>
                   <strong>5.3 Security Incident Protocol:</strong> In the event of a verified personal data breach impacting user confidentiality, SkandX shall provide timely notification to the Data Protection Board of India and affected Data Principals in the form and manner prescribed by statutory law.
@@ -763,7 +763,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                     Submit Account Deletion Request
                   </button>
                   <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0' }}>
-                    Alternatively, email us directly at <strong style={{ color: '#10b981' }}>grievance@skandx.in</strong> with the subject "Delete Account".
+                    Alternatively, email us directly at <strong style={{ color: '#10b981' }}>skandx.in@gmail.com</strong> with the subject "Delete Account".
                   </p>
                 </form>
               )}
@@ -860,7 +860,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 We welcome suggestions to improve our usability. If you encounter any accessibility barrier or have questions, please reach out to our team:
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
-                <div>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:support@skandx.in" style={{ color: '#38bdf8', textDecoration: 'none' }}>support@skandx.in</a></div>
+                <div>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
                 <div style={{ marginTop: '6px' }}>📞 <strong>Toll Free Assistance:</strong> <a href="tel:18001234567" style={{ color: 'inherit', textDecoration: 'none' }}>1800 123 4567</a></div>
                 <div style={{ marginTop: '6px' }}>🏢 <strong>Physical Address:</strong> Level 4, Trade Centre, Financial District, Mumbai - 400051</div>
               </div>
@@ -872,7 +872,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         {/* Footer with Grievance Contact */}
         <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '12px', lineHeight: '1.8' }}>
           <div>&copy; 2026 SkandX Technologies Pvt. Ltd. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
-          <div>Grievance Redressal Officer: <a href="mailto:grievance@skandx.in" style={{ color: '#10b981' }}>grievance@skandx.in</a> | Toll Free: 1800 123 4567 | Level 5, Cyber City, Bangalore, KA 560100</div>
+          <div>Grievance Redressal Officer: <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | Toll Free: 1800 123 4567 | Level 5, Cyber City, Bangalore, KA 560100</div>
         </div>
 
       </div>

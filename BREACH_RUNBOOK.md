@@ -20,10 +20,10 @@ This Runbook establishes immediate, repeatable forensic, containment, escalation
 | Role | Primary Responsibility | Emergency Contact |
 | :--- | :--- | :--- |
 | **Incident Commander (CTO)** | Technical lead, system isolation, containment authority | `incident-commander@skandx.in` |
-| **Data Protection Officer (DPO)** | Regulatory reporting, DPBI notification, statutory compliance | `dpo@skandx.in` |
-| **Lead Security Engineer** | Forensic analysis, log preservation, patch deployment | `security@skandx.in` |
-| **Legal Counsel** | Regulatory liaising, legal copy clearance, statutory liability | `legal@skandx.in` |
-| **Head of Customer Support** | Data Principal communications, support ticket triage | `support@skandx.in` |
+| **Data Protection Officer (DPO)** | Regulatory reporting, DPBI notification, statutory compliance | `skandx.in@gmail.com` |
+| **Lead Security Engineer** | Forensic analysis, log preservation, patch deployment | `skandx.in@gmail.com` |
+| **Legal Counsel** | Regulatory liaising, legal copy clearance, statutory liability | `skandx.in@gmail.com` |
+| **Head of Customer Support** | Data Principal communications, support ticket triage | `skandx.in@gmail.com` |
 
 ---
 
@@ -110,7 +110,7 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
    - Organization Name: SkandX Technologies Private Limited
    - Corporate Identity Number (CIN): [LEGAL REVIEW REQUIRED: CIN-U72900KA2026PTC000000]
    - Registered Office: Level 5, Cyber City, Bangalore, Karnataka 560100, India
-   - Data Protection Officer (DPO): Mr. H. R. Sharma (dpo@skandx.in / +91 80 4567 8900)
+    - Data Protection Officer (DPO): Mr. H. R. Sharma (skandx.in@gmail.com / +91 80 4567 8900)
 
 2. INCIDENT SUMMARY:
    - Date and Time of Incident Detection: [YYYY-MM-DD, HH:MM IST]
@@ -145,7 +145,7 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
 
 7. CONTACT POINT FOR REGULATORY INQUIRIES:
    - Contact Person: Mr. H. R. Sharma (Grievance Redressal Officer & DPO)
-   - Email: dpo@skandx.in / grievance@skandx.in
+   - Email: skandx.in@gmail.com
    - Direct Phone: +91 80 4567 8900
 
 Submitted for and on behalf of SkandX Technologies Private Limited,
@@ -158,7 +158,7 @@ Date: [YYYY-MM-DD]
 ## 6. Formal Customer / Data Principal Incident Notification Template
 
 > **EMAIL SUBJECT:** [IMPORTANT SECURITY NOTICE] Notice of Personal Data Incident Regarding Your SkandX Account  
-> **SENDER:** `security@skandx.in` (Official Verification DKIM / SPF Signed)  
+> **SENDER:** `skandx.in@gmail.com` (Official Verification DKIM / SPF Signed)  
 
 ```text
 Dear {{username}},
@@ -193,7 +193,7 @@ While passwords were encrypted, as an immediate precautionary measure, we recomm
 5. FOR MORE INFORMATION & DEDICATED SUPPORT:
 If you have any questions or wish to exercise your statutory rights to review your personal records under the DPDP Act, our dedicated privacy response team is available to assist you:
 - Dedicated Security Helpline: 1800 123 4567 (Toll-Free, 9:00 AM – 9:00 PM IST)
-- Official Email: grievance@skandx.in / dpo@skandx.in
+- Official Email: skandx.in@gmail.com
 - Grievance Redressal Portal: https://skandx.in/legal?tab=data-rights
 
 We sincerely regret any inconvenience or concern this incident may cause, and we remain fully committed to protecting your trading experience with industry-leading security controls.

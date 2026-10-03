@@ -378,7 +378,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   ${tablesHtml}
 
   <div class="footer">
-    This is a computer-generated official statement from SkandX. No physical signature is required. For discrepancies, contact support@skandx.in.
+    This is a computer-generated official statement from SkandX. No physical signature is required. For discrepancies, contact skandx.in@gmail.com.
   </div>
 
   <script>

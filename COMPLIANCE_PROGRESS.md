@@ -90,7 +90,7 @@ A comprehensive audit of personal data touchpoints across SkandX was conducted:
 - **Contact Details Published:**
   - Name: Shri Raghavan Narayanan (Designated Grievance Redressal Officer)
   - Address: SkandX Technologies Pvt. Ltd., Level 14, Prestige Trade Tower, Palace Road, Bengaluru, Karnataka 560001
-  - Email: `grievance@skandx.in` / `dpo@skandx.in`
+  - Email: `skandx.in@gmail.com`
   - Grievance Portal: `https://skandx.in/data-rights`
   - Response Window: Acknowledgment within 24 hours; resolution within 30 days under Section 13(2) of the DPDP Act.
 

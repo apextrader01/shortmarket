@@ -17,7 +17,7 @@ try {
 } catch(e) {}
 
 webpush.setVapidDetails(
-  'mailto:support@skandx.in',
+  'mailto:skandx.in@gmail.com',
   vapidKeys.publicKey,
   vapidKeys.privateKey
 );
