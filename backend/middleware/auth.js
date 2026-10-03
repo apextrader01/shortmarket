@@ -5,7 +5,6 @@ const path = require('path');
 const db = require('../database/db');
 
 const SECRET_FILE = path.join(__dirname, '../.jwt_secret');
-const STABLE_CLUSTER_SECRET = '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3';
 
 let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET === 'super_secret_shortmarket_key_2026') {
@@ -19,7 +18,7 @@ if (!JWT_SECRET || JWT_SECRET === 'super_secret_shortmarket_key_2026') {
   } catch (_) {}
 
   if (!JWT_SECRET || JWT_SECRET === 'super_secret_shortmarket_key_2026') {
-    JWT_SECRET = STABLE_CLUSTER_SECRET;
+    JWT_SECRET = crypto.randomBytes(64).toString('hex');
     try {
       if (!fs.existsSync(SECRET_FILE)) {
         fs.writeFileSync(SECRET_FILE, JWT_SECRET, { mode: 0o600 });

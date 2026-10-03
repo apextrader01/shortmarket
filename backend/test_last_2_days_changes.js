@@ -324,7 +324,7 @@ assert(cronFile.includes("10 15 * * *") || cronFile.includes("10 15 * * 1-5"), '
 assert(cronFile.includes("20 15 * * *") || cronFile.includes("20 15 * * 1-5"), '03:20 PM Non-F&O Cash Auto Square-off scheduled');
 assert(cronFile.includes("30 15 * * *") || cronFile.includes("30 15 * * 1-5"), '03:30 PM Derivatives Auto Square-off scheduled');
 assert(cronFile.includes("35 15 * * *") || cronFile.includes("35 15 * * 1-5"), '03:35 PM CAS Auction matching scheduled');
-assert(posEngineFile.includes("40 15 * * *"), '03:40 PM F&O Expiry Settlement scheduled');
+assert(cronFile.includes("40 15 * * *") || posEngineFile.includes("40 15 * * *"), '03:40 PM F&O Expiry Settlement scheduled');
 
 // Final Summary
 console.log('\n======================================================================');

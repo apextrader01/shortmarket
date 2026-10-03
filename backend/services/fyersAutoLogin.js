@@ -90,8 +90,8 @@ async function getFyersCredentials() {
     let fy_id = null;
     let pin = null;
     let totp_key = null;
-    let app_id = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
-    let secret_id = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
+    let app_id = process.env.FYERS_APP_ID || '';
+    let secret_id = process.env.FYERS_SECRET_ID || '';
     let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://skandx.in/api/fyers/callback');
 
     try {
@@ -110,8 +110,8 @@ async function getFyersCredentials() {
     fy_id = fy_id || process.env.FYERS_USER_ID;
     pin = pin || process.env.FYERS_PIN;
     totp_key = totp_key || process.env.FYERS_TOTP_KEY;
-    app_id = app_id || process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
-    secret_id = secret_id || process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
+    app_id = app_id || process.env.FYERS_APP_ID || '';
+    secret_id = secret_id || process.env.FYERS_SECRET_ID || '';
 
     return { fy_id, pin, totp_key, app_id, secret_id, redirect_url };
 }
@@ -120,9 +120,11 @@ async function performFyersAutoLogin(retryCount = 0) {
     const creds = await getFyersCredentials();
     const { fy_id, pin, totp_key, app_id, secret_id, redirect_url } = creds;
 
-    if (!fy_id || !pin || !totp_key) {
+    if (!fy_id || !pin || !totp_key || !app_id || !secret_id) {
         const msg = !totp_key && !pin && !fy_id 
             ? 'Missing Fyers credentials (FYERS_USER_ID, FYERS_PIN, FYERS_TOTP_KEY). Please configure them in Admin Settings.'
+            : (!app_id || !secret_id)
+            ? 'Missing Fyers App ID or Secret Key. Please configure them in Admin Settings or environment.'
             : !totp_key 
             ? 'Fyers TOTP Secret Key is missing or could not be decrypted. Please re-enter your 32-character TOTP Secret Key in Admin Settings.'
             : 'Missing Fyers User ID or PIN. Please configure them in Admin Settings.';

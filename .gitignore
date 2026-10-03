@@ -14,3 +14,5 @@ dist/
 backend/config/
 *.log
 test-results/
+.jwt_secret
+backend/.jwt_secret

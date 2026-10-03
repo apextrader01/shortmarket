@@ -1343,8 +1343,8 @@ export function BiometricSettingsSection({ user }) {
             </div>
             <div>
               <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
-              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : (bioAvailable ? 'var(--text-secondary)' : '#94a3b8'), fontWeight: '600', marginTop: '2px' }}>
-                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Requires Chrome/Safari or Native APK')}
+              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : (!pinEnabled ? '#f59e0b' : (bioAvailable ? 'var(--text-secondary)' : '#94a3b8')), fontWeight: '600', marginTop: '2px' }}>
+                {bioEnabled ? '✅ Biometrics Active' : (!pinEnabled ? '⚠️ Requires 4-Digit PIN First' : (bioAvailable ? 'Supported on Device' : 'Requires Chrome/Safari or Native APK'))}
               </div>
             </div>
           </div>
@@ -1353,7 +1353,6 @@ export function BiometricSettingsSection({ user }) {
             <button
               type="button"
               onClick={handleToggleBiometrics}
-              disabled={!pinEnabled && !bioEnabled}
               style={{
                 width: '100%',
                 padding: '9px 16px',
@@ -1363,8 +1362,7 @@ export function BiometricSettingsSection({ user }) {
                 borderRadius: '6px',
                 fontSize: '12px',
                 fontWeight: '700',
-                cursor: (!pinEnabled && !bioEnabled) ? 'not-allowed' : 'pointer',
-                opacity: (!pinEnabled && !bioEnabled) ? 0.5 : 1
+                cursor: 'pointer'
               }}
             >
               {bioEnabled ? 'Disable Biometrics' : 'Enable Touch ID / Face ID'}

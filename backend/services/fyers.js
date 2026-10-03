@@ -90,12 +90,12 @@ function purgeExpiredSubscriptions() {
 const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
 
 // Set Fyers Credentials
-const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
-const SECRET_ID = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
+const APP_ID = process.env.FYERS_APP_ID || '';
+const SECRET_ID = process.env.FYERS_SECRET_ID || '';
 const REDIRECT_URL = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://skandx.in/api/fyers/callback');
 
-fyers.setAppId(APP_ID);
-fyers.setRedirectUrl(REDIRECT_URL);
+if (APP_ID) fyers.setAppId(APP_ID);
+if (REDIRECT_URL) fyers.setRedirectUrl(REDIRECT_URL);
 
 // Keep track of the active access token
 let activeAccessToken = null;
@@ -454,7 +454,11 @@ function startLiveWebSocket() {
     // If wsInstance exists, we just let it be, but we will call connect() later.
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
-    const effectiveAppId = activeAppId || process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+    const effectiveAppId = activeAppId || process.env.FYERS_APP_ID || '';
+    if (!effectiveAppId || !activeAccessToken) {
+        console.warn("⚠️ Cannot initialize Fyers DataSocket: Missing APP_ID or active access token.");
+        return;
+    }
     
     try {
         const logPath = path.join(__dirname, '../logs');

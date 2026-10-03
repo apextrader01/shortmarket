@@ -38,9 +38,6 @@ import OptionChainView from './components/OptionChainView';
 import MutualFundsView from './components/MutualFundsView';
 import AnalyticsView from './components/AnalyticsView';
 import LeaderboardView from './components/LeaderboardView';
-import TradingJournalView from './components/TradingJournalView';
-import TradeDiaryView from './components/TradeDiaryView';
-import ReportsView from './components/ReportsView';
 import PricingView from './components/PricingView';
 import AboutUsView from './components/AboutUsView';
 import ReferralsView from './components/ReferralsView';
@@ -63,6 +60,9 @@ const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
 const MobileStockOverviewModal = lazyWithRetry(() => import('./components/MobileStockOverviewModal'));
 const LegalView = lazyWithRetry(() => import('./components/LegalView'));
 const ConsentBanner = lazyWithRetry(() => import('./components/ConsentBanner'));
+const TradeDiaryView = lazyWithRetry(() => import('./components/TradeDiaryView'));
+const TradingJournalView = lazyWithRetry(() => import('./components/TradingJournalView'));
+const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
 const NotFoundView = lazyWithRetry(() => import('./components/NotFoundView'));
 
 const TabLoader = () => (

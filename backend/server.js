@@ -926,6 +926,13 @@ const walletLimiter = rateLimit({
   }
 });
 
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 300, // limit each IP to 300 requests per minute
+  message: { error: 'Too many requests. Please slow down.' },
+  keyGenerator: (req) => getClientIp(req)
+});
+
 async function upsertUserSession({ userId, tokenHash, deviceModel, browserName, osName, clientIp, city, state }) {
   if (!userId || !tokenHash) return;
   try {
@@ -4240,7 +4247,7 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
 });
 
 // ── Market Status Endpoints (Admin Controls) ──────────────────────────────────
-app.get('/api/market-status', (req, res) => {
+app.get('/api/market-status', apiLimiter, (req, res) => {
   res.json({
     success: true,
     equity: marketStatusCache.equity,
@@ -4341,7 +4348,7 @@ const OFFICIAL_2026_HOLIDAYS = [
   { date: '2026-12-25', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Christmas' }
 ];
 
-app.get('/api/market-calendar', async (req, res) => {
+app.get('/api/market-calendar', apiLimiter, async (req, res) => {
   try {
     const { month } = req.query; // optional 'YYYY-MM'
     let query = db('market_calendar').select('*').orderBy('date', 'asc');
@@ -4777,53 +4784,6 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
     res.json(holdings);
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── ADMIN CLEANUP ENDPOINT ───────────────────────────────────────────────
-app.get('/api/cleanup-expired', async (req, res) => {
-  try {
-    const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
-    const results = [];
-    
-    for (const pattern of patterns) {
-        // Find them first
-        const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-        const stuckPositions = await db('positions').where('symbol', 'like', pattern);
-        const stuckHoldings = await db('holdings').where('symbol', 'like', pattern);
-        
-        // Refund margin for orders
-        for (const order of pendingOrders) {
-            const user = await db('users').where({ id: order.user_id }).first();
-            if (user && !isNaN(parseFloat(order.margin)) && parseFloat(order.margin) > 0) {
-                await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
-            }
-        }
-        
-        // Refund value for positions
-        for (const pos of stuckPositions) {
-            const user = await db('users').where({ id: pos.user_id }).first();
-            if (user) {
-                const refundAmt = Math.abs(pos.quantity) * Math.abs(parseFloat(pos.average_price) || 0);
-                await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
-            }
-        }
-        
-        // Delete them
-        const delO = await db('orders').where('symbol', 'like', pattern).del();
-        const delP = await db('positions').where('symbol', 'like', pattern).del();
-        const delH = await db('holdings').where('symbol', 'like', pattern).del();
-        
-        results.push({
-            pattern,
-            found: { orders: pendingOrders.length, positions: stuckPositions.length, holdings: stuckHoldings.length },
-            deleted: { orders: delO, positions: delP, holdings: delH }
-        });
-    }
-    
-    res.json({ success: true, results });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
   }
 });
 
@@ -5368,7 +5328,7 @@ app.post('/api/mf/names', async (req, res) => {
 });
 
 // 2. FAST Search Endpoint — returns ALL matching funds instantly from memory (no mfapi calls)
-app.get('/api/mf/search', async (req, res) => {
+app.get('/api/mf/search', apiLimiter, async (req, res) => {
     try {
         if (allMutualFunds.length === 0) {
             await initMutualFundsList();
@@ -6956,7 +6916,18 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           console.error('Mutual fund direct execution error:', err);
         }
       } else {
-        const baseLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+        let baseLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+        if (baseLtp <= 0) {
+          try {
+            const { fetchBatchLTPs } = require('./services/fyers');
+            if (typeof fetchBatchLTPs === 'function') {
+              const liveQuotes = await fetchBatchLTPs([ord.symbol]);
+              if (liveQuotes && liveQuotes[ord.symbol]?.ltp) {
+                baseLtp = Number(liveQuotes[ord.symbol].ltp);
+              }
+            }
+          } catch (fetchErr) {}
+        }
 
         if (baseLtp > 0) {
           try {
@@ -6966,6 +6937,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           } catch (err) {
             console.error('Volume matching submission error:', err);
           }
+        } else {
+          // If price is currently unavailable, register in triggerEngine so incoming tick executes it
+          try {
+            await triggerEngine.addOrderToMemory(ord);
+          } catch (trigErr) {}
         }
       }
     } else if (ord.type === 'LIMIT') {
@@ -7329,18 +7305,6 @@ app.post('/api/ltp-batch', async (req, res) => {
 });
 
 // 🧮 Estimate Charges 🧮
-// TEMPORARY FIX ROUTE FOR TCS POSITION
-app.get('/api/admin/fix-tcs-position', authenticateToken, async (req, res) => {
-  try {
-     const caller = await db('users').where({ id: req.user.id }).first();
-     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-     const count = await db('positions').where({ symbol: 'TCS-BSE', quantity: 1 }).update({ quantity: 11, average_price: 2429.00 });
-     res.json({ message: `Fixed ${count} position(s) for TCS.` });
-  } catch(e) {
-     res.status(500).json({ error: e.message });
-  }
-});
-
 app.get('/api/estimate-charges', authenticateToken, (req, res) => {
   try {
     const { symbol, product_type, side, quantity, price, entry_price, holding_days } = req.query;
@@ -7396,19 +7360,6 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid subscription payload' });
     }
 
-    // Ensure push_subscriptions table exists defensively
-    await db.raw(`
-      CREATE TABLE IF NOT EXISTS push_subscriptions (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        endpoint TEXT NOT NULL UNIQUE,
-        p256dh TEXT NOT NULL,
-        auth TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
     const existing = await db('push_subscriptions').where({ endpoint }).first();
     if (existing) {
       await db('push_subscriptions').where({ endpoint }).update({
@@ -7440,19 +7391,6 @@ app.post('/api/push/fcm-subscribe', authenticateToken, async (req, res) => {
     if (!token) {
       return res.status(400).json({ error: 'FCM token is required' });
     }
-
-    // Ensure fcm_device_tokens table exists defensively
-    await db.raw(`
-      CREATE TABLE IF NOT EXISTS fcm_device_tokens (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL UNIQUE,
-        platform VARCHAR(20) DEFAULT 'android',
-        device_name VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
 
     const existing = await db('fcm_device_tokens').where({ token }).first();
     if (existing) {
@@ -7507,6 +7445,11 @@ const {
 // 📱 Telegram Webhook Endpoint for Interactive 2-Way Bot Commands (/pnl, /positions, /exitall)
 app.post('/api/telegram/webhook', async (req, res) => {
   try {
+    const expectedSecret = process.env.TELEGRAM_SECRET_TOKEN;
+    const providedSecret = req.headers['x-telegram-bot-api-secret-token'];
+    if (expectedSecret && providedSecret !== expectedSecret) {
+      return res.status(401).json({ error: 'Unauthorized Telegram webhook request.' });
+    }
     const result = await handleIncomingTelegramUpdate(req.body);
     res.json({ ok: true, ...result });
   } catch (err) {
@@ -7916,10 +7859,10 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
   try {
     const { endpoint, token } = req.body;
     if (endpoint) {
-      await db('push_subscriptions').where({ endpoint }).delete();
+      await db('push_subscriptions').where({ endpoint, user_id: req.user.id }).delete();
     }
     if (token) {
-      await db('fcm_device_tokens').where({ token }).delete();
+      await db('fcm_device_tokens').where({ token, user_id: req.user.id }).delete();
     }
     // Also defensively clear all subscriptions for this user to guarantee status check returns false
     await db('push_subscriptions').where({ user_id: req.user.id }).delete();
@@ -9662,7 +9605,7 @@ io.on('connection', (socket) => {
   });
 });
 
-app.get('/api/debug-state', (req, res) => {
+app.get('/api/debug-state', authenticateToken, requireAdmin, (req, res) => {
   const { getFyersAuthURL, getFyersStatus } = require('./services/fyers');
   let state = {};
   if (getFyersAuthURL) {
@@ -9682,7 +9625,7 @@ app.get('/api/debug-state', (req, res) => {
   });
 });
 
-app.get('/api/fyers/auth-url', (req, res) => {
+app.get('/api/fyers/auth-url', authenticateToken, requireAdmin, (req, res) => {
   const { getFyersAuthURL } = require('./services/fyers');
   try {
     const url = getFyersAuthURL();
@@ -9693,7 +9636,7 @@ app.get('/api/fyers/auth-url', (req, res) => {
   }
 });
 
-app.get('/api/diagnostics/logs', (req, res) => {
+app.get('/api/diagnostics/logs', authenticateToken, requireAdmin, (req, res) => {
   const fs = require('fs');
   const path = require('path');
   try {
@@ -9710,7 +9653,7 @@ app.get('/api/diagnostics/logs', (req, res) => {
   }
 });
 
-app.get('/api/fyers/status', (req, res) => {
+app.get('/api/fyers/status', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { getFyersStatus } = require('./services/fyers');
     if (getFyersStatus) {
@@ -9823,7 +9766,7 @@ app.post('/api/admin/fyers/auto-login', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/fyers-debug', (req, res) => {
+app.get('/api/fyers-debug', authenticateToken, requireAdmin, (req, res) => {
   const { getFyersStatus } = require('./services/fyers');
   if (getFyersStatus) {
     res.json(getFyersStatus());

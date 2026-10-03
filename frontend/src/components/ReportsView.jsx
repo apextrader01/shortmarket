@@ -15,7 +15,7 @@ import {
   generateDPHoldingReport,
   getISTDateString
 } from '../utils/clientReportGenerator';
-import TradingJournalView from './TradingJournalView';
+const TradingJournalView = React.lazy(() => import('./TradingJournalView'));
 
 // --- Subcomponents for Tabs ---
 
@@ -2114,7 +2114,11 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
 
       {/* Content */}
       <div style={{ minHeight: '400px', width: '100%' }}>
-        {activeTab === 'Trading Journal' && <TradingJournalView onBack={() => setActiveTab('Trading Insights')} />}
+        {activeTab === 'Trading Journal' && (
+          <React.Suspense fallback={<div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Trading Journal...</div>}>
+            <TradingJournalView onBack={() => setActiveTab('Trading Insights')} />
+          </React.Suspense>
+        )}
         {activeTab === 'Statement - Ledger' && <LedgerStatement />}
         {activeTab === 'Trades and Charges' && <TradesAndCharges />}
         {activeTab === 'Profit and Loss' && <ProfitAndLoss />}

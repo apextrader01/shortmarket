@@ -789,6 +789,8 @@ function initCronJobs(priceCache, triggerEngine) {
     cron.schedule('0 16 * * *', async () => {
         console.log('\n⏰ [CRON 04:00 PM] Final 04:00 PM Expiry Settlement Safety Net...');
         const positionsEngine = require('./positionsEngine');
+        await positionsEngine.sweepPendingOrders('EQUITY').catch(e => console.error('04:00 PM sweep error:', e));
+        await positionsEngine.forceSquareOff('EQUITY').catch(e => console.error('04:00 PM forceSquareOff error:', e));
         await positionsEngine.settleExpiries(false, false).catch(e => console.error('04:00 PM Expiry settlement error:', e));
     }, TZ);
 
@@ -799,8 +801,10 @@ function initCronJobs(priceCache, triggerEngine) {
     }, TZ);
 
     // 11:35 PM IST: MCX Market Close / Expiry Auto Square-Off (ensures zero open intraday positions after 11:30 PM close)
-    cron.schedule('35 23 * * *', () => {
+    cron.schedule('35 23 * * *', async () => {
         phase3SquareOff('COM');
+        const positionsEngine = require('./positionsEngine');
+        await positionsEngine.settleExpiries(true, false).catch(e => console.error('11:35 PM MCX Expiry settlement error:', e));
     }, TZ);
 
     // 11:40 PM IST: Winter Session Primary Square-Off (after 11:30 PM cutoff) + Summer Safety Sweep

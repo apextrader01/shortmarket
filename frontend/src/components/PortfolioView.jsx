@@ -3,7 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import AnalyticsView from './AnalyticsView';
-import TradingJournalView from './TradingJournalView';
+const TradingJournalView = React.lazy(() => import('./TradingJournalView'));
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 import { 

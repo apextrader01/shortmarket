@@ -4,7 +4,7 @@ const DataSocket = require("fyers-api-v3").fyersDataSocket;
 const token = fs.readFileSync(path.join(__dirname, 'fyers_token.txt'), 'utf8').trim();
 console.log("Token:", token.substring(0, 10) + "...");
 
-const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+const APP_ID = process.env.FYERS_APP_ID || '';
 const ws = DataSocket.getInstance(`${APP_ID}:${token}`, './logs', false);
 ws.mode(ws.SymbolUpdate || 'SymbolUpdate');
 

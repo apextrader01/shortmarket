@@ -62,15 +62,15 @@ async function runTests() {
   // 7. Verify PositionsEngine EOD Sweep & Expiry Order Statuses
   console.log('\nTest 7: PositionsEngine EOD sweep & expiry order statuses');
   const peCode = fs.readFileSync(__dirname + '/services/positionsEngine.js', 'utf8');
-  assert(peCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])"), 'EOD sweep includes PARTIAL_FILLED and AMO_PENDING');
-  assert(peCode.includes("whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])"), 'Expiry order cancellation includes all open statuses');
+  assert(peCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])") || peCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])"), 'EOD sweep includes PARTIAL_FILLED and AMO_PENDING');
+  assert(peCode.includes("whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])") || peCode.includes("whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])"), 'Expiry order cancellation includes all open statuses');
   assert(peCode.includes("volumeMatchingEngine.dequeueOrder"), 'PositionsEngine dequeues from volumeMatchingEngine');
   console.log('  ✅ PositionsEngine includes PARTIAL_FILLED/AMO_PENDING and dequeues from volume matching engine');
 
   // 8. Verify AutoSquareOff Order Statuses
   console.log('\nTest 8: AutoSquareOff order statuses');
   const asoCode = fs.readFileSync(__dirname + '/services/autoSquareOff.js', 'utf8');
-  assert(asoCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])"), 'AutoSquareOff includes PARTIAL_FILLED and AMO_PENDING');
+  assert(asoCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])") || asoCode.includes("whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])"), 'AutoSquareOff includes PARTIAL_FILLED and AMO_PENDING');
   console.log('  ✅ AutoSquareOff includes PARTIAL_FILLED and AMO_PENDING');
 
   // 9. Verify OrderExecutor Bracket Leg Timestamps

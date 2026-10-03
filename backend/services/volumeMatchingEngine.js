@@ -640,7 +640,7 @@ class VolumeMatchingEngine {
               quantity: 0,
               closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
               exit_price: slicePrice,
-              realized_pnl: existingPos.realized_pnl + realizedPnl,
+              realized_pnl: Math.round(((Number(existingPos.realized_pnl) || 0) + realizedPnl + Number.EPSILON) * 100) / 100,
               margin: 0,
               updated_at: new Date()
             });
@@ -818,8 +818,8 @@ class VolumeMatchingEngine {
             await trx('positions').where({ id: existingPos.id }).update({
               quantity: newPosQty,
               closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
-              realized_pnl: existingPos.realized_pnl + realizedPnl,
-              margin: Math.max(0, existingPos.margin - marginRefund),
+              realized_pnl: Math.round(((Number(existingPos.realized_pnl) || 0) + realizedPnl + Number.EPSILON) * 100) / 100,
+              margin: Math.round(Math.max(0, (Number(existingPos.margin) || 0) - marginRefund + Number.EPSILON) * 100) / 100,
               updated_at: new Date()
             });
           }
@@ -969,7 +969,7 @@ class VolumeMatchingEngine {
               await trx('positions').where({ id: existingClosedPos.id }).update({
                 closed_quantity: newTotalClosed,
                 exit_price: newAvgExitPrice,
-                realized_pnl: Number(existingClosedPos.realized_pnl || 0) + realizedPnl,
+                realized_pnl: Math.round(((Number(existingClosedPos.realized_pnl) || 0) + realizedPnl + Number.EPSILON) * 100) / 100,
                 updated_at: new Date()
               });
             } else {
@@ -1422,7 +1422,7 @@ class VolumeMatchingEngine {
 
               if (slice > 0) {
                 await this.processSliceFill(order, slice, ltp);
-                volDelta -= consumed;
+                volDelta -= consumed; // volDelta -= slice;
                 if (order.pending_quantity <= 0) {
                   this.dequeueOrder(order.id, order.symbol);
                 }

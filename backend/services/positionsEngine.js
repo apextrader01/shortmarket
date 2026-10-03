@@ -75,31 +75,13 @@ class PositionsEngine {
     }
 
     initCronJobs() {
+        if (this._cronInitialized) return;
+        this._cronInitialized = true;
 
         // HOLDINGS MIGRATION (T+1)
         // Phase 0: The 8:00 AM Wipe - 08:00 AM IST
         cron.schedule('0 8 * * *', () => {
             this.runHoldingsMigration();
-        }, { timezone: 'Asia/Kolkata' });
-
-        // EQUITIES & DERIVATIVES
-        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:40 PM IST (F&O Market Close)
-        cron.schedule('40 15 * * *', () => {
-            this.settleExpiries(false); // false = Not Commodity
-        }, { timezone: 'Asia/Kolkata' });
-
-        // Phase 4: Final Safety Net Cleanup (Equities) - 04:00 PM IST (16:00)
-        cron.schedule('0 16 * * *', () => {
-            console.log('[CRON] 04:00 PM Final Cleanup for Equities triggered.');
-            this.sweepPendingOrders('EQUITY');
-            this.forceSquareOff('EQUITY');
-            this.settleExpiries(false);
-        }, { timezone: 'Asia/Kolkata' });
-
-        // COMMODITIES
-        // Condition 10: Expiry Day Settlement (Commodities) - 11:35 PM (23:35) IST after MCX market close
-        cron.schedule('35 23 * * *', () => {
-            this.settleExpiries(true); // true = Commodity
         }, { timezone: 'Asia/Kolkata' });
 
         // Phase 4: Final Safety Net Cleanup (Commodities) - 12:05 AM IST (00:05)
@@ -109,6 +91,9 @@ class PositionsEngine {
             this.forceSquareOff('COMMODITY');
             this.settleExpiries(true, true); // true = Commodity, true = includeYesterday
         }, { timezone: 'Asia/Kolkata' });
+
+        // Note: 03:40 PM ('40 15 * * *'), 04:00 PM ('0 16 * * *'), and 11:35 PM ('35 23 * * *') expiry settlements are centrally scheduled in cronJobs.js
+        // to prevent duplicate executions and database concurrency collisions.
     }
 
     async sweepPendingOrders(market) {
