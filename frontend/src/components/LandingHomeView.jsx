@@ -18,7 +18,8 @@ export default function LandingHomeView({
   onOpenBrokerConnect,
   onOpenWealthFinance,
   onOpenMutualFunds,
-  onOpenLeaderboard
+  onOpenLeaderboard,
+  onOpenAlgoBridge
 }) {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,27 +127,6 @@ export default function LandingHomeView({
     {
       id: 5,
       hubNum: '05',
-      category: 'TRADING',
-      title: 'Multi-Broker & Depository Connect',
-      shortDesc: 'Connect 100+ Indian brokers & depositories via SEBI Account Aggregator OTP consent flow.',
-      icon: Link2,
-      color: '#06b6d4',
-      gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.22), rgba(34, 211, 238, 0.05))',
-      border: 'rgba(6, 182, 212, 0.35)',
-      badge: '100+ SEBI Brokers',
-      badgeColor: '#06b6d4',
-      tags: ['100+ Brokers', 'AA OTP Consent', 'Zerodha & Groww', 'HDFC & ICICI', 'CDSL & NSDL'],
-      actionLabel: 'Connect 100+ Brokers',
-      primaryAction: onOpenBrokerConnect,
-      quickLinks: [
-        { label: 'Discount Brokers', action: onOpenBrokerConnect },
-        { label: 'Bank Demats', action: onOpenBrokerConnect },
-        { label: 'Depositories & CAS', action: onOpenBrokerConnect }
-      ]
-    },
-    {
-      id: 6,
-      hubNum: '06',
       category: 'MARKETS',
       title: 'Mutual Funds & Direct SIP Explorer',
       shortDesc: 'Compare top direct mutual funds across 44 AMCs with zero expense distributor fees.',
@@ -165,8 +145,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 7,
-      hubNum: '07',
+      id: 6,
+      hubNum: '06',
       category: 'WEALTH',
       title: '24/7 Personal AI Wealth Copilot',
       shortDesc: 'Instant advisory on Indian tax regimes, portfolio compounding, retirement & insurance.',
@@ -185,8 +165,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 8,
-      hubNum: '08',
+      id: 7,
+      hubNum: '07',
       category: 'WEALTH',
       title: '50/30/20 Budget & Leak Detector',
       shortDesc: 'Automate Needs (50%), Wants (30%), Savings (20%) and plug recurring subscription leaks.',
@@ -205,8 +185,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 9,
-      hubNum: '09',
+      id: 8,
+      hubNum: '08',
       category: 'WEALTH',
       title: 'Term Life & Health Gap (HLV)',
       shortDesc: 'Human Life Value protection shortfall analyzer. Zero-commission pure term strategies.',
@@ -225,8 +205,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 10,
-      hubNum: '10',
+      id: 9,
+      hubNum: '09',
       category: 'WEALTH',
       title: 'Consolidated Net Worth',
       shortDesc: 'Track Stocks, MFs, EPF/PPF, Bank FDs, Gold and Real Estate against debt liabilities.',
@@ -245,8 +225,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 11,
-      hubNum: '11',
+      id: 10,
+      hubNum: '10',
       category: 'CALCULATORS',
       title: 'Tax-Loss Harvesting (FY25)',
       shortDesc: 'Simulate capital gains tax savings under Budget FY25 (STCG 20%, LTCG 12.5%).',
@@ -265,23 +245,23 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 12,
-      hubNum: '12',
+      id: 11,
+      hubNum: '11',
       category: 'TRADING',
-      title: 'Algo Automation & Strategy Studio',
-      shortDesc: 'Rule-based strategy automations, TradingView webhook triggers & bracket risk controls.',
+      title: 'AlgoDelta Multi-Broker Demat & Bridge Suite',
+      shortDesc: 'Multi-broker Demat connection, Dedicated Static IPs, TradingView JSON Webhook Bridge & copy trading.',
       icon: Cpu,
-      color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(167, 139, 250, 0.05))',
-      border: 'rgba(139, 92, 246, 0.35)',
-      badge: 'Webhook Engine',
-      badgeColor: '#8b5cf6',
-      tags: ['TradingView Signals', 'Trailing SL', 'Multi-Leg Execution', 'API Orders'],
-      actionLabel: 'Open Strategy Terminal',
-      primaryAction: onOpenPaperTrading,
+      color: '#ef4444',
+      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(249, 115, 22, 0.05))',
+      border: 'rgba(239, 68, 68, 0.35)',
+      badge: 'ALGODELTA v4.9',
+      badgeColor: '#ef4444',
+      tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts'],
+      actionLabel: 'Launch AlgoDelta Console',
+      primaryAction: onOpenAlgoBridge || onOpenPaperTrading,
       quickLinks: [
-        { label: 'Webhooks', action: onOpenPaperTrading },
-        { label: 'Auto SL Engine', action: onOpenPaperTrading }
+        { label: 'Share Demat Link', action: onOpenAlgoBridge },
+        { label: 'JSON Webhook Bridge', action: onOpenAlgoBridge }
       ]
     }
   ];
@@ -406,10 +386,10 @@ export default function LandingHomeView({
             Calculators
           </button>
           <button 
-            onClick={onOpenBrokerConnect}
+            onClick={onOpenAlgoBridge}
             style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', borderRadius: '6px' }}
           >
-            Connect Brokers
+            AlgoDelta Demat Bridge
           </button>
           <button 
             onClick={() => onOpenWealthFinance('AI_COPILOT')}

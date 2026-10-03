@@ -661,29 +661,7 @@ export default function MutualFundsExplorerModal({
                     >
                       <Calculator size={13} /> Calculate SIP Compound
                     </button>
-
-                    {onOpenPaperTradingMf && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenPaperTradingMf(fund)}
-                        title="Simulate paper trade investment"
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '6px',
-                          color: '#cbd5e1',
-                          fontSize: '11.5px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <ArrowUpRight size={13} /> Paper Trade
-                      </button>
-                    )}
-                  </div>
+                    </div>
                 </div>
               );
             })}

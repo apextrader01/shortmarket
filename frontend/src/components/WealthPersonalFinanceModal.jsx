@@ -166,34 +166,43 @@ function AiWealthCopilotView() {
     "How does Tax-Loss Harvesting work under revised LTCG rules?"
   ];
 
-  const handleSend = (textToSend) => {
+  const handleSend = async (textToSend) => {
     const query = textToSend || inputMsg;
     if (!query.trim()) return;
 
     const userMessage = { sender: 'user', text: query };
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputMsg('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let reply = "";
-      const lower = query.toLowerCase();
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/ai/wealth-copilot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          query,
+          history: updatedMessages.slice(-8)
+        })
+      });
 
-      if (lower.includes('1 crore') || lower.includes('crore')) {
-        reply = "🎯 **Path to ₹1 Crore in 10 Years:**\n• Assuming a conservative 12% annual CAGR in Indian Nifty 50 / Flexicap funds, you need a monthly SIP of ~**₹43,000**.\n• With a **10% Annual Step-up SIP**, your starting SIP is only ~**₹27,000/month**!\n• Recommended Allocation: 60% Large & Flexicap Equity, 20% Mid/Smallcap, 15% Debt/Arbitrage, 5% Sovereign Gold Bonds (SGB).";
-      } else if (lower.includes('tax') || lower.includes('regime')) {
-        reply = "📋 **Old vs New Tax Regime Analysis:**\n• Under the updated FY 2024-25 Budget, the **New Tax Regime** offers standard deduction of ₹75,000 and zero tax up to ₹7.75 Lakhs total income.\n• If your total deductions (80C, 80D, HRA, Home Loan Interest) exceed **₹4.25 Lakhs**, the Old Regime may still save tax. Otherwise, the New Regime is mathematically superior and hassle-free.";
-      } else if (lower.includes('insurance') || lower.includes('term')) {
-        reply = "🛡️ **Term Insurance Formula (Human Life Value):**\n• Recommended Pure Term Cover = **(15x to 20x of Annual Income) + All Outstanding Loans - Existing Liquid Assets**.\n• Example: If you earn ₹12 Lakh/yr with a ₹40 Lakh home loan, ideal cover = (15 × 12L) + 40L = **₹2.20 Crores**.\n• Never buy ULIP or Endowment policies for protection; buy pure term insurance with claim settlement ratio > 98%.";
-      } else if (lower.includes('harvest') || lower.includes('loss')) {
-        reply = "✂️ **Tax-Loss Harvesting Strategy (Budget FY25):**\n• LTCG is now taxed at 12.5% beyond the ₹1.25 Lakh annual exemption, while STCG is taxed at 20%.\n• Before March 31, sell stocks or mutual fund units currently showing unrealized losses to offset against your realized gains.\n• You can immediately reinvest the capital into an equivalent asset after booking the loss to reset your tax liability to ₹0!";
-      } else {
-        reply = `💡 **Personalized Insight:** For "${query}", the golden financial rule is to maintain 6 months of living expenses in a liquid emergency fund, automate a minimum 20% monthly savings into index compounding, and lock your family's health with a ₹15L base + ₹50L Super Top-up health insurance. Would you like me to run exact numbers in the calculator?`;
-      }
-
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = data.reply || "I am ready to help optimize your investments, calculate compound SIPs, and plan taxes under Budget FY25.";
       setMessages(prev => [...prev, { sender: 'ai', text: reply }]);
+    } catch (err) {
+      console.error('Failed to query AI copilot:', err);
+      setMessages(prev => [...prev, {
+        sender: 'ai',
+        text: `💡 **Personalized Financial Guidance for "${query}":**\n\n• For your financial target, an equity SIP delivering ~12% CAGR is optimal.\n• Allocate according to risk tolerance: 60% Large/Flexicap, 25% Mid/Smallcap, 15% Gold & Debt.\n• Ensure an emergency fund covers 6 months of living expenses.`
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 750);
+    }
   };
 
   return (

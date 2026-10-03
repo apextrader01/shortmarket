@@ -70,6 +70,7 @@ const FinancialCalculatorsModal = lazyWithRetry(() => import('./components/Finan
 const BrokerConnectModal = lazyWithRetry(() => import('./components/BrokerConnectModal'));
 const WealthPersonalFinanceModal = lazyWithRetry(() => import('./components/WealthPersonalFinanceModal'));
 const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/MutualFundsExplorerModal'));
+const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBridgeDashboardModal'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -422,6 +423,7 @@ function App() {
   const [showWealthModal, setShowWealthModal] = useState(false);
   const [wealthInitialTab, setWealthInitialTab] = useState('AI_COPILOT');
   const [showMutualFundsModal, setShowMutualFundsModal] = useState(false);
+  const [showAlgoBridgeModal, setShowAlgoBridgeModal] = useState(false);
 
   // Apply persisted UI settings on load
   useEffect(() => {
@@ -830,6 +832,7 @@ function App() {
             }} 
             onOpenMutualFunds={() => setShowMutualFundsModal(true)} 
             onOpenLeaderboard={() => setActiveTab('Leaderboard')} 
+            onOpenAlgoBridge={() => setShowAlgoBridgeModal(true)} 
           />
         </Suspense>
       ) : activeTab === 'PrimaryMarkets' ? (
@@ -913,7 +916,6 @@ function App() {
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
-                    { key: 'PrimaryMarkets', label: 'Bhavcopy & IPO' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
                     { key: 'Portfolio', label: 'Portfolio' },
@@ -1204,6 +1206,12 @@ function App() {
               onClose={() => setShowWealthModal(false)} 
             />
           )}
+          {showAlgoBridgeModal && (
+            <AlgoBridgeDashboardModal 
+              isOpen={showAlgoBridgeModal} 
+              onClose={() => setShowAlgoBridgeModal(false)} 
+            />
+          )}
           {user && isLocked && isUserPinEnabled(user.id) && (
             <BiometricLockModal onUnlock={() => setIsLocked(false)} />
           )}
@@ -1263,7 +1271,6 @@ function App() {
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
-            { label: 'Bhavcopy & IPO Hub', key: 'PrimaryMarkets', icon: Building2 },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
             { label: 'Portfolio', key: 'Portfolio', icon: Briefcase },
