@@ -1,5 +1,21 @@
 // frontend/src/utils/biometricAuth.js
-// Client-side Biometric (Face ID / Fingerprint / WebAuthn) & 4-Digit Security PIN Engine
+// Client-side Biometric (Face ID / Fingerprint / WebAuthn / Capacitor Native) & 4-Digit Security PIN Engine
+import { Capacitor } from '@capacitor/core';
+
+let _biometricAuth = null;
+async function getNativeBiometricPlugin() {
+  if (_biometricAuth) return _biometricAuth;
+  try {
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      const mod = await import('@aparajita/capacitor-biometric-auth');
+      _biometricAuth = mod.BiometricAuth || mod.default?.BiometricAuth || mod.default;
+      return _biometricAuth;
+    }
+  } catch (e) {
+    console.warn('[BIOMETRIC] Native plugin lookup failed:', e);
+  }
+  return null;
+}
 
 const PIN_STORAGE_KEY_PREFIX = 'skandx_pin_hash_';
 const OLD_PIN_KEY_PREFIX = 'shortmarket_pin_hash_';
@@ -133,7 +149,21 @@ export function removeBiometrics(userId = 'default') {
  */
 export async function isBiometricsAvailable() {
   if (typeof window === 'undefined') return false;
-  
+
+  // 1. Native platform check (Android / iOS via Capacitor)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const bioPlugin = await getNativeBiometricPlugin();
+      if (bioPlugin) {
+        const info = await bioPlugin.checkBiometry();
+        return Boolean(info && info.isAvailable);
+      }
+    } catch (e) {
+      console.warn('[BIOMETRIC] Native checkBiometry error:', e);
+    }
+  }
+
+  // 2. Web browser WebAuthn check
   // Must be in a secure context (HTTPS or localhost)
   if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return false;
@@ -157,9 +187,32 @@ export async function isBiometricsAvailable() {
 }
 
 /**
- * Register Biometrics using WebAuthn Platform Authenticator
+ * Register Biometrics using Native Capacitor Plugin or WebAuthn Platform Authenticator
  */
 export async function registerBiometrics(userId = 'default', username = 'Trader') {
+  // 1. Native platform enrollment (Android / iOS)
+  if (Capacitor.isNativePlatform()) {
+    const bioPlugin = await getNativeBiometricPlugin();
+    if (bioPlugin) {
+      try {
+        await bioPlugin.authenticate({
+          reason: 'Verify your fingerprint or Face ID to link biometric quick unlock',
+          androidTitle: 'Enable SkandX Biometrics',
+          androidSubtitle: 'Confirm biometric sensor to enable quick unlock',
+          cancelTitle: 'Cancel',
+          allowDeviceCredential: true
+        });
+        localStorage.setItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`, 'native_biometric_active');
+        return true;
+      } catch (err) {
+        console.warn('Native biometric registration failed:', err);
+        throw new Error(err.message || 'Biometric authentication was cancelled.');
+      }
+    }
+    throw new Error('Native biometric hardware is not ready on this device.');
+  }
+
+  // 2. Web browser WebAuthn enrollment
   if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     throw new Error('Biometrics require a secure HTTPS connection.');
   }
@@ -237,6 +290,27 @@ export async function verifyBiometrics(userId = 'default') {
     throw new Error('Biometrics not set up on this device.');
   }
 
+  // 1. Native platform authentication (Android / iOS)
+  if (Capacitor.isNativePlatform()) {
+    const bioPlugin = await getNativeBiometricPlugin();
+    if (bioPlugin) {
+      try {
+        await bioPlugin.authenticate({
+          reason: 'Unlock SkandX Trading',
+          androidTitle: 'SkandX Quick Unlock',
+          androidSubtitle: 'Touch fingerprint sensor or scan Face ID',
+          cancelTitle: 'Use PIN',
+          allowDeviceCredential: true
+        });
+        return true;
+      } catch (err) {
+        console.warn('Native biometric unlock cancelled or failed:', err);
+        throw new Error('Biometric unlock cancelled. Please enter your 4-Digit PIN.');
+      }
+    }
+  }
+
+  // 2. Web browser WebAuthn authentication
   const credIdBase64 = localStorage.getItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`);
   if (!credIdBase64) return false;
 

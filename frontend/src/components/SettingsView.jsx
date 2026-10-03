@@ -1040,14 +1040,6 @@ export function BiometricSettingsSection({ user }) {
       return;
     }
 
-    if (!bioAvailable) {
-      setStatusMsg({ 
-        type: 'error', 
-        text: '💡 Biometric sensors are restricted inside the Android WebView app. Your 4-Digit PIN is active and fully secures your account!' 
-      });
-      return;
-    }
-
     try {
       const res = await registerBiometrics(userId, user?.username || 'Trader');
       if (res) {
@@ -1059,7 +1051,7 @@ export function BiometricSettingsSection({ user }) {
       if (isBrowserLimitation) {
         setStatusMsg({ 
           type: 'error', 
-          text: '💡 Biometrics requires Google Chrome / Safari on Web. Your 4-Digit PIN is active and protects your account!' 
+          text: '💡 Biometrics requires device hardware or Google Chrome / Safari on Web. Your 4-Digit PIN is active and protects your account!' 
         });
       } else {
         setStatusMsg({ type: 'error', text: 'Biometric setup: ' + (err.message || String(err)) });
@@ -1375,7 +1367,7 @@ export function BiometricSettingsSection({ user }) {
                 opacity: (!pinEnabled && !bioEnabled) ? 0.5 : 1
               }}
             >
-              {bioEnabled ? 'Disable Biometrics' : (bioAvailable ? 'Enable Touch ID / Face ID' : 'Link Biometrics (Chrome/Safari)')}
+              {bioEnabled ? 'Disable Biometrics' : 'Enable Touch ID / Face ID'}
             </button>
           </div>
         </div>
