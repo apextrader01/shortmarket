@@ -4409,6 +4409,7 @@ if (typeof primaryMarketsService.initPrimaryMarketCrons === 'function') {
 
 app.get('/api/bhavcopy/delivery', apiLimiter, (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     const list = primaryMarketsService.getBhavcopyDeliveryScreener(req.query);
     res.json({ success: true, count: list.length, data: list });
   } catch (err) {
@@ -4418,6 +4419,7 @@ app.get('/api/bhavcopy/delivery', apiLimiter, (req, res) => {
 
 app.get('/api/market-deals', apiLimiter, (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     const list = primaryMarketsService.getMarketDeals(req.query.type || 'ALL');
     res.json({ success: true, count: list.length, deals: list });
   } catch (err) {
@@ -4427,6 +4429,7 @@ app.get('/api/market-deals', apiLimiter, (req, res) => {
 
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     const list = primaryMarketsService.getIpoList(req.query.category || 'ALL');
     res.json({ success: true, count: list.length, ipos: list });
   } catch (err) {

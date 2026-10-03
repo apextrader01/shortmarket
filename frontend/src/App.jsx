@@ -764,8 +764,21 @@ function App() {
 
   // ── Authenticated layout ─────────────────────────────────────────────────────
 
+  const isScrollableTab = ['Home', 'PrimaryMarkets', 'TradeDiary'].includes(activeTab);
+
   return (
-    <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
+    <div 
+      className={`app-container ${isScrollableTab ? 'scrollable-page' : ''}`} 
+      data-theme={theme} 
+      style={{ 
+        flexDirection: 'column', 
+        color: 'var(--text-primary)', 
+        backgroundColor: 'var(--bg-primary)',
+        height: '100vh',
+        overflowY: isScrollableTab ? 'auto' : 'hidden',
+        overflowX: 'hidden'
+      }}
+    >
       <NetworkStatusBanner />
       <GlobalToast />
       <SessionExpiredModal />

@@ -1,5 +1,5 @@
 // frontend/src/components/LandingHomeView.jsx
-// 🌟 Optimized 12-Hub Fintech Portal & Command Center (Compact, High-Converting & Instant Navigation)
+// 🌟 Impressive 12-Hub Fintech Portal & Command Center (High-Impact Visuals, Smooth Scrolling & Zero-Lag Architecture)
 
 import React, { useState, useMemo } from 'react';
 import { 
@@ -7,7 +7,7 @@ import {
   Sparkles, ShieldCheck, ArrowRight, CheckCircle2, ChevronRight, 
   BarChart2, Award, Zap, Layers, Cpu, PieChart, Scissors, 
   HeartPulse, Wallet, Bot, Globe, Shield, RefreshCw, Search,
-  Filter, Check, Star, Lock
+  ChevronDown, Flame, DollarSign, Target, Activity, ArrowUpRight
 } from 'lucide-react';
 
 export default function LandingHomeView({
@@ -34,16 +34,23 @@ export default function LandingHomeView({
     { symbol: 'CRUDE OIL', ltp: '₹6,120', change: '-45.00 (-0.73%)', isUp: false }
   ];
 
+  const scrollToHubs = () => {
+    const el = document.getElementById('hubs-command-center');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const HUBS = [
     {
       id: 1,
       hubNum: '01',
       category: 'TRADING',
       title: 'Paper Trading Terminal',
-      shortDesc: 'Trade NSE/BSE Equities, F&O & Futures with ₹10,00,000 real-time virtual capital.',
+      shortDesc: 'Trade NSE/BSE Equities, F&O & Futures with ₹10,00,000 live virtual capital.',
       icon: TrendingUp,
       color: '#0284c7',
-      gradient: 'linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(56, 189, 248, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(2, 132, 199, 0.22), rgba(56, 189, 248, 0.05))',
       border: 'rgba(56, 189, 248, 0.35)',
       badge: 'Free ₹10L Capital',
       badgeColor: '#38bdf8',
@@ -63,7 +70,7 @@ export default function LandingHomeView({
       shortDesc: 'Institutional journaling covering checklists, strategies, discipline rules & leaks.',
       icon: BookOpen,
       color: '#818cf8',
-      gradient: 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(129, 140, 248, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(129, 140, 248, 0.05))',
       border: 'rgba(129, 140, 248, 0.35)',
       badge: '8 Core Pillars',
       badgeColor: '#818cf8',
@@ -83,7 +90,7 @@ export default function LandingHomeView({
       shortDesc: 'Daily NSE delivery tracker (>60%), 2x+ surges, Bulk/Block deals & 1-click IPO allotment.',
       icon: Building2,
       color: '#10b981',
-      gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(52, 211, 153, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(52, 211, 153, 0.05))',
       border: 'rgba(16, 185, 129, 0.35)',
       badge: '₹0 NSE Feed',
       badgeColor: '#10b981',
@@ -103,7 +110,7 @@ export default function LandingHomeView({
       shortDesc: 'Compounding SIPs, position sizing with R:R, revised Oct 2024 STT & Options Greeks.',
       icon: Calculator,
       color: '#f59e0b',
-      gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(251, 191, 36, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(251, 191, 36, 0.05))',
       border: 'rgba(245, 158, 11, 0.35)',
       badge: 'SEBI Oct 2024 Rates',
       badgeColor: '#f59e0b',
@@ -124,7 +131,7 @@ export default function LandingHomeView({
       shortDesc: 'Connect Zerodha, Fyers V3 OAuth, Upstox, INDmoney and CAMS/KFintech e-CAS.',
       icon: Link2,
       color: '#06b6d4',
-      gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.18), rgba(34, 211, 238, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.22), rgba(34, 211, 238, 0.05))',
       border: 'rgba(6, 182, 212, 0.35)',
       badge: 'Read-Only Sync',
       badgeColor: '#06b6d4',
@@ -145,7 +152,7 @@ export default function LandingHomeView({
       shortDesc: 'Discover top direct mutual funds across 44 AMCs with zero expense distributor fees.',
       icon: BarChart2,
       color: '#3b82f6',
-      gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(96, 165, 250, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(96, 165, 250, 0.05))',
       border: 'rgba(59, 130, 246, 0.35)',
       badge: '44 Indian AMCs',
       badgeColor: '#3b82f6',
@@ -165,7 +172,7 @@ export default function LandingHomeView({
       shortDesc: 'Instant advisory on Indian tax regimes, portfolio compounding, retirement & insurance.',
       icon: Bot,
       color: '#c084fc',
-      gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(192, 132, 252, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(192, 132, 252, 0.05))',
       border: 'rgba(192, 132, 252, 0.35)',
       badge: 'Generative AI',
       badgeColor: '#c084fc',
@@ -185,7 +192,7 @@ export default function LandingHomeView({
       shortDesc: 'Automate Needs (50%), Wants (30%), Savings (20%) and plug recurring subscription leaks.',
       icon: Wallet,
       color: '#ef4444',
-      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(248, 113, 113, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(248, 113, 113, 0.05))',
       border: 'rgba(239, 68, 68, 0.35)',
       badge: 'Leak Alert',
       badgeColor: '#ef4444',
@@ -205,7 +212,7 @@ export default function LandingHomeView({
       shortDesc: 'Human Life Value protection shortfall analyzer. Zero-commission pure term strategies.',
       icon: HeartPulse,
       color: '#ec4899',
-      gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(244, 114, 182, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(244, 114, 182, 0.05))',
       border: 'rgba(236, 72, 153, 0.35)',
       badge: 'Actuarial HLV',
       badgeColor: '#ec4899',
@@ -225,7 +232,7 @@ export default function LandingHomeView({
       shortDesc: 'Track Stocks, MFs, EPF/PPF, Bank FDs, Gold and Real Estate against debt liabilities.',
       icon: PieChart,
       color: '#14b8a6',
-      gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(45, 212, 191, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.22), rgba(45, 212, 191, 0.05))',
       border: 'rgba(20, 184, 166, 0.35)',
       badge: 'Balance Sheet',
       badgeColor: '#14b8a6',
@@ -240,12 +247,12 @@ export default function LandingHomeView({
     {
       id: 11,
       hubNum: '11',
-      category: 'WEALTH',
+      category: 'CALCULATORS',
       title: 'Tax-Loss Harvesting (FY25)',
       shortDesc: 'Simulate capital gains tax savings under Budget FY25 (STCG 20%, LTCG 12.5%).',
       icon: Scissors,
       color: '#eab308',
-      gradient: 'linear-gradient(135deg, rgba(234, 179, 8, 0.18), rgba(250, 204, 21, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(234, 179, 8, 0.22), rgba(250, 204, 21, 0.05))',
       border: 'rgba(234, 179, 8, 0.35)',
       badge: 'Budget 2024-25',
       badgeColor: '#eab308',
@@ -265,7 +272,7 @@ export default function LandingHomeView({
       shortDesc: 'Rule-based strategy automations, TradingView webhook triggers & bracket risk controls.',
       icon: Cpu,
       color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(167, 139, 250, 0.04))',
+      gradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(167, 139, 250, 0.05))',
       border: 'rgba(139, 92, 246, 0.35)',
       badge: 'Webhook Engine',
       badgeColor: '#8b5cf6',
@@ -279,7 +286,6 @@ export default function LandingHomeView({
     }
   ];
 
-  // Filtering hubs
   const filteredHubs = useMemo(() => {
     return HUBS.filter(hub => {
       const matchCat = selectedCategory === 'ALL' || hub.category === selectedCategory;
@@ -294,14 +300,15 @@ export default function LandingHomeView({
   return (
     <div style={{
       width: '100%',
-      minHeight: '100vh',
+      minHeight: '100%',
       backgroundColor: 'var(--bg-main, #090d16)',
       color: '#f8fafc',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Inter, system-ui, sans-serif'
+      fontFamily: 'Inter, system-ui, sans-serif',
+      position: 'relative'
     }}>
-      {/* 1. Ticker Tape Header */}
+      {/* 1. Real-Time Ticker Tape Header */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.95)',
         borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
@@ -310,7 +317,10 @@ export default function LandingHomeView({
         display: 'flex',
         alignItems: 'center',
         gap: '24px',
-        fontSize: '11.5px'
+        fontSize: '11.5px',
+        position: 'sticky',
+        top: 0,
+        zIndex: 60
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: '700', whiteSpace: 'nowrap' }}>
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
@@ -329,7 +339,7 @@ export default function LandingHomeView({
         </div>
       </div>
 
-      {/* 2. Compact Top Navbar */}
+      {/* 2. Top Navigation Bar */}
       <header style={{
         padding: '12px 24px',
         display: 'flex',
@@ -338,7 +348,7 @@ export default function LandingHomeView({
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
         backdropFilter: 'blur(10px)',
         position: 'sticky',
-        top: 0,
+        top: '32px',
         zIndex: 50,
         background: 'rgba(9, 13, 22, 0.92)'
       }}>
@@ -368,8 +378,15 @@ export default function LandingHomeView({
           </div>
         </div>
 
-        {/* Desktop Navigation Links */}
+        {/* Desktop Quick Jump Links */}
         <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button 
+            onClick={scrollToHubs}
+            style={{ padding: '6px 12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <span>Explore 12 Hubs</span>
+            <ChevronDown size={14} />
+          </button>
           <button 
             onClick={onOpenTradeDiary}
             style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', borderRadius: '6px' }}
@@ -424,16 +441,17 @@ export default function LandingHomeView({
         </button>
       </header>
 
-      {/* 3. Streamlined, Highly Optimized Hero Banner */}
+      {/* 3. Hero Banner with Interactive Visuals & Scroll Cue */}
       <section style={{
-        padding: '24px 20px 18px',
+        padding: '32px 20px 24px',
         maxWidth: '1240px',
         margin: '0 auto',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        textAlign: 'center'
+        textAlign: 'center',
+        position: 'relative'
       }}>
         {/* Subtle Feature Badge */}
         <div style={{
@@ -442,59 +460,59 @@ export default function LandingHomeView({
           gap: '6px',
           padding: '4px 12px',
           background: 'rgba(56, 189, 248, 0.08)',
-          border: '1px solid rgba(56, 189, 248, 0.2)',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
           borderRadius: '16px',
           color: '#38bdf8',
           fontSize: '11.5px',
           fontWeight: '600',
-          marginBottom: '12px'
+          marginBottom: '14px'
         }}>
           <Sparkles size={13} />
           <span>Next-Gen Operating System • Zero-Risk Virtual Capital • Institutional ₹0 Architecture</span>
         </div>
 
-        {/* Hero Title */}
+        {/* Hero Headline */}
         <h1 style={{
-          fontSize: 'clamp(24px, 3.8vw, 42px)',
+          fontSize: 'clamp(26px, 4.2vw, 48px)',
           fontWeight: '900',
-          lineHeight: '1.2',
-          margin: '0 0 10px',
+          lineHeight: '1.18',
+          margin: '0 0 14px',
           letterSpacing: '-0.5px',
-          maxWidth: '850px'
+          maxWidth: '880px'
         }}>
-          Everything You Need to Trade & Grow Wealth: <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>All 12 Hubs in One View</span>
+          Master Markets with <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹10,00,000 Virtual Capital</span> & 12 Specialized Hubs
         </h1>
 
-        {/* Concise Subtitle */}
+        {/* Subtitle */}
         <p style={{
           fontSize: 'clamp(13px, 1.6vw, 15px)',
           color: '#94a3b8',
-          lineHeight: '1.5',
+          lineHeight: '1.55',
           maxWidth: '720px',
-          margin: '0 0 20px'
+          margin: '0 0 24px'
         }}>
-          Practice risk-free with ₹10,00,000 live virtual capital, track Bhavcopy deliveries, check IPO allotments, connect external brokers, and calculate net worth with AI guidance.
+          Practice risk-free with live F&O WebSocket ticks, maintain an 8-pillar institutional journal, screen daily NSE deliveries & IPOs, and optimize your wealth with 24/7 AI advisory.
         </p>
 
-        {/* Quick Launch Buttons & Trust Badges Row */}
+        {/* Dual CTA Buttons */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'center',
           gap: '12px',
-          marginBottom: '12px'
+          marginBottom: '20px'
         }}>
           <button
             onClick={onOpenPaperTrading}
             style={{
-              padding: '12px 24px',
+              padding: '13px 26px',
               background: 'linear-gradient(135deg, #0284c7, #2563eb)',
               border: 'none',
               borderRadius: '10px',
               color: '#fff',
               fontWeight: '800',
-              fontSize: '14.5px',
+              fontSize: '15px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -511,13 +529,13 @@ export default function LandingHomeView({
           <button
             onClick={onOpenTradeDiary}
             style={{
-              padding: '12px 22px',
+              padding: '13px 24px',
               background: 'rgba(255, 255, 255, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.14)',
               borderRadius: '10px',
               color: '#f8fafc',
               fontWeight: '700',
-              fontSize: '14px',
+              fontSize: '14.5px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -529,8 +547,8 @@ export default function LandingHomeView({
           </button>
         </div>
 
-        {/* Inline Micro Badges */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '16px', fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+        {/* Trust Badges */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '16px', fontSize: '12px', color: '#64748b', marginBottom: '20px' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <CheckCircle2 size={13} color="#10b981" /> 100% Risk Free (Virtual Capital)
           </span>
@@ -538,60 +556,154 @@ export default function LandingHomeView({
             <CheckCircle2 size={13} color="#10b981" /> Real-time NSE/BSE WebSockets
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <CheckCircle2 size={13} color="#10b981" /> SEBI-Compliant ₹0 Architecture
+            <CheckCircle2 size={13} color="#10b981" /> High-Concurrency Zero-Lag Engine
           </span>
         </div>
+
+        {/* Bouncing Scroll Cue Button */}
+        <button
+          onClick={scrollToHubs}
+          style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '24px',
+            padding: '8px 16px',
+            color: '#38bdf8',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+          }}
+        >
+          <span>Scroll Down to Explore All 12 Hubs</span>
+          <ChevronDown size={14} className="animate-bounce" />
+        </button>
       </section>
 
-      {/* 4. Interactive 12-Hub Filter & Search Command Bar */}
+      {/* 4. Live Simulated Demo Card (Makes the page visually impressive!) */}
       <section style={{
         maxWidth: '1240px',
         margin: '0 auto',
         width: '100%',
-        padding: '0 20px 14px'
+        padding: '0 20px 24px'
       }}>
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '14px',
-          padding: '12px 16px',
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(2, 132, 199, 0.12))',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          borderRadius: '16px',
+          padding: '18px 24px',
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '16px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#10b981'
+            }}>
+              <Activity size={24} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Simulated Trading Sandbox
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
+                ₹10,00,000 Virtual Capital Active
+              </div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '600' }}>
+                Today's Simulated P&L: +₹24,850.00 (+2.48%)
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                padding: '9px 18px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '8px',
+                color: '#34d399',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Buy 1 Lot Nifty (Demo)</span>
+              <ArrowUpRight size={14} />
+            </button>
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                padding: '9px 18px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.35)'
+              }}
+            >
+              <span>Open Real Terminal</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. The 12-Hub Command Center (Target of Smooth Scroll) */}
+      <section 
+        id="hubs-command-center" 
+        style={{
+          maxWidth: '1240px',
+          margin: '0 auto',
+          width: '100%',
+          padding: '10px 20px 48px'
+        }}
+      >
+        {/* Section Header */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          marginBottom: '16px',
           gap: '12px'
         }}>
-          {/* Category Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-            {[
-              { id: 'ALL', label: 'All 12 Hubs' },
-              { id: 'TRADING', label: '📈 Trading & Execution' },
-              { id: 'MARKETS', label: '🏛️ Primary Markets & MFs' },
-              { id: 'CALCULATORS', label: '🧮 Calculators & Tax' },
-              { id: 'WEALTH', label: '💰 Personal Wealth & AI' }
-            ].map(cat => {
-              const isActive = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    border: 'none',
-                    background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
-                    color: isActive ? '#fff' : '#94a3b8',
-                    fontSize: '12px',
-                    fontWeight: isActive ? '700' : '500',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+              <Sparkles size={14} />
+              <span>Full Platform Ecosystem</span>
+            </div>
+            <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
+              All 12 Platform Hubs & Tools
+            </h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+              Select any hub below to launch its dedicated terminal or modal directly.
+            </p>
           </div>
 
           {/* Quick Search Input */}
@@ -600,24 +712,23 @@ export default function LandingHomeView({
             alignItems: 'center',
             gap: '8px',
             background: 'rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '8px',
-            padding: '6px 12px',
-            minWidth: '260px',
-            flex: '1',
+            padding: '8px 14px',
+            minWidth: '280px',
             maxWidth: '380px'
           }}>
-            <Search size={14} color="#94a3b8" />
+            <Search size={15} color="#94a3b8" />
             <input 
               type="text"
-              placeholder="Search 12 hubs (e.g. SIP, Bhavcopy, Fyers, HLV)..."
+              placeholder="Search 12 hubs (e.g. SIP, Bhavcopy, F&O, Tax)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
                 color: '#fff',
-                fontSize: '12px',
+                fontSize: '12.5px',
                 width: '100%',
                 outline: 'none'
               }}
@@ -625,31 +736,65 @@ export default function LandingHomeView({
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '11px' }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
               >
                 ✕
               </button>
             )}
           </div>
         </div>
-      </section>
 
-      {/* 5. The 12-Hub Launcher Cards Grid (Immediately Visible!) */}
-      <section style={{
-        maxWidth: '1240px',
-        margin: '0 auto',
-        width: '100%',
-        padding: '0 20px 40px'
-      }}>
+        {/* Category Filter Bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '14px',
+          marginBottom: '14px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+        }}>
+          {[
+            { id: 'ALL', label: 'All 12 Hubs (12)' },
+            { id: 'TRADING', label: '📈 Trading & Orders (4)' },
+            { id: 'MARKETS', label: '🏛️ Primary Markets & MFs (2)' },
+            { id: 'CALCULATORS', label: '🧮 Calculators & Tax (2)' },
+            { id: 'WEALTH', label: '💰 Personal Wealth & AI (4)' }
+          ].map(cat => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '20px',
+                  border: 'none',
+                  background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.04)',
+                  color: isActive ? '#fff' : '#94a3b8',
+                  fontSize: '12.5px',
+                  fontWeight: isActive ? '700' : '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 12-Hub Grid Cards */}
         {filteredHubs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+          <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
             No tools found matching "{searchQuery}". Try searching for "SIP", "IPO", "Option", or "Tax".
           </div>
         ) : (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '16px'
+            gap: '18px'
           }}>
             {filteredHubs.map(hub => {
               const Icon = hub.icon;
@@ -659,24 +804,40 @@ export default function LandingHomeView({
                   style={{
                     background: hub.gradient,
                     border: `1px solid ${hub.border}`,
-                    borderRadius: '14px',
-                    padding: '20px',
+                    borderRadius: '16px',
+                    padding: '22px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     gap: '14px',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-                    transition: 'transform 0.2s ease, border-color 0.2s ease'
+                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.28)',
+                    transition: 'transform 0.2s ease, border-color 0.2s ease',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                   className="hover:scale-[1.01]"
                 >
+                  {/* Faint Hub Number Watermark */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '12px',
+                    fontSize: '44px',
+                    fontWeight: '900',
+                    color: 'rgba(255, 255, 255, 0.03)',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}>
+                    {hub.hubNum}
+                  </div>
+
                   <div>
-                    {/* Card Header: Hub Number, Icon & Status Badge */}
+                    {/* Header: Icon, Number & Badge */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
-                          width: '38px',
-                          height: '38px',
+                          width: '40px',
+                          height: '40px',
                           borderRadius: '10px',
                           background: `${hub.color}22`,
                           border: `1px solid ${hub.color}55`,
@@ -685,13 +846,13 @@ export default function LandingHomeView({
                           justifyContent: 'center',
                           color: hub.color
                         }}>
-                          <Icon size={20} />
+                          <Icon size={22} />
                         </div>
                         <div>
                           <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '800', letterSpacing: '0.8px' }}>
                             HUB {hub.hubNum}
                           </span>
-                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.2' }}>
+                          <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.2' }}>
                             {hub.title}
                           </h3>
                         </div>
@@ -711,12 +872,12 @@ export default function LandingHomeView({
                       </span>
                     </div>
 
-                    {/* Short Description */}
+                    {/* Description */}
                     <p style={{ margin: '0 0 12px', fontSize: '12.5px', color: '#94a3b8', lineHeight: '1.45' }}>
                       {hub.shortDesc}
                     </p>
 
-                    {/* Tags */}
+                    {/* Tag Badges */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
                       {hub.tags.slice(0, 4).map((tag, tIdx) => (
                         <span 
@@ -735,9 +896,9 @@ export default function LandingHomeView({
                       ))}
                     </div>
 
-                    {/* Direct Sub-links for Instant Navigation */}
+                    {/* Direct Shortcut Sub-links */}
                     {hub.quickLinks && hub.quickLinks.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '4px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }}>
                         {hub.quickLinks.map((ql, qIdx) => (
                           <button
                             key={qIdx}
@@ -762,12 +923,12 @@ export default function LandingHomeView({
                     )}
                   </div>
 
-                  {/* Primary Action Button */}
+                  {/* High-Impact Launch Button */}
                   <button
                     onClick={hub.primaryAction}
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '11px 16px',
                       background: `linear-gradient(135deg, ${hub.color}, ${hub.color}cc)`,
                       border: 'none',
                       borderRadius: '8px',
@@ -779,12 +940,12 @@ export default function LandingHomeView({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: `0 4px 12px ${hub.color}33`,
-                      transition: 'opacity 0.15s ease'
+                      boxShadow: `0 4px 14px ${hub.color}33`,
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <span>{hub.actionLabel}</span>
-                    <ArrowRight size={14} />
+                    <ArrowRight size={15} />
                   </button>
                 </div>
               );
@@ -793,12 +954,70 @@ export default function LandingHomeView({
         )}
       </section>
 
-      {/* 6. Streamlined Footer */}
+      {/* 6. High-Concurrency & Enterprise Performance Guarantee Banner */}
+      <section style={{
+        background: 'rgba(15, 23, 42, 0.7)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        padding: '28px 20px',
+        width: '100%'
+      }}>
+        <div style={{
+          maxWidth: '1240px',
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '20px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
+              <Zap size={18} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
+                Zero-Lag Multi-Core Cluster
+              </h4>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.4' }}>
+                Automated PM2 cluster workers across all VM CPU cores engineered for 1 Lakh to 10 Lakh concurrent users.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
+                In-Memory Edge Caching
+              </h4>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.4' }}>
+                Sub-millisecond Bhavcopy, deal flow, and public feeds served straight from RAM with zero database bottlenecks.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(129, 140, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', flexShrink: 0 }}>
+              <Cpu size={18} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
+                Hardware Accelerated 60 FPS
+              </h4>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.4' }}>
+                GPU-accelerated CSS rendering, smooth scrolling, and code-split chunks for lightning fast mobile and web browsing.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Footer */}
       <footer style={{
         marginTop: 'auto',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(0, 0, 0, 0.45)',
-        padding: '20px 24px',
+        background: 'rgba(0, 0, 0, 0.5)',
+        padding: '24px 24px',
         fontSize: '12px',
         color: '#94a3b8'
       }}>
@@ -813,10 +1032,10 @@ export default function LandingHomeView({
         }}>
           <div>
             <div style={{ fontWeight: '700', color: '#f8fafc', fontSize: '13px', marginBottom: '2px' }}>
-              SKANDX PRO • Zero-Cost Trading & Wealth Operating System
+              SKANDX PRO • High-Concurrency Trading & Wealth Operating System
             </div>
             <div style={{ fontSize: '11px', color: '#64748b' }}>
-              Designed for retail traders. Paper trading simulator uses virtual currency for educational purposes.
+              Paper trading simulator uses virtual currency for educational purposes. Fully compliant with Indian regulatory guidelines.
             </div>
           </div>
           <div style={{ display: 'flex', gap: '14px', fontSize: '12px' }}>

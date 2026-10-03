@@ -4,11 +4,11 @@ module.exports = {
       name: process.env.PM2_APP_NAME || 'skandx-backend',
       script: './server.js',
       cwd: './backend',
-      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 2, // 2 cluster workers for high-concurrency API & WS
+      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 'max', // Auto-cluster across all CPU cores for 100k - 1M concurrency
       exec_mode: 'cluster',
       watch: false,
-      max_memory_restart: '800M',
-      node_args: '--optimize_for_size --max-old-space-size=384 --expose-gc',
+      max_memory_restart: '1200M',
+      node_args: '--optimize_for_size --max-old-space-size=768',
       env: {
         NODE_ENV: process.env.NODE_ENV || 'production',
         PORT: process.env.PORT ? parseInt(process.env.PORT, 10) : 5000,
