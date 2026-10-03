@@ -58,9 +58,11 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     sourcemap: false,
-    chunkSizeWarningLimit: 800,
+    rolldownOptions: {
+      external: ['@capacitor/push-notifications', '@aparajita/capacitor-biometric-auth'],
+    },
     rollupOptions: {
-      external: ['@capacitor/push-notifications'],
+      external: ['@capacitor/push-notifications', '@aparajita/capacitor-biometric-auth'],
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {

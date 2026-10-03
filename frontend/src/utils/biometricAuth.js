@@ -7,7 +7,8 @@ async function getNativeBiometricPlugin() {
   if (_biometricAuth) return _biometricAuth;
   try {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      const mod = await import('@aparajita/capacitor-biometric-auth');
+      const pluginName = '@aparajita/capacitor-biometric-auth';
+      const mod = await import(/* @vite-ignore */ pluginName);
       _biometricAuth = mod.BiometricAuth || mod.default?.BiometricAuth || mod.default;
       return _biometricAuth;
     }

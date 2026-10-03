@@ -20,9 +20,9 @@ NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
 # 2. Smart Frontend Build (Skips npm install if package.json hasn't changed)
 echo "🌐 Building Frontend..."
 cd frontend
-if [ -n "$PREV_HEAD" ] && [ "$PREV_HEAD" != "$NEW_HEAD" ] && git diff --name-only "$PREV_HEAD" "$NEW_HEAD" | grep -q "frontend/package"; then
-    echo "📦 Frontend dependencies changed, running npm ci..."
-    npm ci --prefer-offline || npm install
+if [ ! -d "node_modules" ] || [ ! -d "node_modules/@aparajita/capacitor-biometric-auth" ] || ([ -n "$PREV_HEAD" ] && [ "$PREV_HEAD" != "$NEW_HEAD" ] && git diff --name-only "$PREV_HEAD" "$NEW_HEAD" | grep -q "frontend/package"); then
+    echo "📦 Frontend dependencies changed or missing, running npm install..."
+    npm ci --prefer-offline || npm install --prefer-offline
 else
     echo "⚡ Frontend dependencies unchanged. Skipping npm install (saving ~800 KiB/s bandwidth)."
 fi
