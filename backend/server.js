@@ -2493,11 +2493,31 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
-});
+async function getRazorpayConfig() {
+  let key_id = process.env.RAZORPAY_KEY_ID;
+  let key_secret = process.env.RAZORPAY_KEY_SECRET;
+  try {
+    const rowId = await db('system_settings').where({ key: 'razorpay_key_id' }).first();
+    const rowSec = await db('system_settings').where({ key: 'razorpay_key_secret' }).first();
+    if (rowId && rowId.value) key_id = rowId.value.trim();
+    if (rowSec && rowSec.value) key_secret = rowSec.value.trim();
+  } catch (_) {}
+  return {
+    key_id: key_id || 'rzp_test_placeholder',
+    key_secret: key_secret || 'secret_placeholder'
+  };
+}
 
+async function getRazorpayClient() {
+  const conf = await getRazorpayConfig();
+  return {
+    client: new Razorpay({ key_id: conf.key_id, key_secret: conf.key_secret }),
+    key_id: conf.key_id,
+    key_secret: conf.key_secret
+  };
+}
+
+// 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   try {
     const { plan } = req.body || {};
@@ -2510,49 +2530,49 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
       amount = 199 * 100;
     }
     
+    const { client, key_id, key_secret } = await getRazorpayClient();
+    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
+    }
+
     const options = {
       amount,
       currency: "INR",
       receipt: "receipt_order_" + req.user.id + "_" + Date.now()
     };
-    const order = await razorpay.orders.create(options);
-    res.json({ ...order, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
+    const order = await client.orders.create(options);
+    res.json({ ...order, key_id, amount, currency: "INR" });
   } catch (error) {
     const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
     res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
   }
 });
 
+// Fallback endpoint for backwards compatibility
 app.post('/api/payment/create-subscription', authenticateToken, async (req, res) => {
   try {
     const { plan } = req.body || {};
-    
-    // Support monthly, yearly, and highest / feature plan
-    let planId;
+    let amount = 199 * 100;
     if (plan === 'highest' || plan === 'feature') {
-      planId = process.env.RAZORPAY_PLAN_ID_HIGHEST || 'plan_placeholder_highest';
+      amount = 2999 * 100;
     } else if (plan === 'yearly') {
-      planId = process.env.RAZORPAY_PLAN_ID_YEARLY || 'plan_placeholder_yearly';
+      amount = 1999 * 100;
     } else {
-      planId = process.env.RAZORPAY_PLAN_ID_MONTHLY || 'plan_placeholder_monthly';
+      amount = 199 * 100;
     }
-
-    if (planId.includes('placeholder')) {
-      console.warn('WARNING: Using placeholder Plan ID. Real Razorpay recurring payments will fail until you configure Plan IDs in .env');
+    
+    const { client, key_id, key_secret } = await getRazorpayClient();
+    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
     }
-
-    // 7 days from now in Unix timestamp
-    const startAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
 
     const options = {
-      plan_id: planId,
-      customer_notify: 1,
-      total_count: plan === 'monthly' ? 120 : 10, // Max billing cycles (10 years)
-      start_at: startAt, // This creates the 7-day free trial delay
+      amount,
+      currency: "INR",
+      receipt: "receipt_order_" + req.user.id + "_" + Date.now()
     };
-
-    const subscription = await razorpay.subscriptions.create(options);
-    res.json({ subscription_id: subscription.id, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
+    const order = await client.orders.create(options);
+    res.json({ ...order, key_id, amount, currency: "INR" });
   } catch (error) {
     const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
     res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
@@ -2563,18 +2583,18 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
     
-    const secret = process.env.RAZORPAY_KEY_SECRET;
+    const { key_secret: secret } = await getRazorpayConfig();
     if (!secret || secret === 'secret_placeholder') {
-      return res.status(503).json({ error: 'Payment gateway configuration is incomplete or in maintenance. Please contact support.' });
+      return res.status(503).json({ error: 'Payment gateway configuration is incomplete. Please add Razorpay Key Secret.' });
     }
 
     if (!razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: 'Missing required payment verification parameters' });
     }
 
-    // For subscriptions, Razorpay generates signature using payment_id + '|' + subscription_id
-    // For normal orders, it uses order_id + '|' + payment_id
-    let body = razorpay_order_id + "|" + razorpay_payment_id;
+    // For normal orders, body is order_id + '|' + payment_id
+    // For subscriptions, body is payment_id + '|' + subscription_id
+    let body = (razorpay_order_id || '') + "|" + razorpay_payment_id;
     if (razorpay_subscription_id) {
       body = razorpay_payment_id + "|" + razorpay_subscription_id;
     }
@@ -10157,6 +10177,42 @@ app.post('/api/fyers/verify', async (req, res) => {
   } catch (err) {
     console.error("Fyers Verify Error:", err);
     res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
+app.get('/api/admin/razorpay/credentials', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const rowId = await db('system_settings').where({ key: 'razorpay_key_id' }).first();
+    const rowSec = await db('system_settings').where({ key: 'razorpay_key_secret' }).first();
+    const key_id = rowId?.value || process.env.RAZORPAY_KEY_ID || '';
+    const key_secret = rowSec?.value || process.env.RAZORPAY_KEY_SECRET || '';
+    res.json({
+      success: true,
+      key_id,
+      has_key_id: !!(key_id && key_id !== 'rzp_test_placeholder'),
+      has_key_secret: !!(key_secret && key_secret !== 'secret_placeholder')
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const { key_id, key_secret } = req.body;
+    if (key_id !== undefined) {
+      await db('system_settings').insert({ key: 'razorpay_key_id', value: key_id.trim(), updated_at: new Date() }).onConflict('key').merge();
+    }
+    if (key_secret !== undefined && key_secret.trim() !== '') {
+      await db('system_settings').insert({ key: 'razorpay_key_secret', value: key_secret.trim(), updated_at: new Date() }).onConflict('key').merge();
+    }
+    res.json({ success: true, message: 'Razorpay keys saved successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

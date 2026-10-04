@@ -1422,7 +1422,73 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDataRightsRequests();
+    fetchRazorpayCreds();
   }, []);
+
+  // Razorpay Gateway Admin State
+  const [rzpKeyId, setRzpKeyId] = useState('');
+  const [rzpKeySecret, setRzpKeySecret] = useState('');
+  const [rzpHasSecret, setRzpHasSecret] = useState(false);
+  const [rzpLoading, setRzpLoading] = useState(false);
+  const [rzpSaving, setRzpSaving] = useState(false);
+  const [rzpStatusMsg, setRzpStatusMsg] = useState({ type: '', text: '' });
+
+  const fetchRazorpayCreds = async () => {
+    setRzpLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/razorpay/credentials`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setRzpKeyId(data.key_id || '');
+        setRzpHasSecret(!!data.has_key_secret);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch Razorpay credentials:', e);
+    } finally {
+      setRzpLoading(false);
+    }
+  };
+
+  const handleSaveRazorpayCreds = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!rzpKeyId.trim()) {
+      alert('Please enter your Razorpay Key ID (rzp_live_... or rzp_test_...)');
+      return;
+    }
+    setRzpSaving(true);
+    setRzpStatusMsg({ type: '', text: '' });
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/razorpay/credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          key_id: rzpKeyId.trim(),
+          key_secret: rzpKeySecret.trim()
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setRzpStatusMsg({ type: 'success', text: '✅ Razorpay credentials updated and active! Plans are now live for ₹199, ₹1,999, and ₹2,999 with instant activation (NO trial delay).' });
+        setRzpKeySecret('');
+        setRzpHasSecret(true);
+      } else {
+        setRzpStatusMsg({ type: 'error', text: data.error || 'Failed to save credentials' });
+      }
+    } catch (err) {
+      setRzpStatusMsg({ type: 'error', text: err.message || 'Network error saving keys' });
+    } finally {
+      setRzpSaving(false);
+    }
+  };
 
   const handleResolveDataRightsRequest = async (reqItem, action) => {
     const isDelete = action === 'DELETE_ACCOUNT';
@@ -3023,6 +3089,12 @@ export default function AdminDashboard() {
         >
           📱 Telegram & Peak Engine
         </button>
+        <button 
+          onClick={() => { setActiveTab('razorpay'); fetchRazorpayCreds?.(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'razorpay' ? '2px solid #10b981' : '2px solid transparent', color: activeTab === 'razorpay' ? '#10b981' : 'var(--text-secondary)', fontWeight: activeTab === 'razorpay' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          💳 Razorpay Gateway
+        </button>
       </div>
 
       {/* Content Container */}
@@ -3662,6 +3734,246 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+          </div>
+        ) : activeTab === 'razorpay' ? (
+          <div style={{ padding: isMobile ? '12px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Header Banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '16px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CreditCard size={22} color="#10b981" />
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#fff' }}>
+                    Razorpay Payment Gateway Setup
+                  </h2>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    background: rzpHasSecret ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    color: rzpHasSecret ? '#34d399' : '#f87171',
+                    border: rzpHasSecret ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '20px',
+                    padding: '2px 10px'
+                  }}>
+                    {rzpHasSecret ? '● ACTIVE' : '○ NOT CONFIGURED'}
+                  </span>
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Configure live Razorpay API Keys to accept instant payments for ₹199 (Monthly), ₹1,999 (Yearly), and ₹2,999 (VIP). Direct one-time payment with instant activation — NO trial delay, NO e-mandate.
+                </p>
+              </div>
+              <button
+                onClick={fetchRazorpayCreds}
+                disabled={rzpLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                <RefreshCw size={14} className={rzpLoading ? 'animate-spin' : ''} />
+                Refresh Status
+              </button>
+            </div>
+
+            {/* Status Message */}
+            {rzpStatusMsg.text && (
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '600',
+                background: rzpStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                border: rzpStatusMsg.type === 'success' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                color: rzpStatusMsg.type === 'success' ? '#34d399' : '#f87171'
+              }}>
+                {rzpStatusMsg.text}
+              </div>
+            )}
+
+            {/* Form & Pricing Overview Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr', gap: '20px' }}>
+              {/* Credentials Card */}
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.65)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '20px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Key size={16} color="#38bdf8" /> API Credentials
+                </h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Find your credentials in your Razorpay Dashboard under <b>Accounts & Settings → API Keys → Generate Key</b>. You can use Live keys (starts with <code>rzp_live_</code>) or Test keys (starts with <code>rzp_test_</code>).
+                </p>
+
+                <form onSubmit={handleSaveRazorpayCreds} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Key ID (Required)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. rzp_live_xxxxxxxxxxxxxxxx or rzp_test_xxxxxxxxxxxxxxxx"
+                      value={rzpKeyId}
+                      onChange={(e) => setRzpKeyId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        fontFamily: 'monospace',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Key Secret {rzpHasSecret ? '(Leave blank to keep existing saved secret)' : '(Required)'}
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={rzpHasSecret ? '•••••••••••••••••••••••• (Secret already configured)' : 'Paste your Razorpay Key Secret'}
+                      value={rzpKeySecret}
+                      onChange={(e) => setRzpKeySecret(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        fontFamily: 'monospace',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <button
+                      type="submit"
+                      disabled={rzpSaving}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 22px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                      }}
+                    >
+                      {rzpSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {rzpSaving ? 'Saving Keys...' : 'Save & Activate Gateway'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Plans & Pricing Reference Card */}
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.65)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '20px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} color="#fbbf24" /> Active Pricing Architecture
+                </h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  All plans are configured as direct one-time payments with <b>NO free trials</b>. Instant access is granted upon UPI / Card / NetBanking verification.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Pro Monthly</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Full access for 30 days</div>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#10b981' }}>₹199</div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Pro Yearly</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Full access for 365 days</div>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8' }}>₹1,999</div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>VIP / Feature Plan</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Lifetime VIP features & algorithms</div>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#fbbf24' }}>₹2,999</div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 'auto', padding: '10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '11.5px', color: '#7dd3fc', lineHeight: '1.4' }}>
+                  💡 <b>No server restart required:</b> Keys saved here are immediately queried from the database by the payment creation and verification pipelines.
+                </div>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'contests' ? (
           <div style={{ padding: isMobile ? '10px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>

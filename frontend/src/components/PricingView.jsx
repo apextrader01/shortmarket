@@ -36,7 +36,8 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      const orderRes = await fetch(`${API}/api/payment/create-subscription`, {
+      // Direct payment (no trial): calls create-order with exact 199, 1999, or 2999
+      const orderRes = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -45,16 +46,18 @@ export default function PricingView({ setActiveTab }) {
         body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create subscription');
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create payment order');
 
-      const planTitle = plan === 'highest' ? 'Feature Plan VIP' : plan === 'yearly' ? 'Yearly Elite' : 'Pro Monthly';
+      const planTitle = plan === 'highest' ? 'Feature Plan VIP (₹2,999/yr)' : plan === 'yearly' ? 'Yearly Elite (₹1,999/yr)' : 'Pro Monthly (₹199/mo)';
 
       const options = {
-        key: orderData.key_id || 'rzp_test_placeholder',
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: orderData.currency || 'INR',
         name: 'SkandX',
-        description: `7-Day Free Trial (${planTitle})`,
-        image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-        subscription_id: orderData.subscription_id,
+        description: `Upgrade to ${planTitle}`,
+        image: 'https://skandx.in/skandx-playstore-icon.png',
+        order_id: orderData.id,
         handler: async function (response) {
           try {
             const verifyRes = await fetch(`${API}/api/payment/verify`, {
@@ -64,35 +67,35 @@ export default function PricingView({ setActiveTab }) {
                 'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || response.razorpay_subscription_id,
+                razorpay_order_id: response.razorpay_order_id || orderData.id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_subscription_id: response.razorpay_subscription_id,
                 razorpay_signature: response.razorpay_signature,
                 plan: plan
               })
             });
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-              alert(`Upgraded to ${planTitle} successfully! Please log out and log back in to see changes.`);
-              setActiveTab('ClientData');
+              alert(`🎉 Successfully upgraded to ${planTitle}! Your plan is active immediately.`);
+              if (typeof setActiveTab === 'function') setActiveTab('ClientData');
+              else window.location.href = '/clientdata';
             } else {
-              alert('Payment verification failed. Please contact support.');
+              alert('Payment verification failed: ' + (verifyData.error || 'Please contact support.'));
             }
           } catch (err) {
             alert('Error verifying payment: ' + err.message);
           }
         },
         prefill: {
-          name: user?.name || '',
+          name: user?.name || user?.username || '',
           email: user?.email || '',
           contact: user?.phone || ''
         },
-        theme: { color: plan === 'highest' ? '#8B5CF6' : '#3B82F6' }
+        theme: { color: plan === 'highest' ? '#8B5CF6' : plan === 'yearly' ? '#F59E0B' : '#3B82F6' }
       };
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
-        alert(response.error.description);
+        alert(response.error?.description || 'Payment cancelled or failed');
       });
       rzp.open();
     } catch (err) {
@@ -258,7 +261,7 @@ export default function PricingView({ setActiveTab }) {
 
           {isMonthly ? (
             <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
-              ✓ Active Subscription
+              ✓ Active Plan
             </button>
           ) : (
             <button 
@@ -267,7 +270,7 @@ export default function PricingView({ setActiveTab }) {
               onClick={() => handleUpgrade('monthly')}
               disabled={loading}
             >
-              {loading === 'monthly' ? 'Processing...' : 'Upgrade Monthly'}
+              {loading === 'monthly' ? 'Processing...' : 'Upgrade Monthly (₹199)'}
             </button>
           )}
         </div>
@@ -317,7 +320,7 @@ export default function PricingView({ setActiveTab }) {
 
           {isYearly ? (
             <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
-              ✓ Active Subscription
+              ✓ Active Plan
             </button>
           ) : (
             <button 
@@ -326,7 +329,7 @@ export default function PricingView({ setActiveTab }) {
               onClick={() => handleUpgrade('yearly')}
               disabled={loading}
             >
-              {loading === 'yearly' ? 'Processing...' : 'Start 7-Day Free Trial'}
+              {loading === 'yearly' ? 'Processing...' : 'Upgrade Yearly (₹1,999)'}
             </button>
           )}
         </div>
@@ -376,7 +379,7 @@ export default function PricingView({ setActiveTab }) {
 
           {isHighest ? (
             <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
-              ✓ Active VIP Subscription
+              ✓ Active VIP Plan
             </button>
           ) : (
             <button 
@@ -385,7 +388,7 @@ export default function PricingView({ setActiveTab }) {
               onClick={() => handleUpgrade('highest')}
               disabled={loading}
             >
-              {loading === 'highest' ? 'Processing...' : 'Upgrade to Feature Plan'}
+              {loading === 'highest' ? 'Processing...' : 'Upgrade VIP (₹2,999)'}
             </button>
           )}
         </div>
