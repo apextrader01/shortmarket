@@ -1357,6 +1357,11 @@ export default function AdminDashboard() {
   const [dataRightsPendingCount, setDataRightsPendingCount] = useState(0);
   const [dataRightsFilter, setDataRightsFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'ERASURE' | 'COMPLETED'
   const [dataRightsResolvingId, setDataRightsResolvingId] = useState(null);
+  const [smtpConfigured, setStpConfigured] = useState(false);
+  const [smtpUser, setSmtpUser] = useState('skandx.in@gmail.com');
+  const [smtpPassInput, setSmtpPassInput] = useState('');
+  const [smtpSaving, setSmtpSaving] = useState(false);
+  const [showSmtpForm, setShowSmtpForm] = useState(false);
 
   const fetchDataRightsRequests = async () => {
     try {
@@ -1369,9 +1374,49 @@ export default function AdminDashboard() {
       if (data && data.success) {
         setDataRightsRequests(data.requests || []);
         setDataRightsPendingCount(data.pendingCount || 0);
+        setStpConfigured(!!data.smtpConfigured);
+        if (data.gmailUser) setSmtpUser(data.gmailUser);
       }
     } catch (e) {
       console.warn('Failed to fetch data rights requests:', e);
+    }
+  };
+
+  const handleSaveEmailSettings = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!smtpUser.trim() || !smtpPassInput.trim()) {
+      alert('Please enter your Gmail address and 16-character Google App Password.');
+      return;
+    }
+    setSmtpSaving(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/email-settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          gmail_user: smtpUser.trim(),
+          gmail_app_password: smtpPassInput.trim(),
+          send_test: true
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        alert(`✅ ${data.message}`);
+        setStpConfigured(true);
+        setShowSmtpForm(false);
+        setSmtpPassInput('');
+      } else {
+        alert('⚠️ ' + (data?.error || 'Failed to verify Gmail App Password'));
+      }
+    } catch (err) {
+      alert('Error saving Gmail settings: ' + err.message);
+    } finally {
+      setSmtpSaving(false);
     }
   };
 
@@ -3054,6 +3099,96 @@ export default function AdminDashboard() {
                   <RefreshCw size={12} /> Refresh
                 </button>
               </div>
+            </div>
+
+            {/* Email Notification Status / 1-Click Gmail App Password Setup */}
+            <div style={{
+              background: smtpConfigured ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.1)',
+              border: smtpConfigured ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{smtpConfigured ? '🟢' : '⚠️'}</span>
+                  <span>
+                    {smtpConfigured
+                      ? <><strong>Email Alerts Active:</strong> Instant deletion notifications are sent to <strong>{smtpUser}</strong> and the client.</>
+                      : <><strong>Why you didn&apos;t receive an email yet:</strong> Gmail SMTP App Password is not saved yet. Connect <strong>skandx.in@gmail.com</strong> below to get instant email alerts.</>}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSmtpForm(v => !v)}
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {showSmtpForm ? 'Hide Email Setup' : (smtpConfigured ? '⚙️ Update / Test Email' : '📧 Connect Gmail Alerts')}
+                </button>
+              </div>
+
+              {(!smtpConfigured || showSmtpForm) && (
+                <form onSubmit={handleSaveEmailSettings} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '4px' }}>
+                  <input
+                    type="email"
+                    value={smtpUser}
+                    onChange={e => setSmtpUser(e.target.value)}
+                    placeholder="skandx.in@gmail.com"
+                    style={{
+                      background: '#0a0d14',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '7px 10px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      minWidth: '210px'
+                    }}
+                  />
+                  <input
+                    type="password"
+                    value={smtpPassInput}
+                    onChange={e => setSmtpPassInput(e.target.value)}
+                    placeholder="16-digit Google App Password (myaccount.google.com/apppasswords)"
+                    style={{
+                      background: '#0a0d14',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '7px 10px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      flex: 1,
+                      minWidth: '260px'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={smtpSaving}
+                    style={{
+                      background: '#10b981',
+                      color: '#0a0d14',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '7px 14px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      cursor: smtpSaving ? 'wait' : 'pointer'
+                    }}
+                  >
+                    {smtpSaving ? 'Testing & Saving...' : 'Save & Send Test Email'}
+                  </button>
+                </form>
+              )}
             </div>
 
             {/* Table of Requests */}

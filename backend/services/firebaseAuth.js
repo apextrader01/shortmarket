@@ -433,8 +433,20 @@ async function sendDataRightsNotificationEmail({
   clientIp,
   adminNotes
 }) {
-  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  let gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  let gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  if (!gmailUser || !gmailPass) {
+    try {
+      const db = require('../database/db');
+      const rows = await db('system_settings').whereIn('key', ['gmail_user', 'gmail_app_password']);
+      for (const r of rows) {
+        if (r.key === 'gmail_user' && r.value) gmailUser = r.value;
+        if (r.key === 'gmail_app_password' && r.value) gmailPass = r.value;
+      }
+    } catch (_) {}
+  }
+
   if (!nodemailer || !gmailUser || !gmailPass) {
     console.log(`[DATA RIGHTS EMAIL] Gmail SMTP not configured (GMAIL_USER / GMAIL_APP_PASSWORD). Request ${requestId} (${requestType}) for ${email} logged in database.`);
     return false;
@@ -444,14 +456,14 @@ async function sendDataRightsNotificationEmail({
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: gmailUser,
+        user: gmailUser.trim(),
         pass: gmailPass.replace(/\s+/g, '')
       }
     });
 
     const isErasure = String(requestType).toUpperCase() === 'ERASURE';
     const typeLabel = isErasure ? 'Account Deletion (Right to Erasure)' : `Data Rights (${requestType})`;
-    const adminRecipients = Array.from(new Set([gmailUser, process.env.ADMIN_EMAIL, 'skandx.in@gmail.com'].filter(Boolean))).join(', ');
+    const adminRecipients = Array.from(new Set([gmailUser.trim(), process.env.ADMIN_EMAIL, 'skandx.in@gmail.com'].filter(Boolean))).join(', ');
 
     if (event === 'SUBMITTED') {
       // 1. Send instant alert email to Admin

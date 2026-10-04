@@ -2939,9 +2939,30 @@ app.post('/api/user/data-rights-request', async (req, res) => {
           requestType: cleanType,
           details: cleanDetails,
           userId,
-          username: matchedUser?.username || matchedUser?.full_name || null,
+          username: matchedUser?.username || null,
           clientIp
         }).catch(err => console.warn('[DATA RIGHTS EMAIL ERROR]', err.message));
+      }
+    } catch (e) {}
+
+    // Also notify Admin via Telegram Bot if any admin has telegram_chat_id configured
+    try {
+      const { callTelegramApi } = require('./services/telegramService');
+      if (typeof callTelegramApi === 'function') {
+        const adminsWithTg = await db('users')
+          .where({ is_admin: true })
+          .whereNotNull('telegram_chat_id')
+          .whereNot('telegram_chat_id', '');
+        const tgMsg =
+          `🚨 <b>SkandX Compliance Alert: ${cleanType === 'ERASURE' ? 'Account Deletion Request' : cleanType}</b>\n\n` +
+          `<b>Ref ID:</b> <code>${requestId}</code>\n` +
+          `<b>Client Email:</b> ${cleanEmail}\n` +
+          `<b>Matched Account:</b> ${matchedUser ? `${matchedUser.username} (#${matchedUser.id})` : 'None'}\n` +
+          `<b>Reason:</b> ${cleanDetails || 'Not specified'}\n\n` +
+          `👉 Open <b>Admin Panel → Account Deletions</b> to approve or resolve.`;
+        for (const adm of adminsWithTg) {
+          callTelegramApi(adm.telegram_chat_id, tgMsg).catch(() => {});
+        }
       }
     } catch (e) {}
 
@@ -2976,43 +2997,125 @@ app.get('/api/admin/data-rights-requests', authenticateToken, async (req, res) =
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
-    const requests = await db('data_rights_requests as drr')
-      .leftJoin('users as u', function () {
-        this.on('drr.user_id', '=', 'u.id').orOn(db.raw('LOWER(drr.email) = LOWER(u.email)'));
-      })
+    const rawRequests = await db('data_rights_requests')
       .select(
-        'drr.id',
-        'drr.request_id',
-        'drr.user_id',
-        'drr.email',
-        'drr.request_type',
-        'drr.details',
-        'drr.status',
-        'drr.admin_notes',
-        'drr.ip_address',
-        'drr.created_at',
-        'drr.updated_at',
-        'u.id as matched_user_id',
-        'u.username as matched_username',
-        'u.full_name as matched_full_name',
-        'u.balance as matched_balance',
-        'u.subscription_tier as matched_tier',
-        'u.is_admin as matched_is_admin'
+        'id',
+        'request_id',
+        'user_id',
+        'email',
+        'request_type',
+        'details',
+        'status',
+        'admin_notes',
+        'ip_address',
+        'created_at',
+        'updated_at'
       )
-      .orderBy('drr.created_at', 'desc')
+      .orderBy('created_at', 'desc')
       .limit(250);
+
+    // Enrich with matched user info safely without SQL join column failures
+    const allUsers = await db('users')
+      .select('id', 'client_id', 'username', 'email', 'balance', 'subscription_tier', 'is_admin')
+      .catch(() => []);
+
+    const usersById = new Map();
+    const usersByEmail = new Map();
+    for (const u of allUsers) {
+      usersById.set(Number(u.id), u);
+      if (u.email) usersByEmail.set(String(u.email).toLowerCase().trim(), u);
+    }
+
+    const requests = rawRequests.map(r => {
+      const matched = (r.user_id && usersById.get(Number(r.user_id))) ||
+        (r.email && usersByEmail.get(String(r.email).toLowerCase().trim())) ||
+        null;
+      return {
+        ...r,
+        matched_user_id: matched ? matched.id : null,
+        matched_client_id: matched ? matched.client_id : null,
+        matched_username: matched ? matched.username : null,
+        matched_balance: matched ? matched.balance : null,
+        matched_tier: matched ? matched.subscription_tier : null,
+        matched_is_admin: matched ? matched.is_admin : false
+      };
+    });
 
     const pendingCount = requests.filter(r => r.status === 'PENDING').length;
     const erasurePendingCount = requests.filter(r => r.status === 'PENDING' && r.request_type === 'ERASURE').length;
+
+    let gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER || '';
+    let gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
+    try {
+      const rows = await db('system_settings').whereIn('key', ['gmail_user', 'gmail_app_password']);
+      for (const r of rows) {
+        if (r.key === 'gmail_user' && r.value) gmailUser = r.value;
+        if (r.key === 'gmail_app_password' && r.value) gmailPass = r.value;
+      }
+    } catch (_) {}
 
     res.json({
       success: true,
       requests,
       pendingCount,
-      erasurePendingCount
+      erasurePendingCount,
+      smtpConfigured: !!(gmailUser && gmailPass),
+      gmailUser: gmailUser || 'skandx.in@gmail.com'
     });
   } catch (err) {
     console.error('Admin Data Rights List Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Save Gmail SMTP credentials for Compliance & Deletion Email Alerts
+app.post('/api/admin/email-settings', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { gmail_user, gmail_app_password, send_test } = req.body || {};
+    const cleanUser = String(gmail_user || 'skandx.in@gmail.com').trim();
+    const cleanPass = String(gmail_app_password || '').replace(/\s+/g, '').trim();
+
+    if (!cleanUser || !cleanPass) {
+      return res.status(400).json({ error: 'Both Gmail address and 16-character Google App Password are required.' });
+    }
+
+    process.env.GMAIL_USER = cleanUser;
+    process.env.GMAIL_APP_PASSWORD = cleanPass;
+
+    for (const [k, v] of [['gmail_user', cleanUser], ['gmail_app_password', cleanPass]]) {
+      const exists = await db('system_settings').where({ key: k }).first();
+      if (exists) {
+        await db('system_settings').where({ key: k }).update({ value: v, updated_at: new Date() });
+      } else {
+        await db('system_settings').insert({ key: k, value: v, updated_at: new Date() });
+      }
+    }
+
+    if (send_test) {
+      const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+      const sent = await sendDataRightsNotificationEmail({
+        event: 'SUBMITTED',
+        requestId: 'DRR-TEST-VERIFY',
+        email: cleanUser,
+        requestType: 'ERASURE',
+        details: 'Test email alert from SkandX Admin Panel to verify Gmail SMTP delivery.',
+        userId: caller.id,
+        username: caller.username,
+        clientIp: '127.0.0.1'
+      });
+      if (!sent) {
+        return res.status(400).json({ error: 'Saved, but Gmail rejected the App Password. Make sure 2-Step Verification is ON in your Google Account and use a 16-letter Google App Password.' });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Gmail SMTP credentials saved and verified! All Account Deletion requests will now email you immediately.'
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
