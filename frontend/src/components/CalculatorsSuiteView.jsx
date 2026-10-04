@@ -156,6 +156,13 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
   const [catalogSearch, setCatalogSearch] = useState('');
   const [viewMode, setViewMode] = useState('CHART'); // 'CHART' | 'TABLE'
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Update selectedCalcId if initialType prop changes
   useEffect(() => {
@@ -236,168 +243,211 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
       color: '#f8fafc',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      overflowX: 'hidden'
     }}>
       {/* ── Topbar (Edge-to-Edge Institutional Header) ── */}
       <header style={{
-        height: '62px',
+        height: isMobile ? 'auto' : '62px',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         background: 'rgba(15, 23, 42, 0.95)',
         backdropFilter: 'blur(12px)',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
+        padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 12px 10px' : '0 24px',
+        gap: isMobile ? '8px' : '16px',
         position: 'sticky',
         top: 0,
         zIndex: 50
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            onClick={() => {
-              if (selectedCalcId !== 'CATALOG') {
-                setSelectedCalcId('CATALOG');
-              } else if (onBack) {
-                onBack();
-              }
-            }}
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              color: '#94a3b8',
-              fontSize: '12.5px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <ArrowLeft size={14} />
-            <span>{selectedCalcId === 'CATALOG' ? 'Back to Home' : 'All Calculators'}</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '8px' : '16px', width: isMobile ? '100%' : 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', minWidth: 0, flex: 1 }}>
+            <button
+              onClick={() => {
+                if (selectedCalcId !== 'CATALOG') {
+                  setSelectedCalcId('CATALOG');
+                } else if (onBack) {
+                  onBack();
+                }
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '8px',
+                padding: isMobile ? '6px 10px' : '6px 12px',
+                color: '#94a3b8',
+                fontSize: isMobile ? '11.5px' : '12.5px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <ArrowLeft size={14} />
+              <span>{selectedCalcId === 'CATALOG' ? (isMobile ? 'Back' : 'Back to Home') : (isMobile ? 'All Tools' : 'All Calculators')}</span>
+            </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff'
-            }}>
-              <Calculator size={18} />
-            </div>
-            <div>
-              <span style={{ fontSize: '15px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff' }}>
-                SkandX Calculators
-              </span>
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '8px' }}>
-                {selectedCalcId === 'CATALOG' ? 'Directory & Tools' : activeCalcMeta.title}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <div style={{
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                flexShrink: 0
+              }}>
+                <Calculator size={isMobile ? 15 : 18} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: isMobile ? '13.5px' : '15px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  SkandX Calculators
+                </div>
+                {!isMobile && (
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                    {selectedCalcId === 'CATALOG' ? 'Directory & Tools' : activeCalcMeta.title}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Topbar Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {selectedCalcId !== 'CATALOG' && (
-            <>
-              {/* Calculator Quick-Switch Dropdown */}
-              <select
-                value={selectedCalcId}
-                onChange={e => setSelectedCalcId(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '8px',
-                  color: '#f8fafc',
-                  fontSize: '12.5px',
-                  fontWeight: '600',
-                  padding: '7px 12px',
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                {CALCULATORS_CATALOG.map(calc => (
-                  <option key={calc.id} value={calc.id} style={{ background: '#0f172a', color: '#fff' }}>
-                    {calc.title}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={handleCopyShareLink}
-                style={{
-                  background: copiedLink ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '7px 12px',
-                  color: copiedLink ? '#34d399' : '#cbd5e1',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer'
-                }}
-                title="Copy Direct Calculator Link"
-              >
-                <Share2 size={14} />
-                <span className="hide-on-mobile">{copiedLink ? 'Link Copied!' : 'Share Link'}</span>
-              </button>
-
-              <button
-                onClick={handlePrintPDF}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '7px 12px',
-                  color: '#cbd5e1',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer'
-                }}
-                title="Print or Save as PDF"
-              >
-                <Printer size={14} />
-                <span className="hide-on-mobile">Save PDF</span>
-              </button>
-            </>
-          )}
-
-          {onOpenPaperTrading && (
+          {isMobile && onOpenPaperTrading && (
             <button
               onClick={onOpenPaperTrading}
               style={{
                 background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                 border: 'none',
                 borderRadius: '8px',
-                padding: '7px 14px',
+                padding: '6px 10px',
                 color: '#fff',
-                fontSize: '12.5px',
+                fontSize: '11.5px',
                 fontWeight: '700',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '4px',
                 cursor: 'pointer',
-                boxShadow: '0 0 16px rgba(2, 132, 199, 0.35)'
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                boxShadow: '0 0 12px rgba(2, 132, 199, 0.35)'
               }}
             >
-              <span>Paper Trading</span>
-              <ArrowRight size={14} />
+              <span>Terminal</span>
+              <ArrowRight size={12} />
             </button>
           )}
         </div>
+
+        {/* Topbar Right Actions */}
+        {(selectedCalcId !== 'CATALOG' || (!isMobile && onOpenPaperTrading)) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', width: isMobile ? '100%' : 'auto' }}>
+            {selectedCalcId !== 'CATALOG' && (
+              <>
+                {/* Calculator Quick-Switch Dropdown */}
+                <select
+                  value={selectedCalcId}
+                  onChange={e => setSelectedCalcId(e.target.value)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '8px',
+                    color: '#f8fafc',
+                    fontSize: isMobile ? '12px' : '12.5px',
+                    fontWeight: '600',
+                    padding: isMobile ? '6px 8px' : '7px 12px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    flex: isMobile ? 1 : 'initial',
+                    minWidth: 0
+                  }}
+                >
+                  {CALCULATORS_CATALOG.map(calc => (
+                    <option key={calc.id} value={calc.id} style={{ background: '#0f172a', color: '#fff' }}>
+                      {calc.title}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={handleCopyShareLink}
+                  style={{
+                    background: copiedLink ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: isMobile ? '6px 10px' : '7px 12px',
+                    color: copiedLink ? '#34d399' : '#cbd5e1',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                  title="Copy Direct Calculator Link"
+                >
+                  <Share2 size={13} />
+                  <span>{copiedLink ? 'Copied!' : (isMobile ? 'Share' : 'Share Link')}</span>
+                </button>
+
+                <button
+                  onClick={handlePrintPDF}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: isMobile ? '6px 10px' : '7px 12px',
+                    color: '#cbd5e1',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                  title="Print or Save as PDF"
+                >
+                  <Printer size={13} />
+                  <span>PDF</span>
+                </button>
+              </>
+            )}
+
+            {!isMobile && onOpenPaperTrading && (
+              <button
+                onClick={onOpenPaperTrading}
+                style={{
+                  background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '7px 14px',
+                  color: '#fff',
+                  fontSize: '12.5px',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 16px rgba(2, 132, 199, 0.35)'
+                }}
+              >
+                <span>Paper Trading</span>
+                <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {/* ── Main View Content ── */}
@@ -410,6 +460,7 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
             searchQuery={catalogSearch}
             onSearchChange={setCatalogSearch}
             onSelectCalculator={setSelectedCalcId}
+            isMobile={isMobile}
           />
         ) : (
           <DedicatedCalculatorView 
@@ -421,6 +472,7 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
             onDownloadCSV={downloadCSV}
             onPrintPDF={handlePrintPDF}
             onOpenPaperTrading={onOpenPaperTrading}
+            isMobile={isMobile}
           />
         )}
       </main>
@@ -432,34 +484,34 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
 // COMPONENT 1: CATALOG DIRECTORY VIEW (Matching Fyers Screen 1)
 // ============================================================================
 function CatalogDirectoryView({
-  catalog, selectedCategory, onSelectCategory, searchQuery, onSearchChange, onSelectCalculator
+  catalog, selectedCategory, onSelectCategory, searchQuery, onSearchChange, onSelectCalculator, isMobile
 }) {
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: '32px 24px' }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: isMobile ? '16px 12px 60px' : '32px 24px', boxSizing: 'border-box' }}>
       {/* Hero Banner */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+      <div style={{ marginBottom: isMobile ? '18px' : '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontSize: '11.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
           <Sparkles size={14} />
           <span>Institutional Computational Math</span>
         </div>
-        <h1 style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: '900', margin: 0, letterSpacing: '-0.5px', color: '#f8fafc' }}>
+        <h1 style={{ fontSize: isMobile ? '22px' : 'clamp(24px, 3vw, 32px)', fontWeight: '900', margin: 0, letterSpacing: '-0.5px', color: '#f8fafc' }}>
           Financial & Trading Calculators
         </h1>
-        <p style={{ fontSize: '14px', color: '#94a3b8', margin: '8px 0 0', maxWidth: '720px', lineHeight: '1.5' }}>
+        <p style={{ fontSize: isMobile ? '12.5px' : '14px', color: '#94a3b8', margin: '6px 0 0', maxWidth: '720px', lineHeight: '1.5' }}>
           Explore our suite of compounding models, multi-tranche stock averaging, MTF leverage costs, SEBI tax calculations, and loan amortization engines.
         </p>
       </div>
 
       {/* Search & Category Filter Bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: isMobile ? '16px' : '24px' }}>
         {/* Category Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '4px', width: isMobile ? '100%' : 'auto' }}>
           {[
-            { id: 'ALL', label: `All Calculators (${CALCULATORS_CATALOG.length})` },
-            { id: 'INVESTMENT', label: '📈 Investment & Wealth (3)' },
-            { id: 'TRADING', label: '⚡ Trading & Equities (3)' },
-            { id: 'LOANS', label: '🏦 Loans & Debt (2)' },
-            { id: 'RISK', label: '🎯 Risk & Derivatives (2)' }
+            { id: 'ALL', label: `All (${CALCULATORS_CATALOG.length})` },
+            { id: 'INVESTMENT', label: '📈 Investment (3)' },
+            { id: 'TRADING', label: '⚡ Trading (3)' },
+            { id: 'LOANS', label: '🏦 Loans (2)' },
+            { id: 'RISK', label: '🎯 Risk & Greeks (2)' }
           ].map(cat => {
             const isActive = selectedCategory === cat.id;
             return (
@@ -467,15 +519,16 @@ function CatalogDirectoryView({
                 key={cat.id}
                 onClick={() => onSelectCategory(cat.id)}
                 style={{
-                  padding: '8px 16px',
+                  padding: isMobile ? '7px 12px' : '8px 16px',
                   borderRadius: '20px',
                   border: 'none',
                   background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
                   color: isActive ? '#fff' : '#94a3b8',
-                  fontSize: '13px',
+                  fontSize: isMobile ? '12px' : '13px',
                   fontWeight: isActive ? '700' : '500',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -494,7 +547,9 @@ function CatalogDirectoryView({
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           padding: '8px 14px',
-          minWidth: '280px'
+          minWidth: isMobile ? '100%' : '280px',
+          width: isMobile ? '100%' : 'auto',
+          boxSizing: 'border-box'
         }}>
           <Search size={16} color="#94a3b8" />
           <input 
@@ -508,7 +563,7 @@ function CatalogDirectoryView({
       </div>
 
       {/* Grid of Calculator Cards (Fyers Layout) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: isMobile ? '14px' : '20px' }}>
         {catalog.map(calc => {
           const Icon = calc.icon;
           return (
@@ -519,7 +574,7 @@ function CatalogDirectoryView({
                 background: 'rgba(15, 23, 42, 0.65)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '16px',
-                padding: '22px',
+                padding: isMobile ? '16px' : '22px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -540,10 +595,10 @@ function CatalogDirectoryView({
               }}
             >
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div style={{
-                    width: '44px',
-                    height: '44px',
+                    width: '42px',
+                    height: '42px',
                     borderRadius: '12px',
                     background: `${calc.color}22`,
                     border: `1px solid ${calc.color}44`,
@@ -552,7 +607,7 @@ function CatalogDirectoryView({
                     justifyContent: 'center',
                     color: calc.color
                   }}>
-                    <Icon size={22} />
+                    <Icon size={20} />
                   </div>
                   <span style={{
                     fontSize: '11px',
@@ -567,13 +622,13 @@ function CatalogDirectoryView({
                   </span>
                 </div>
 
-                <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '2px' }}>
                   {calc.categoryLabel}
                 </div>
-                <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', margin: '0 0 8px', lineHeight: '1.3' }}>
+                <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#f8fafc', margin: '0 0 6px', lineHeight: '1.3' }}>
                   {calc.title}
                 </h3>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 16px', lineHeight: '1.5' }}>
+                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '0 0 14px', lineHeight: '1.5' }}>
                   {calc.shortDesc}
                 </p>
               </div>
@@ -582,7 +637,7 @@ function CatalogDirectoryView({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingTop: '14px',
+                paddingTop: '12px',
                 borderTop: '1px solid rgba(255, 255, 255, 0.06)'
               }}>
                 <span style={{ fontSize: '12px', fontWeight: '600', color: '#38bdf8' }}>
@@ -613,23 +668,23 @@ function CatalogDirectoryView({
 // COMPONENT 2: DEDICATED FULL-PAGE CALCULATOR VIEW (Matching Fyers Screen 2)
 // ============================================================================
 function DedicatedCalculatorView({
-  calcId, calcMeta, viewMode, onToggleViewMode, onBackToCatalog, onDownloadCSV, onPrintPDF, onOpenPaperTrading
+  calcId, calcMeta, viewMode, onToggleViewMode, onBackToCatalog, onDownloadCSV, onPrintPDF, onOpenPaperTrading, isMobile
 }) {
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: '24px' }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: isMobile ? '14px 12px 60px' : '24px', boxSizing: 'border-box' }}>
       {/* Calculator Header Bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: isMobile ? '16px' : '24px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
               {calcMeta.categoryLabel}
             </span>
             <span style={{ color: '#475569' }}>•</span>
-            <span style={{ fontSize: '11.5px', color: calcMeta.badgeColor, fontWeight: '700' }}>
+            <span style={{ fontSize: '11px', color: calcMeta.badgeColor, fontWeight: '700' }}>
               {calcMeta.badge}
             </span>
           </div>
-          <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#f8fafc', margin: '4px 0 0' }}>
+          <h1 style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', color: '#f8fafc', margin: '4px 0 0' }}>
             {calcMeta.title}
           </h1>
         </div>
@@ -651,7 +706,7 @@ function DedicatedCalculatorView({
                 border: 'none',
                 background: viewMode === 'CHART' ? '#0284c7' : 'transparent',
                 color: viewMode === 'CHART' ? '#fff' : '#94a3b8',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
@@ -670,7 +725,7 @@ function DedicatedCalculatorView({
                 border: 'none',
                 background: viewMode === 'TABLE' ? '#0284c7' : 'transparent',
                 color: viewMode === 'TABLE' ? '#fff' : '#94a3b8',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
@@ -819,7 +874,7 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       {/* Left Input Sliders Panel */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
@@ -947,7 +1002,7 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV }) {
             </div>
 
             {/* SVG Visual Donut Chart (Fyers Style) */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', margin: '20px 0' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '16px 0' }}>
               <svg width="180" height="180" viewBox="0 0 42 42">
                 <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0284c7" strokeWidth="6" />
                 <circle 
@@ -1077,7 +1132,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       {/* Input Sliders */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
@@ -1200,7 +1255,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV }) {
           </div>
 
           {/* Donut Chart */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', margin: '20px 0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '16px 0' }}>
             <svg width="180" height="180" viewBox="0 0 42 42">
               <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0284c7" strokeWidth="6" />
               <circle 
@@ -1316,7 +1371,7 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       {/* Left Tranches Input Panel */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
@@ -1546,7 +1601,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       {/* Inputs */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
@@ -1742,7 +1797,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       {/* Input Sliders */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
@@ -1858,7 +1913,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
             </div>
 
             {/* Donut Chart (Fyers Screen 2 Exact Visual Style) */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', margin: '20px 0' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '16px 0' }}>
               <svg width="180" height="180" viewBox="0 0 42 42">
                 <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0284c7" strokeWidth="6" />
                 <circle 
@@ -1967,7 +2022,7 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2045,7 +2100,7 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onOpenPaperTradi
   }, [monthlySip, tenureYears, expectedCagr, regularTer, directTer]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2147,7 +2202,7 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
   }, [segment, buyPrice, sellPrice, qty]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '8px' }}>
           {[
@@ -2231,7 +2286,7 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
   }, [capital, riskPct, entryPrice, stopLoss, targetPrice]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Total Account Capital (₹)</label>
@@ -2334,7 +2389,7 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onOpenPaperTrading }) {
   }, [spotPrice, strikePrice, daysToExpiry, ivPct, optionType]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => setOptionType('CE')} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: optionType === 'CE' ? '#10b981' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Call (CE)</button>

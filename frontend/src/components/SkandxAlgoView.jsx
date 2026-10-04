@@ -27,6 +27,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   // Active Navigation Tab
   const [activeMenu, setActiveMenu] = useState(() => resolveAlgoTab(initialTab));
   const [toastMsg, setToastMsg] = useState('');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (initialTab) {
@@ -626,9 +633,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       {/* ───────────────────────────────────────────────────────────── */}
       <header style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        padding: '12px 24px',
+        padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 12px 10px' : '12px 24px',
+        gap: isMobile ? '8px' : '12px',
         borderBottom: '1px solid #1e293b',
         background: '#090d16',
         position: 'sticky',
@@ -636,84 +645,118 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         zIndex: 50,
         backdropFilter: 'blur(10px)'
       }}>
-        {/* Left: Brand + Latency */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        {/* Left: Brand + Latency (plus Back button on mobile top row) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: isMobile ? '8px' : '10px',
             fontWeight: '900',
-            fontSize: '19px',
+            fontSize: isMobile ? '15px' : '19px',
             letterSpacing: '0.5px'
           }}>
             <span style={{
               background: 'linear-gradient(135deg, #0284c7, #3b82f6)',
               color: '#fff',
-              width: '32px',
-              height: '32px',
+              width: isMobile ? '28px' : '32px',
+              height: isMobile ? '28px' : '32px',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '17px',
+              fontSize: isMobile ? '14px' : '17px',
               fontWeight: '900',
-              boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)'
+              boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)',
+              flexShrink: 0
             }}>
               ⚡
             </span>
-            <span style={{ color: '#fff', letterSpacing: '0.5px' }}>SKANDX ALGO</span>
+            <span style={{ color: '#fff', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>SKANDX ALGO</span>
             <span style={{
-              fontSize: '11px',
+              fontSize: '10px',
               color: '#38bdf8',
               background: 'rgba(56, 189, 248, 0.12)',
               border: '1px solid rgba(56, 189, 248, 0.3)',
-              padding: '2px 8px',
+              padding: '2px 6px',
               borderRadius: '4px',
-              fontWeight: '700'
+              fontWeight: '700',
+              whiteSpace: 'nowrap'
             }}>
               v4.9 PRO
             </span>
           </div>
 
-          <div className="hide-on-mobile" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            padding: '4px 10px',
-            borderRadius: '16px',
-            fontSize: '11px',
-            color: '#10b981',
-            fontWeight: '600'
-          }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-            <span>NSE Colocation Tick Gateway: 1.8ms</span>
-          </div>
+          {!isMobile && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              padding: '4px 10px',
+              borderRadius: '16px',
+              fontSize: '11px',
+              color: '#10b981',
+              fontWeight: '600'
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+              <span>NSE Colocation Tick Gateway: 1.8ms</span>
+            </div>
+          )}
+
+          {isMobile && (
+            <button
+              onClick={onBack}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid #334155',
+                color: '#cbd5e1',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              <ArrowLeft size={13} /> Back
+            </button>
+          )}
         </div>
 
         {/* Right: Actions, Wallet, Kill Switch, Return button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: isMobile ? '6px' : '12px',
+          flexWrap: 'wrap',
+          justifyContent: isMobile ? 'space-between' : 'flex-end'
+        }}>
           {/* Emergency Kill Switch */}
           <button
             onClick={handleKillSwitch}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '5px',
               background: 'rgba(239, 68, 68, 0.18)',
               border: '1px solid rgba(239, 68, 68, 0.5)',
               color: '#f87171',
-              padding: '6px 12px',
+              padding: isMobile ? '5px 8px' : '6px 12px',
               borderRadius: '6px',
-              fontSize: '11.5px',
+              fontSize: isMobile ? '10.5px' : '11.5px',
               fontWeight: '800',
               cursor: 'pointer',
-              letterSpacing: '0.3px'
+              letterSpacing: '0.3px',
+              whiteSpace: 'nowrap'
             }}
             title="Emergency Kill Switch - Exits all copy trading positions immediately"
           >
-            <Power size={14} /> KILL SWITCH
+            <Power size={13} /> {isMobile ? 'KILL' : 'KILL SWITCH'}
           </button>
 
           {/* Credit Wallet Badge with + Add Funds */}
@@ -724,12 +767,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             border: '1px solid #1e293b',
             borderRadius: '6px',
             overflow: 'hidden',
-            fontSize: '12.5px',
-            fontWeight: '700'
+            fontSize: isMobile ? '11px' : '12.5px',
+            fontWeight: '700',
+            whiteSpace: 'nowrap'
           }}>
-            <span style={{ padding: '5px 9px', color: '#94a3b8' }}>Credit:</span>
-            <span style={{ padding: '5px 10px', background: '#7c3aed', color: '#fff' }}>
-              ₹{config.availableCredit.toFixed(2)}
+            {!isMobile && <span style={{ padding: '5px 9px', color: '#94a3b8' }}>Credit:</span>}
+            <span style={{ padding: isMobile ? '5px 8px' : '5px 10px', background: '#7c3aed', color: '#fff' }}>
+              ₹{config.availableCredit.toFixed(0)}
             </span>
             <button
               onClick={() => setShowRechargeModal(true)}
@@ -737,43 +781,46 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 background: '#2563eb',
                 border: 'none',
                 color: '#fff',
-                padding: '5px 10px',
+                padding: isMobile ? '5px 8px' : '5px 10px',
                 cursor: 'pointer',
-                fontSize: '11.5px',
-                fontWeight: '800'
+                fontSize: isMobile ? '10.5px' : '11.5px',
+                fontWeight: '800',
+                whiteSpace: 'nowrap'
               }}
             >
               + Add Funds
             </button>
           </div>
 
-          {/* User Email Pill */}
-          <div className="hide-on-mobile" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid #1e293b',
-            padding: '5px 12px',
-            borderRadius: '20px',
-            fontSize: '12px'
-          }}>
-            <span style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: '#38bdf8',
-              color: '#0f172a',
+          {/* User Email Pill (Desktop only) */}
+          {!isMobile && (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: '800'
+              gap: '8px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid #1e293b',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '12px'
             }}>
-              H
-            </span>
-            <span style={{ color: '#cbd5e1' }}>h4harikrishnan2015@gmail.com</span>
-          </div>
+              <span style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: '#38bdf8',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: '800'
+              }}>
+                H
+              </span>
+              <span style={{ color: '#cbd5e1' }}>h4harikrishnan2015@gmail.com</span>
+            </div>
+          )}
 
           {/* Open Paper Trading Terminal Button */}
           {onOpenPaperTrading && (
@@ -782,151 +829,221 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                 border: '1px solid rgba(56, 189, 248, 0.45)',
                 color: '#fff',
-                padding: '6px 12px',
+                padding: isMobile ? '5px 9px' : '6px 12px',
                 borderRadius: '6px',
-                fontSize: '12px',
+                fontSize: isMobile ? '11px' : '12px',
                 fontWeight: '700',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              <Zap size={13} /> Paper Terminal
+              <Zap size={12} /> {isMobile ? 'Terminal' : 'Paper Terminal'}
             </button>
           )}
 
-          {/* Exit / Back to Home Button */}
-          <button
-            onClick={onBack}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid #334155',
-              color: '#cbd5e1',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            <ArrowLeft size={14} /> Back to Home
-          </button>
+          {/* Exit / Back to Home Button (Desktop) */}
+          {!isMobile && (
+            <button
+              onClick={onBack}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid #334155',
+                color: '#cbd5e1',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <ArrowLeft size={14} /> Back to Home
+            </button>
+          )}
         </div>
       </header>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. MAIN LAYOUT: SIDEBAR + WORKSPACE                           */}
+      {/* 2. MAIN LAYOUT: SIDEBAR (OR MOBILE TAB STRIP) + WORKSPACE     */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, minHeight: 0, width: '100%', overflowX: 'hidden' }}>
 
-        {/* Left Navigation Sidebar */}
-        <nav style={{
-          width: '240px',
-          borderRight: '1px solid #1e293b',
-          background: '#080c15',
-          padding: '20px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '5px',
-          overflowY: 'auto'
-        }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800', padding: '0 8px 8px', letterSpacing: '0.5px' }}>
-            SKANDX ALGO PLATFORM
-          </div>
-
-          {/* Dashboard Tab */}
-          <button
-            onClick={() => setActiveMenu('Dashboard')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              background: activeMenu === 'Dashboard' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: activeMenu === 'Dashboard' ? '#38bdf8' : '#94a3b8',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13.5px',
-              fontWeight: activeMenu === 'Dashboard' ? '800' : '500',
-              textAlign: 'left',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeMenu === 'Dashboard' ? '#22c55e' : '#64748b' }} />
-            Dashboard
-          </button>
-
-          <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '800', padding: '14px 8px 4px', letterSpacing: '0.6px' }}>
-            ACCOUNT & BROKER MANAGEMENT
-          </div>
-
-          {[
-            { id: 'Demat', label: 'Demat Accounts', icon: Folder, count: demats.length },
-            { id: 'StaticIp', label: 'Static IPs', icon: Wifi, count: staticIps.length },
-            { id: 'LinkUser', label: 'Link Users', icon: Users, count: linkedUsers.length },
-            { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
-            { id: 'GroupCopy', label: 'Group / Copy', icon: Layers, count: copyGroup.followers.length },
-            { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
-            { id: 'TelegramBot', label: 'Telegram Bot', icon: Send }
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeMenu === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveMenu(item.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  background: isActive ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                  color: isActive ? '#38bdf8' : '#94a3b8',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: isActive ? '700' : '500',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Icon size={16} color={isActive ? '#38bdf8' : '#64748b'} />
-                  <span>{item.label}</span>
-                </div>
-                {item.count !== undefined && (
-                  <span style={{
-                    fontSize: '11px',
-                    background: isActive ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)',
+        {/* Navigation: Horizontal Scrollable Pill Strip on Mobile, Vertical 240px Sidebar on Desktop */}
+        {isMobile ? (
+          <nav style={{
+            width: '100%',
+            borderBottom: '1px solid #1e293b',
+            background: '#080c15',
+            padding: '8px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            boxSizing: 'border-box'
+          }}>
+            {[
+              { id: 'Dashboard', label: 'Dashboard', icon: Activity },
+              { id: 'Demat', label: 'Demat Accounts', icon: Folder, count: demats.length },
+              { id: 'StaticIp', label: 'Static IPs', icon: Wifi, count: staticIps.length },
+              { id: 'LinkUser', label: 'Link Users', icon: Users, count: linkedUsers.length },
+              { id: 'WatchList', label: 'Watchlist', icon: Bookmark, count: watchlist.length },
+              { id: 'GroupCopy', label: 'Group Copy', icon: Layers, count: copyGroup.followers.length },
+              { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
+              { id: 'TelegramBot', label: 'Telegram Bot', icon: Send }
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeMenu === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveMenu(item.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 12px',
+                    borderRadius: '20px',
+                    background: isActive ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
                     color: isActive ? '#38bdf8' : '#94a3b8',
-                    padding: '2px 7px',
-                    borderRadius: '10px',
-                    fontWeight: '700'
-                  }}>
-                    {item.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b' }}>
-            <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Brokers Gateway</div>
-            <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
-              Zerodha • Angel • Upstox • Fyers
+                    border: isActive ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isActive ? '800' : '600',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                >
+                  <Icon size={13} color={isActive ? '#38bdf8' : '#64748b'} />
+                  <span>{item.label}</span>
+                  {item.count !== undefined && (
+                    <span style={{
+                      fontSize: '10px',
+                      background: isActive ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.08)',
+                      color: isActive ? '#38bdf8' : '#94a3b8',
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontWeight: '800'
+                    }}>
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        ) : (
+          <nav style={{
+            width: '240px',
+            flexShrink: 0,
+            borderRight: '1px solid #1e293b',
+            background: '#080c15',
+            padding: '20px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '5px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800', padding: '0 8px 8px', letterSpacing: '0.5px' }}>
+              SKANDX ALGO PLATFORM
             </div>
-          </div>
-        </nav>
+
+            {/* Dashboard Tab */}
+            <button
+              onClick={() => setActiveMenu('Dashboard')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: activeMenu === 'Dashboard' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                color: activeMenu === 'Dashboard' ? '#38bdf8' : '#94a3b8',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13.5px',
+                fontWeight: activeMenu === 'Dashboard' ? '800' : '500',
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeMenu === 'Dashboard' ? '#22c55e' : '#64748b' }} />
+              Dashboard
+            </button>
+
+            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '800', padding: '14px 8px 4px', letterSpacing: '0.6px' }}>
+              ACCOUNT & BROKER MANAGEMENT
+            </div>
+
+            {[
+              { id: 'Demat', label: 'Demat Accounts', icon: Folder, count: demats.length },
+              { id: 'StaticIp', label: 'Static IPs', icon: Wifi, count: staticIps.length },
+              { id: 'LinkUser', label: 'Link Users', icon: Users, count: linkedUsers.length },
+              { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
+              { id: 'GroupCopy', label: 'Group / Copy', icon: Layers, count: copyGroup.followers.length },
+              { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
+              { id: 'TelegramBot', label: 'Telegram Bot', icon: Send }
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeMenu === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveMenu(item.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: isActive ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                    color: isActive ? '#38bdf8' : '#94a3b8',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: isActive ? '700' : '500',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Icon size={16} color={isActive ? '#38bdf8' : '#64748b'} />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.count !== undefined && (
+                    <span style={{
+                      fontSize: '11px',
+                      background: isActive ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)',
+                      color: isActive ? '#38bdf8' : '#94a3b8',
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      fontWeight: '700'
+                    }}>
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b' }}>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Brokers Gateway</div>
+              <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
+                Zerodha • Angel • Upstox • Fyers
+              </div>
+            </div>
+          </nav>
+        )}
 
         {/* Full-Width Workspace Container */}
-        <main style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        <main style={{ flex: 1, width: '100%', boxSizing: 'border-box', padding: isMobile ? '14px 12px 80px' : '24px 32px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '22px' }}>
 
           {/* ───────────────────────────────────────────────────────────── */}
           {/* TAB 1: DASHBOARD VIEW                                         */}
@@ -938,51 +1055,53 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 background: '#101726',
                 border: '1px solid #1e293b',
                 borderRadius: '14px',
-                padding: '20px 24px',
+                padding: isMobile ? '14px' : '20px 24px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '14px',
                 boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
                       🔗
                     </div>
-                    <span style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>Share Demat Connection</span>
+                    <span style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: '#fff' }}>Share Demat Connection</span>
 
                     <span style={{
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '700',
                       background: 'rgba(34, 197, 94, 0.15)',
                       color: '#22c55e',
                       border: '1px solid rgba(34, 197, 94, 0.3)',
-                      padding: '3px 10px',
+                      padding: '2px 8px',
                       borderRadius: '4px'
                     }}>
                       Demat Connection Enable
                     </span>
                     <span style={{
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '700',
                       background: 'rgba(34, 197, 94, 0.15)',
                       color: '#22c55e',
                       border: '1px solid rgba(34, 197, 94, 0.3)',
-                      padding: '3px 10px',
+                      padding: '2px 8px',
                       borderRadius: '4px'
                     }}>
                       IP Purchase Enable
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
                     <button
                       onClick={handleRegenerateToken}
                       style={{
+                        flex: isMobile ? 1 : 'initial',
+                        justifyContent: 'center',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '8px 14px',
+                        padding: '8px 12px',
                         borderRadius: '6px',
                         background: '#1e293b',
                         border: '1px solid #334155',
@@ -998,10 +1117,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <button
                       onClick={handleCopyLink}
                       style={{
+                        flex: isMobile ? 1 : 'initial',
+                        justifyContent: 'center',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '8px 16px',
+                        padding: '8px 14px',
                         borderRadius: '6px',
                         background: '#2563eb',
                         border: 'none',
@@ -1016,19 +1137,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
                   If you don't want to ask your users for their demat credentials, you can simply share this link with them so they can connect their account themselves.
                 </div>
 
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '24px',
+                  gap: isMobile ? '12px' : '24px',
                   flexWrap: 'wrap',
                   paddingTop: '8px',
                   borderTop: '1px solid rgba(255,255,255,0.06)'
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#cbd5e1' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: '#cbd5e1' }}>
                     <span style={{ color: '#818cf8' }}>🔒</span>
                     <span>Allow your users to connect account</span>
                     <input
@@ -1039,7 +1160,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     />
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#cbd5e1' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: '#cbd5e1' }}>
                     <span style={{ color: '#22c55e' }}>📶</span>
                     <span>Allow your users to purchase IP</span>
                     <input
@@ -1051,14 +1172,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </label>
 
                   <div style={{
-                    marginLeft: 'auto',
+                    marginLeft: isMobile ? '0' : 'auto',
+                    width: isMobile ? '100%' : 'auto',
+                    boxSizing: 'border-box',
+                    wordBreak: 'break-all',
                     display: 'flex',
                     alignItems: 'center',
                     background: '#090d16',
                     border: '1px solid #1e293b',
                     borderRadius: '6px',
-                    padding: '5px 12px',
-                    fontSize: '12px',
+                    padding: '6px 12px',
+                    fontSize: '11.5px',
                     color: '#64748b'
                   }}>
                     {shareUrl}
@@ -1069,23 +1193,23 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               {/* 6 KPI Stat Cards */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '14px'
+                gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: isMobile ? '10px' : '14px'
               }}>
                 {/* Available Credit */}
                 <div 
                   onClick={() => setShowRechargeModal(true)}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                   className="hover:border-blue-500 transition-colors"
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Credit(₹)</div>
-                    <div style={{ color: '#22c55e', background: 'rgba(34, 197, 94, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <CreditCard size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Credit(₹)</div>
+                    <div style={{ color: '#22c55e', background: 'rgba(34, 197, 94, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <CreditCard size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#fff' }}>
-                    ₹{config.availableCredit.toFixed(2)}
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                    ₹{config.availableCredit.toFixed(0)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px', fontWeight: '700' }}>
                     + Click to Add Funds
@@ -1095,15 +1219,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Total Demat */}
                 <div 
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Demat</div>
-                    <div style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <Users size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Demat</div>
+                    <div style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <Users size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
                     {demats.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
@@ -1114,15 +1238,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Disconnected Demat */}
                 <div 
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Disconnected Demat</div>
-                    <div style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <Activity size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Disconnected Demat</div>
+                    <div style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <Activity size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
                     {demats.filter(d => d.status === 'DISCONNECTED').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>
@@ -1133,15 +1257,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Expired Demat */}
                 <div 
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Expired Demat</div>
-                    <div style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <Clock size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Expired Demat</div>
+                    <div style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <Clock size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#f59e0b' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#f59e0b' }}>
                     {demats.filter(d => d.status === 'EXPIRED').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
@@ -1152,15 +1276,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Total Static IP */}
                 <div 
                   onClick={() => setActiveMenu('StaticIp')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Static IP</div>
-                    <div style={{ color: '#a855f7', background: 'rgba(168, 85, 247, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <Server size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Static IP</div>
+                    <div style={{ color: '#a855f7', background: 'rgba(168, 85, 247, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <Server size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
                     {staticIps.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
@@ -1171,15 +1295,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Available Static IP */}
                 <div 
                   onClick={() => setActiveMenu('StaticIp')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', cursor: 'pointer' }}
+                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Static IP</div>
-                    <div style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '7px', borderRadius: '8px' }}>
-                      <Wifi size={17} />
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Static IP</div>
+                    <div style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                      <Wifi size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: '900', marginTop: '10px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
                     {staticIps.filter(i => i.status === 'AVAILABLE').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>
@@ -1250,16 +1374,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               )}
 
               {/* Bottom 3 Cards: Platform Features, Today Orders, Customer Support */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: isMobile ? '14px' : '18px' }}>
 
                 {/* Platform Features Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                     <span style={{ color: '#a855f7' }}>⚙️</span>
                     <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Platform Features</span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
                     {/* Watchlist */}
                     <div 
                       onClick={() => setActiveMenu('WatchList')}
@@ -1327,7 +1451,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Today Order Status Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Today Order Status</div>
                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -1341,8 +1465,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   {orders.length > 0 ? (
-                    <div style={{ overflowX: 'auto', flex: 1, maxHeight: '180px' }}>
-                      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, maxHeight: '180px' }}>
+                      <table style={{ width: '100%', minWidth: '340px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
                             <th style={{ padding: '6px 4px' }}>Broker</th>
@@ -1377,7 +1501,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Customer Support Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', marginBottom: '14px' }}>
                       🎧
@@ -1436,46 +1560,51 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 2: DEMAT ACCOUNTS MANAGEMENT                              */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'Demat' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                     Connected Demat Accounts ({demats.length})
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                     Manage multi-broker API credentials, static IP bindings, and daily session renewals.
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                   <button
                     onClick={handleRenewAllAccounts}
                     style={{
-                      padding: '9px 16px',
+                      flex: isMobile ? 1 : 'initial',
+                      padding: '9px 14px',
                       background: '#ef4444',
                       color: '#fff',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '12.5px',
+                      fontSize: '12px',
                       fontWeight: '800',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    Renew All Expired Sessions
+                    Renew Expired
                   </button>
                   <button
                     onClick={() => setShowAddDematModal(true)}
                     style={{
-                      padding: '9px 18px',
+                      flex: isMobile ? 1 : 'initial',
+                      justifyContent: 'center',
+                      padding: '9px 16px',
                       background: '#2563eb',
                       color: '#fff',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '12.5px',
+                      fontSize: '12px',
                       fontWeight: '800',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     <Plus size={15} /> Connect New Demat
@@ -1484,7 +1613,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               {/* Demat Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
                 {demats.map(acc => {
                   const isExp = acc.status === 'EXPIRED';
                   return (
@@ -1494,59 +1623,61 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         background: '#101726',
                         border: `1px solid ${isExp ? 'rgba(239,68,68,0.4)' : '#1e293b'}`,
                         borderRadius: '14px',
-                        padding: '20px',
+                        padding: isMobile ? '16px' : '20px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '14px'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                           <div style={{
-                            width: '38px',
-                            height: '38px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '8px',
                             background: 'rgba(56, 189, 248, 0.15)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '18px'
+                            fontSize: '18px',
+                            flexShrink: 0
                           }}>
                             🏛️
                           </div>
-                          <div>
-                            <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{acc.broker}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.broker}</div>
                             <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{acc.clientCode}</span></div>
                           </div>
                         </div>
 
                         <span style={{
-                          padding: '3px 9px',
+                          padding: '3px 8px',
                           borderRadius: '4px',
-                          fontSize: '11px',
+                          fontSize: '10.5px',
                           fontWeight: '800',
                           background: isExp ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
                           color: isExp ? '#ef4444' : '#22c55e',
-                          border: `1px solid ${isExp ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`
+                          border: `1px solid ${isExp ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                          flexShrink: 0
                         }}>
                           {acc.status}
                         </span>
                       </div>
 
                       <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Account Alias:</span>
-                          <span style={{ color: '#cbd5e1', fontWeight: '600' }}>{acc.name}</span>
+                          <span style={{ color: '#cbd5e1', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Dedicated Static IP:</span>
                           <span style={{ color: '#a855f7', fontWeight: '700' }}>{acc.ip}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Session Status:</span>
-                          <span style={{ color: isExp ? '#f87171' : '#22c55e', fontWeight: '700' }}>{acc.expiresIn}</span>
+                          <span style={{ color: isExp ? '#f87171' : '#22c55e', fontWeight: '700', textAlign: 'right' }}>{acc.expiresIn}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Trading Permitted:</span>
                           <span style={{ color: acc.tradingActive ? '#22c55e' : '#ef4444', fontWeight: '800' }}>
                             {acc.tradingActive ? 'ACTIVE (OMS LINKED)' : 'PAUSED'}
@@ -1555,11 +1686,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
 
                       {/* Action buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleRenewSingleAccount(acc)}
                           style={{
                             flex: 1,
+                            minWidth: '140px',
                             padding: '8px 12px',
                             background: isExp ? '#ef4444' : '#1e293b',
                             border: 'none',
@@ -1615,19 +1747,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 3: STATIC IP MANAGEMENT                                   */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'StaticIp' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                     Dedicated Static IP Addresses ({staticIps.length})
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                     Dedicated Indian IPv4 proxy addresses whitelisted with Zerodha, Angel One, and NSE colocation servers.
                   </p>
                 </div>
                 <button
                   onClick={handlePurchaseStaticIp}
                   style={{
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center',
                     padding: '9px 18px',
                     background: '#10b981',
                     color: '#fff',
@@ -1645,7 +1779,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
                 {staticIps.map(ip => (
                   <div
                     key={ip.id}
@@ -1653,7 +1787,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       background: '#101726',
                       border: '1px solid #1e293b',
                       borderRadius: '14px',
-                      padding: '20px',
+                      padding: isMobile ? '16px' : '20px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '14px'
@@ -1662,7 +1796,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Server size={20} color="#a855f7" />
-                        <span style={{ fontSize: '17px', fontWeight: '900', color: '#fff' }}>{ip.ip}</span>
+                        <span style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>{ip.ip}</span>
                       </div>
                       <span style={{
                         padding: '3px 9px',
@@ -1677,19 +1811,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
 
                     <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ color: '#64748b' }}>Datacenter:</span>
-                        <span style={{ color: '#cbd5e1' }}>{ip.datacenter}</span>
+                        <span style={{ color: '#cbd5e1', textAlign: 'right' }}>{ip.datacenter}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ color: '#64748b' }}>NSE Gateway Latency:</span>
                         <span style={{ color: '#10b981', fontWeight: '800' }}>{ip.latency}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ color: '#64748b' }}>Assigned Demats:</span>
-                        <span style={{ color: '#38bdf8', fontWeight: '700' }}>{ip.assignedTo}</span>
+                        <span style={{ color: '#38bdf8', fontWeight: '700', textAlign: 'right' }}>{ip.assignedTo}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                         <span style={{ color: '#64748b' }}>Port / Protocol:</span>
                         <span style={{ color: '#cbd5e1' }}>{ip.port}</span>
                       </div>
@@ -1741,19 +1875,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 4: LINK USERS (CLIENT ONBOARDING)                         */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'LinkUser' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                     Linked Clients & Users ({linkedUsers.length})
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                     Users who connected their personal Demat account using your unique Demat connection link.
                   </p>
                 </div>
                 <button
                   onClick={handleCopyLink}
                   style={{
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center',
                     padding: '9px 18px',
                     background: '#2563eb',
                     color: '#fff',
@@ -1771,8 +1907,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </button>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: '640px', fontSize: '13px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
                   <thead>
                     <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
                       <th style={{ padding: '14px 18px' }}>Client</th>
@@ -1851,32 +1987,34 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 5: WATCHLIST (LIVE ALGO EXECUTION)                         */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'WatchList' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                     Multi-Broker Algo Watchlist ({watchlist.length})
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                     Live ticks with 1-click execution across all connected Demat accounts.
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
                   <input
                     type="text"
-                    placeholder="Add Symbol (e.g. NIFTY, INFY, TATAMOTORS)..."
+                    placeholder="Add Symbol (e.g. NIFTY, INFY)..."
                     value={searchSymbol}
                     onChange={e => setSearchSymbol(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddWatchlist(); }}
                     style={{
+                      flex: isMobile ? 1 : 'initial',
                       background: '#090d16',
                       border: '1px solid #1e293b',
                       borderRadius: '8px',
                       padding: '8px 14px',
                       color: '#fff',
                       fontSize: '12.5px',
-                      width: '280px'
+                      width: isMobile ? '100%' : '280px',
+                      minWidth: 0
                     }}
                   />
                   <button
@@ -1889,7 +2027,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       borderRadius: '8px',
                       fontSize: '12.5px',
                       fontWeight: '800',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     + Add
@@ -1897,8 +2036,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: '680px', fontSize: '13px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
                   <thead>
                     <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
                       <th style={{ padding: '14px 18px' }}>Symbol</th>
@@ -1994,19 +2133,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 6: GROUP / COPY TRADING                                   */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'GroupCopy' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                     Group & Multi-Account Copy Trading
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                     Replicate orders from one Master account to multiple Slave Demats in sub-50ms latency.
                   </p>
                 </div>
                 <button
                   onClick={handleKillSwitch}
                   style={{
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center',
                     padding: '9px 18px',
                     background: '#ef4444',
                     color: '#fff',
@@ -2024,14 +2165,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </button>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7', flexShrink: 0 }}>
                       👑
                     </div>
                     <div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>{copyGroup.groupName}</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{copyGroup.groupName}</div>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>
                         Master Demat: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{copyGroup.masterAccount} (Zerodha Kite)</span>
                       </div>
@@ -2075,7 +2216,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           background: '#090d16',
                           border: '1px solid #1e293b',
                           borderRadius: '8px',
-                          padding: '14px 18px',
+                          padding: '14px 16px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -2115,19 +2256,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 7: WEBHOOK & STRATEGY BRIDGE (TRADINGVIEW & PYTHON)       */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'Bridge' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                   TradingView, Chartink & Python Webhook Bridge
                 </h2>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                   Zero-latency JSON alert webhook listener routing strategy signals directly into live Demats.
                 </p>
               </div>
 
               {/* Target Webhook Endpoints */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8' }}>
                     Target Webhook URL
                   </div>
@@ -2141,18 +2282,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Copy Webhook URL
                   </button>
                 </div>
-                <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: '13.5px' }}>
+                <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13.5px', wordBreak: 'break-all' }}>
                   https://skandx.in/api/v1/bridge/webhook
                 </code>
               </div>
 
               {/* Webhook JSON Generator Form */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
                   Interactive TradingView Alert Payload Builder
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '11.5px', color: '#64748b' }}>Action</label>
                     <select
@@ -2197,7 +2338,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </select>
                   </div>
 
-                  <div>
+                  <div style={{ gridColumn: isMobile ? 'span 2' : 'auto' }}>
                     <label style={{ fontSize: '11.5px', color: '#64748b' }}>Product</label>
                     <select
                       value={whProduct}
@@ -2213,7 +2354,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 {/* Pre-formatted output */}
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#94a3b8' }}>TradingView Alert Message JSON:</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
@@ -2239,7 +2380,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     border: '1px solid #1e293b',
                     borderRadius: '8px',
                     padding: '14px',
-                    fontSize: '12.5px',
+                    fontSize: '12px',
                     color: '#38bdf8',
                     overflowX: 'auto',
                     margin: 0
@@ -2255,20 +2396,20 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* TAB 8: TELEGRAM BOT OMS                                       */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'TelegramBot' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
                   Telegram Bot OMS & Notifications
                 </h2>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
                   Get real-time filled trade alerts and control your algorithms using Telegram chat commands.
                 </p>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(2,132,199,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(2,132,199,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
                       <Send size={20} />
                     </div>
                     <div>
@@ -2279,7 +2420,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                   <button
                     onClick={handleTelegramTestPing}
-                    style={{ padding: '9px 16px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                    style={{ width: isMobile ? '100%' : 'auto', padding: '9px 16px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
                   >
                     Send Test Trade Alert
                   </button>
@@ -2289,7 +2430,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
                     Interactive Telegram Chat Commands:
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
                     <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
                       <code style={{ color: '#38bdf8', fontWeight: '800' }}>/buy &lt;symbol&gt; &lt;qty&gt;</code>
                       <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market buy across master demat</div>

@@ -2067,13 +2067,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       }}>
         {/* ── TOPBAR: LIVE INDEX TICKERS & CONTROLS ── */}
         <header style={{
-          height: isMobile ? '52px' : '56px',
+          minHeight: isMobile ? '52px' : '56px',
+          height: isMobile ? 'auto' : '56px',
           backgroundColor: colors.bgSidebar,
           borderBottom: `1px solid ${colors.borderColor}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: isMobile ? '0 10px' : '0 24px',
+          padding: isMobile ? 'max(6px, env(safe-area-inset-top, 6px)) 10px 6px' : '0 24px',
           flexShrink: 0,
           gap: '8px',
           zIndex: 10
@@ -2503,11 +2504,57 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           </div>
         </header>
 
+        {/* ── MOBILE QUICK-NAVIGATION STRIP (Horizontal Scrollable Pills) ── */}
+        {isMobile && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            padding: '8px 10px',
+            backgroundColor: colors.bgSidebar,
+            borderBottom: `1px solid ${colors.borderColor}`,
+            flexShrink: 0
+          }}>
+            {sidebarItems.filter(it => !it.isBridge).map(item => {
+              const isActive = activeTab === item.id;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 11px',
+                    borderRadius: '20px',
+                    fontSize: '11.5px',
+                    fontWeight: isActive ? '700' : '600',
+                    color: isActive ? '#ffffff' : colors.textSecondary,
+                    backgroundColor: isActive ? '#2563eb' : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)'),
+                    border: isActive ? '1px solid #3b82f6' : `1px solid ${colors.borderColor}`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Icon size={13} color={isActive ? '#ffffff' : (isLight ? '#64748b' : '#94a3b8')} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── SUB-VIEW ROUTER / SCROLLABLE CONTENT ── */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: isMobile ? '12px 10px 24px 10px' : '24px 32px',
+          padding: isMobile ? '12px 10px 32px 10px' : '24px 32px',
           WebkitOverflowScrolling: 'touch'
         }}>
           {/* ══════════════════════════════════════════════════════════════ */}

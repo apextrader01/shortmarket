@@ -19,6 +19,13 @@ export default function WealthPersonalFinanceModal({
   initialTab = 'NET_WORTH'
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'NET_WORTH');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -49,11 +56,11 @@ export default function WealthPersonalFinanceModal({
   };
 
   const TABS = [
-    { id: 'NET_WORTH', label: 'Consolidated Net Worth', badge: 'Solvency & Assets', icon: PieChart, color: '#10b981' },
-    { id: 'BUDGET', label: '50/30/20 Budget & Leak Detector', badge: 'Cashflow Audit', icon: Wallet, color: '#38bdf8' },
-    { id: 'INSURANCE', label: 'Term Life & Health Gap (HLV)', badge: 'Actuarial Shield', icon: HeartPulse, color: '#f59e0b' },
-    { id: 'TAX_LOSS', label: 'Tax-Loss Harvesting (FY25)', badge: 'STCG 20% / LTCG 12.5%', icon: Scissors, color: '#ec4899' },
-    { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', badge: 'Live Advisory', icon: Sparkles, color: '#a855f7' }
+    { id: 'NET_WORTH', label: 'Consolidated Net Worth', shortLabel: 'Net Worth', badge: 'Solvency & Assets', icon: PieChart, color: '#10b981' },
+    { id: 'BUDGET', label: '50/30/20 Budget & Leak Detector', shortLabel: '50/30/20 Budget', badge: 'Cashflow Audit', icon: Wallet, color: '#38bdf8' },
+    { id: 'INSURANCE', label: 'Term Life & Health Gap (HLV)', shortLabel: 'Insurance (HLV)', badge: 'Actuarial Shield', icon: HeartPulse, color: '#f59e0b' },
+    { id: 'TAX_LOSS', label: 'Tax-Loss Harvesting (FY25)', shortLabel: 'Tax Harvesting', badge: 'STCG 20% / LTCG 12.5%', icon: Scissors, color: '#ec4899' },
+    { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', shortLabel: 'AI Copilot', badge: 'Live Advisory', icon: Sparkles, color: '#a855f7' }
   ];
 
   if (isFullPage) {
@@ -65,11 +72,12 @@ export default function WealthPersonalFinanceModal({
         color: '#f8fafc',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'Inter, system-ui, sans-serif'
+        fontFamily: 'Inter, system-ui, sans-serif',
+        overflowX: 'hidden'
       }}>
         {/* Top Institutional Navigation Bar */}
         <header style={{
-          padding: '14px 24px',
+          padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 12px 10px' : '14px 24px',
           background: 'rgba(11, 17, 30, 0.94)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           backdropFilter: 'blur(12px)',
@@ -77,213 +85,307 @@ export default function WealthPersonalFinanceModal({
           top: 0,
           zIndex: 50,
           display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
           justifyContent: 'space-between',
-          gap: '12px'
+          gap: isMobile ? '8px' : '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px', minWidth: 0 }}>
             <button
               onClick={onBack || onClose}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
+                gap: '5px',
+                padding: isMobile ? '6px 10px' : '8px 14px',
                 borderRadius: '8px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
                 color: '#e2e8f0',
-                fontSize: '12.5px',
+                fontSize: isMobile ? '11.5px' : '12.5px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
-              <ArrowLeft size={15} />
-              <span>Back to Home</span>
+              <ArrowLeft size={14} />
+              <span>{isMobile ? 'Back' : 'Back to Home'}</span>
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
               <div style={{
-                width: '38px',
-                height: '38px',
+                width: isMobile ? '32px' : '38px',
+                height: isMobile ? '32px' : '38px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(56, 189, 248, 0.2))',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(56, 189, 248, 0.2))',
                 border: '1px solid rgba(16, 185, 129, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#10b981'
+                color: '#10b981',
+                flexShrink: 0
               }}>
-                <PieChart size={20} />
+                <PieChart size={isMobile ? 16 : 20} />
               </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 7px', borderRadius: '4px', letterSpacing: '0.6px' }}>
-                    HUB 05 • WEALTH OS
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '9.5px', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                    HUB 04 • WEALTH OS
                   </span>
-                  <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
+                  <h1 style={{ margin: 0, fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     Wealth OS & Tax Hub
                   </h1>
                 </div>
-                <p style={{ margin: 0, fontSize: '11.5px', color: '#94a3b8' }}>
-                  Institutional Net Worth, 50/30/20 Cashflow Audit, Actuarial HLV Protection & FY25 Tax-Loss Harvesting
-                </p>
+                {!isMobile && (
+                  <p style={{ margin: 0, fontSize: '11.5px', color: '#94a3b8' }}>
+                    Institutional Net Worth, 50/30/20 Cashflow Audit, Actuarial HLV Protection & FY25 Tax-Loss Harvesting
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? '6px' : '8px',
+            overflowX: isMobile ? 'auto' : 'visible',
+            WebkitOverflowScrolling: 'touch',
+            flexWrap: isMobile ? 'nowrap' : 'wrap',
+            paddingBottom: isMobile ? '2px' : 0
+          }}>
             {onOpenCalculators && (
               <button
                 onClick={() => onOpenCalculators('all')}
                 style={{
-                  padding: '8px 13px',
+                  padding: isMobile ? '6px 10px' : '8px 13px',
                   borderRadius: '8px',
                   background: 'rgba(245, 158, 11, 0.12)',
                   border: '1px solid rgba(245, 158, 11, 0.35)',
                   color: '#fbbf24',
-                  fontSize: '12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   fontWeight: '700',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
               >
-                <Calculator size={14} />
-                <span>EMI & SIP Calculators</span>
+                <Calculator size={13} />
+                <span>{isMobile ? 'Calculators' : 'EMI & SIP Calculators'}</span>
               </button>
             )}
             <button
               onClick={handleExportWealthCsv}
               style={{
-                padding: '8px 13px',
+                padding: isMobile ? '6px 10px' : '8px 13px',
                 borderRadius: '8px',
                 background: 'rgba(16, 185, 129, 0.12)',
                 border: '1px solid rgba(16, 185, 129, 0.35)',
                 color: '#34d399',
-                fontSize: '12px',
+                fontSize: isMobile ? '11px' : '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
-              <Download size={14} />
-              <span>Export Excel / CSV</span>
+              <Download size={13} />
+              <span>{isMobile ? 'CSV' : 'Export Excel / CSV'}</span>
             </button>
             <button
               onClick={() => window.print()}
               style={{
-                padding: '8px 13px',
+                padding: isMobile ? '6px 10px' : '8px 13px',
                 borderRadius: '8px',
                 background: 'rgba(56, 189, 248, 0.12)',
                 border: '1px solid rgba(56, 189, 248, 0.35)',
                 color: '#38bdf8',
-                fontSize: '12px',
+                fontSize: isMobile ? '11px' : '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
-              <Printer size={14} />
-              <span>Print / PDF</span>
+              <Printer size={13} />
+              <span>{isMobile ? 'PDF' : 'Print / PDF'}</span>
             </button>
             {onOpenPaperTrading && (
               <button
                 onClick={onOpenPaperTrading}
                 style={{
-                  padding: '8px 15px',
+                  padding: isMobile ? '6px 11px' : '8px 15px',
                   borderRadius: '8px',
                   background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                   border: 'none',
                   color: '#fff',
-                  fontSize: '12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   fontWeight: '700',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
               >
-                <TrendingUp size={14} />
-                <span>Paper Trading</span>
+                <TrendingUp size={13} />
+                <span>{isMobile ? 'Terminal' : 'Paper Trading'}</span>
               </button>
             )}
           </div>
         </header>
 
         {/* Main Container */}
-        <div style={{ maxWidth: '1260px', width: '100%', margin: '0 auto', padding: '24px 20px 60px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-          {/* Bento Pillar Selector Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-            {TABS.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: '16px',
-                    borderRadius: '14px',
-                    background: isActive
-                      ? `linear-gradient(135deg, ${tab.color}26, rgba(15, 23, 42, 0.9))`
-                      : 'rgba(15, 23, 42, 0.7)',
-                    border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
-                    color: '#f8fafc',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    transition: 'all 0.18s ease',
-                    boxShadow: isActive ? `0 8px 24px ${tab.color}25` : 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+        <div style={{
+          maxWidth: '1260px',
+          width: '100%',
+          boxSizing: 'border-box',
+          margin: '0 auto',
+          padding: isMobile ? '12px 12px 80px' : '24px 20px 60px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isMobile ? '14px' : '22px'
+        }}>
+          {/* Bento Pillar Selector Cards (Compact Horizontal Pill Strip on Mobile, 5-Card Bento Grid on Desktop) */}
+          {isMobile ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: '4px'
+            }}>
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: isActive
+                        ? `linear-gradient(135deg, ${tab.color}30, rgba(15, 23, 42, 0.95))`
+                        : 'rgba(15, 23, 42, 0.8)',
+                      border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
+                      color: '#f8fafc',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      boxShadow: isActive ? `0 4px 14px ${tab.color}25` : 'none'
+                    }}
+                  >
                     <div style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '9px',
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '7px',
                       background: `${tab.color}20`,
                       border: `1px solid ${tab.color}45`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: tab.color
+                      color: tab.color,
+                      flexShrink: 0
                     }}>
-                      <Icon size={18} />
+                      <Icon size={14} />
                     </div>
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: isActive ? tab.color : '#94a3b8',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      padding: '2px 7px',
-                      borderRadius: '5px'
-                    }}>
-                      {tab.badge}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: isActive ? '#fff' : '#cbd5e1' }}>
-                    {tab.label}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: isActive ? '#fff' : '#cbd5e1' }}>
+                        {tab.shortLabel || tab.label}
+                      </div>
+                      <div style={{ fontSize: '9.5px', color: isActive ? tab.color : '#64748b', fontWeight: '700' }}>
+                        {tab.badge}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      padding: '16px',
+                      borderRadius: '14px',
+                      background: isActive
+                        ? `linear-gradient(135deg, ${tab.color}26, rgba(15, 23, 42, 0.9))`
+                        : 'rgba(15, 23, 42, 0.7)',
+                      border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
+                      color: '#f8fafc',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 0.18s ease',
+                      boxShadow: isActive ? `0 8px 24px ${tab.color}25` : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '9px',
+                        background: `${tab.color}20`,
+                        border: `1px solid ${tab.color}45`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: tab.color
+                      }}>
+                        <Icon size={18} />
+                      </div>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        color: isActive ? tab.color : '#94a3b8',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        padding: '2px 7px',
+                        borderRadius: '5px'
+                      }}>
+                        {tab.badge}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: isActive ? '#fff' : '#cbd5e1' }}>
+                      {tab.label}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Active Workspace Panel */}
           <div style={{
             background: 'rgba(15, 23, 42, 0.85)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '18px',
-            padding: '28px',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)'
+            borderRadius: isMobile ? '14px' : '18px',
+            padding: isMobile ? '16px 12px' : '28px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
+            boxSizing: 'border-box',
+            width: '100%',
+            overflowX: 'hidden'
           }}>
             {activeTab === 'AI_COPILOT' && <AiWealthCopilotView />}
             {activeTab === 'BUDGET' && <BudgetLeakDetectorView />}
@@ -775,7 +877,7 @@ function BudgetLeakDetectorView() {
   const targetSavings = monthlyIncome * 0.20;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Net Monthly Take-Home Income (₹)</label>
@@ -915,7 +1017,7 @@ function InsuranceGapView() {
   }, [annualIncome, currentAge, retireAge, totalDebts, existingTermCover]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Annual Gross Income (₹)</label>
@@ -1037,7 +1139,7 @@ function NetWorthView() {
   const netWorth = totalAssets - debtLiability;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <h4 style={{ margin: '0 0 6px', fontSize: '14px', color: '#94a3b8' }}>Asset Breakdown (₹)</h4>
         
@@ -1178,7 +1280,7 @@ function TaxLossHarvestingView() {
   }, [stcgGains, ltcgGains, unrealizedLosses]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Realized Short Term Gains (STCG @ 20%)</label>
