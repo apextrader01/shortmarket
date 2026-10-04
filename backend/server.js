@@ -2617,8 +2617,9 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
 const RAZORPAY_PLAN_MAP = {
   monthly: 'plan_Tjwq81Q691SX5t',   // ₹199 Every Month
   yearly: 'plan_Tjwr3Kfn0d8JuL',    // ₹1,999 Every Year
-  highest: 'plan_Tjws5s02DWgWE5',   // ₹2,999 Every Year
-  feature: 'plan_Tjws5s02DWgWE5'
+  highest: 'plan_Tjws5S02DWgWE5',   // ₹2,999 Every Year (VIP Tier)
+  feature: 'plan_Tjws5S02DWgWE5',
+  vip: 'plan_Tjws5S02DWgWE5'
 };
 
 // AutoPay recurring subscription mandate endpoint
