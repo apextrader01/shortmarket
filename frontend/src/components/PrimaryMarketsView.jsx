@@ -748,8 +748,16 @@ const SEED_IPO_DATA = [
   }
 ];
 
-export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
-  const [activeTab, setActiveTab] = useState('BHAVCOPY'); // 'BHAVCOPY' | 'DEALS' | 'IPOS'
+const resolvePrimaryMarketTab = (tab) => {
+  if (!tab) return 'BHAVCOPY';
+  const upper = String(tab).toUpperCase();
+  if (upper === 'DEALS' || upper === 'BULK') return 'DEALS';
+  if (upper === 'IPO' || upper === 'IPOS' || upper === 'ALLOTMENT') return 'IPOS';
+  return 'BHAVCOPY';
+};
+
+export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrading }) {
+  const [activeTab, setActiveTab] = useState(() => resolvePrimaryMarketTab(initialTab)); // 'BHAVCOPY' | 'DEALS' | 'IPOS'
   const [bhavcopyData, setBhavcopyData] = useState(SEED_BHAVCOPY_DATA);
   const [dealsData, setDealsData] = useState(SEED_DEALS_DATA);
   const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
@@ -965,6 +973,28 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
     sectorFilter !== 'ALL', exchangeFilter !== 'ALL', bhavSearch.trim().length > 0
   ].filter(Boolean).length;
 
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(resolvePrimaryMarketTab(initialTab));
+    }
+  }, [initialTab]);
+
+  const handleExportPrimaryCsv = () => {
+    const headers = ['Symbol', 'Company Name', 'Exchange', 'Sector', 'LTP', 'Day Change (%)', 'Volume', 'Delivery Qty', 'Delivery (%)', 'Volume Surge (x)'];
+    const rows = filteredBhavcopy.map(r => [
+      r.symbol, `"${(r.name || '').replace(/"/g, '""')}"`, r.exchange, `"${r.sector || ''}"`, r.ltp, r.change, r.volume, r.delivQty, r.delivPct, r.surgeMult
+    ]);
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SkandX_Bhavcopy_Screener_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100vh', background: 'var(--bg-dark, #0b0e14)', color: '#fff', overflowY: 'auto', padding: '16px 20px 100px' }}>
       
@@ -989,7 +1019,15 @@ export default function PrimaryMarketsView({ onBack, onOpenPaperTrading }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={handleExportPrimaryCsv}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#34d399', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}
+            title="Export Screened Bhavcopy Stocks to CSV"
+          >
+            ⬇ Export CSV ({filteredBhavcopy.length})
+          </button>
           <button
             type="button"
             onClick={fetchPrimaryMarketData}

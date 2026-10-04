@@ -128,7 +128,29 @@ const DiaryIndexChip = React.memo(({ idx, isMobile, isLight, colors }) => {
   );
 });
 
-export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfile, onNavigate }) {
+const resolveTradeDiaryTab = (tab) => {
+  if (!tab) return 'DASHBOARD';
+  const map = {
+    DASHBOARD: 'DASHBOARD',
+    CHECKLIST: 'CHECKLIST',
+    TRADES: 'TRADES',
+    STRATEGIES: 'STRATEGIES',
+    RULES: 'RULES',
+    MISTAKES: 'MISTAKES',
+    AI_SUMMARY: 'AI_SUMMARIZER',
+    AI_SUMMARIZER: 'AI_SUMMARIZER',
+    REPORTS: 'REPORTS',
+    RISK: 'RISK_MANAGEMENT',
+    RISK_MANAGEMENT: 'RISK_MANAGEMENT',
+    COMMUNITY: 'COMMUNITY',
+    CHALLENGE: 'CHALLENGE',
+    CALENDAR: 'CALENDAR',
+    AFFILIATE: 'AFFILIATE'
+  };
+  return map[String(tab).toUpperCase()] || 'DASHBOARD';
+};
+
+export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack, onOpenProfile, onNavigate }) {
   const { user, theme, toggleTheme, logout } = useStore(useShallow(state => ({
     user: state.user,
     theme: state.theme,
@@ -137,7 +159,12 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfi
   })));
 
   // Navigation state: which Trade Diary sub-view is active
-  const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [activeTab, setActiveTab] = useState(() => resolveTradeDiaryTab(initialTab));
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(resolveTradeDiaryTab(initialTab));
+    }
+  }, [initialTab]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
@@ -2076,7 +2103,52 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           </div>
 
           {/* Right Topbar Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexShrink: 0 }}>
+            {onBack && (
+              <button
+                onClick={onBack}
+                title="Back to SkandX Command Center"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: isMobile ? '6px 9px' : '6px 12px',
+                  borderRadius: '20px',
+                  backgroundColor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${colors.borderColor}`,
+                  color: colors.textSecondary,
+                  fontSize: isMobile ? '11px' : '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                ← Hub
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowNewTradeModal(true)}
+              title="Log a New Trade Entry"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: isMobile ? '6px 9px' : '6px 12px',
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                border: 'none',
+                color: '#fff',
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)'
+              }}
+            >
+              <Plus size={13} /> {isTinyMobile ? 'Log' : 'Log Trade'}
+            </button>
+
             {/* Direct Paper Trading Button in Topbar */}
             <button
               onClick={() => onOpenPaperTrading ? onOpenPaperTrading() : onBack && onBack()}

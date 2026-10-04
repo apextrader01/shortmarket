@@ -1,17 +1,299 @@
 // frontend/src/components/WealthPersonalFinanceModal.jsx
 // 💰 24/7 AI Wealth Copilot, Smart Budgeting, Insurance Gap Analyzer & Tax-Loss Harvester
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, PieChart, Shield, Wallet, Sparkles, Send, AlertTriangle, 
   CheckCircle2, ArrowRight, TrendingUp, Scissors, HeartPulse,
-  DollarSign, RefreshCw, HelpCircle, ChevronRight
+  DollarSign, RefreshCw, HelpCircle, ChevronRight, ArrowLeft, Download, Printer, Calculator
 } from 'lucide-react';
 
-export default function WealthPersonalFinanceModal({ isOpen, onClose, initialTab = 'AI_COPILOT' }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+export default function WealthPersonalFinanceModal({
+  isOpen = true,
+  isFullPage = false,
+  onClose,
+  onBack,
+  onOpenPaperTrading,
+  onOpenCalculators,
+  initialTab = 'NET_WORTH'
+}) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'NET_WORTH');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
+
+  if (!isFullPage && !isOpen) return null;
+
+  const handleExportWealthCsv = () => {
+    const rows = [
+      ['SkandX Wealth OS & Tax Hub Summary Report', new Date().toLocaleDateString('en-IN')],
+      [],
+      ['Module', 'Key Metric', 'Benchmark / Rule', 'Status'],
+      ['Consolidated Net Worth', 'Multi-Asset Equity + Debt + Gold + Real Estate', 'Solvency Ratio > 65%', 'Active'],
+      ['50/30/20 Smart Budget', '50% Needs / 30% Wants / 20% SIP Investments', 'Savings Rate >= 20%', 'Active'],
+      ['Term Life & Health HLV', '15x Annual Income + Total Debt Payoff', 'Pure Term Policy Only', 'Active'],
+      ['Tax-Loss Harvesting (FY25)', 'STCG @ 20% | LTCG @ 12.5% (>1.25L Exempt)', 'March 31 Offset Deadline', 'Active']
+    ];
+    const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SkandX_Wealth_OS_Tax_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const TABS = [
+    { id: 'NET_WORTH', label: 'Consolidated Net Worth', badge: 'Solvency & Assets', icon: PieChart, color: '#10b981' },
+    { id: 'BUDGET', label: '50/30/20 Budget & Leak Detector', badge: 'Cashflow Audit', icon: Wallet, color: '#38bdf8' },
+    { id: 'INSURANCE', label: 'Term Life & Health Gap (HLV)', badge: 'Actuarial Shield', icon: HeartPulse, color: '#f59e0b' },
+    { id: 'TAX_LOSS', label: 'Tax-Loss Harvesting (FY25)', badge: 'STCG 20% / LTCG 12.5%', icon: Scissors, color: '#ec4899' },
+    { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', badge: 'Live Advisory', icon: Sparkles, color: '#a855f7' }
+  ];
+
+  if (isFullPage) {
+    return (
+      <div style={{
+        width: '100%',
+        minHeight: '100vh',
+        backgroundColor: '#070b12',
+        color: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      }}>
+        {/* Top Institutional Navigation Bar */}
+        <header style={{
+          padding: '14px 24px',
+          background: 'rgba(11, 17, 30, 0.94)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(12px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={onBack || onClose}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#e2e8f0',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back to Home</span>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(56, 189, 248, 0.2))',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#10b981'
+              }}>
+                <PieChart size={20} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 7px', borderRadius: '4px', letterSpacing: '0.6px' }}>
+                    HUB 05 • WEALTH OS
+                  </span>
+                  <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
+                    Wealth OS & Tax Hub
+                  </h1>
+                </div>
+                <p style={{ margin: 0, fontSize: '11.5px', color: '#94a3b8' }}>
+                  Institutional Net Worth, 50/30/20 Cashflow Audit, Actuarial HLV Protection & FY25 Tax-Loss Harvesting
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {onOpenCalculators && (
+              <button
+                onClick={() => onOpenCalculators('all')}
+                style={{
+                  padding: '8px 13px',
+                  borderRadius: '8px',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  color: '#fbbf24',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Calculator size={14} />
+                <span>EMI & SIP Calculators</span>
+              </button>
+            )}
+            <button
+              onClick={handleExportWealthCsv}
+              style={{
+                padding: '8px 13px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#34d399',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Download size={14} />
+              <span>Export Excel / CSV</span>
+            </button>
+            <button
+              onClick={() => window.print()}
+              style={{
+                padding: '8px 13px',
+                borderRadius: '8px',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Printer size={14} />
+              <span>Print / PDF</span>
+            </button>
+            {onOpenPaperTrading && (
+              <button
+                onClick={onOpenPaperTrading}
+                style={{
+                  padding: '8px 15px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <TrendingUp size={14} />
+                <span>Paper Trading</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Main Container */}
+        <div style={{ maxWidth: '1260px', width: '100%', margin: '0 auto', padding: '24px 20px 60px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          {/* Bento Pillar Selector Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '14px',
+                    background: isActive
+                      ? `linear-gradient(135deg, ${tab.color}26, rgba(15, 23, 42, 0.9))`
+                      : 'rgba(15, 23, 42, 0.7)',
+                    border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#f8fafc',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    transition: 'all 0.18s ease',
+                    boxShadow: isActive ? `0 8px 24px ${tab.color}25` : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '9px',
+                      background: `${tab.color}20`,
+                      border: `1px solid ${tab.color}45`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: tab.color
+                    }}>
+                      <Icon size={18} />
+                    </div>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      color: isActive ? tab.color : '#94a3b8',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      padding: '2px 7px',
+                      borderRadius: '5px'
+                    }}>
+                      {tab.badge}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: isActive ? '#fff' : '#cbd5e1' }}>
+                    {tab.label}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Workspace Panel */}
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '18px',
+            padding: '28px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)'
+          }}>
+            {activeTab === 'AI_COPILOT' && <AiWealthCopilotView />}
+            {activeTab === 'BUDGET' && <BudgetLeakDetectorView />}
+            {activeTab === 'INSURANCE' && <InsuranceGapView />}
+            {activeTab === 'NET_WORTH' && <NetWorthView />}
+            {activeTab === 'TAX_LOSS' && <TaxLossHarvestingView />}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -97,13 +379,7 @@ export default function WealthPersonalFinanceModal({ isOpen, onClose, initialTab
           background: 'rgba(0, 0, 0, 0.2)',
           overflowX: 'auto'
         }}>
-          {[
-            { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', icon: Sparkles },
-            { id: 'BUDGET', label: '50/30/20 Budget & Leak Detector', icon: Wallet },
-            { id: 'INSURANCE', label: 'Term Life & Health Gap (HLV)', icon: HeartPulse },
-            { id: 'NET_WORTH', label: 'Consolidated Net Worth', icon: PieChart },
-            { id: 'TAX_LOSS', label: 'Tax-Loss Harvesting (FY25)', icon: Scissors }
-          ].map(tab => {
+          {TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
@@ -695,11 +971,36 @@ function NetWorthView() {
               </div>
             </div>
           </div>
+
+          {/* Visual Stacked Asset Allocation Bar */}
+          {totalAssets > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>
+                <span>Multi-Asset Allocation Mix</span>
+                <span>100% (₹{(totalAssets / 100000).toFixed(1)}L)</span>
+              </div>
+              <div style={{ height: '10px', borderRadius: '6px', overflow: 'hidden', display: 'flex', background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: `${(stocks / totalAssets) * 100}%`, background: '#38bdf8' }} title="Direct Stocks" />
+                <div style={{ width: `${(mutualFunds / totalAssets) * 100}%`, background: '#10b981' }} title="Mutual Funds" />
+                <div style={{ width: `${(epfPpf / totalAssets) * 100}%`, background: '#f59e0b' }} title="EPF/PPF" />
+                <div style={{ width: `${(bankFd / totalAssets) * 100}%`, background: '#94a3b8' }} title="Bank FD" />
+                <div style={{ width: `${(gold / totalAssets) * 100}%`, background: '#fbbf24' }} title="Gold" />
+                <div style={{ width: `${(realEstate / totalAssets) * 100}%`, background: '#a855f7' }} title="Real Estate" />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '8px', fontSize: '10.5px', color: '#cbd5e1' }}>
+                <span style={{ color: '#38bdf8' }}>● Equity {((stocks / totalAssets) * 100).toFixed(0)}%</span>
+                <span style={{ color: '#10b981' }}>● MF {((mutualFunds / totalAssets) * 100).toFixed(0)}%</span>
+                <span style={{ color: '#f59e0b' }}>● EPF {((epfPpf / totalAssets) * 100).toFixed(0)}%</span>
+                <span style={{ color: '#fbbf24' }}>● Gold {((gold / totalAssets) * 100).toFixed(0)}%</span>
+                <span style={{ color: '#a855f7' }}>● Real Estate {((realEstate / totalAssets) * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px' }}>
           <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
-            <strong>Solvency Ratio:</strong> {((netWorth / totalAssets) * 100).toFixed(1)}% healthy equity cushion.
+            <strong>Solvency Ratio:</strong> {totalAssets > 0 ? ((netWorth / totalAssets) * 100).toFixed(1) : '0.0'}% healthy equity cushion.
           </div>
         </div>
       </div>
@@ -791,6 +1092,20 @@ function TaxLossHarvestingView() {
               </div>
             </div>
           </div>
+
+          {calc.currentTotalTax > 0 && (
+            <div style={{ marginTop: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>
+                <span>Tax Reduction Efficiency</span>
+                <span style={{ color: '#10b981', fontWeight: '700' }}>
+                  {((calc.taxSaved / calc.currentTotalTax) * 100).toFixed(1)}% Saved
+                </span>
+              </div>
+              <div style={{ height: '8px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min(100, (calc.taxSaved / calc.currentTotalTax) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #38bdf8)' }} />
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', fontSize: '12px', color: '#cbd5e1' }}>

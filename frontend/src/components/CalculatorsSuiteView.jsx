@@ -134,15 +134,28 @@ const CALCULATORS_CATALOG = [
 
 const normalizeCalcId = (type) => {
   if (!type || type.toLowerCase() === 'all' || type.toLowerCase() === 'catalog') return 'CATALOG';
-  return type.toLowerCase();
+  const clean = type.toLowerCase().trim();
+  if (clean === 'position-sizing') return 'position-size';
+  if (clean === 'black-scholes') return 'options-greeks';
+  if (clean === 'loan' || clean === 'emi') return 'reducing-loan';
+  return clean;
 };
 
 export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOpenPaperTrading }) {
   // Current active view: 'CATALOG' or specific calculator id (e.g. 'sip', 'reducing-loan')
-  const [selectedCalcId, setSelectedCalcId] = useState(() => normalizeCalcId(initialType));
+  const [selectedCalcId, setSelectedCalcId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const parts = window.location.pathname.toLowerCase().split('/').filter(Boolean);
+      if (parts[0] === 'calculators' && parts[1]) {
+        return normalizeCalcId(parts[1]);
+      }
+    }
+    return normalizeCalcId(initialType);
+  });
   const [activeCatalogCategory, setActiveCatalogCategory] = useState('ALL');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [viewMode, setViewMode] = useState('CHART'); // 'CHART' | 'TABLE'
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Update selectedCalcId if initialType prop changes
   useEffect(() => {
@@ -150,6 +163,32 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
       setSelectedCalcId(normalizeCalcId(initialType));
     }
   }, [initialType]);
+
+  // Sync deep-linked calculator URL (/calculators/:slug) for Google Search SEO & direct sharing
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const slugMap = {
+      'position-size': 'position-sizing',
+      'options-greeks': 'black-scholes'
+    };
+    const slug = slugMap[selectedCalcId] || selectedCalcId;
+    const targetPath = selectedCalcId === 'CATALOG' ? '/calculators' : `/calculators/${slug}`;
+    if (window.location.pathname.toLowerCase().startsWith('/calculators') && window.location.pathname !== targetPath) {
+      window.history.replaceState(null, '', targetPath);
+    }
+    import('../utils/seoEngine').then(m => {
+      if (m && typeof m.applyDynamicSEO === 'function') {
+        m.applyDynamicSEO(targetPath);
+      }
+    }).catch(() => {});
+  }, [selectedCalcId]);
+
+  const handleCopyShareLink = () => {
+    if (typeof window === 'undefined') return;
+    navigator.clipboard?.writeText(window.location.href).catch(() => {});
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2200);
+  };
 
   const activeCalcMeta = useMemo(() => {
     return CALCULATORS_CATALOG.find(c => c.id === selectedCalcId) || CALCULATORS_CATALOG[0];
@@ -291,6 +330,27 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                   </option>
                 ))}
               </select>
+
+              <button
+                onClick={handleCopyShareLink}
+                style={{
+                  background: copiedLink ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                  border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  padding: '7px 12px',
+                  color: copiedLink ? '#34d399' : '#cbd5e1',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+                title="Copy Direct Calculator Link"
+              >
+                <Share2 size={14} />
+                <span className="hide-on-mobile">{copiedLink ? 'Link Copied!' : 'Share Link'}</span>
+              </button>
 
               <button
                 onClick={handlePrintPDF}

@@ -269,8 +269,9 @@ export default function LoginView() {
         return;
       }
       const cleanName = username.replace(/[^A-Za-z\s]/g, '').trim();
-      if (!cleanName || !/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
-        useStore.setState({ authError: 'Name must contain letters only and be at most 15 characters.' });
+      const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+      if (!cleanName || !/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
+        useStore.setState({ authError: 'Name must contain letters only and be between 5 and 15 characters.' });
         setLoading(false);
         return;
       }
@@ -735,20 +736,21 @@ export default function LoginView() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>Full Name</label>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                  Letters only · {username.length}/15
+                <span style={{ fontSize: '11px', color: username.replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)', fontWeight: '600' }}>
+                  Letters only (5–15) · {username.length}/15
                 </span>
               </div>
               <input
                 type="text"
                 required
+                minLength={5}
                 maxLength={15}
-                pattern="[A-Za-z\s]{1,15}"
-                title="Letters only, maximum 15 characters"
+                pattern="[A-Za-z\s]{5,15}"
+                title="Letters only, minimum 5 and maximum 15 characters"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15))}
                 className="premium-input"
-                placeholder="John Doe"
+                placeholder="John Doe (5-15 letters)"
               />
             </div>
           )}

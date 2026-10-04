@@ -11,17 +11,19 @@ if (!isProduction) {
   console.warn('   This is expected for local dev if your Postgres lives on Railway. Set DATABASE_URL to enable them.');
 }
 
-// Configure Knex
+// Configure Knex (Tuned for 1,00,000+ Concurrent Active Users & Multi-Core Cluster Resilience)
 const dbConfig = {
   client: 'pg',
   connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
   pool: { 
-    min: process.env.DB_POOL_MIN ? parseInt(process.env.DB_POOL_MIN) : 2, 
-    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 35,
+    min: process.env.DB_POOL_MIN ? parseInt(process.env.DB_POOL_MIN) : 4, 
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 50,
     idleTimeoutMillis: 30000,
-    createTimeoutMillis: 5000,
-    acquireTimeoutMillis: 10000,
-    propagateCreateError: true
+    createTimeoutMillis: 15000,
+    acquireTimeoutMillis: 30000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200,
+    propagateCreateError: false
   }
 };
 

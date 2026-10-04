@@ -555,7 +555,12 @@ const socketKey = process.env.SOCKET_KEY || (process.env.PORT == 5001 ? 'socket.
 
 const io = new Server(server, {
   cors: { origin: true, credentials: true, methods: ['GET', 'POST'] },
-  adapter: createAdapter(adapterPubClient, adapterSubClient, { key: socketKey })
+  adapter: createAdapter(adapterPubClient, adapterSubClient, { key: socketKey }),
+  perMessageDeflate: false, // Saves ~300KB RAM per socket (~30GB across 1 Lakh concurrent users)
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  maxHttpBufferSize: 1e6,
+  transports: ['websocket', 'polling']
 });
 
 // Listen for Fyers token updates, Market Status updates & Calendar updates on all cluster nodes
@@ -749,19 +754,60 @@ app.get('/api/prices', (req, res) => {
   res.type('application/json').send(_lastPricesJson);
 });
 
+const _batchFetchCooldowns = new Map();
+let _inFlightBatchPromise = null;
+
 app.get('/api/prices/batch', async (req, res) => {
   try {
-    const symbols = req.query.symbols?.split(',') || [];
+    const rawSymbols = req.query.symbols?.split(',') || [];
+    const symbols = rawSymbols.map(s => s.trim()).filter(Boolean).slice(0, 150);
     if (symbols.length === 0) return res.json({});
-    
-    const { fetchBatchLTPs } = require('./services/fyers');
-    if (fetchBatchLTPs) {
-      const prices = await fetchBatchLTPs(symbols);
-      Object.assign(priceCache, prices);
-      res.json(prices);
-    } else {
-      res.json({});
+
+    const now = Date.now();
+    const result = {};
+    const missing = [];
+
+    for (const sym of symbols) {
+      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      const cached = priceCache[sym] || priceCache[clean];
+      const lastFetch = _batchFetchCooldowns.get(sym) || 0;
+      if (cached && cached.ltp > 0 && (now - lastFetch < 2000)) {
+        result[sym] = cached;
+      } else {
+        missing.push(sym);
+      }
     }
+
+    if (missing.length > 0) {
+      const { fetchBatchLTPs } = require('./services/fyers');
+      if (fetchBatchLTPs) {
+        if (!_inFlightBatchPromise) {
+          _inFlightBatchPromise = fetchBatchLTPs(missing)
+            .then(prices => {
+              const ts = Date.now();
+              if (prices && typeof prices === 'object') {
+                Object.assign(priceCache, prices);
+                for (const s of missing) _batchFetchCooldowns.set(s, ts);
+              }
+              return prices || {};
+            })
+            .catch(() => ({}))
+            .finally(() => { _inFlightBatchPromise = null; });
+        }
+        const fetched = await _inFlightBatchPromise;
+        Object.assign(result, fetched);
+      }
+    }
+
+    for (const sym of symbols) {
+      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      if (!result[sym] && (priceCache[sym] || priceCache[clean])) {
+        result[sym] = priceCache[sym] || priceCache[clean];
+      }
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=1, stale-while-revalidate=5');
+    res.json(result);
   } catch (err) {
     console.error('/api/prices/batch Error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
@@ -1061,8 +1107,9 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
     }
     if (username) {
       const trimmedUser = String(username).trim();
-      if (!/^[A-Za-z\s]{1,15}$/.test(trimmedUser)) {
-        return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+      const letterCount = trimmedUser.replace(/[^A-Za-z]/g, '').length;
+      if (!/^[A-Za-z\s]{5,15}$/.test(trimmedUser) || letterCount < 5) {
+        return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
       }
       const existingUser = await db('users').whereRaw('LOWER(username) = ?', [trimmedUser.toLowerCase()]).first();
       if (existingUser) {
@@ -1118,9 +1165,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   const cleanEmail = String(email).toLowerCase().trim();
   const cleanPhone = String(phone).replace(/\D/g, '');
   const cleanUsername = String(username).trim();
+  const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
 
-  if (!/^[A-Za-z\s]{1,15}$/.test(cleanUsername)) {
-    return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+  if (!/^[A-Za-z\s]{5,15}$/.test(cleanUsername) || letterCount < 5) {
+    return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
   }
 
   if (cleanPhone.length !== 10) {
@@ -2927,8 +2975,9 @@ const handleUpdateUserDetails = async (req, res) => {
     const updates = {};
     if (username !== undefined) {
       const cleanName = String(username).trim();
-      if (!/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
-        return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+      const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+      if (!/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
+        return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
       }
       const existingUser = await db('users')
         .whereRaw('LOWER(username) = ?', [cleanName.toLowerCase()])
@@ -11824,6 +11873,95 @@ app.post('/api/v1/bridge/webhook', (req, res) => {
   }
 });
 
+// ─── In-Memory HTML Template & Server-Side SEO Engine (0 Disk I/O at 1 Lakh Concurrent Users) ───
+let _cachedIndexHtml = null;
+let _cachedIndexMtime = 0;
+
+const SERVER_SEO_MAP = {
+  '/paper-trading': {
+    title: 'Free Paper Trading India — Live NSE, BSE & MCX Options & Futures Simulator | SkandX',
+    desc: 'Trade NSE Nifty, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 virtual capital and real-time WebSocket ticks on SkandX.'
+  },
+  '/calculators': {
+    title: 'Financial Calculators Suite — SIP, Loan EMI, MTF, Brokerage & Options Greeks | SkandX',
+    desc: 'Free institutional financial calculators: SIP & Step-Up Calculator, Reducing & Fixed Interest Loan EMI, MTF 4x Leverage, Stock Average Price, Mutual Funds, NSE Brokerage & Black-Scholes Greeks with PDF & Excel download.'
+  },
+  '/calculators/sip': {
+    title: 'SIP Calculator & Step-Up SIP Wealth Compounder (With PDF & Excel Schedule) | SkandX',
+    desc: 'Calculate mutual fund SIP returns with annual Step-Up %. View year-by-year compounding schedule, invested vs wealth gained chart, and download PDF or Excel reports.'
+  },
+  '/calculators/lumpsum': {
+    title: 'Lumpsum Investment Calculator — Compounding & CAGR Growth Table | SkandX',
+    desc: 'Calculate one-time lumpsum mutual fund and equity returns with year-by-year compounding tables, interactive charts, and instant PDF/Excel export.'
+  },
+  '/calculators/reducing-loan': {
+    title: 'Reducing Balance Loan EMI Calculator — Home, Car & Personal Loan Amortization | SkandX',
+    desc: 'Calculate monthly EMI for Home Loan, Car Loan, and Personal Loan using the reducing balance interest method. View year-by-year principal vs interest amortization table and download PDF/Excel.'
+  },
+  '/calculators/fixed-loan': {
+    title: 'Fixed / Flat Interest Rate Loan Calculator — Flat vs Effective Reducing Rate | SkandX',
+    desc: 'Calculate Flat / Fixed interest rate loan EMI, total interest outgo, and compare equivalent reducing balance APR with year-by-year repayment schedule in PDF & Excel.'
+  },
+  '/calculators/average-price': {
+    title: 'Stock Average Share Price Calculator — Multi-Tranche Equity Averaging | SkandX',
+    desc: 'Calculate weighted average buy price across multiple stock tranches, target breakeven price, and required shares to average down on NSE/BSE stocks.'
+  },
+  '/calculators/mtf': {
+    title: 'MTF Calculator (Margin Trading Facility 4x Leverage & Holding Interest) | SkandX',
+    desc: 'Calculate Margin Trading Facility (MTF) 4x leverage funding, daily interest cost, statutory charges, net ROI, and breakeven stock price.'
+  },
+  '/calculators/mutual-funds': {
+    title: 'Mutual Fund Returns & Direct vs Regular Plan Commission Calculator | SkandX',
+    desc: 'Compare Direct vs Regular mutual fund expense ratios and calculate how much commission you save over 5 to 30 years with year-by-year compounding tables.'
+  },
+  '/calculators/brokerage': {
+    title: 'NSE/BSE Brokerage, STT & Regulatory Tax Calculator (Oct 2024 Mandate) | SkandX',
+    desc: 'Calculate exact STT, Exchange Transaction Charges, SEBI Turnover Fees, Stamp Duty, GST, Breakeven points, and Net P&L for Intraday, Delivery, Futures & Options.'
+  },
+  '/calculators/position-sizing': {
+    title: 'Position Sizing & Stop-Loss Risk Management Calculator | SkandX',
+    desc: 'Calculate exact share or F&O lot quantity based on account capital, risk percentage per trade, entry price, and stop-loss distance.'
+  },
+  '/calculators/black-scholes': {
+    title: 'Black-Scholes Option Pricing & Greeks Calculator (Delta, Gamma, Theta, Vega) | SkandX',
+    desc: 'Institutional Black-Scholes Call & Put option pricing calculator with live Delta, Gamma, Theta, Vega, Rho Greeks and Strike Sensitivity Matrix.'
+  },
+  '/wealth-hub': {
+    title: 'Wealth OS & Tax Hub — Net Worth, 50/30/20 Budget, HLV Insurance & FY25 Tax Harvesting | SkandX',
+    desc: '360° Personal Finance & Tax Command Center: Multi-asset Net Worth tracker, 50/30/20 Budget Leak Detector, Actuarial Term/Health HLV Gap, and FY25 STCG 20% / LTCG 12.5% Tax-Loss Harvesting.'
+  },
+  '/algo': {
+    title: 'SkandX Algo — Multi-Broker Demat Bridge, TradingView Webhooks & Copy Trading | SkandX',
+    desc: 'Automate NSE/BSE/MCX trading with TradingView JSON Webhooks, Dedicated Static IPs, Pre-Built Options Strategy Templates, and Multi-Broker Demat API execution.'
+  },
+  '/algo-trading': {
+    title: 'Algo Trading India — TradingView Webhook Bridge & Multi-Broker Execution | SkandX',
+    desc: 'Connect Zerodha, Fyers, AngelOne, Dhan & Upstox with TradingView alerts, static IP compliance, and 1-click algorithmic strategy templates.'
+  },
+  '/primary-markets': {
+    title: 'NSE Bhavcopy Delivery Screener (>60%), Bulk Deals & Live IPO GMP Hub | SkandX',
+    desc: 'Screen daily NSE/BSE high-delivery institutional accumulation stocks, 2x+ volume surges, Bulk/Block deals, and track Mainboard & SME IPO GMP & allotment.'
+  },
+  '/trade-diary': {
+    title: '8-Pillar Institutional Trade Diary, Discipline Checklist & AI Trading Journal | SkandX',
+    desc: 'Track trading win rate, profit factor, strategy performance, emotional mistakes, pre-trade checklists, and AI-powered journal analytics.'
+  }
+};
+
+function getIndexHtmlFromRam() {
+  const indexPath = path.join(__dirname, '../frontend/dist/index.html');
+  try {
+    const stat = fs.statSync(indexPath);
+    if (!_cachedIndexHtml || stat.mtimeMs !== _cachedIndexMtime) {
+      _cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
+      _cachedIndexMtime = stat.mtimeMs;
+    }
+    return _cachedIndexHtml;
+  } catch (e) {
+    return null;
+  }
+}
+
 app.use((req, res) => {
   // If the request is for an API endpoint that wasn't found, return 404 JSON instead of HTML!
   if (req.path.startsWith('/api/')) {
@@ -11834,7 +11972,36 @@ app.use((req, res) => {
     return res.status(404).send('Asset not found');
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+
+  const rawHtml = getIndexHtmlFromRam();
+  if (!rawHtml) {
+    return res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  }
+
+  const cleanPath = (req.path || '/').toLowerCase().replace(/\/+$/, '') || '/';
+  const seoEntry = SERVER_SEO_MAP[cleanPath];
+  if (!seoEntry) {
+    return res.type('html').send(rawHtml);
+  }
+
+  const canonicalUrl = `https://skandx.in${cleanPath}`;
+  const jsonLdScript = `<link rel="canonical" href="${canonicalUrl}" /><script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: seoEntry.title.split('|')[0].trim(),
+    operatingSystem: 'Web, Android, iOS, Windows, macOS',
+    applicationCategory: 'FinanceApplication',
+    url: canonicalUrl,
+    description: seoEntry.desc,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' }
+  })}</script>`;
+
+  const customizedHtml = rawHtml
+    .replace(/<title>.*?<\/title>/i, `<title>${seoEntry.title}</title>`)
+    .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i, `<meta name="description" content="${seoEntry.desc}" />`)
+    .replace('</head>', `${jsonLdScript}</head>`);
+
+  return res.type('html').send(customizedHtml);
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────

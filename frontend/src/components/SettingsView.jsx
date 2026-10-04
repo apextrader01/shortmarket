@@ -127,8 +127,9 @@ export default function SettingsView() {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     const cleanName = (profileForm.username || '').replace(/[^A-Za-z\s]/g, '').trim();
-    if (!cleanName || !/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
-      setProfileMsg({ type: 'error', text: 'Name must contain letters only and be at most 15 characters.' });
+    const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+    if (!cleanName || !/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
+      setProfileMsg({ type: 'error', text: 'Name must contain letters only and be between 5 and 15 characters.' });
       return;
     }
     setProfileLoading(true);
@@ -281,19 +282,21 @@ export default function SettingsView() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Full Name</label>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                      Letters only · {(profileForm.username || '').length}/15
+                    <span style={{ fontSize: '11px', color: (profileForm.username || '').replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)', fontWeight: '600' }}>
+                      Letters only (5–15) · {(profileForm.username || '').length}/15
                     </span>
                   </div>
                   <input
                     type="text"
                     required
+                    minLength={5}
                     maxLength={15}
-                    pattern="[A-Za-z\s]{1,15}"
+                    pattern="[A-Za-z\s]{5,15}"
+                    title="Letters only, minimum 5 and maximum 15 characters"
                     className="input"
                     value={profileForm.username || ''}
                     onChange={e => setProfileForm({ ...profileForm, username: e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15) })}
-                    placeholder="John Doe"
+                    placeholder="John Doe (5-15 letters)"
                   />
                 </div>
                 <div>

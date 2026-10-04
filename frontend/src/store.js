@@ -64,7 +64,12 @@ window.fetch = async function (url, options = {}) {
 
 export const socket = io(API, { 
   withCredentials: false,
-  transports: ['websocket'] // Force websocket to bypass PM2 cluster long-polling issues
+  transports: ['websocket'], // Force websocket to bypass PM2 cluster long-polling issues
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 10000,
+  randomizationFactor: 0.5, // Jitter prevents thundering-herd reconnect storms at 1 Lakh+ users
+  timeout: 20000
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

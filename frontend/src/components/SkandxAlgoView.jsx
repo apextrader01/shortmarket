@@ -11,10 +11,28 @@ import {
   ArrowLeft, QrCode, Smartphone, Wallet, Lock, DollarSign
 } from 'lucide-react';
 
-export default function SkandxAlgoView({ onBack, onOpenPaperTrading }) {
+const resolveAlgoTab = (tab) => {
+  if (!tab) return 'Dashboard';
+  const upper = String(tab).toUpperCase();
+  if (upper === 'SHARE_LINK' || upper === 'LINKUSER') return 'LinkUser';
+  if (upper === 'API_KEYS' || upper === 'DEMAT') return 'Demat';
+  if (upper === 'STATIC_IP' || upper === 'STATICIP') return 'StaticIp';
+  if (upper === 'WEBHOOK' || upper === 'BRIDGE') return 'Bridge';
+  if (upper === 'COPY' || upper === 'GROUPCOPY') return 'GroupCopy';
+  if (upper === 'TELEGRAM' || upper === 'TELEGRAMBOT') return 'TelegramBot';
+  return 'Dashboard';
+};
+
+export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading }) {
   // Active Navigation Tab
-  const [activeMenu, setActiveMenu] = useState('Dashboard');
+  const [activeMenu, setActiveMenu] = useState(() => resolveAlgoTab(initialTab));
   const [toastMsg, setToastMsg] = useState('');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveMenu(resolveAlgoTab(initialTab));
+    }
+  }, [initialTab]);
 
   // ── Global Bridge State ──────────────────────────────────────────────────
   const [config, setConfig] = useState({
@@ -756,6 +774,28 @@ export default function SkandxAlgoView({ onBack, onOpenPaperTrading }) {
             </span>
             <span style={{ color: '#cbd5e1' }}>h4harikrishnan2015@gmail.com</span>
           </div>
+
+          {/* Open Paper Trading Terminal Button */}
+          {onOpenPaperTrading && (
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                border: '1px solid rgba(56, 189, 248, 0.45)',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              <Zap size={13} /> Paper Terminal
+            </button>
+          )}
 
           {/* Exit / Back to Home Button */}
           <button
