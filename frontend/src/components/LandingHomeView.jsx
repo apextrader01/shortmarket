@@ -107,49 +107,31 @@ export default function LandingHomeView({
       id: 4,
       hubNum: '04',
       category: 'CALCULATORS',
-      title: 'Financial Calculators & Mutual Funds Hub',
-      shortDesc: 'Compounding SIPs, position sizing with R:R, revised Oct 2024 STT, Options Greeks, and 44 AMCs direct mutual funds explorer.',
+      title: 'Financial Calculators Suite & AI Wealth Planning',
+      shortDesc: 'Comprehensive Fyers-style institutional calculators: Reducing & Flat EMI Loans, SIP Compounder, MTF 4x Leverage, Averaging, Mutual Funds, STT & AI Wealth Copilot.',
       icon: Calculator,
       color: '#f59e0b',
       gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(251, 191, 36, 0.05))',
       border: 'rgba(245, 158, 11, 0.35)',
-      badge: 'Calculators & 44 AMCs',
+      badge: 'Full Suite + PDF/Excel',
       badgeColor: '#f59e0b',
-      tags: ['SIP & Step-Up', 'Direct vs Regular MFs', '44 Indian AMCs', 'Position Sizing', 'STT Oct 2024', 'Black-Scholes Greeks', 'Fee Savings', 'Zero Commission'],
-      actionLabel: 'Launch Calculators & Mutual Funds',
-      primaryAction: () => onOpenCalculators('SIP'),
+      tags: ['Reducing Loan EMI', 'Fixed Loan', 'Average Price', 'MTF 4x', 'SIP & Step-Up', 'Mutual Funds', 'AI Tax Copilot', 'Export Schedules'],
+      actionLabel: 'Launch Full Calculator Suite',
+      primaryAction: () => onOpenCalculators('all'),
       quickLinks: [
-        { label: 'SIP & Step-Up Compounder', action: () => onOpenCalculators('SIP') },
-        { label: 'Direct Mutual Funds (44 AMCs)', action: onOpenMutualFunds },
-        { label: 'Direct vs Regular Fee Savings', action: onOpenMutualFunds },
-        { label: 'Position Sizer (R:R)', action: () => onOpenCalculators('POSITION') },
-        { label: 'STT & Brokerage (Oct 2024)', action: () => onOpenCalculators('BROKERAGE') },
-        { label: 'Options Greeks', action: () => onOpenCalculators('GREEKS') }
+        { label: 'All Calculators Catalog', action: () => onOpenCalculators('all') },
+        { label: 'Reducing Loan EMI (Home/Car)', action: () => onOpenCalculators('reducing-loan') },
+        { label: 'Fixed / Flat Rate Loan', action: () => onOpenCalculators('fixed-loan') },
+        { label: 'Average Share Price', action: () => onOpenCalculators('average-price') },
+        { label: 'MTF Financing (4x Leverage)', action: () => onOpenCalculators('mtf') },
+        { label: 'SIP & Step-Up Compounder', action: () => onOpenCalculators('sip') },
+        { label: 'Mutual Funds & Fee Savings', action: () => onOpenCalculators('mutual-funds') },
+        { label: 'AI Wealth Copilot & Tax Advisory', action: () => onOpenWealthFinance('AI_COPILOT') }
       ]
     },
     {
       id: 5,
       hubNum: '05',
-      category: 'WEALTH',
-      title: '24/7 Personal AI Wealth Copilot',
-      shortDesc: 'Instant advisory on Indian tax regimes, portfolio compounding, retirement & insurance.',
-      icon: Bot,
-      color: '#c084fc',
-      gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(192, 132, 252, 0.05))',
-      border: 'rgba(192, 132, 252, 0.35)',
-      badge: 'Generative AI',
-      badgeColor: '#c084fc',
-      tags: ['Old vs New Tax', '₹1 Cr Roadmap', 'SEBI Guidelines', 'Asset Allocation'],
-      actionLabel: 'Ask AI Copilot',
-      primaryAction: () => onOpenWealthFinance('AI_COPILOT'),
-      quickLinks: [
-        { label: 'Tax Regime', action: () => onOpenWealthFinance('AI_COPILOT') },
-        { label: '₹1 Cr Roadmap', action: () => onOpenWealthFinance('AI_COPILOT') }
-      ]
-    },
-    {
-      id: 6,
-      hubNum: '06',
       category: 'WEALTH',
       title: '50/30/20 Budget & Leak Detector',
       shortDesc: 'Automate Needs (50%), Wants (30%), Savings (20%) and plug recurring subscription leaks.',
@@ -168,8 +150,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 7,
-      hubNum: '07',
+      id: 6,
+      hubNum: '06',
       category: 'WEALTH',
       title: 'Term Life & Health Gap (HLV)',
       shortDesc: 'Human Life Value protection shortfall analyzer. Zero-commission pure term strategies.',
@@ -188,8 +170,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 8,
-      hubNum: '08',
+      id: 7,
+      hubNum: '07',
       category: 'WEALTH',
       title: 'Consolidated Net Worth',
       shortDesc: 'Track Stocks, MFs, EPF/PPF, Bank FDs, Gold and Real Estate against debt liabilities.',
@@ -208,8 +190,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 9,
-      hubNum: '09',
+      id: 8,
+      hubNum: '08',
       category: 'CALCULATORS',
       title: 'Tax-Loss Harvesting (FY25)',
       shortDesc: 'Simulate capital gains tax savings under Budget FY25 (STCG 20%, LTCG 12.5%).',
@@ -228,8 +210,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 10,
-      hubNum: '10',
+      id: 9,
+      hubNum: '09',
       category: 'TRADING',
       title: 'SkandX Algo Multi-Broker Demat & Bridge Suite',
       shortDesc: 'Multi-broker Demat connection, Dedicated Static IPs, TradingView JSON Webhook Bridge & copy trading.',

@@ -72,6 +72,7 @@ const WealthPersonalFinanceModal = lazyWithRetry(() => import('./components/Weal
 const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/MutualFundsExplorerModal'));
 const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBridgeDashboardModal'));
 const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));
+const CalculatorsSuiteView = lazyWithRetry(() => import('./components/CalculatorsSuiteView'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -403,6 +404,7 @@ function App() {
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
       'home': 'Home',
+      'calculators': 'Calculators', 'calculator': 'Calculators',
       'algo': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
       'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
       'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
@@ -421,6 +423,7 @@ function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showCalculatorsModal, setShowCalculatorsModal] = useState(false);
   const [calculatorsInitialTab, setCalculatorsInitialTab] = useState('SIP');
+  const [calculatorsInitialType, setCalculatorsInitialType] = useState('all');
   const [showBrokerConnectModal, setShowBrokerConnectModal] = useState(false);
   const [showWealthModal, setShowWealthModal] = useState(false);
   const [wealthInitialTab, setWealthInitialTab] = useState('AI_COPILOT');
@@ -441,6 +444,7 @@ function App() {
     if (activeTab) {
       let newPath = '/';
       if (activeTab === 'Home') newPath = '/';
+      else if (activeTab === 'Calculators') newPath = '/calculators';
       else if (activeTab === 'Algo') newPath = '/algo';
       else if (activeTab === 'TradeDiary') newPath = '/trade-diary';
       else if (activeTab === 'PrimaryMarkets') newPath = '/primary-markets';
@@ -461,6 +465,7 @@ function App() {
       }
       const tabsMap = {
         'home': 'Home',
+        'calculators': 'Calculators', 'calculator': 'Calculators',
         'algo': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
@@ -613,6 +618,7 @@ function App() {
 
   const knownAppRoutes = new Set([
     '', 'home', 'login', 'register', 'signup', 'forgot', 'reset',
+    'calculators', 'calculator',
     'markets', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
     'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
     'pricing', 'referrals', 'leaderboard', 'journal', 'tradingjournal', 'trading-journal',
@@ -638,6 +644,7 @@ function App() {
   useEffect(() => {
     const tabTitleMap = {
       Home: 'SkandX | Next-Gen Paper Trading & Wealth Operating System',
+      Calculators: 'Financial Calculators Suite & Amortization Terminal | SkandX',
       Markets: 'Live Markets & Paper Trading | SkandX',
       PrimaryMarkets: 'Primary Markets, Bhavcopy & IPO Hub | SkandX',
       Orders: 'Order Book & Executions | SkandX',
@@ -772,7 +779,7 @@ function App() {
 
   // ── Authenticated layout ─────────────────────────────────────────────────────
 
-  const isScrollableTab = ['Home', 'PrimaryMarkets', 'TradeDiary'].includes(activeTab);
+  const isScrollableTab = ['Home', 'PrimaryMarkets', 'TradeDiary', 'Calculators'].includes(activeTab);
 
   return (
     <div 
@@ -826,8 +833,8 @@ function App() {
             onOpenTradeDiary={() => setActiveTab('TradeDiary')} 
             onOpenPrimaryMarkets={() => setActiveTab('PrimaryMarkets')} 
             onOpenCalculators={(tab) => {
-              setCalculatorsInitialTab(tab || 'SIP');
-              setShowCalculatorsModal(true);
+              setCalculatorsInitialType(tab || 'all');
+              setActiveTab('Calculators');
             }} 
             onOpenBrokerConnect={() => setShowBrokerConnectModal(true)} 
             onOpenWealthFinance={(tab) => {
@@ -858,6 +865,14 @@ function App() {
       ) : activeTab === 'Algo' ? (
         <Suspense fallback={<TabLoader />}>
           <SkandxAlgoView 
+            onBack={() => setActiveTab('Home')} 
+            onOpenPaperTrading={() => setActiveTab('Markets')} 
+          />
+        </Suspense>
+      ) : activeTab === 'Calculators' ? (
+        <Suspense fallback={<TabLoader />}>
+          <CalculatorsSuiteView 
+            initialType={calculatorsInitialType}
             onBack={() => setActiveTab('Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
@@ -926,6 +941,7 @@ function App() {
                   {[
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
+                    { key: 'Calculators', label: 'Calculators' },
                     { key: 'Algo', label: 'SkandX Algo' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Positions', label: 'Positions' },
@@ -1286,6 +1302,7 @@ function App() {
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
+            { label: 'Calculators Suite', key: 'Calculators', icon: Calculator },
             { label: 'SkandX Algo Platform', key: 'Algo', icon: Cpu },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
@@ -1342,7 +1359,7 @@ function App() {
       </div>
       
       {/* Mobile Bottom Navigation (Only for Paper Trading Terminal) */}
-      {!['Home', 'TradeDiary', 'PrimaryMarkets'].includes(activeTab) && (
+      {!['Home', 'TradeDiary', 'PrimaryMarkets', 'Calculators', 'Algo'].includes(activeTab) && (
         <div className="mobile-bottom-nav">
           <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
             <List size={20} />
