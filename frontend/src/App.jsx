@@ -98,29 +98,41 @@ const IndexChip = React.memo(({ label, price }) => {
   return (
     <div
       style={{
-        display:      'flex',
-        alignItems:   'center',
-        gap:          '4px',
-        background:   price
+        display:        'flex',
+        flexDirection:  'column',
+        justifyContent: 'center',
+        background:     price
           ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
           : 'rgba(255,255,255,0.05)',
         color: price
           ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
           : 'var(--text-secondary)',
-        padding:      '2px 6px',
-        borderRadius: '12px',
-        fontSize:     '10px',
-        fontWeight:   '700',
+        padding:        '2px 6px',
+        borderRadius:   '8px',
+        fontSize:       '9px',
+        fontWeight:     '700',
+        lineHeight:     '1.2',
+        whiteSpace:     'nowrap',
+        flexShrink:     0
       }}
     >
-      {price && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
-      {label}{' '}
-      {price && price.ltp !== undefined && !isNaN(price.ltp) ? Number(price.ltp).toFixed(2) : '...'}
-      {price && price.change !== undefined && !isNaN(price.change) && (
-        <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
-          {Number(price.change) > 0 ? '+' : ''}{Number(price.change).toFixed(2)} ({Number(price.pct || 0) > 0 ? '+' : ''}{Number(price.pct || 0).toFixed(2)}%)
-        </span>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+        {price && (isUp ? <TrendingUp size={9} /> : <TrendingDown size={9} />)}
+        <span>{label}</span>
+        {price && price.pct !== undefined && !isNaN(price.pct) && (
+          <span style={{ opacity: 0.85, fontSize: '8.5px' }}>
+            ({Number(price.pct || 0) > 0 ? '+' : ''}{Number(price.pct || 0).toFixed(2)}%)
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px' }}>
+        <span>{price && price.ltp !== undefined && !isNaN(price.ltp) ? Number(price.ltp).toFixed(2) : '...'}</span>
+        {price && price.change !== undefined && !isNaN(price.change) && (
+          <span style={{ opacity: 0.8, fontSize: '8.5px' }}>
+            {Number(price.change) > 0 ? '+' : ''}{Number(price.change).toFixed(2)}
+          </span>
+        )}
+      </div>
     </div>
   );
 });
@@ -134,29 +146,30 @@ const DataStatusBadge = React.memo(() => {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '5px',
-        padding: '2px 7px',
-        borderRadius: '12px',
+        gap: '4px',
+        padding: '2px 6px',
+        borderRadius: '10px',
         background: isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
         border: `1px solid ${isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-        fontSize: '9.5px',
+        fontSize: '9px',
         fontWeight: '700',
         color: isConnected ? '#10b981' : '#f59e0b',
-        letterSpacing: '0.4px',
+        letterSpacing: '0.3px',
+        whiteSpace: 'nowrap',
         userSelect: 'none'
       }}
     >
       <span
         style={{
-          width: '6px',
-          height: '6px',
+          width: '5px',
+          height: '5px',
           borderRadius: '50%',
           background: isConnected ? '#10b981' : '#f59e0b',
           boxShadow: isConnected ? '0 0 6px #10b981' : '0 0 6px #f59e0b',
           display: 'inline-block'
         }}
       />
-      <span>{isConnected ? 'LIVE' : 'PARTIAL DATA'}</span>
+      <span>{isConnected ? 'LIVE' : 'PARTIAL'}</span>
     </div>
   );
 });
@@ -168,10 +181,10 @@ const TopIndexTicker = React.memo(() => {
   const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX']);
 
   return (
-    <div className="hide-on-tablet" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <IndexChip label="NSE:NIFTY50" price={nifty} />
-      <IndexChip label="NSE:NIFTYBANK" price={banknifty} />
-      <IndexChip label="BSE:SENSEX" price={sensex} />
+    <div className="hide-on-tablet" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+      <IndexChip label="NIFTY50" price={nifty} />
+      <IndexChip label="BANKNIFTY" price={banknifty} />
+      <IndexChip label="SENSEX" price={sensex} />
       <DataStatusBadge />
     </div>
   );
@@ -879,21 +892,21 @@ function App() {
         </Suspense>
       ) : (
         <>
-          <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
+          <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)', padding: '0 10px', gap: '6px' }}>
               {/* Left: title + index pills */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '4px' }}>
                   <div 
                     onClick={() => setActiveTab('Home')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}
                     title="SkandX Trading Platform"
                   >
                     <img 
                       src="/pwa-192x192.png" 
                       alt="SkandX Logo" 
-                      style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)' }} 
+                      style={{ width: '24px', height: '24px', borderRadius: '6px', boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)' }} 
                     />
-                    <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
+                    <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
                       Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
                     </span>
                     {isStagingEnv && (
@@ -902,10 +915,10 @@ function App() {
                         color: '#f59e0b',
                         border: '1px solid rgba(245, 158, 11, 0.45)',
                         borderRadius: '4px',
-                        padding: '1px 6px',
-                        fontSize: '10px',
+                        padding: '1px 4px',
+                        fontSize: '8.5px',
                         fontWeight: '800',
-                        letterSpacing: '0.6px',
+                        letterSpacing: '0.4px',
                         textTransform: 'uppercase',
                         lineHeight: '1.2'
                       }}>
@@ -919,7 +932,7 @@ function App() {
               </div>
 
               {/* Right: nav tabs + user info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0, minWidth: 0 }}>
                 {/* Hotkey Toast Notification */}
                 {hotkeyToast && (
                   <div style={{
@@ -935,8 +948,8 @@ function App() {
                 
                 {/* Tab Navigation */}
                 <div className="hide-on-mobile" style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  fontSize: '10px', fontWeight: '700', marginRight: '4px',
+                  display: 'flex', alignItems: 'center', gap: '2px',
+                  fontSize: '9.5px', fontWeight: '700', marginRight: '2px', whiteSpace: 'nowrap'
                 }}>
                   {[
                     { key: 'Home', label: 'Home' },
@@ -958,7 +971,8 @@ function App() {
                         padding:        '16px 4px',
                         cursor:         'pointer',
                         textTransform:  'uppercase',
-                        letterSpacing:  '0.5px',
+                        letterSpacing:  '0.2px',
+                        whiteSpace:     'nowrap'
                       }}
                     >
                       {tabItem.label}
@@ -978,32 +992,33 @@ function App() {
                     position: 'relative',
                     background: unreadNotificationsCount > 0 ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.05)',
                     border: `1px solid ${unreadNotificationsCount > 0 ? 'rgba(56, 189, 248, 0.35)' : 'var(--border-color)'}`,
-                    borderRadius: '8px',
-                    padding: '6px 8px',
+                    borderRadius: '7px',
+                    padding: '5px 6px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: unreadNotificationsCount > 0 ? '#38bdf8' : 'var(--text-secondary)',
                     transition: 'all 0.2s ease',
-                    height: '32px',
-                    minWidth: '34px'
+                    height: '28px',
+                    minWidth: '28px',
+                    flexShrink: 0
                   }}
                   title="Notifications & Trade Signals"
                 >
-                  <Bell size={16} />
+                  <Bell size={14} />
                   {unreadNotificationsCount > 0 && (
                     <span style={{
                       position: 'absolute',
-                      top: '-5px',
-                      right: '-5px',
+                      top: '-4px',
+                      right: '-4px',
                       background: '#ef4444',
                       color: '#fff',
-                      fontSize: '9.5px',
+                      fontSize: '9px',
                       fontWeight: '800',
                       borderRadius: '10px',
-                      minWidth: '17px',
-                      height: '17px',
+                      minWidth: '15px',
+                      height: '15px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1018,29 +1033,30 @@ function App() {
 
                 {/* Hamburger Menu (Mobile Only) */}
                 <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
-                  <Menu size={24} color="var(--text-primary)" />
+                  <Menu size={22} color="var(--text-primary)" />
                 </div>
 
                 {/* User avatar + logout */}
-                <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                   <div 
                     onClick={() => setActiveTab('ClientData')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '3px 6px', borderRadius: '8px' }}
                     className="hover:bg-white/5 transition-colors"
+                    title={user.username}
                   >
                     <div style={{
-                      width: '28px', height: '28px', borderRadius: '50%',
+                      width: '24px', height: '24px', borderRadius: '50%',
                       background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '1px solid var(--border-color)', overflow: 'hidden'
+                      border: '1px solid var(--border-color)', overflow: 'hidden', flexShrink: 0
                     }}>
                       {user?.profile_picture_url ? (
                         <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
-                        <User size={14} color="var(--text-secondary)" />
+                        <User size={13} color="var(--text-secondary)" />
                       )}
                     </div>
-                    <div>
-                      <div style={{ fontWeight: '700', fontSize: '15px' }}>{user.username}</div>
+                    <div style={{ fontWeight: '700', fontSize: '11.5px', maxWidth: '85px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.username}
                     </div>
                   </div>
                 </div>
