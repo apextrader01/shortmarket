@@ -44,7 +44,7 @@ export default function LandingHomeView({
       else if (hubId === 3) import('./PrimaryMarketsView');
       else if (hubId === 4) import('./CalculatorsSuiteView');
       else if (hubId === 5) import('./WealthPersonalFinanceModal');
-      else if (hubId === 6) import('./SkandXAlgoView');
+      else if (hubId === 6) import('./SkandxAlgoView');
     } catch (_) {}
   };
 
