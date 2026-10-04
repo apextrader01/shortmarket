@@ -107,46 +107,29 @@ export default function LandingHomeView({
       id: 4,
       hubNum: '04',
       category: 'CALCULATORS',
-      title: 'Financial & Trading Calculators',
-      shortDesc: 'Compounding SIPs, position sizing with R:R, revised Oct 2024 STT & Options Greeks.',
+      title: 'Financial Calculators & Mutual Funds Hub',
+      shortDesc: 'Compounding SIPs, position sizing with R:R, revised Oct 2024 STT, Options Greeks, and 44 AMCs direct mutual funds explorer.',
       icon: Calculator,
       color: '#f59e0b',
       gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(251, 191, 36, 0.05))',
       border: 'rgba(245, 158, 11, 0.35)',
-      badge: 'SEBI Oct 2024 Rates',
+      badge: 'Calculators & 44 AMCs',
       badgeColor: '#f59e0b',
-      tags: ['SIP & Step-Up', 'Position Sizing', 'STT & Turnover', 'Black-Scholes Greeks'],
-      actionLabel: 'Launch Calculators',
+      tags: ['SIP & Step-Up', 'Direct vs Regular MFs', '44 Indian AMCs', 'Position Sizing', 'STT Oct 2024', 'Black-Scholes Greeks', 'Fee Savings', 'Zero Commission'],
+      actionLabel: 'Launch Calculators & Mutual Funds',
       primaryAction: () => onOpenCalculators('SIP'),
       quickLinks: [
-        { label: 'SIP Compounder', action: () => onOpenCalculators('SIP') },
-        { label: 'Position Sizer', action: () => onOpenCalculators('POSITION') },
-        { label: 'STT & Brokerage', action: () => onOpenCalculators('BROKERAGE') }
+        { label: 'SIP & Step-Up Compounder', action: () => onOpenCalculators('SIP') },
+        { label: 'Direct Mutual Funds (44 AMCs)', action: onOpenMutualFunds },
+        { label: 'Direct vs Regular Fee Savings', action: onOpenMutualFunds },
+        { label: 'Position Sizer (R:R)', action: () => onOpenCalculators('POSITION') },
+        { label: 'STT & Brokerage (Oct 2024)', action: () => onOpenCalculators('BROKERAGE') },
+        { label: 'Options Greeks', action: () => onOpenCalculators('GREEKS') }
       ]
     },
     {
       id: 5,
       hubNum: '05',
-      category: 'MARKETS',
-      title: 'Mutual Funds & Direct SIP Explorer',
-      shortDesc: 'Compare top direct mutual funds across 44 AMCs with zero expense distributor fees.',
-      icon: BarChart2,
-      color: '#3b82f6',
-      gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(96, 165, 250, 0.05))',
-      border: 'rgba(59, 130, 246, 0.35)',
-      badge: '44 Indian AMCs',
-      badgeColor: '#3b82f6',
-      tags: ['Direct vs Regular', 'Fee Savings Calculator', 'Top 5Y CAGR', 'Zero Commission'],
-      actionLabel: 'Explore Mutual Funds',
-      primaryAction: onOpenMutualFunds,
-      quickLinks: [
-        { label: 'Direct vs Regular Calculator', action: onOpenMutualFunds },
-        { label: 'Top SIP Funds', action: onOpenMutualFunds }
-      ]
-    },
-    {
-      id: 6,
-      hubNum: '06',
       category: 'WEALTH',
       title: '24/7 Personal AI Wealth Copilot',
       shortDesc: 'Instant advisory on Indian tax regimes, portfolio compounding, retirement & insurance.',
@@ -165,8 +148,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 7,
-      hubNum: '07',
+      id: 6,
+      hubNum: '06',
       category: 'WEALTH',
       title: '50/30/20 Budget & Leak Detector',
       shortDesc: 'Automate Needs (50%), Wants (30%), Savings (20%) and plug recurring subscription leaks.',
@@ -185,8 +168,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 8,
-      hubNum: '08',
+      id: 7,
+      hubNum: '07',
       category: 'WEALTH',
       title: 'Term Life & Health Gap (HLV)',
       shortDesc: 'Human Life Value protection shortfall analyzer. Zero-commission pure term strategies.',
@@ -205,8 +188,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 9,
-      hubNum: '09',
+      id: 8,
+      hubNum: '08',
       category: 'WEALTH',
       title: 'Consolidated Net Worth',
       shortDesc: 'Track Stocks, MFs, EPF/PPF, Bank FDs, Gold and Real Estate against debt liabilities.',
@@ -225,8 +208,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 10,
-      hubNum: '10',
+      id: 9,
+      hubNum: '09',
       category: 'CALCULATORS',
       title: 'Tax-Loss Harvesting (FY25)',
       shortDesc: 'Simulate capital gains tax savings under Budget FY25 (STCG 20%, LTCG 12.5%).',
@@ -245,8 +228,8 @@ export default function LandingHomeView({
       ]
     },
     {
-      id: 11,
-      hubNum: '11',
+      id: 10,
+      hubNum: '10',
       category: 'TRADING',
       title: 'SkandX Algo Multi-Broker Demat & Bridge Suite',
       shortDesc: 'Multi-broker Demat connection, Dedicated Static IPs, TradingView JSON Webhook Bridge & copy trading.',
@@ -364,7 +347,7 @@ export default function LandingHomeView({
             onClick={scrollToHubs}
             style={{ padding: '6px 12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <span>Explore 12 Hubs</span>
+            <span>Explore 10 Hubs</span>
             <ChevronDown size={14} />
           </button>
           <button 
@@ -383,7 +366,7 @@ export default function LandingHomeView({
             onClick={() => onOpenCalculators('SIP')}
             style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', borderRadius: '6px' }}
           >
-            Calculators
+            Calculators & MFs
           </button>
           <button 
             onClick={onOpenAlgoBridge}
@@ -460,7 +443,7 @@ export default function LandingHomeView({
           letterSpacing: '-0.5px',
           maxWidth: '880px'
         }}>
-          Master Markets with <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹10,00,000 Virtual Capital</span> & 12 Specialized Hubs
+          Master Markets with <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹10,00,000 Virtual Capital</span> & 10 Specialized Hubs
         </h1>
 
         {/* Subtitle */}
@@ -559,7 +542,7 @@ export default function LandingHomeView({
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
           }}
         >
-          <span>Scroll Down to Explore All 12 Hubs</span>
+          <span>Scroll Down to Explore All 10 Hubs</span>
           <ChevronDown size={14} className="animate-bounce" />
         </button>
       </section>
@@ -679,7 +662,7 @@ export default function LandingHomeView({
               <span>Full Platform Ecosystem</span>
             </div>
             <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
-              All 12 Platform Hubs & Tools
+              All 10 Platform Hubs & Tools
             </h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
               Select any hub below to launch its dedicated terminal or modal directly.
@@ -701,7 +684,7 @@ export default function LandingHomeView({
             <Search size={15} color="#94a3b8" />
             <input 
               type="text"
-              placeholder="Search 12 hubs (e.g. SIP, Bhavcopy, F&O, Tax)..."
+              placeholder="Search 10 hubs (e.g. SIP, MFs, Bhavcopy, F&O, Tax)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
@@ -735,11 +718,11 @@ export default function LandingHomeView({
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
           {[
-            { id: 'ALL', label: 'All 12 Hubs (12)' },
-            { id: 'TRADING', label: '📈 Trading & Orders (4)' },
-            { id: 'MARKETS', label: '🏛️ Primary Markets & MFs (2)' },
-            { id: 'CALCULATORS', label: '🧮 Calculators & Tax (2)' },
-            { id: 'WEALTH', label: '💰 Personal Wealth & AI (4)' }
+            { id: 'ALL', label: `All 10 Hubs (${HUBS.length})` },
+            { id: 'TRADING', label: `📈 Trading & Orders (${HUBS.filter(h => h.category === 'TRADING').length})` },
+            { id: 'MARKETS', label: `🏛️ Primary Markets (${HUBS.filter(h => h.category === 'MARKETS').length})` },
+            { id: 'CALCULATORS', label: `🧮 Calculators & Mutual Funds (${HUBS.filter(h => h.category === 'CALCULATORS').length})` },
+            { id: 'WEALTH', label: `💰 Personal Wealth & AI (${HUBS.filter(h => h.category === 'WEALTH').length})` }
           ].map(cat => {
             const isActive = selectedCategory === cat.id;
             return (
@@ -859,7 +842,7 @@ export default function LandingHomeView({
 
                     {/* Tag Badges */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
-                      {hub.tags.slice(0, 4).map((tag, tIdx) => (
+                      {hub.tags.slice(0, 6).map((tag, tIdx) => (
                         <span 
                           key={tIdx}
                           style={{

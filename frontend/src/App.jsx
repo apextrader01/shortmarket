@@ -1184,6 +1184,10 @@ function App() {
               isOpen={showCalculatorsModal} 
               initialTab={calculatorsInitialTab}
               onClose={() => setShowCalculatorsModal(false)} 
+              onOpenMutualFunds={() => {
+                setShowCalculatorsModal(false);
+                setShowMutualFundsModal(true);
+              }}
             />
           )}
           {showBrokerConnectModal && (

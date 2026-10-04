@@ -1,14 +1,19 @@
 // frontend/src/components/FinancialCalculatorsModal.jsx
 // 🧮 Comprehensive Financial & Trading Calculators Suite
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, Calculator, TrendingUp, ShieldAlert, Receipt, LineChart, 
-  ArrowRight, Info, CheckCircle2, RefreshCw, DollarSign, Percent
+  ArrowRight, Info, CheckCircle2, RefreshCw, DollarSign, Percent,
+  BarChart2, Sparkles, Award, ArrowUpRight, ChevronRight
 } from 'lucide-react';
 
-export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab = 'SIP' }) {
+export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab = 'SIP', onOpenMutualFunds }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   if (!isOpen) return null;
 
@@ -98,6 +103,7 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
         }}>
           {[
             { id: 'SIP', label: 'SIP & Lumpsum Compounder', icon: TrendingUp },
+            { id: 'MUTUAL_FUNDS', label: 'Direct Mutual Funds & Fee Savings', icon: BarChart2 },
             { id: 'POSITION', label: 'Position Sizing & Risk/Reward', icon: ShieldAlert },
             { id: 'BROKERAGE', label: 'Brokerage & Tax (STT Oct 2024)', icon: Receipt },
             { id: 'GREEKS', label: 'Options Greeks & Black-Scholes', icon: LineChart }
@@ -134,6 +140,14 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
         {/* Calculator Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {activeTab === 'SIP' && <SipCalculatorView />}
+          {activeTab === 'MUTUAL_FUNDS' && (
+            <MutualFundsDirectSipView 
+              onSwitchToSip={(cagr) => {
+                setActiveTab('SIP');
+              }} 
+              onOpenMutualFunds={onOpenMutualFunds} 
+            />
+          )}
           {activeTab === 'POSITION' && <PositionSizerView />}
           {activeTab === 'BROKERAGE' && <BrokerageTaxView />}
           {activeTab === 'GREEKS' && <OptionGreeksView />}
@@ -909,3 +923,365 @@ function OptionGreeksView() {
     </div>
   );
 }
+
+// --------------------------------------------------------------------------
+// 5. Direct Mutual Funds & Fee Savings Simulator
+// --------------------------------------------------------------------------
+function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
+  const [monthlySip, setMonthlySip] = useState(10000);
+  const [tenureYears, setTenureYears] = useState(15);
+  const [expectedCagr, setExpectedCagr] = useState(14);
+  const [regularTer, setRegularTer] = useState(1.75);
+  const [directTer, setDirectTer] = useState(0.65);
+
+  const feeSavings = useMemo(() => {
+    const months = tenureYears * 12;
+    const directMonthlyRate = (expectedCagr - directTer) / 12 / 100;
+    const regularMonthlyRate = (expectedCagr - regularTer) / 12 / 100;
+
+    let directCorpus = 0;
+    let regularCorpus = 0;
+    const invested = monthlySip * months;
+
+    for (let m = 1; m <= months; m++) {
+      directCorpus += monthlySip * Math.pow(1 + directMonthlyRate, months - m + 1);
+      regularCorpus += monthlySip * Math.pow(1 + regularMonthlyRate, months - m + 1);
+    }
+
+    const savedAmount = Math.max(0, directCorpus - regularCorpus);
+    const savedPct = regularCorpus > 0 ? (savedAmount / regularCorpus) * 100 : 0;
+
+    return {
+      invested,
+      directCorpus,
+      regularCorpus,
+      savedAmount,
+      savedPct
+    };
+  }, [monthlySip, tenureYears, expectedCagr, regularTer, directTer]);
+
+  const TOP_DIRECT_FUNDS = [
+    {
+      name: 'Parag Parikh Flexi Cap Direct - Growth',
+      category: 'Flexi Cap',
+      cagr5y: 24.6,
+      directTer: 0.58,
+      regularTer: 1.34,
+      aumCr: 76420,
+      highlight: 'Zero Distributor Commission'
+    },
+    {
+      name: 'Nippon India Small Cap Direct - Growth',
+      category: 'Small Cap',
+      cagr5y: 31.4,
+      directTer: 0.68,
+      regularTer: 1.58,
+      aumCr: 58910,
+      highlight: 'Highest 5Y Alpha'
+    },
+    {
+      name: 'Quant Small Cap Fund Direct - Growth',
+      category: 'Small Cap',
+      cagr5y: 36.2,
+      directTer: 0.72,
+      regularTer: 1.65,
+      aumCr: 24350,
+      highlight: 'Momentum + Quant Algo'
+    },
+    {
+      name: 'Mirae Asset Large & Midcap Direct - Growth',
+      category: 'Large & Midcap',
+      cagr5y: 21.2,
+      directTer: 0.62,
+      regularTer: 1.48,
+      aumCr: 38200,
+      highlight: 'Core Compounder'
+    },
+    {
+      name: 'ICICI Prudential Nifty 50 Index Direct',
+      category: 'Index Fund',
+      cagr5y: 18.5,
+      directTer: 0.17,
+      regularTer: 0.85,
+      aumCr: 14800,
+      highlight: 'Ultra Low 0.17% TER'
+    }
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Top Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(59, 130, 246, 0.05))',
+        border: '1px solid rgba(56, 189, 248, 0.3)',
+        borderRadius: '12px',
+        padding: '16px 20px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '10px',
+            background: 'rgba(56, 189, 248, 0.2)',
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#38bdf8'
+          }}>
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc' }}>
+              Direct Plans vs Regular Plans Wealth Multiplier
+            </div>
+            <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+              Cut out 1.0% - 1.5% annual distributor trail commissions across 44 Indian AMCs & keep 100% of the alpha.
+            </div>
+          </div>
+        </div>
+        {onOpenMutualFunds && (
+          <button
+            onClick={onOpenMutualFunds}
+            style={{
+              padding: '8px 16px',
+              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>Open Full 44 AMCs Terminal</span>
+            <ArrowUpRight size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Simulator Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        {/* Controls */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Monthly SIP Amount (₹)</label>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#38bdf8' }}>₹{monthlySip.toLocaleString('en-IN')}</span>
+            </div>
+            <input 
+              type="range" min="1000" max="100000" step="1000"
+              value={monthlySip} 
+              onChange={e => setMonthlySip(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#38bdf8', marginTop: '6px' }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Investment Horizon</label>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#10b981' }}>{tenureYears} Years</span>
+            </div>
+            <input 
+              type="range" min="3" max="30" step="1"
+              value={tenureYears} 
+              onChange={e => setTenureYears(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#10b981', marginTop: '6px' }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Expected Market Return (CAGR)</label>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#f59e0b' }}>{expectedCagr}%</span>
+            </div>
+            <input 
+              type="range" min="8" max="25" step="0.5"
+              value={expectedCagr} 
+              onChange={e => setExpectedCagr(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#f59e0b', marginTop: '6px' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ fontSize: '11.5px', color: '#ef4444' }}>Regular TER (Broker Plan %)</label>
+              <input 
+                type="number" step="0.05"
+                value={regularTer} 
+                onChange={e => setRegularTer(Number(e.target.value))}
+                style={{ width: '100%', padding: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', color: '#fca5a5', fontSize: '13px', marginTop: '4px' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11.5px', color: '#10b981' }}>Direct TER (Zero Fee Plan %)</label>
+              <input 
+                type="number" step="0.05"
+                value={directTer} 
+                onChange={e => setDirectTer(Number(e.target.value))}
+                style={{ width: '100%', padding: '8px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', color: '#86efac', fontSize: '13px', marginTop: '4px' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Results Card */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Extra Wealth Saved by Going Direct
+            </span>
+            <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#10b981', margin: '4px 0 0' }}>
+              +₹{Math.round(feeSavings.savedAmount).toLocaleString('en-IN')}
+            </h3>
+            <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px' }}>
+              +{feeSavings.savedPct.toFixed(1)}% higher returns with zero distributor leakage
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Direct Plan Value</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                  ₹{Math.round(feeSavings.directCorpus).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>Net CAGR: {(expectedCagr - directTer).toFixed(2)}%</div>
+              </div>
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Regular Plan Value</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: '#cbd5e1', marginTop: '2px' }}>
+                  ₹{Math.round(feeSavings.regularCorpus).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>Net CAGR: {(expectedCagr - regularTer).toFixed(2)}%</div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onSwitchToSip && onSwitchToSip(expectedCagr)}
+            style={{
+              marginTop: '16px',
+              padding: '10px',
+              background: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '8px',
+              color: '#38bdf8',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>Run Complete SIP & Step-Up Compounding</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Top Direct Funds Grid */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#f8fafc' }}>
+              Top Direct Mutual Funds (Zero Commission Flagships)
+            </h4>
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+              Benchmark 5Y CAGR & Direct Expense Ratios (TER)
+            </span>
+          </div>
+          {onOpenMutualFunds && (
+            <button
+              onClick={onOpenMutualFunds}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>View All 44 AMCs</span>
+              <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+          {TOP_DIRECT_FUNDS.map((fund, idx) => (
+            <div 
+              key={idx}
+              style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '10px',
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '10.5px', padding: '2px 6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderRadius: '4px', fontWeight: '600' }}>
+                    {fund.category}
+                  </span>
+                  <span style={{ fontSize: '10.5px', padding: '2px 6px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '4px', fontWeight: '700' }}>
+                    {fund.highlight}
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#f8fafc', marginTop: '8px' }}>
+                  {fund.name}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div>
+                  <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>5Y CAGR</div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>{fund.cagr5y}%</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>Direct vs Reg TER</div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#f8fafc' }}>
+                    <span style={{ color: '#10b981' }}>{fund.directTer}%</span> / <span style={{ color: '#ef4444', textDecoration: 'line-through' }}>{fund.regularTer}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
