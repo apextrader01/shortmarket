@@ -133,85 +133,28 @@ export default function LandingHomeView({
       id: 5,
       hubNum: '05',
       category: 'WEALTH',
-      title: '50/30/20 Budget & Leak Detector',
-      shortDesc: 'Automate Needs (50%), Wants (30%), Savings (20%) and plug recurring subscription leaks.',
-      icon: Wallet,
-      color: '#ef4444',
-      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(248, 113, 113, 0.05))',
-      border: 'rgba(239, 68, 68, 0.35)',
-      badge: 'Leak Alert',
-      badgeColor: '#ef4444',
-      tags: ['Needs 50%', 'Wants 30%', 'Savings 20%', 'Recurring Leak Detector'],
-      actionLabel: 'Analyze Expense Leaks',
-      primaryAction: () => onOpenWealthFinance('BUDGET'),
+      title: 'Wealth OS & Tax Hub',
+      shortDesc: 'Complete 360° personal financial command center: Multi-asset net worth tracking, 50/30/20 budget & leak detector, actuarial term/health HLV gap, and FY25 tax-loss harvesting.',
+      icon: PieChart,
+      color: '#10b981',
+      gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(6, 182, 212, 0.05))',
+      border: 'rgba(16, 185, 129, 0.35)',
+      badge: '360° Financial Cockpit',
+      badgeColor: '#10b981',
+      tags: ['Consolidated Net Worth', '50/30/20 Budget', 'Expense Leaks', 'Actuarial HLV Gap', 'Family Floater', 'Tax-Loss Harvesting FY25', 'STCG 20% / LTCG 12.5%'],
+      actionLabel: 'Launch Wealth OS & Tax Hub',
+      primaryAction: () => onOpenWealthFinance('NET_WORTH'),
       quickLinks: [
-        { label: 'Budget Rule', action: () => onOpenWealthFinance('BUDGET') },
-        { label: 'Leak Detector', action: () => onOpenWealthFinance('BUDGET') }
+        { label: 'Consolidated Net Worth & Solvency', action: () => onOpenWealthFinance('NET_WORTH') },
+        { label: '50/30/20 Budget & Leak Detector', action: () => onOpenWealthFinance('BUDGET') },
+        { label: 'Term Life & Health Protection Gap (HLV)', action: () => onOpenWealthFinance('INSURANCE') },
+        { label: 'Tax-Loss Harvesting (Budget FY25)', action: () => onOpenWealthFinance('TAX_LOSS') },
+        { label: '24/7 AI Wealth Copilot Advisory', action: () => onOpenWealthFinance('AI_COPILOT') }
       ]
     },
     {
       id: 6,
       hubNum: '06',
-      category: 'WEALTH',
-      title: 'Term Life & Health Gap (HLV)',
-      shortDesc: 'Human Life Value protection shortfall analyzer. Zero-commission pure term strategies.',
-      icon: HeartPulse,
-      color: '#ec4899',
-      gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(244, 114, 182, 0.05))',
-      border: 'rgba(236, 72, 153, 0.35)',
-      badge: 'Actuarial HLV',
-      badgeColor: '#ec4899',
-      tags: ['Pure Term Cover', 'Debt Protection', 'Family Floater', 'Zero Agent Cut'],
-      actionLabel: 'Calculate Protection Gap',
-      primaryAction: () => onOpenWealthFinance('INSURANCE'),
-      quickLinks: [
-        { label: 'HLV Gap', action: () => onOpenWealthFinance('INSURANCE') },
-        { label: 'Family Floater', action: () => onOpenWealthFinance('INSURANCE') }
-      ]
-    },
-    {
-      id: 7,
-      hubNum: '07',
-      category: 'WEALTH',
-      title: 'Consolidated Net Worth',
-      shortDesc: 'Track Stocks, MFs, EPF/PPF, Bank FDs, Gold and Real Estate against debt liabilities.',
-      icon: PieChart,
-      color: '#14b8a6',
-      gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.22), rgba(45, 212, 191, 0.05))',
-      border: 'rgba(20, 184, 166, 0.35)',
-      badge: 'Balance Sheet',
-      badgeColor: '#14b8a6',
-      tags: ['Equities', 'Mutual Funds', 'EPF & PPF', 'Gold & Real Estate', 'Debt Solvency'],
-      actionLabel: 'View Net Worth',
-      primaryAction: () => onOpenWealthFinance('NET_WORTH'),
-      quickLinks: [
-        { label: 'Asset Breakdown', action: () => onOpenWealthFinance('NET_WORTH') },
-        { label: 'Solvency Cushion', action: () => onOpenWealthFinance('NET_WORTH') }
-      ]
-    },
-    {
-      id: 8,
-      hubNum: '08',
-      category: 'CALCULATORS',
-      title: 'Tax-Loss Harvesting (FY25)',
-      shortDesc: 'Simulate capital gains tax savings under Budget FY25 (STCG 20%, LTCG 12.5%).',
-      icon: Scissors,
-      color: '#eab308',
-      gradient: 'linear-gradient(135deg, rgba(234, 179, 8, 0.22), rgba(250, 204, 21, 0.05))',
-      border: 'rgba(234, 179, 8, 0.35)',
-      badge: 'Budget 2024-25',
-      badgeColor: '#eab308',
-      tags: ['STCG @ 20%', 'LTCG @ 12.5%', 'Offset Losses', 'Save Tax Before Mar 31'],
-      actionLabel: 'Simulate Tax Savings',
-      primaryAction: () => onOpenWealthFinance('TAX_LOSS'),
-      quickLinks: [
-        { label: 'Offset Gains', action: () => onOpenWealthFinance('TAX_LOSS') },
-        { label: 'March 31 Deadline', action: () => onOpenWealthFinance('TAX_LOSS') }
-      ]
-    },
-    {
-      id: 9,
-      hubNum: '09',
       category: 'TRADING',
       title: 'SkandX Algo Multi-Broker Demat & Bridge Suite',
       shortDesc: 'Multi-broker Demat connection, Dedicated Static IPs, TradingView JSON Webhook Bridge & copy trading.',
@@ -319,7 +262,7 @@ export default function LandingHomeView({
                 PRO
               </span>
             </div>
-            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>12-Hub Trading & Wealth Platform</span>
+            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Institutional Trading & Wealth OS</span>
           </div>
         </div>
 
@@ -329,7 +272,7 @@ export default function LandingHomeView({
             onClick={scrollToHubs}
             style={{ padding: '6px 12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <span>Explore 10 Hubs</span>
+            <span>Explore Hubs</span>
             <ChevronDown size={14} />
           </button>
           <button 
@@ -425,7 +368,7 @@ export default function LandingHomeView({
           letterSpacing: '-0.5px',
           maxWidth: '880px'
         }}>
-          Master Markets with <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹10,00,000 Virtual Capital</span> & 10 Specialized Hubs
+          Master Markets with <span style={{ background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹10,00,000 Virtual Capital</span> & 6 Specialized Powerhouse Hubs
         </h1>
 
         {/* Subtitle */}
@@ -524,7 +467,7 @@ export default function LandingHomeView({
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
           }}
         >
-          <span>Scroll Down to Explore All 10 Hubs</span>
+          <span>Scroll Down to Explore Platform Hubs</span>
           <ChevronDown size={14} className="animate-bounce" />
         </button>
       </section>
@@ -644,7 +587,7 @@ export default function LandingHomeView({
               <span>Full Platform Ecosystem</span>
             </div>
             <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
-              All 10 Platform Hubs & Tools
+              Specialized Platform Hubs & Suites
             </h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
               Select any hub below to launch its dedicated terminal or modal directly.
@@ -666,7 +609,7 @@ export default function LandingHomeView({
             <Search size={15} color="#94a3b8" />
             <input 
               type="text"
-              placeholder="Search 10 hubs (e.g. SIP, MFs, Bhavcopy, F&O, Tax)..."
+              placeholder="Search hubs (e.g. Wealth OS, SIP, Algo, Bhavcopy, Tax)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
@@ -700,7 +643,7 @@ export default function LandingHomeView({
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
           {[
-            { id: 'ALL', label: `All 10 Hubs (${HUBS.length})` },
+            { id: 'ALL', label: `All Hubs (${HUBS.length})` },
             { id: 'TRADING', label: `📈 Trading & Orders (${HUBS.filter(h => h.category === 'TRADING').length})` },
             { id: 'MARKETS', label: `🏛️ Primary Markets (${HUBS.filter(h => h.category === 'MARKETS').length})` },
             { id: 'CALCULATORS', label: `🧮 Calculators & Mutual Funds (${HUBS.filter(h => h.category === 'CALCULATORS').length})` },

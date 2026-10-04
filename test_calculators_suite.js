@@ -24,7 +24,10 @@ assert(homeCode.includes("onOpenCalculators('average-price')"), 'Hub 4 quicklink
 assert(homeCode.includes("onOpenCalculators('mtf')"), 'Hub 4 quicklinks must have mtf');
 assert(homeCode.includes("onOpenWealthFinance('AI_COPILOT')"), 'Hub 4 quicklinks must fold in AI Copilot');
 assert(!homeCode.includes("title: '24/7 Personal AI Wealth Copilot'"), 'Hub 5 should be folded into Hub 4, not separate card');
-console.log('  ✅ [PASS] LandingHomeView Hub 4 merged with Hub 5 and renumbered');
+assert(homeCode.includes("title: 'Wealth OS & Tax Hub'"), 'Unified Hub 5 must be Wealth OS & Tax Hub');
+assert(homeCode.includes("hubNum: '05'"), 'Hub 05 must exist');
+assert(homeCode.includes("hubNum: '06'"), 'Hub 06 must exist as Algo');
+console.log('  ✅ [PASS] LandingHomeView Hub 4, 5, 6 configuration and Wealth OS & Tax Hub verified');
 
 // 3. CalculatorsSuiteView.jsx Features
 const calcCode = fs.readFileSync('frontend/src/components/CalculatorsSuiteView.jsx', 'utf8');

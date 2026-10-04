@@ -65,10 +65,10 @@ export default function WealthPersonalFinanceModal({ isOpen, onClose, initialTab
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#f8fafc' }}>
-                AI Wealth & Personal Finance Suite
+                Wealth OS & Tax Hub
               </h2>
               <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
-                24/7 AI wealth copilot, 50/30/20 leak detector, term life insurance gap & tax optimizer
+                360° personal finance cockpit: Net worth, 50/30/20 budget, actuarial HLV gap & FY25 tax harvesting
               </p>
             </div>
           </div>
