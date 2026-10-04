@@ -344,6 +344,11 @@ export async function verifyBiometrics(userId = 'default') {
   }
 
   // 2. Web browser WebAuthn authentication
+  if (typeof document !== 'undefined' && document.hidden) {
+    console.warn('verifyBiometrics ignored: Browser tab is currently hidden/backgrounded.');
+    return false;
+  }
+
   const credIdBase64 = localStorage.getItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`);
   if (!credIdBase64) return false;
 

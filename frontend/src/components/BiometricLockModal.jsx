@@ -16,10 +16,6 @@ export default function BiometricLockModal({ onUnlock }) {
 
   useEffect(() => {
     setHasBio(isBiometricsEnabled(userId));
-    // Auto-prompt biometrics on load if enabled
-    if (isBiometricsEnabled(userId)) {
-      handleBiometricUnlock();
-    }
   }, [userId]);
 
   const handleDigitClick = (digit) => {
@@ -68,6 +64,9 @@ export default function BiometricLockModal({ onUnlock }) {
   };
 
   const handleBiometricUnlock = async () => {
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
     setIsVerifying(true);
     try {
       const success = await verifyBiometrics(userId);
@@ -178,6 +177,37 @@ export default function BiometricLockModal({ onUnlock }) {
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', minHeight: '18px' }}>
             Enter your 4-digit security PIN
           </div>
+        )}
+
+        {/* Passkey / Biometrics Manual Trigger */}
+        {hasBio && (
+          <button
+            type="button"
+            onClick={handleBiometricUnlock}
+            disabled={isVerifying}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              maxWidth: '280px',
+              padding: '10px 16px',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(37, 99, 235, 0.28))',
+              border: '1px solid rgba(59, 130, 246, 0.45)',
+              borderRadius: '12px',
+              color: '#60a5fa',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              marginBottom: '16px',
+              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.2)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Fingerprint size={18} />
+            <span>{isVerifying ? 'Verifying Passkey...' : 'Unlock with Windows Hello / Passkey'}</span>
+          </button>
         )}
 
         {/* Keypad Grid */}
