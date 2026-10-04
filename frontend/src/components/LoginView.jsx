@@ -268,8 +268,9 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
-      if (!username.trim()) {
-        useStore.setState({ authError: 'Please enter your full name.' });
+      const cleanName = username.replace(/[^A-Za-z\s]/g, '').trim();
+      if (!cleanName || !/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
+        useStore.setState({ authError: 'Name must contain letters only and be at most 15 characters.' });
         setLoading(false);
         return;
       }
@@ -732,8 +733,23 @@ export default function LoginView() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {view === 'register' && (
             <div>
-              <label style={labelStyle}>Full Name</label>
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="premium-input" placeholder="John Doe" />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Full Name</label>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  Letters only · {username.length}/15
+                </span>
+              </div>
+              <input
+                type="text"
+                required
+                maxLength={15}
+                pattern="[A-Za-z\s]{1,15}"
+                title="Letters only, maximum 15 characters"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15))}
+                className="premium-input"
+                placeholder="John Doe"
+              />
             </div>
           )}
 

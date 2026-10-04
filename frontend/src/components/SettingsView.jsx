@@ -100,6 +100,7 @@ export default function SettingsView() {
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
+    username: (user?.username || '').replace(/[^A-Za-z\s]/g, '').slice(0, 15),
     phone: user?.phone || '',
     pan_card: user?.pan_card || '',
     address: user?.address || ''
@@ -110,6 +111,7 @@ export default function SettingsView() {
   useEffect(() => {
     if (user) {
       setProfileForm({
+        username: (user.username || '').replace(/[^A-Za-z\s]/g, '').slice(0, 15),
         phone: user.phone || '',
         pan_card: user.pan_card || '',
         address: user.address || ''
@@ -124,9 +126,14 @@ export default function SettingsView() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    const cleanName = (profileForm.username || '').replace(/[^A-Za-z\s]/g, '').trim();
+    if (!cleanName || !/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
+      setProfileMsg({ type: 'error', text: 'Name must contain letters only and be at most 15 characters.' });
+      return;
+    }
     setProfileLoading(true);
     setProfileMsg({ type: '', text: '' });
-    const res = await updateUserDetails(profileForm);
+    const res = await updateUserDetails({ ...profileForm, username: cleanName });
     if (res.success) {
       setProfileMsg({ type: 'success', text: 'Profile details updated successfully!' });
       setIsEditingProfile(false);
@@ -271,6 +278,24 @@ export default function SettingsView() {
               </div>
             ) : (
               <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Full Name</label>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                      Letters only · {(profileForm.username || '').length}/15
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={15}
+                    pattern="[A-Za-z\s]{1,15}"
+                    className="input"
+                    value={profileForm.username || ''}
+                    onChange={e => setProfileForm({ ...profileForm, username: e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15) })}
+                    placeholder="John Doe"
+                  />
+                </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Phone Number</label>
                   <input

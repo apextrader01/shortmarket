@@ -1060,7 +1060,11 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'An account with this phone number already exists.' });
     }
     if (username) {
-      const existingUser = await db('users').whereRaw('LOWER(username) = ?', [String(username).toLowerCase().trim()]).first();
+      const trimmedUser = String(username).trim();
+      if (!/^[A-Za-z\s]{1,15}$/.test(trimmedUser)) {
+        return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+      }
+      const existingUser = await db('users').whereRaw('LOWER(username) = ?', [trimmedUser.toLowerCase()]).first();
       if (existingUser) {
         return res.status(400).json({ error: 'Username is already taken. Please choose another username.' });
       }
@@ -1114,6 +1118,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   const cleanEmail = String(email).toLowerCase().trim();
   const cleanPhone = String(phone).replace(/\D/g, '');
   const cleanUsername = String(username).trim();
+
+  if (!/^[A-Za-z\s]{1,15}$/.test(cleanUsername)) {
+    return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+  }
 
   if (cleanPhone.length !== 10) {
     return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
@@ -2915,8 +2923,22 @@ app.post('/api/user/password', authenticateToken, async (req, res) => {
 
 const handleUpdateUserDetails = async (req, res) => {
   try {
-    const { phone, pan_card, address, upi_id, bank_account_no, bank_ifsc } = req.body || {};
+    const { username, phone, pan_card, address, upi_id, bank_account_no, bank_ifsc } = req.body || {};
     const updates = {};
+    if (username !== undefined) {
+      const cleanName = String(username).trim();
+      if (!/^[A-Za-z\s]{1,15}$/.test(cleanName)) {
+        return res.status(400).json({ error: 'Name must contain letters only and be at most 15 characters.' });
+      }
+      const existingUser = await db('users')
+        .whereRaw('LOWER(username) = ?', [cleanName.toLowerCase()])
+        .whereNot('id', req.user.id)
+        .first();
+      if (existingUser) {
+        return res.status(400).json({ error: 'Name is already taken by another user.' });
+      }
+      updates.username = cleanName;
+    }
     if (phone !== undefined) updates.phone = String(phone).trim();
     if (pan_card !== undefined) updates.pan_card = String(pan_card).trim().toUpperCase();
     if (address !== undefined) updates.address = String(address).trim();
