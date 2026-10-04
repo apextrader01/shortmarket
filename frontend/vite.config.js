@@ -19,13 +19,18 @@ export default defineConfig({
         injectionPoint: undefined, // Don't try to inject precache manifest into our sw.js
       },
       manifest: {
-        name: 'SkandX',
+        id: '/',
+        name: 'SkandX: Paper Trading & Algo Terminal',
         short_name: 'SkandX',
-        description: 'Advanced Algorithmic Trading Platform',
+        description: "India's #1 Real-Time NSE, BSE & MCX Paper Trading, Financial Calculators, Wealth OS & Algo Trading Terminal.",
+        start_url: '/',
+        scope: '/',
         theme_color: '#0a0b0d',
         background_color: '#0a0b0d',
         display: 'standalone',
         orientation: 'portrait',
+        categories: ['finance', 'business', 'education'],
+        prefer_related_applications: false,
         icons: [
           {
             src: 'pwa-192x192.png',

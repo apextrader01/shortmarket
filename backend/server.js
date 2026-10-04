@@ -12551,6 +12551,29 @@ function getIndexHtmlFromRam() {
   }
 }
 
+// Google Play Store TWA Digital Asset Links verification endpoint
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  const pkgName = process.env.ANDROID_PACKAGE_NAME || 'in.skandx.twa';
+  const rawFingerprints = process.env.ANDROID_SHA256_CERT_FINGERPRINTS || '';
+  const fingerprints = rawFingerprints
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: pkgName,
+        sha256_cert_fingerprints: fingerprints
+      }
+    }
+  ]);
+});
+
 app.use((req, res) => {
   // If the request is for an API endpoint that wasn't found, return 404 JSON instead of HTML!
   if (req.path.startsWith('/api/')) {
