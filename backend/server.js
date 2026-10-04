@@ -2613,38 +2613,53 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   }
 });
 
-// Fallback endpoint for backwards compatibility
+// Official Razorpay Plan IDs for AutoPay recurring mandates
+const RAZORPAY_PLAN_MAP = {
+  monthly: 'plan_Tjwq81Q691SX5t',   // ₹199 Every Month
+  yearly: 'plan_Tjwr3Kfn0d8JuL',    // ₹1,999 Every Year
+  highest: 'plan_Tjwa5s02DWgWE5',   // ₹2,999 Every Year
+  feature: 'plan_Tjwa5s02DWgWE5'
+};
+
+// AutoPay recurring subscription mandate endpoint
 app.post('/api/payment/create-subscription', authenticateToken, async (req, res) => {
   try {
     const { plan } = req.body || {};
-    let amount = 199 * 100;
-    if (plan === 'lifetime' || plan === 'elite_lifetime') {
-      amount = 24999 * 100;
-    } else if (plan === 'masterclass' || plan === 'course') {
-      amount = 9999 * 100;
-    } else if (plan === 'highest' || plan === 'feature') {
-      amount = 2999 * 100;
-    } else if (plan === 'yearly') {
-      amount = 1999 * 100;
-    } else {
-      amount = 199 * 100;
-    }
-    
-    const { client, key_id, key_secret } = await getRazorpayClient();
-    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
-      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
+    const selectedPlan = (plan || 'monthly').toLowerCase();
+    const planId = RAZORPAY_PLAN_MAP[selectedPlan];
+
+    if (!planId) {
+      return res.status(400).json({ error: `AutoPay is not supported for "${plan}". Please use one-time payment.` });
     }
 
-    const options = {
-      amount,
-      currency: "INR",
-      receipt: "receipt_order_" + req.user.id + "_" + Date.now()
-    };
-    const order = await client.orders.create(options);
-    res.json({ ...order, key_id, amount, currency: "INR" });
+    const { client, key_id, key_secret } = await getRazorpayClient();
+    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel.' });
+    }
+
+    // Determine billing cycles (e.g. 60 months = 5 years, 5 years for yearly)
+    const totalCount = selectedPlan === 'monthly' ? 60 : 5;
+
+    const subscription = await client.subscriptions.create({
+      plan_id: planId,
+      total_count: totalCount,
+      quantity: 1,
+      customer_notify: 1, // Razorpay automatically dispatches mandatory RBI pre-debit notifications
+      notes: {
+        user_id: String(req.user.id),
+        plan: selectedPlan
+      }
+    });
+
+    res.json({
+      ...subscription,
+      subscription_id: subscription.id,
+      key_id,
+      is_subscription: true
+    });
   } catch (error) {
     const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
-    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
+    res.status(500).json({ error: 'Razorpay AutoPay Rejected: ' + errMsg });
   }
 });
 

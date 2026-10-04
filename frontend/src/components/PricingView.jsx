@@ -36,8 +36,10 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      // Direct payment (no trial): calls create-order with exact ₹199, ₹1,999, ₹2,999, ₹9,999, or ₹24,999
-      const orderRes = await fetch(`${API}/api/payment/create-order`, {
+      const isAutoPayPlan = plan === 'monthly' || plan === 'yearly' || plan === 'highest';
+      const endpoint = isAutoPayPlan ? `${API}/api/payment/create-subscription` : `${API}/api/payment/create-order`;
+
+      const orderRes = await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -51,9 +53,9 @@ export default function PricingView({ setActiveTab }) {
       const planTitles = {
         lifetime: 'Lifetime All-Inclusive Elite (₹24,999)',
         masterclass: 'Stock Market Masterclass: Basic to Advanced (₹9,999)',
-        highest: 'Feature Plan VIP (₹2,999/yr)',
-        yearly: 'Yearly Elite (₹1,999/yr)',
-        monthly: 'Pro Monthly (₹199/mo)'
+        highest: 'Feature Plan VIP (₹2,999/yr AutoPay)',
+        yearly: 'Yearly Elite (₹1,999/yr AutoPay)',
+        monthly: 'Pro Monthly (₹199/mo AutoPay)'
       };
       const planTitle = planTitles[plan] || 'Pro Plan';
 
@@ -67,30 +69,33 @@ export default function PricingView({ setActiveTab }) {
 
       const options = {
         key: orderData.key_id,
-        amount: orderData.amount,
-        currency: orderData.currency || 'INR',
         name: 'SkandX',
-        description: `Upgrade to ${planTitle}`,
+        description: `Subscribe to ${planTitle}`,
         image: 'https://skandx.in/skandx-playstore-icon.png',
-        order_id: orderData.id,
         handler: async function (response) {
           try {
+            const verifyPayload = {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan: plan
+            };
+            if (response.razorpay_subscription_id || orderData.subscription_id) {
+              verifyPayload.razorpay_subscription_id = response.razorpay_subscription_id || orderData.subscription_id;
+            } else {
+              verifyPayload.razorpay_order_id = response.razorpay_order_id || orderData.id;
+            }
+
             const verifyRes = await fetch(`${API}/api/payment/verify`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || orderData.id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                plan: plan
-              })
+              body: JSON.stringify(verifyPayload)
             });
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-              alert(`🎉 Successfully upgraded to ${planTitle}! Your plan is active immediately.`);
+              alert(`🎉 Successfully activated ${planTitle}! Your AutoPay subscription is now active.`);
               if (typeof setActiveTab === 'function') setActiveTab('ClientData');
               else window.location.href = '/clientdata';
             } else {
@@ -107,6 +112,15 @@ export default function PricingView({ setActiveTab }) {
         },
         theme: { color: themeColors[plan] || '#3B82F6' }
       };
+
+      // AutoPay subscriptions pass subscription_id; one-time orders pass order_id + amount
+      if (orderData.subscription_id) {
+        options.subscription_id = orderData.subscription_id;
+      } else {
+        options.order_id = orderData.id;
+        options.amount = orderData.amount;
+        options.currency = orderData.currency || 'INR';
+      }
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
