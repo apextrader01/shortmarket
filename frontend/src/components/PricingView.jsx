@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Star, Shield, Zap, ArrowLeft, X, Crown, Award, BookOpen, GraduationCap, FileText } from 'lucide-react';
+import { Check, Star, Shield, Zap, ArrowLeft, X, Crown, Award, BookOpen, GraduationCap, FileText, Sparkles, Infinity as InfinityIcon } from 'lucide-react';
 
 export default function PricingView({ setActiveTab }) {
   const { user } = useStore(useShallow(state => ({ user: state.user })));
@@ -36,7 +36,7 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      // Direct payment (no trial): calls create-order with exact 199, 1999, or 2999
+      // Direct payment (no trial): calls create-order with exact ₹199, ₹1,999, ₹2,999, ₹9,999, or ₹24,999
       const orderRes = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
         headers: { 
@@ -48,7 +48,22 @@ export default function PricingView({ setActiveTab }) {
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create payment order');
 
-      const planTitle = plan === 'highest' ? 'Feature Plan VIP (₹2,999/yr)' : plan === 'yearly' ? 'Yearly Elite (₹1,999/yr)' : 'Pro Monthly (₹199/mo)';
+      const planTitles = {
+        lifetime: 'Lifetime All-Inclusive Elite (₹24,999)',
+        masterclass: 'Stock Market Masterclass: Basic to Advanced (₹9,999)',
+        highest: 'Feature Plan VIP (₹2,999/yr)',
+        yearly: 'Yearly Elite (₹1,999/yr)',
+        monthly: 'Pro Monthly (₹199/mo)'
+      };
+      const planTitle = planTitles[plan] || 'Pro Plan';
+
+      const themeColors = {
+        lifetime: '#E11D48',
+        masterclass: '#0D9488',
+        highest: '#8B5CF6',
+        yearly: '#F59E0B',
+        monthly: '#3B82F6'
+      };
 
       const options = {
         key: orderData.key_id,
@@ -90,7 +105,7 @@ export default function PricingView({ setActiveTab }) {
           email: user?.email || '',
           contact: user?.phone || ''
         },
-        theme: { color: plan === 'highest' ? '#8B5CF6' : plan === 'yearly' ? '#F59E0B' : '#3B82F6' }
+        theme: { color: themeColors[plan] || '#3B82F6' }
       };
 
       const rzp = new window.Razorpay(options);
@@ -109,47 +124,50 @@ export default function PricingView({ setActiveTab }) {
   const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
   const activeTier = isExpired ? 'BASIC' : userTier;
 
-  const isHighest = ['HIGHEST', 'FEATURE', 'ELITE', 'VIP'].includes(activeTier);
+  const isLifetime = activeTier === 'LIFETIME';
+  const isMasterclass = activeTier === 'MASTERCLASS';
+  const isHighest = ['HIGHEST', 'FEATURE', 'ELITE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
   const isYearly = activeTier === 'YEARLY';
   const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-  const isNormal = !isHighest && !isYearly && !isMonthly;
+  const isNormal = !isLifetime && !isMasterclass && !isHighest && !isYearly && !isMonthly;
 
   const comparisonRows = [
     { category: 'Watchlists & Marketwatch', items: [
-      { name: 'Max Custom Watchlists', normal: '2 Watchlists', monthly: '3 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists (Max)' },
-      { name: 'Symbols per Watchlist', normal: '30 symbols', monthly: '50 symbols', yearly: '75 symbols', highest: '100 symbols' },
-      { name: 'Real-time WebSocket Data', normal: 'Standard (~1s)', monthly: 'High-speed (500ms)', yearly: 'Ultra-fast (200ms)', highest: 'Direct Tick Feed (<50ms)' }
+      { name: 'Max Custom Watchlists', normal: '2 Watchlists', monthly: '3 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists', masterclass: '5 Watchlists', lifetime: '5 Watchlists (Forever)' },
+      { name: 'Symbols per Watchlist', normal: '30 symbols', monthly: '50 symbols', yearly: '75 symbols', highest: '100 symbols', masterclass: '100 symbols', lifetime: '100 symbols' },
+      { name: 'Real-time WebSocket Data', normal: 'Standard (~1s)', monthly: 'High-speed (500ms)', yearly: 'Ultra-fast (200ms)', highest: 'Direct Tick Feed (<50ms)', masterclass: 'Direct Tick Feed (<50ms)', lifetime: 'Direct Tick Feed (<50ms)' }
     ]},
     { category: 'Order Execution & Risk Control', items: [
-      { name: 'Monthly Trade Limits', normal: '25 Trades / mo (25 Buy + 25 Sell)', monthly: '100 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders' },
-      { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '5-Depth (Level 1)', yearly: '20-Depth (Level 2)', highest: '20-Depth + DOM Ladder' },
-      { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 5 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs + Batch execution' },
-      { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '3 resets / month', yearly: '10 resets / month', highest: 'Unlimited instant resets' }
+      { name: 'Monthly Trade Limits', normal: '25 Trades / mo', monthly: '100 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders', masterclass: 'Unlimited Orders', lifetime: 'Unlimited Orders (No Limits Forever)' },
+      { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '5-Depth (Level 1)', yearly: '20-Depth (Level 2)', highest: '20-Depth + DOM Ladder', masterclass: '20-Depth + DOM Ladder', lifetime: '20-Depth + DOM Ladder' },
+      { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 5 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: 'Unlimited legs', lifetime: 'Unlimited legs' },
+      { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '3 resets / month', yearly: '10 resets / month', highest: 'Unlimited resets', masterclass: 'Unlimited resets', lifetime: 'Unlimited instant resets' }
     ]},
     { category: 'Mentorship, Education & Research Reports', items: [
-      { name: 'Daily Pre-Market Report', normal: '—', monthly: '—', yearly: '✓ Daily Morning Outlook & Levels', highest: '✓ Priority Outlook, Key Levels & Setups' },
-      { name: 'Live Stock Market Classes (Basics to Adv)', normal: '—', monthly: '—', yearly: '—', highest: '✓ Live Interactive Batches (Basics to Adv)' },
-      { name: 'Doubt Clearing by NISM-Certified Mentor', normal: '—', monthly: '—', yearly: '—', highest: '✓ 1-on-1 & Live Group Doubt Clearing' }
+      { name: 'Daily Pre-Market Report', normal: '—', monthly: '—', yearly: '✓ Daily Morning Outlook', highest: '✓ Priority Outlook & Levels', masterclass: '✓ Priority Outlook & Levels', lifetime: '✓ VIP Morning Setups & Key Levels' },
+      { name: 'Live Stock Market Classes (Basics to Adv)', normal: '—', monthly: '—', yearly: '—', highest: 'Webinars', masterclass: '✓ Full Live Batches (Basics to Adv)', lifetime: '✓ All Live Batches + Lifetime Vault' },
+      { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Priority NISM Mentor Q&A', lifetime: '✓ 1-on-1 Personal Mentor Calls' }
     ]},
     { category: 'Derivatives & Options Suite', items: [
-      { name: 'Option Chain Greeks (Δ, θ, γ, ν)', normal: '—', monthly: '✓ Included', yearly: '✓ Included', highest: '✓ Included' },
-      { name: 'Multi-Strike OI & PCR Tracker', normal: '—', monthly: '—', yearly: '✓ Included', highest: '✓ Included' },
-      { name: 'Options Strategy Builder & Payoff', normal: '—', monthly: '—', yearly: '—', highest: '✓ Full Interactive Suite' }
+      { name: 'Option Chain Greeks (Δ, θ, γ, ν)', normal: '—', monthly: '✓ Included', yearly: '✓ Included', highest: '✓ Included', masterclass: '✓ Included', lifetime: '✓ Included' },
+      { name: 'Multi-Strike OI & PCR Tracker', normal: '—', monthly: '—', yearly: '✓ Included', highest: '✓ Included', masterclass: '✓ Included', lifetime: '✓ Included' },
+      { name: 'Options Strategy Builder & Payoff', normal: '—', monthly: '—', yearly: '—', highest: '✓ Full Interactive Suite', masterclass: '✓ Full Interactive Suite', lifetime: '✓ Full Interactive Suite' }
     ]},
     { category: 'Alerts & Intelligence', items: [
-      { name: 'Active Price Alerts', normal: '3 Alerts', monthly: '10 Alerts', yearly: '25 Alerts', highest: 'Unlimited Alerts' },
-      { name: 'Instant Push & Telegram Alerts', normal: '—', monthly: 'Web Push', yearly: 'Web Push + SMS', highest: 'Instant Push + Telegram VIP' },
-      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Journal with Notes & Tags', yearly: 'Win-rate Heatmaps & Sharpe', highest: 'AI Trade Strategy Audit & Tax PDF' }
+      { name: 'Active Price Alerts', normal: '3 Alerts', monthly: '10 Alerts', yearly: '25 Alerts', highest: 'Unlimited Alerts', masterclass: 'Unlimited Alerts', lifetime: 'Unlimited Alerts' },
+      { name: 'Instant Push & Telegram Alerts', normal: '—', monthly: 'Web Push', yearly: 'Web Push + SMS', highest: 'Instant Push + Telegram VIP', masterclass: 'Instant Push + Telegram VIP', lifetime: 'Instant Push + VIP Telegram Inner Circle' },
+      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Journal with Notes & Tags', yearly: 'Win-rate Heatmaps & Sharpe', highest: 'AI Trade Strategy Audit', masterclass: 'AI Trade Strategy Audit', lifetime: 'AI Strategy Audit + Portfolio Reviews' }
     ]},
-    { category: 'Tournaments & Prestige', items: [
-      { name: 'Tournament Eligibility', normal: 'Open Tournaments', monthly: 'Monthly+ & Open', yearly: 'Yearly+, Monthly+ & Open', highest: '👑 VIP Exclusives + All' },
-      { name: 'Leaderboard Badge', normal: 'Starter', monthly: '⚡ PRO', yearly: '⭐ YEARLY', highest: '👑 VIP Gold Crown' },
-      { name: 'Customer Support', normal: 'Community FAQ', monthly: 'Email Support', yearly: '24/7 Priority Support', highest: 'VIP Dedicated Concierge' }
+    { category: 'Validity, Prestige & Support', items: [
+      { name: 'Platform Access Duration', normal: 'Free Tier', monthly: '30 Days', yearly: '365 Days', highest: '365 Days', masterclass: '1 Full Year VIP Access', lifetime: '👑 Permanent Lifetime (Never Expires)' },
+      { name: 'Tournament Eligibility', normal: 'Open Tournaments', monthly: 'Monthly+ & Open', yearly: 'Yearly+, Monthly+ & Open', highest: '👑 VIP Exclusives + All', masterclass: '👑 VIP Exclusives + All', lifetime: '👑 All Tournaments (Lifetime Entry)' },
+      { name: 'Leaderboard Badge', normal: 'Starter', monthly: '⚡ PRO', yearly: '⭐ YEARLY', highest: '👑 VIP Gold Crown', masterclass: '🎓 MASTERCLASS', lifetime: '👑 LIFETIME ELITE' },
+      { name: 'Customer Support', normal: 'Community FAQ', monthly: 'Email Support', yearly: '24/7 Priority Support', highest: 'VIP Dedicated Concierge', masterclass: 'Mentor Direct Hotline', lifetime: 'Dedicated 1-on-1 VIP Concierge' }
     ]}
   ];
 
   return (
-    <div style={{ padding: isMobile ? '12px 6px 60px 6px' : '24px 40px', maxWidth: '1400px', margin: '0 auto', color: 'var(--text-primary)' }}>
+    <div style={{ padding: isMobile ? '12px 6px 60px 6px' : '24px 40px', maxWidth: '1440px', margin: '0 auto', color: 'var(--text-primary)' }}>
       {/* Back Button & Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: isMobile ? '12px' : '20px' }}>
         <div 
@@ -162,18 +180,18 @@ export default function PricingView({ setActiveTab }) {
       </div>
       
       <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '36px' }}>
-        <h1 style={{ fontSize: isMobile ? '24px' : '40px', fontWeight: '900', marginBottom: '8px', background: 'linear-gradient(to right, #60A5FA, #A78BFA, #FBBF24)', WebkitBackgroundClip: 'text', color: 'transparent', letterSpacing: '-0.5px' }}>
+        <h1 style={{ fontSize: isMobile ? '24px' : '40px', fontWeight: '900', marginBottom: '8px', background: 'linear-gradient(to right, #60A5FA, #A78BFA, #FBBF24, #FB7185)', WebkitBackgroundClip: 'text', color: 'transparent', letterSpacing: '-0.5px' }}>
           Choose Your Trading Edge
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '15px', maxWidth: '720px', margin: '0 auto', lineHeight: '1.5' }}>
-          Select the plan that matches your goals. Get daily research, live masterclasses with NISM mentors, deep order books, and VIP tournament prestige.
+        <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '15px', maxWidth: '780px', margin: '0 auto', lineHeight: '1.5' }}>
+          Select the plan that matches your goals. Direct one-time payment with instant activation — zero trial delays, zero recurring mandates.
         </p>
       </div>
 
-      {/* 4 Pricing Cards Grid */}
+      {/* 6 Pricing Cards Grid */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))', 
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(290px, 1fr))', 
         gap: isMobile ? '20px' : '22px', 
         alignItems: 'stretch',
         marginBottom: isMobile ? '40px' : '60px'
@@ -337,7 +355,7 @@ export default function PricingView({ setActiveTab }) {
         {/* 4. FEATURE PLAN / HIGHEST TIER (VIP EXCLUSIVE) */}
         <div style={{ 
           background: 'linear-gradient(180deg, rgba(168, 85, 247, 0.12) 0%, var(--bg-card) 100%)', 
-          border: isHighest ? '2px solid #10B981' : '2px solid #A855F7', 
+          border: (isHighest && !isMasterclass && !isLifetime) ? '2px solid #10B981' : '2px solid #A855F7', 
           borderRadius: isMobile ? '16px' : '22px', 
           padding: isMobile ? '26px 18px' : '34px 24px', 
           display: 'flex', 
@@ -346,7 +364,7 @@ export default function PricingView({ setActiveTab }) {
           boxShadow: '0 16px 40px rgba(168, 85, 247, 0.18)' 
         }}>
           <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #A855F7, #EC4899)', color: '#fff', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.4)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            <Crown size={12} fill="#fff" /> HIGHEST TIER - VIP
+            <Crown size={12} fill="#fff" /> VIP PLATFORM
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -365,7 +383,7 @@ export default function PricingView({ setActiveTab }) {
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><GraduationCap size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Live Stock Market Classes</strong> (Basics to Adv)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><GraduationCap size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Webinar Sessions</strong> (Basics to Adv)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><Award size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Doubt Clearing by NISM-Certified Mentor</strong></li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><FileText size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Priority Levels)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Crown size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>5 Watchlists</strong> (100 symbols/list - Max)</li>
@@ -377,7 +395,7 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Award size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> 👑 VIP Tournaments Exclusive Entry</li>
           </ul>
 
-          {isHighest ? (
+          {(isHighest && !isMasterclass && !isLifetime) ? (
             <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
               ✓ Active VIP Plan
             </button>
@@ -389,6 +407,124 @@ export default function PricingView({ setActiveTab }) {
               disabled={loading}
             >
               {loading === 'highest' ? 'Processing...' : 'Upgrade VIP (₹2,999)'}
+            </button>
+          )}
+        </div>
+
+        {/* 5. STOCK MARKET MASTERCLASS (₹9,999) */}
+        <div style={{ 
+          background: 'linear-gradient(180deg, rgba(13, 148, 136, 0.12) 0%, var(--bg-card) 100%)', 
+          border: isMasterclass ? '2px solid #10B981' : '2px solid #0D9488', 
+          borderRadius: isMobile ? '16px' : '22px', 
+          padding: isMobile ? '26px 18px' : '34px 24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          position: 'relative', 
+          boxShadow: '0 16px 40px rgba(13, 148, 136, 0.2)' 
+        }}>
+          <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #0D9488, #10B981)', color: '#fff', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.4)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <GraduationCap size={12} fill="#fff" /> FULL COURSE: BASIC TO ADVANCED
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ background: 'rgba(13, 148, 136, 0.18)', padding: '8px', borderRadius: '10px' }}>
+              <BookOpen size={20} style={{ color: '#2DD4BF' }} />
+            </div>
+            <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>Masterclass</h3>
+          </div>
+          
+          <div style={{ fontSize: isMobile ? '34px' : '40px', fontWeight: '900', marginBottom: '6px', color: '#2DD4BF', display: 'flex', alignItems: 'baseline' }}>
+            ₹9,999
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/one-time (Full Batch)</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
+            Full comprehensive stock market education from foundational basics to institutional F&O trading. Includes 1-Year VIP Platform access!
+          </p>
+          
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Full Course: Basics to Advanced</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Live Interactive Batches</strong> by NISM Mentors</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Options Hedging & Greek Strategies</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><Sparkles size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>1 Full Year VIP Platform Included</strong> (₹2,999 val)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Technical & Price Action Mastery</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Risk Management & Trading Psychology</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Lifetime Recording Vault & Study Materials</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Priority Live Doubt Clearing Sessions</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 5 Watchlists + 20-Depth DOM Ladder</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 🎓 Masterclass Leaderboard Badge</li>
+          </ul>
+
+          {isMasterclass ? (
+            <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
+              ✓ Active Masterclass
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary hoverable" 
+              style={{ width: '100%', padding: '13px', fontWeight: '800', background: 'linear-gradient(90deg, #0D9488, #14B8A6)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13.5px', letterSpacing: '0.5px', boxShadow: '0 8px 20px rgba(13, 148, 136, 0.35)', cursor: 'pointer' }}
+              onClick={() => handleUpgrade('masterclass')}
+              disabled={loading}
+            >
+              {loading === 'masterclass' ? 'Processing...' : 'Join Masterclass (₹9,999)'}
+            </button>
+          )}
+        </div>
+
+        {/* 6. LIFETIME ALL-INCLUSIVE ELITE (₹24,999) */}
+        <div style={{ 
+          background: 'linear-gradient(180deg, rgba(225, 29, 72, 0.12) 0%, var(--bg-card) 100%)', 
+          border: isLifetime ? '2px solid #10B981' : '2px solid #E11D48', 
+          borderRadius: isMobile ? '16px' : '22px', 
+          padding: isMobile ? '26px 18px' : '34px 24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          position: 'relative', 
+          boxShadow: '0 20px 48px rgba(225, 29, 72, 0.25)' 
+        }}>
+          <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #E11D48, #F59E0B)', color: '#fff', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(225, 29, 72, 0.4)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <Crown size={12} fill="#fff" /> ALL-INCLUSIVE - LIFETIME ACCESS
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ background: 'rgba(225, 29, 72, 0.18)', padding: '8px', borderRadius: '10px' }}>
+              <Sparkles size={20} style={{ color: '#FB7185' }} />
+            </div>
+            <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>Lifetime Elite</h3>
+          </div>
+          
+          <div style={{ fontSize: isMobile ? '34px' : '40px', fontWeight: '900', marginBottom: '6px', color: '#FB7185', display: 'flex', alignItems: 'baseline' }}>
+            ₹24,999
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/lifetime (Zero Renewals)</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
+            The definitive all-in-one pass. Permanent lifetime app & web access, full masterclass, 1-on-1 mentorship, and lifetime algorithm updates.
+          </p>
+          
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#FECDD3' }}><Crown size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>PERMANENT LIFETIME APP & WEB ACCESS</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>Full Stock Market Masterclass Included</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>1-on-1 Personal Mentorship & Portfolio Audits</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>All Live Batches + Future Advanced Batches</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Priority Pre-Market Levels & Algo Signals</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Unlimited Orders & Unlimited Watchlists Forever</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Unlimited Portfolio Resets & DOM Ladder</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Exclusive VIP Tournaments & Cash Leagues Entry</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Private Telegram Inner Circle with Founders</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Dedicated 24/7 VIP Concierge Support</li>
+          </ul>
+
+          {isLifetime ? (
+            <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
+              ✓ Active Lifetime Elite
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary hoverable" 
+              style={{ width: '100%', padding: '13px', fontWeight: '800', background: 'linear-gradient(90deg, #E11D48, #F59E0B)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13.5px', letterSpacing: '0.5px', boxShadow: '0 8px 24px rgba(225, 29, 72, 0.4)', cursor: 'pointer' }}
+              onClick={() => handleUpgrade('lifetime')}
+              disabled={loading}
+            >
+              {loading === 'lifetime' ? 'Processing...' : 'Get Lifetime Access (₹24,999)'}
             </button>
           )}
         </div>
@@ -408,26 +544,28 @@ export default function PricingView({ setActiveTab }) {
             Comprehensive Plan Comparison
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '12px' : '14px' }}>
-            Transparent breakdown of features, mentorship, research, and limits across all 4 tiers.
+            Transparent breakdown of features, mentorship, research, and limits across all tiers.
           </p>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1000px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                <th style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', width: '30%' }}>Features & Tools</th>
-                <th style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', textAlign: 'center', width: '17%' }}>Normal (₹0)</th>
-                <th style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', textAlign: 'center', width: '17%', color: '#60A5FA' }}>Monthly (₹199)</th>
-                <th style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', textAlign: 'center', width: '18%', color: '#FCD34D' }}>Yearly (₹1,999)</th>
-                <th style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', textAlign: 'center', width: '18%', color: '#C084FC' }}>Feature Plan (₹2,999)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', width: '22%' }}>Features & Tools</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%' }}>Normal (₹0)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%', color: '#60A5FA' }}>Monthly (₹199)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%', color: '#FCD34D' }}>Yearly (₹1,999)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%', color: '#C084FC' }}>VIP (₹2,999)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%', color: '#2DD4BF' }}>Masterclass (₹9,999)</th>
+                <th style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: '700', textAlign: 'center', width: '13%', color: '#FB7185' }}>Lifetime (₹24,999)</th>
               </tr>
             </thead>
             <tbody>
               {comparisonRows.map((cat, cIdx) => (
                 <React.Fragment key={cIdx}>
                   <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <td colSpan={5} style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
+                    <td colSpan={7} style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
                       {cat.category}
                     </td>
                   </tr>
@@ -447,6 +585,12 @@ export default function PricingView({ setActiveTab }) {
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: '12.5px', textAlign: 'center', fontWeight: '700', color: '#E9D5FF' }}>
                         {item.highest}
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '12.5px', textAlign: 'center', fontWeight: '700', color: '#5EEAD4' }}>
+                        {item.masterclass}
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '12.5px', textAlign: 'center', fontWeight: '800', color: '#FECDD3' }}>
+                        {item.lifetime}
                       </td>
                     </tr>
                   ))}

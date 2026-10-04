@@ -3965,9 +3965,41 @@ export default function AdminDashboard() {
                   }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>VIP / Feature Plan</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Lifetime VIP features & algorithms</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Full VIP features & algorithms (1 Year)</div>
                     </div>
                     <div style={{ fontSize: '16px', fontWeight: '800', color: '#fbbf24' }}>₹2,999</div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Stock Market Masterclass</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Full Live Classes (Basic to Advanced) + 1-Yr Pro</div>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#34d399' }}>₹9,999</div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Lifetime All-Inclusive Elite</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Permanent App & Web Access + All Classes</div>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#f43f5e' }}>₹24,999</div>
                   </div>
                 </div>
 
@@ -6709,6 +6741,8 @@ export default function AdminDashboard() {
                     <option value="MONTHLY">Pro Monthly (3 Watchlists - ₹199/mo)</option>
                     <option value="YEARLY">Pro Yearly (4 Watchlists - ₹1,999/yr)</option>
                     <option value="HIGHEST">Feature Plan / VIP (5 Watchlists - ₹2,999/yr)</option>
+                    <option value="MASTERCLASS">Stock Market Masterclass (₹9,999)</option>
+                    <option value="LIFETIME">Lifetime All-Inclusive Elite (₹24,999)</option>
                   </select>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Tier'}

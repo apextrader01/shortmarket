@@ -488,7 +488,7 @@ export const useStore = create(persist((set, get) => ({
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
     const maxWatchlists = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
@@ -541,7 +541,7 @@ export const useStore = create(persist((set, get) => ({
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
     const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));

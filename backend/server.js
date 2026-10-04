@@ -2517,12 +2517,16 @@ async function getRazorpayClient() {
   };
 }
 
-// 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999
+// 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   try {
     const { plan } = req.body || {};
     let amount = 199 * 100;
-    if (plan === 'highest' || plan === 'feature') {
+    if (plan === 'lifetime' || plan === 'elite_lifetime') {
+      amount = 24999 * 100;
+    } else if (plan === 'masterclass' || plan === 'course') {
+      amount = 9999 * 100;
+    } else if (plan === 'highest' || plan === 'feature') {
       amount = 2999 * 100;
     } else if (plan === 'yearly') {
       amount = 1999 * 100;
@@ -2553,7 +2557,11 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
   try {
     const { plan } = req.body || {};
     let amount = 199 * 100;
-    if (plan === 'highest' || plan === 'feature') {
+    if (plan === 'lifetime' || plan === 'elite_lifetime') {
+      amount = 24999 * 100;
+    } else if (plan === 'masterclass' || plan === 'course') {
+      amount = 9999 * 100;
+    } else if (plan === 'highest' || plan === 'feature') {
       amount = 2999 * 100;
     } else if (plan === 'yearly') {
       amount = 1999 * 100;
@@ -2618,7 +2626,13 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         const expires = new Date(baseDate.getTime());
         const selectedPlan = (plan || '').toLowerCase();
         let targetTier = 'MONTHLY';
-        if (selectedPlan === 'highest' || selectedPlan === 'feature') {
+        if (selectedPlan === 'lifetime' || selectedPlan === 'elite_lifetime') {
+          targetTier = 'LIFETIME';
+          expires.setFullYear(expires.getFullYear() + 100);
+        } else if (selectedPlan === 'masterclass' || selectedPlan === 'course') {
+          targetTier = 'MASTERCLASS';
+          expires.setFullYear(expires.getFullYear() + 1);
+        } else if (selectedPlan === 'highest' || selectedPlan === 'feature') {
           targetTier = 'HIGHEST';
           expires.setFullYear(expires.getFullYear() + 1);
         } else if (selectedPlan === 'yearly') {
@@ -2642,7 +2656,16 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
             .first();
 
           if (pendingRef) {
-            const rewardAmount = (selectedPlan === 'highest' || selectedPlan === 'feature') ? 99.9 : (selectedPlan === 'yearly' ? 49.9 : 9.9);
+            let rewardAmount = 9.9;
+            if (selectedPlan === 'lifetime' || selectedPlan === 'elite_lifetime') {
+              rewardAmount = 999.0;
+            } else if (selectedPlan === 'masterclass' || selectedPlan === 'course') {
+              rewardAmount = 499.0;
+            } else if (selectedPlan === 'highest' || selectedPlan === 'feature') {
+              rewardAmount = 99.9;
+            } else if (selectedPlan === 'yearly') {
+              rewardAmount = 49.9;
+            }
             
             // Mark as completed
             await trx('referrals')
@@ -5074,7 +5097,7 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     
     // Check subscription tier
     const user = await db('users').where({ id: req.user.id }).first();
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
     const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
     const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
     const limit = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
@@ -8512,7 +8535,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
   // 🛡️ Subscription Tier Eligibility & Leg Limits for Basket Orders (Multi-Leg)
   const user = await db('users').where({ id: req.user.id }).first();
-  const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isPaidTier = isHighest || isYearly || isMonthly;
@@ -10600,7 +10623,7 @@ function applyTierFilterToQuery(query, accessTier) {
   } 
   // HIGHEST_ONLY: Allowed tiers: HIGHEST, FEATURE
   else if (tier === 'HIGHEST_ONLY' || tier === 'FEATURE_ONLY') {
-    query.whereIn('users.subscription_tier', ['HIGHEST', 'FEATURE'])
+    query.whereIn('users.subscription_tier', ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'])
          .where(builder => {
            builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
          });
@@ -10762,7 +10785,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires) <= new Date();
     const activeTier = isExpired ? 'BASIC' : userTier;
     
-    const hasHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const hasHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const hasYearly = hasHighest || activeTier === 'YEARLY';
     const hasMonthly = hasYearly || ['MONTHLY', 'PRO'].includes(activeTier);
     

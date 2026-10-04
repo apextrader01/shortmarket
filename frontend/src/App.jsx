@@ -1498,6 +1498,12 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
+                {user.subscription_tier === 'LIFETIME' && (
+                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #e11d48, #f59e0b)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 LIFETIME</span>
+                )}
+                {user.subscription_tier === 'MASTERCLASS' && (
+                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>🎓 MASTERCLASS</span>
+                )}
                 {['HIGHEST', 'FEATURE'].includes(user.subscription_tier) && (
                   <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #a855f7)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 VIP</span>
                 )}
