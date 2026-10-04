@@ -1,0 +1,1027 @@
+[
+  {
+    "method": "GET",
+    "endpoint": "/api/health",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/prices",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/prices/batch",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/stocks/lotsizes",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/stocks",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/stocks/search",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/profile",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/auth/check-username",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/send-registration-otp",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/register",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/resend-verification-email",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/pre-login",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/send-login-email-otp",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/verify-2fa",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/totp/setup",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/totp/enable",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/totp/disable",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/trusted-devices",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/user/trusted-devices/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/login",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/telemetry",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/skip-onboarding",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/logout",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/forgot-password",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/verify-reset-otp",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/auth/reset-password",
+    "classification": "PUBLIC AUTH"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/debug-db",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/bootstrap",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/profile_picture",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/payment/create-order",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/payment/create-subscription",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/payment/verify",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/analytics",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/kyc",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/consent",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/consents",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/data-rights-request",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/data-rights-requests",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/email-settings",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/data-rights-requests/:id/resolve",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/data-export",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/password",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/details",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/user/details",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/wallet/deposit",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/wallet/withdraw",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/users/:id/toggle_ban",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/telemetry",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/telemetry/reset",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/master_square_off",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/staging-power",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/staging-power",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/live-feed",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/heal-referrals",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/users",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/admin/user/:id",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/user/:id/reset",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/admin/user/:id",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/user/:id/subscription",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/user/:id/balance",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/deposits",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/deposits/:id/approve",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/deposits/:id/reject",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/analytics",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/orders",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/positions",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/ledger",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/market-status",
+    "classification": "PUBLIC MARKET DATA"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/market-status",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/market-status",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/market-calendar",
+    "classification": "PUBLIC MARKET DATA"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/market-calendar/today",
+    "classification": "PUBLIC MARKET DATA"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/bhavcopy/delivery",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/market-deals",
+    "classification": "PUBLIC MARKET DATA"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/ipos",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/market-calendar",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/admin/market-calendar/:date",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/market-calendar/bulk-holidays",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/force-close",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/settle-expiries",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/reset",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/positions",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/holdings",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/position/convert",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/mf/names",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/mf/search",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/mf/enrich",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/mf/by-ids",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/mf/details",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/mf/:schemeCode",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/mutual-funds/buy",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/mf/buy",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/restricted-stocks",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/options/chain/:symbol",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/options/symbols",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/options/futures/:symbol",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/orders",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/order",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/sip",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/sips",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/sip/:id/execute-now",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/sips/process-all",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/mf/settle-pending",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/sip/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/ltp-batch",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/estimate-charges",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/push/vapid-public-key",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/push/status",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/push/subscribe",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/push/fcm-subscribe",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/push/fcm-unsubscribe",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/telegram/webhook",
+    "classification": "WEBHOOK"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/telegram/settings",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/telegram/settings",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/telegram/test",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/telegram/config",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/telegram/config",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/telegram/broadcast",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/risk-guardian",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/holdings/exit-all",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/order/:id/tag",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/push/unsubscribe",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/push/test",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/ledger",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/basket-order",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/order/:id/cancel",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/cleanup",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/order/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/candles/:symbol",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/stocks/:symbol/details",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/debug-state",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/fyers/auth-url",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/diagnostics/logs",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/fyers/status",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/fyers/callback",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/fyers/verify",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/razorpay/credentials",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/razorpay/credentials",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/fyers/credentials",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/fyers/credentials",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/fyers/auto-login",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/fyers-debug",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/bank_details",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/withdrawals/request",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/withdrawals",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/withdrawals/:id/process",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/leaderboard",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/announcement",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/announcement",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/notifications",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/broadcast-notification",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/broadcast-notifications/clear-old",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/broadcast-notifications/clear-all",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/admin/broadcast-notification/:id",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/user/sessions",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/sessions/clean-duplicates",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/user/sessions/revoke-others",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/user/sessions/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/contests/active",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/contests/past",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/contests",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/contests",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/admin/contests/:id",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/contests/:id/award",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/referrals",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/banned",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/ban",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/unban",
+    "classification": "ADMIN"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/journal/trades",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/journal/trades",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/journal/trades/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/journal/trades/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/journal/checklists",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/journal/checklists",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/journal/mistakes",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/journal/mistakes",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/journal/mistakes/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/journal/mistakes/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/journal/strategies",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/journal/strategies",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/journal/strategies/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/journal/strategies/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/journal/rules",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/journal/rules",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "PUT",
+    "endpoint": "/api/journal/rules/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/journal/rules/:id",
+    "classification": "AUTHENTICATED USER"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/ai/wealth-copilot",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/v1/bridge/all",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/v1/bridge/stats",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/config",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/regenerate-token",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/demats",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/demats/:id/renew",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/demats/:id/toggle-trade",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/v1/bridge/demats/:id",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/renew-demat",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/ips/purchase",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/watchlist/add",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "DELETE",
+    "endpoint": "/api/v1/bridge/watchlist/:id",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/kill-switch",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/credit/recharge",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/order",
+    "classification": "PUBLIC"
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/v1/bridge/webhook",
+    "classification": "WEBHOOK"
+  },
+  {
+    "method": "GET",
+    "endpoint": "/.well-known/assetlinks.json",
+    "classification": "PUBLIC"
+  }
+]
