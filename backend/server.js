@@ -12115,6 +12115,38 @@ const SERVER_SEO_MAP = {
   '/trade-diary': {
     title: '8-Pillar Institutional Trade Diary, Discipline Checklist & AI Trading Journal | SkandX',
     desc: 'Track trading win rate, profit factor, strategy performance, emotional mistakes, pre-trade checklists, and AI-powered journal analytics.'
+  },
+  '/wealth': {
+    title: 'Wealth OS & Tax Hub — Net Worth, 50/30/20 Budget, HLV Insurance & FY25 Tax Harvesting | SkandX',
+    desc: '360° Personal Finance & Tax Command Center: Multi-asset Net Worth tracker, 50/30/20 Budget Leak Detector, Actuarial Term/Health HLV Gap, and FY25 STCG 20% / LTCG 12.5% Tax-Loss Harvesting.'
+  },
+  '/login': {
+    title: 'Login or Create Free Trading Account | SkandX Paper Trading & Algo Hub',
+    desc: 'Sign in to SkandX to access India’s real-time NSE/BSE/MCX Paper Trading Terminal, 8-Pillar Trade Diary, Wealth OS, Financial Calculators, and SkandX Algo Bridge.'
+  },
+  '/pricing': {
+    title: 'Pricing & Institutional Plans — Paper Trading, Trade Diary & Algo Bridge | SkandX',
+    desc: 'Explore transparent pricing for SkandX Paper Trading, AI Trading Journal, and Multi-Broker Algorithmic Webhook Execution.'
+  },
+  '/aboutus': {
+    title: 'About SkandX — India’s 6-Hub Financial, Paper Trading & Algorithmic Ecosystem',
+    desc: 'Learn how SkandX empowers Indian retail and institutional traders with risk-free NSE/BSE/MCX simulation, quantitative calculators, and automated broker execution.'
+  },
+  '/privacy-policy': {
+    title: 'Privacy Policy & Data Protection | SkandX',
+    desc: 'Read the SkandX Privacy Policy covering data encryption, zero-credential exposure, and user privacy standards.'
+  },
+  '/terms': {
+    title: 'Terms & Conditions of Use | SkandX',
+    desc: 'Review the official Terms and Conditions for using SkandX Paper Trading, Calculators, Trade Diary, and Algo Webhook services.'
+  },
+  '/risk-policy': {
+    title: 'Risk Disclosure & Regulatory Disclaimer | SkandX',
+    desc: 'Important risk disclosure regarding virtual paper trading simulation, derivatives risk, and educational financial tools on SkandX.'
+  },
+  '/delete-account': {
+    title: 'Account & Data Deletion Request | SkandX',
+    desc: 'Submit a permanent account and personal data deletion request for your SkandX profile.'
   }
 };
 
@@ -12155,7 +12187,7 @@ app.use((req, res) => {
   }
 
   const canonicalUrl = `https://skandx.in${cleanPath}`;
-  const jsonLdScript = `<link rel="canonical" href="${canonicalUrl}" /><script type="application/ld+json">${JSON.stringify({
+  const jsonLdScript = `<script type="application/ld+json">${JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: seoEntry.title.split('|')[0].trim(),
@@ -12166,10 +12198,23 @@ app.use((req, res) => {
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' }
   })}</script>`;
 
-  const customizedHtml = rawHtml
+  let customizedHtml = rawHtml
     .replace(/<title>.*?<\/title>/i, `<title>${seoEntry.title}</title>`)
     .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i, `<meta name="description" content="${seoEntry.desc}" />`)
-    .replace('</head>', `${jsonLdScript}</head>`);
+    .replace(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:title" content="${seoEntry.title}" />`)
+    .replace(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:description" content="${seoEntry.desc}" />`)
+    .replace(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:url" content="${canonicalUrl}" />`);
+
+  if (/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i.test(customizedHtml)) {
+    customizedHtml = customizedHtml.replace(
+      /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
+      `<link rel="canonical" href="${canonicalUrl}" />`
+    );
+  } else {
+    customizedHtml = customizedHtml.replace('</head>', `<link rel="canonical" href="${canonicalUrl}" /></head>`);
+  }
+
+  customizedHtml = customizedHtml.replace('</head>', `${jsonLdScript}</head>`);
 
   return res.type('html').send(customizedHtml);
 });
