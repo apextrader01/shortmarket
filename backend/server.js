@@ -666,11 +666,9 @@ app.use(helmet({
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
-        "'unsafe-eval'",
         "https://checkout.razorpay.com",
         "https://www.googletagmanager.com",
-        "https://www.google-analytics.com",
-        "https://apis.google.com"
+        "https://www.google-analytics.com"
       ],
       styleSrc: [
         "'self'",
@@ -687,8 +685,9 @@ app.use(helmet({
         "'self'",
         "data:",
         "blob:",
-        "https:",
         "https://*.razorpay.com",
+        "https://*.googleusercontent.com",
+        "https://*.gstatic.com",
         "https://www.google-analytics.com"
       ],
       connectSrc: [
@@ -697,7 +696,6 @@ app.use(helmet({
         "https://api.razorpay.com",
         "https://checkout.razorpay.com",
         "https://*.firebaseio.com",
-        "https://*.googleapis.com",
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
         "https://www.google-analytics.com",
@@ -712,7 +710,7 @@ app.use(helmet({
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
-      frameAncestors: ["'self'"],
+      frameAncestors: ["'none'"],
       upgradeInsecureRequests: []
     }
   },
