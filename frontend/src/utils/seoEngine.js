@@ -115,6 +115,120 @@ export const SEO_ROUTES = {
     description: 'Track trading win rate, profit factor, strategy performance, emotional mistakes, pre-trade checklists, and AI-powered journal analytics.',
     keywords: 'trading journal india, trade diary app, option trading journal, trading checklist and discipline tracker',
     category: 'FinanceApplication'
+  },
+  '/trading-journal': {
+    title: 'Trading Journal & Execution Analytics — Track Win Rate & Profit Factor | SkandX',
+    description: 'Analyze every paper and live trade with institutional performance metrics, behavioral tags, and strategy breakdowns on SkandX.',
+    keywords: 'trading journal india, stock trading log, f&o trading journal, skandx journal',
+    category: 'FinanceApplication'
+  },
+  '/bhavcopy': {
+    title: 'NSE/BSE Daily Bhavcopy Delivery Screener (>60% Delivery & Volume Surge) | SkandX',
+    description: 'Analyze daily NSE and BSE Bhavcopy delivery percentages, institutional volume breakouts, and bulk/block deal accumulation.',
+    keywords: 'nse bhavcopy screener, high delivery stocks nse today, bulk deals nse, skandx bhavcopy',
+    category: 'FinanceApplication'
+  },
+  '/ipo': {
+    title: 'Live IPO GMP Today, Mainboard & SME IPO Subscription & Allotment Hub | SkandX',
+    description: 'Track upcoming and open Mainboard & SME IPOs, Grey Market Premium (GMP), retail/QIB subscription numbers, and listing gains.',
+    keywords: 'live ipo gmp today, upcoming ipo india, sme ipo gmp, ipo subscription status',
+    category: 'FinanceApplication'
+  },
+  '/tax-hub': {
+    title: 'Trader Tax Hub — FY25 STCG 20% / LTCG 12.5% & F&O Tax Harvesting | SkandX',
+    description: 'Calculate Indian capital gains taxes (STCG 20%, LTCG 12.5%), F&O business income tax, and actionable tax-loss harvesting opportunities.',
+    keywords: 'stcg ltcg tax calculator india, tax loss harvesting india, f&o tax calculator, skandx tax hub',
+    category: 'FinanceApplication'
+  },
+  '/wealth': {
+    title: 'Wealth OS & Tax Hub — Net Worth, 50/30/20 Budget, HLV Insurance & FY25 Tax Harvesting | SkandX',
+    description: '360° Personal Finance & Tax Command Center: Multi-asset Net Worth tracker, 50/30/20 Budget Leak Detector, Actuarial Term/Health HLV Gap, and FY25 STCG 20% / LTCG 12.5% Tax-Loss Harvesting.',
+    keywords: 'wealth management calculator india, tax loss harvesting calculator india, stcg ltcg tax calculator fy25, human life value insurance calculator',
+    category: 'FinanceApplication'
+  },
+  '/pricing': {
+    title: 'Subscription Plans & Pricing — Free Paper Trading & Pro Algo Terminal | SkandX',
+    description: 'Transparent pricing for SkandX Paper Trading, Financial Calculators, Wealth OS, and Multi-Broker Algo Trading Bridge.',
+    keywords: 'skandx pricing, paper trading subscription india, algo trading plans india',
+    category: 'FinanceApplication'
+  },
+  '/aboutus': {
+    title: 'About SkandX — Mission, Architecture & Regulatory Disclosures | SkandX',
+    description: 'Learn about SkandX Technologies, our institutional paper trading and algorithmic execution platform, policies, and regulatory disclosures.',
+    keywords: 'about skandx, skandx technologies, paper trading platform india',
+    category: 'FinanceApplication'
+  },
+  '/about': {
+    title: 'About SkandX — Mission, Architecture & Regulatory Disclosures | SkandX',
+    description: 'Learn about SkandX Technologies, our institutional paper trading and algorithmic execution platform, policies, and regulatory disclosures.',
+    keywords: 'about skandx, skandx technologies, paper trading platform india',
+    category: 'FinanceApplication'
+  },
+  '/login': {
+    title: 'Login to SkandX Terminal — Paper Trading, Wealth OS & Algo Bridge | SkandX',
+    description: 'Sign in to your SkandX account to access real-time NSE/BSE/MCX paper trading, ₹10,00,000 virtual capital, and algorithmic trading tools.',
+    keywords: 'skandx login, paper trading login, skandx terminal sign in',
+    category: 'FinanceApplication'
+  },
+  '/register': {
+    title: 'Create Free Account — Get ₹10,00,000 Virtual Capital on SkandX | SkandX',
+    description: 'Register for a free SkandX account and start practicing NSE, BSE & MCX Options, Futures & Equity trading with ₹10L virtual funds.',
+    keywords: 'skandx register, free paper trading account india, virtual trading sign up',
+    category: 'FinanceApplication'
+  },
+  '/privacy-policy': {
+    title: 'Privacy Policy & DPDP Act 2023 Data Protection Notice | SkandX',
+    description: 'Official Privacy Notice and Data Protection Policy of SkandX Technologies under the Digital Personal Data Protection Act, 2023 (DPDP Act).',
+    keywords: 'skandx privacy policy, dpdp act 2023 compliance, data protection officer skandx',
+    category: 'FinanceApplication'
+  },
+  '/privacy': {
+    title: 'Privacy Policy & DPDP Act 2023 Data Protection Notice | SkandX',
+    description: 'Official Privacy Notice and Data Protection Policy of SkandX Technologies under the Digital Personal Data Protection Act, 2023 (DPDP Act).',
+    keywords: 'skandx privacy policy, dpdp act 2023 compliance, data protection officer skandx',
+    category: 'FinanceApplication'
+  },
+  '/terms': {
+    title: 'Terms of Service & Platform Usage Agreement | SkandX',
+    description: 'Terms and Conditions governing the use of the SkandX web trading terminal, mobile applications, financial calculators, and APIs.',
+    keywords: 'skandx terms of service, terms and conditions skandx',
+    category: 'FinanceApplication'
+  },
+  '/risk-policy': {
+    title: 'Risk Disclosure Document — SEBI & Derivative Risk Warning | SkandX',
+    description: 'Mandatory Risk Disclosure Document for Equity, Futures & Options derivative simulation and algorithmic trading tools on SkandX.',
+    keywords: 'skandx risk disclosure, sebi f&o risk warning, derivative risk policy',
+    category: 'FinanceApplication'
+  },
+  '/risk': {
+    title: 'Risk Disclosure Document — SEBI & Derivative Risk Warning | SkandX',
+    description: 'Mandatory Risk Disclosure Document for Equity, Futures & Options derivative simulation and algorithmic trading tools on SkandX.',
+    keywords: 'skandx risk disclosure, sebi f&o risk warning, derivative risk policy',
+    category: 'FinanceApplication'
+  },
+  '/delete-account': {
+    title: 'Request Account Deletion & Data Purge | SkandX',
+    description: 'Submit an official account deletion and personal data erasure request for your SkandX account in compliance with Google Play and DPDP Act 2023 policies.',
+    keywords: 'delete skandx account, account deletion request skandx, data erasure request',
+    category: 'FinanceApplication'
+  },
+  '/delete': {
+    title: 'Request Account Deletion & Data Purge | SkandX',
+    description: 'Submit an official account deletion and personal data erasure request for your SkandX account in compliance with Google Play and DPDP Act 2023 policies.',
+    keywords: 'delete skandx account, account deletion request skandx, data erasure request',
+    category: 'FinanceApplication'
+  },
+  '/data-rights': {
+    title: 'Data Principal Rights Portal (DPDP Act, 2023) | SkandX',
+    description: 'Exercise your statutory rights to access, export, correct, or erase personal data under the Digital Personal Data Protection Act, 2023.',
+    keywords: 'data principal rights dpdp, export personal data skandx, right to erasure india',
+    category: 'FinanceApplication'
+  },
+  '/accessibility': {
+    title: 'Accessibility Statement & Digital Inclusion Policy (WCAG 2.1 AA) | SkandX',
+    description: 'SkandX Accessibility Statement detailing WCAG 2.1 Level AA compliance, keyboard execution hotkeys, high-contrast OLED themes, and screen reader support.',
+    keywords: 'skandx accessibility statement, wcag 2.1 trading terminal, keyboard shortcuts skandx',
+    category: 'FinanceApplication'
   }
 };
 
@@ -122,11 +236,14 @@ export function applyDynamicSEO(pathname = '/') {
   if (typeof document === 'undefined') return;
 
   const cleanPath = (pathname || '/').toLowerCase().replace(/\/+$/, '') || '/';
-  const seo = SEO_ROUTES[cleanPath] || SEO_ROUTES['/'];
+  const matchedSeo = SEO_ROUTES[cleanPath];
+  const seo = matchedSeo || SEO_ROUTES['/'];
   const canonicalUrl = `https://skandx.in${cleanPath === '/' ? '' : cleanPath}`;
 
-  // 1. Update Document Title
-  document.title = seo.title;
+  // 1. Update Document Title only if this route has an explicit SEO entry
+  if (matchedSeo) {
+    document.title = matchedSeo.title;
+  }
 
   // 2. Helper to upsert meta tags
   const setMeta = (selector, attrName, attrVal, contentVal) => {

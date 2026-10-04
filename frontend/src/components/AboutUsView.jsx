@@ -19,16 +19,33 @@ export default function AboutUsView({ setActiveTab }) {
     },
     {
       title: 'Privacy Policy',
-      content: 'Your privacy is our utmost priority. We collect only the information necessary to facilitate your trades and comply with regulatory KYC/AML requirements. We have strict data governance policies in place and guarantee that your personal and financial data is never sold to third-party marketers.'
+      content: 'Your privacy is our utmost priority. We collect only the information necessary to facilitate your trades and comply with regulatory KYC/AML requirements. We have strict data governance policies in place and guarantee that your personal and financial data is never sold to third-party marketers.',
+      link: '/privacy-policy',
+      linkLabel: 'View Privacy Policy →'
     },
     {
       title: 'Terms and Conditions',
-      content: 'By accessing and using the SkandX platform, you agree to abide by our standard terms of service. Trading in equities, derivatives, and commodities involves substantial risk of loss. You acknowledge that you are solely responsible for all trading decisions and outcomes.'
+      content: 'By accessing and using the SkandX platform, you agree to abide by our standard terms of service. Trading in equities, derivatives, and commodities involves substantial risk of loss. You acknowledge that you are solely responsible for all trading decisions and outcomes.',
+      link: '/terms',
+      linkLabel: 'View Terms of Service →'
     },
     {
       title: 'Risk Policies',
       content: 'Options and margin trading are highly leveraged and carry a high degree of risk. Please review our comprehensive Risk Disclosure Document before engaging in leveraged trading.',
-      link: 'https://www.skandx.in/riskpolicy'
+      link: '/risk-policy',
+      linkLabel: 'View Risk Disclosure Document →'
+    },
+    {
+      title: 'Data Principal Rights (DPDP Act, 2023)',
+      content: 'Under the Digital Personal Data Protection Act, 2023, you have the right to access, export, correct, or erase your personal data at any time through our Data Rights Portal.',
+      link: '/data-rights',
+      linkLabel: 'Open Data Rights Portal →'
+    },
+    {
+      title: 'Account & Data Deletion',
+      content: 'You may request permanent deletion of your SkandX account and associated personal records at any time.',
+      link: '/delete-account',
+      linkLabel: 'Request Account Deletion →'
     },
     {
       title: 'Roles and Responsibilities for UPI',
@@ -102,7 +119,7 @@ export default function AboutUsView({ setActiveTab }) {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Website</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                <a href="https://www.skandx.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>https://www.skandx.in</a>
+                <a href="https://skandx.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>https://skandx.in</a>
               </div>
             </div>
           </div>
@@ -144,7 +161,9 @@ export default function AboutUsView({ setActiveTab }) {
                   {policy.content}
                   {policy.link && (
                     <div style={{ marginTop: '8px' }}>
-                      <a href={policy.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Read more</a>
+                      <a href={policy.link} style={{ color: 'var(--color-blue-light)', textDecoration: 'none', fontWeight: '600' }}>
+                        {policy.linkLabel || 'Read more →'}
+                      </a>
                     </div>
                   )}
                 </div>

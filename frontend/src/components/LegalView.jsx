@@ -8,6 +8,39 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
   const submitDataRightsRequest = useStore(state => state.submitDataRightsRequest);
   const downloadDataExport = useStore(state => state.downloadDataExport);
 
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    if (!onBack && typeof window !== 'undefined') {
+      const tabUrlMap = {
+        'privacy': '/privacy-policy',
+        'terms': '/terms',
+        'data-rights': '/data-rights',
+        'delete-account': '/delete-account',
+        'risk': '/risk-policy',
+        'accessibility': '/accessibility'
+      };
+      const tabTitleMap = {
+        'privacy': 'Privacy Policy | SkandX',
+        'terms': 'Terms of Service | SkandX',
+        'data-rights': 'Data Principal Rights Portal (DPDP Act) | SkandX',
+        'delete-account': 'Request Account Deletion & Data Purge | SkandX',
+        'risk': 'Risk Disclosure Document | SkandX',
+        'accessibility': 'Accessibility Statement | SkandX'
+      };
+      const nextUrl = tabUrlMap[tab] || '/privacy-policy';
+      if (window.location.pathname !== nextUrl) {
+        window.history.replaceState(null, '', nextUrl);
+      }
+      if (tabTitleMap[tab]) {
+        document.title = tabTitleMap[tab];
+      }
+    }
+  };
+
   // Deletion Form State
   const [deleteEmail, setDeleteEmail] = useState(user?.email || '');
   const [deleteReason, setDeleteReason] = useState('');
@@ -160,7 +193,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           borderBottom: '1px solid #1f2937'
         }}>
           <button
-            onClick={() => setActiveTab('privacy')}
+            onClick={() => handleSelectTab('privacy')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -181,7 +214,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('terms')}
+            onClick={() => handleSelectTab('terms')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -202,7 +235,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('data-rights')}
+            onClick={() => handleSelectTab('data-rights')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -223,7 +256,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('delete-account')}
+            onClick={() => handleSelectTab('delete-account')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -244,7 +277,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('risk')}
+            onClick={() => handleSelectTab('risk')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -265,7 +298,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('accessibility')}
+            onClick={() => handleSelectTab('accessibility')}
             style={{
               display: 'flex',
               alignItems: 'center',

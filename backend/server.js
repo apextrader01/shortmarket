@@ -12494,6 +12494,46 @@ const SERVER_SEO_MAP = {
   '/delete-account': {
     title: 'Account & Data Deletion Request | SkandX',
     desc: 'Submit a permanent account and personal data deletion request for your SkandX profile.'
+  },
+  '/delete': {
+    title: 'Account & Data Deletion Request | SkandX',
+    desc: 'Submit a permanent account and personal data deletion request for your SkandX profile.'
+  },
+  '/privacy': {
+    title: 'Privacy Policy & Data Protection | SkandX',
+    desc: 'Read the SkandX Privacy Policy covering data encryption, zero-credential exposure, and user privacy standards.'
+  },
+  '/risk': {
+    title: 'Risk Disclosure & Regulatory Disclaimer | SkandX',
+    desc: 'Important risk disclosure regarding virtual paper trading simulation, derivatives risk, and educational financial tools on SkandX.'
+  },
+  '/data-rights': {
+    title: 'Data Principal Rights Portal (DPDP Act, 2023) | SkandX',
+    desc: 'Exercise your statutory rights to access, export, correct, or erase personal data under the Digital Personal Data Protection Act, 2023.'
+  },
+  '/accessibility': {
+    title: 'Accessibility Statement & Digital Inclusion Policy (WCAG 2.1 AA) | SkandX',
+    desc: 'SkandX Accessibility Statement detailing WCAG 2.1 Level AA compliance, keyboard execution hotkeys, high-contrast OLED themes, and screen reader support.'
+  },
+  '/about': {
+    title: 'About SkandX — India’s 6-Hub Financial, Paper Trading & Algorithmic Ecosystem',
+    desc: 'Learn how SkandX empowers Indian retail and institutional traders with risk-free NSE/BSE/MCX simulation, quantitative calculators, and automated broker execution.'
+  },
+  '/trading-journal': {
+    title: 'Trading Journal & Execution Analytics — Track Win Rate & Profit Factor | SkandX',
+    desc: 'Analyze every paper and live trade with institutional performance metrics, behavioral tags, and strategy breakdowns on SkandX.'
+  },
+  '/bhavcopy': {
+    title: 'NSE/BSE Daily Bhavcopy Delivery Screener (>60% Delivery & Volume Surge) | SkandX',
+    desc: 'Analyze daily NSE and BSE Bhavcopy delivery percentages, institutional volume breakouts, and bulk/block deal accumulation.'
+  },
+  '/ipo': {
+    title: 'Live IPO GMP Today, Mainboard & SME IPO Subscription & Allotment Hub | SkandX',
+    desc: 'Track upcoming and open Mainboard & SME IPOs, Grey Market Premium (GMP), retail/QIB subscription numbers, and listing gains.'
+  },
+  '/tax-hub': {
+    title: 'Trader Tax Hub — FY25 STCG 20% / LTCG 12.5% & F&O Tax Harvesting | SkandX',
+    desc: 'Calculate Indian capital gains taxes (STCG 20%, LTCG 12.5%), F&O business income tax, and actionable tax-loss harvesting opportunities.'
   }
 };
 

@@ -1222,6 +1222,32 @@ export default function LandingHomeView({
               <span style={{ cursor: 'pointer', color: '#38bdf8' }} onClick={() => onOpenAlgoBridge('SHARE_LINK')}>SkandX Algo</span>
             </div>
           </div>
+
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            marginTop: '14px',
+            paddingTop: '12px',
+            borderTop: '1px solid rgba(148, 163, 184, 0.08)',
+            fontSize: '11.5px'
+          }}>
+            <div style={{ color: '#64748b' }}>
+              &copy; {new Date().getFullYear()} SkandX Technologies Pvt. Ltd. All rights reserved.
+            </div>
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <a href="/aboutus" style={{ color: '#94a3b8', textDecoration: 'none' }}>About Us</a>
+              <a href="/pricing" style={{ color: '#94a3b8', textDecoration: 'none' }}>Pricing</a>
+              <a href="/privacy-policy" style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
+              <a href="/terms" style={{ color: '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
+              <a href="/risk-policy" style={{ color: '#94a3b8', textDecoration: 'none' }}>Risk Disclosure</a>
+              <a href="/data-rights" style={{ color: '#94a3b8', textDecoration: 'none' }}>Data Rights (DPDP)</a>
+              <a href="/accessibility" style={{ color: '#94a3b8', textDecoration: 'none' }}>Accessibility</a>
+              <a href="/delete-account" style={{ color: '#f87171', textDecoration: 'none', fontWeight: '600' }}>Delete Account</a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

@@ -1032,6 +1032,22 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '13px', fontWeight: '600' }}>About Us</span>
             </div>
+            <a
+              href="/privacy-policy"
+              className="glass-panel hoverable"
+              style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
+            >
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><ShieldCheck size={16} color="#10b981" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Privacy, Terms & Data Rights</span>
+            </a>
+            <a
+              href="/delete-account"
+              className="glass-panel hoverable"
+              style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textDecoration: 'none', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <div style={{ background: 'rgba(239, 68, 68, 0.12)', padding: '8px', borderRadius: '4px' }}><ShieldAlert size={16} color="#ef4444" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Request Account Deletion</span>
+            </a>
           </div>
         </div>
 
