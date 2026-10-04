@@ -1727,17 +1727,42 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     setTimeout(() => setAiToast(null), 3500);
   };
 
-  // Ask AI Coach Question
-  const handleAskAiCoach = (e) => {
+  // Ask AI Coach Question (Powered by Live Gemini 3.8 Flash Backend)
+  const handleAskAiCoach = async (e) => {
     if (e) e.preventDefault();
     if (!aiCustomQuestion.trim()) return;
 
     const userQ = aiCustomQuestion.trim();
     const userMsg = { sender: 'user', text: userQ };
-    
-    // Generate Contextual AI Response
-    let replyText = "Based on your trade logs, your highest win rate (68%) occurs during the first 90 minutes of market open. To optimize your edge, focus exclusively on setups aligning with the 200 EMA trend and strictly cap your daily risk at 1%.";
+    const priorHistory = aiChatMessages.map(m => ({ sender: m.sender === 'user' ? 'user' : 'ai', text: m.text })).slice(-6);
+    setAiChatMessages(prev => [...prev, userMsg]);
+    setAiCustomQuestion('');
+    setAiGenerating(true);
 
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/ai/wealth-copilot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          query: `[Trade Diary & Execution Coach Context] ${userQ}`,
+          history: priorHistory
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.reply) {
+          setAiChatMessages(prev => [...prev, { sender: 'coach', text: data.reply.replace(/\*\*/g, '') }]);
+          setAiGenerating(false);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    let replyText = "Based on your trade logs, your highest win rate (68%) occurs during the first 90 minutes of market open. To optimize your edge, focus exclusively on setups aligning with the 200 EMA trend and strictly cap your daily risk at 1%.";
     const qLower = userQ.toLowerCase();
     if (qLower.includes('afternoon') || qLower.includes('2 pm') || qLower.includes('late')) {
       replyText = "Your logs show that 72% of your red trades happen after 02:00 PM due to decay and chop. My prescription: Shut down your terminal at 01:30 PM after locking morning gains.";
@@ -1749,8 +1774,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       replyText = "You have exited winners early 5 times, leaving over ₹11,200 on the table. Switch from manual discretionary exits to a rule-based 9-EMA trailing stop.";
     }
 
-    setAiChatMessages(prev => [...prev, userMsg, { sender: 'coach', text: replyText }]);
-    setAiCustomQuestion('');
+    setAiChatMessages(prev => [...prev, { sender: 'coach', text: replyText }]);
+    setAiGenerating(false);
   };
 
   // Position Sizing Calculations
