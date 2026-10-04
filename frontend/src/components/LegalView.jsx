@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp } from 'lucide-react';
+import { Shield, ShieldCheck, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function LegalView({ initialTab = 'privacy', onBack }) {
@@ -12,6 +12,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
   const [deleteEmail, setDeleteEmail] = useState(user?.email || '');
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteSubmitted, setDeleteSubmitted] = useState(false);
+  const [deleteRequestId, setDeleteRequestId] = useState('');
 
   // Data Rights Request State
   const [rightsEmail, setRightsEmail] = useState(user?.email || '');
@@ -46,7 +47,10 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
     e.preventDefault();
     if (!deleteEmail.trim()) return;
     if (typeof submitDataRightsRequest === 'function') {
-      await submitDataRightsRequest(deleteEmail.trim(), 'ERASURE', deleteReason);
+      const res = await submitDataRightsRequest(deleteEmail.trim(), 'ERASURE', deleteReason);
+      if (res && res.request_id) {
+        setDeleteRequestId(res.request_id);
+      }
     }
     setDeleteSubmitted(true);
   };
@@ -694,8 +698,13 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 }}>
                   <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 12px' }} />
                   <h3 style={{ color: '#10b981', margin: '0 0 8px' }}>Deletion Request Received</h3>
+                  {deleteRequestId && (
+                    <div style={{ display: 'inline-block', padding: '4px 10px', backgroundColor: 'rgba(16, 185, 129, 0.15)', borderRadius: '6px', color: '#10b981', fontSize: '12px', fontWeight: '700', fontFamily: 'monospace', marginBottom: '10px' }}>
+                      Reference ID: {deleteRequestId}
+                    </div>
+                  )}
                   <p style={{ color: '#9ca3af', fontSize: '13px', margin: 0 }}>
-                    Your request for <strong>{deleteEmail}</strong> has been logged. Our compliance team will 
+                    Your request for <strong>{deleteEmail}</strong> has been logged and our admin team has been notified immediately. Our compliance team will 
                     verify and process your deletion within 48 business hours. You will receive a confirmation email once completed.
                   </p>
                 </div>

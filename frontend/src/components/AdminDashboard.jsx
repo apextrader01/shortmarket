@@ -1352,6 +1352,72 @@ export default function AdminDashboard() {
     }
   };
 
+  // Account Deletion & DPDP Data Rights Requests State
+  const [dataRightsRequests, setDataRightsRequests] = useState([]);
+  const [dataRightsPendingCount, setDataRightsPendingCount] = useState(0);
+  const [dataRightsFilter, setDataRightsFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'ERASURE' | 'COMPLETED'
+  const [dataRightsResolvingId, setDataRightsResolvingId] = useState(null);
+
+  const fetchDataRightsRequests = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/data-rights-requests`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setDataRightsRequests(data.requests || []);
+        setDataRightsPendingCount(data.pendingCount || 0);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch data rights requests:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchDataRightsRequests();
+  }, []);
+
+  const handleResolveDataRightsRequest = async (reqItem, action) => {
+    const isDelete = action === 'DELETE_ACCOUNT';
+    const confirmMsg = isDelete
+      ? `⚠️ PERMANENT ACCOUNT DELETION\n\nAre you sure you want to permanently delete the user account for:\nEmail: ${reqItem.email}\nReference: ${reqItem.request_id}\n\nThis will erase their profile, positions, orders, ledger, and send a final deletion confirmation email to ${reqItem.email}.`
+      : `Mark request ${reqItem.request_id} (${reqItem.email}) as ${action}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const adminNotes = window.prompt(
+      isDelete ? 'Optional Compliance Note (sent in confirmation email):' : 'Optional Admin Note:',
+      isDelete ? 'Account and personal data permanently erased per your request.' : ''
+    );
+    if (adminNotes === null) return;
+
+    setDataRightsResolvingId(reqItem.id);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/data-rights-requests/${reqItem.id}/resolve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ action, admin_notes: adminNotes })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        alert(`✅ ${data.message}`);
+        await fetchDataRightsRequests();
+      } else {
+        alert('Failed: ' + (data?.error || 'Could not process request'));
+      }
+    } catch (err) {
+      alert('Error processing request: ' + err.message);
+    } finally {
+      setDataRightsResolvingId(null);
+    }
+  };
+
   const handleToggleStagingPower = async () => {
     const nextAction = stagingRunning ? 'stop' : 'start';
     const confirmMsg = stagingRunning
@@ -2048,6 +2114,8 @@ export default function AdminDashboard() {
         }
       } else if (activeTab === 'contests') {
         await fetchAdminContests?.();
+      } else if (activeTab === 'deletions') {
+        await fetchDataRightsRequests();
       } else if (activeTab === 'ledger') {
         const { startDate, endDate } = calculateDateBounds(ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd);
         const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch, startDate, endDate);
@@ -2846,6 +2914,17 @@ export default function AdminDashboard() {
           Client Management
         </button>
         <button 
+          onClick={() => { setActiveTab('deletions'); fetchDataRightsRequests(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'deletions' ? '2px solid #ef4444' : '2px solid transparent', color: activeTab === 'deletions' ? '#f87171' : (dataRightsPendingCount > 0 ? '#fca5a5' : 'var(--text-secondary)'), fontWeight: (activeTab === 'deletions' || dataRightsPendingCount > 0) ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+        >
+          🗑️ Account Deletions
+          {dataRightsPendingCount > 0 && (
+            <span style={{ background: '#ef4444', color: '#fff', borderRadius: '999px', padding: '1px 6px', fontSize: '10px', fontWeight: '800', lineHeight: '1.3' }}>
+              {dataRightsPendingCount}
+            </span>
+          )}
+        </button>
+        <button 
           onClick={() => setActiveTab('positions')} 
           style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'positions' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'positions' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'positions' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
@@ -2905,6 +2984,242 @@ export default function AdminDashboard() {
       <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>Loading platform data...</div>
+        ) : activeTab === 'deletions' ? (
+          <div style={{ padding: isMobile ? '12px' : '18px 22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Top Summary & Filter Bar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '12px',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(15, 23, 42, 0.85) 100%)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '10px',
+              padding: '14px 18px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Trash2 size={18} color="#ef4444" />
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                    Account Deletion & DPDP Data Rights Requests
+                  </h3>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Manage client requests submitted via <code>/delete-account</code> and <code>/data-rights</code>. Approving deletion permanently purges the account and sends a confirmation email.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'ALL', label: `All (${dataRightsRequests.length})` },
+                  { id: 'PENDING', label: `Pending (${dataRightsRequests.filter(r => r.status === 'PENDING').length})` },
+                  { id: 'ERASURE', label: `Deletions (${dataRightsRequests.filter(r => r.request_type === 'ERASURE').length})` },
+                  { id: 'COMPLETED', label: `Completed (${dataRightsRequests.filter(r => r.status === 'COMPLETED').length})` }
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setDataRightsFilter(f.id)}
+                    style={{
+                      background: dataRightsFilter === f.id ? '#ef4444' : 'rgba(255,255,255,0.05)',
+                      color: dataRightsFilter === f.id ? '#fff' : 'var(--text-secondary)',
+                      border: dataRightsFilter === f.id ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '5px 10px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={fetchDataRightsRequests}
+                  style={{
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <RefreshCw size={12} /> Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Table of Requests */}
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '10px 12px' }}>Ref ID / Date</th>
+                    <th style={{ padding: '10px 12px' }}>Client Email & Account</th>
+                    <th style={{ padding: '10px 12px' }}>Type</th>
+                    <th style={{ padding: '10px 12px' }}>Reason / Details</th>
+                    <th style={{ padding: '10px 12px' }}>Status</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataRightsRequests
+                    .filter(r => {
+                      if (dataRightsFilter === 'PENDING') return r.status === 'PENDING';
+                      if (dataRightsFilter === 'ERASURE') return r.request_type === 'ERASURE';
+                      if (dataRightsFilter === 'COMPLETED') return r.status === 'COMPLETED';
+                      return true;
+                    })
+                    .map(reqItem => {
+                      const isErasure = reqItem.request_type === 'ERASURE';
+                      const isPending = reqItem.status === 'PENDING';
+                      const isBusy = dataRightsResolvingId === reqItem.id;
+                      return (
+                        <tr key={reqItem.id} style={{ borderBottom: '1px solid var(--border-color)', background: isPending && isErasure ? 'rgba(239, 68, 68, 0.04)' : 'transparent' }}>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontFamily: 'monospace', fontWeight: '700', color: '#10b981', fontSize: '11.5px' }}>
+                              {reqItem.request_id}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {reqItem.created_at ? new Date(reqItem.created_at).toLocaleString('en-IN') : 'N/A'}
+                            </div>
+                            {reqItem.ip_address && (
+                              <div style={{ fontSize: '10px', color: '#6b7280', fontFamily: 'monospace' }}>
+                                IP: {reqItem.ip_address}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ fontWeight: '700', color: '#f3f4f6' }}>{reqItem.email}</div>
+                            {reqItem.matched_user_id ? (
+                              <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '2px' }}>
+                                Matched User #{reqItem.matched_user_id} ({reqItem.matched_username || reqItem.matched_full_name || 'Client'}) • Tier: {reqItem.matched_tier || 'BASIC'}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                                {reqItem.status === 'COMPLETED' ? 'Account deleted / Not in DB' : 'No registered account matched'}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '3px 8px',
+                              borderRadius: '5px',
+                              fontSize: '10.5px',
+                              fontWeight: '800',
+                              background: isErasure ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                              color: isErasure ? '#f87171' : '#fbbf24',
+                              border: isErasure ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)'
+                            }}>
+                              {isErasure ? '🗑️ ACCOUNT DELETION' : reqItem.request_type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', maxWidth: '300px' }}>
+                            <div style={{ color: '#e5e7eb', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {reqItem.details || <span style={{ color: '#6b7280', fontStyle: 'italic' }}>No reason specified</span>}
+                            </div>
+                            {reqItem.admin_notes && (
+                              <div style={{ marginTop: '4px', fontSize: '10.5px', color: '#10b981' }}>
+                                Note: {reqItem.admin_notes}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '3px 8px',
+                              borderRadius: '5px',
+                              fontSize: '10.5px',
+                              fontWeight: '700',
+                              background: isPending ? 'rgba(245, 158, 11, 0.15)' : reqItem.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(107, 114, 128, 0.2)',
+                              color: isPending ? '#fbbf24' : reqItem.status === 'COMPLETED' ? '#10b981' : '#9ca3af'
+                            }}>
+                              {reqItem.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            {isPending ? (
+                              <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                {isErasure && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => handleResolveDataRightsRequest(reqItem, 'DELETE_ACCOUNT')}
+                                    style={{
+                                      background: '#ef4444',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: '5px',
+                                      padding: '5px 10px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: isBusy ? 'wait' : 'pointer'
+                                    }}
+                                  >
+                                    🗑️ Approve & Delete Account
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleResolveDataRightsRequest(reqItem, 'COMPLETED')}
+                                  style={{
+                                    background: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#10b981',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    borderRadius: '5px',
+                                    padding: '5px 9px',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    cursor: isBusy ? 'wait' : 'pointer'
+                                  }}
+                                >
+                                  ✅ Mark Resolved
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleResolveDataRightsRequest(reqItem, 'REJECTED')}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.06)',
+                                    color: '#9ca3af',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '5px',
+                                    padding: '5px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    cursor: isBusy ? 'wait' : 'pointer'
+                                  }}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Processed</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {dataRightsRequests.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '28px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No Account Deletion or Data Rights requests found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : activeTab === 'telegram' ? (
           <div style={{ padding: isMobile ? '10px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Header Banner */}

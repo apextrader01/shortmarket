@@ -419,6 +419,196 @@ async function verifyFirebasePassword(email, password) {
   }
 }
 
+/**
+ * Send Admin & Client notification emails for Account Deletion / DPDP Data Rights Requests
+ */
+async function sendDataRightsNotificationEmail({
+  event = 'SUBMITTED',
+  requestId,
+  email,
+  requestType,
+  details,
+  userId,
+  username,
+  clientIp,
+  adminNotes
+}) {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  if (!nodemailer || !gmailUser || !gmailPass) {
+    console.log(`[DATA RIGHTS EMAIL] Gmail SMTP not configured (GMAIL_USER / GMAIL_APP_PASSWORD). Request ${requestId} (${requestType}) for ${email} logged in database.`);
+    return false;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailPass.replace(/\s+/g, '')
+      }
+    });
+
+    const isErasure = String(requestType).toUpperCase() === 'ERASURE';
+    const typeLabel = isErasure ? 'Account Deletion (Right to Erasure)' : `Data Rights (${requestType})`;
+    const adminRecipients = Array.from(new Set([gmailUser, process.env.ADMIN_EMAIL, 'skandx.in@gmail.com'].filter(Boolean))).join(', ');
+
+    if (event === 'SUBMITTED') {
+      // 1. Send instant alert email to Admin
+      const adminHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #121721; border-radius: 12px; border: 1px solid #ef4444; overflow: hidden;">
+            <tr>
+              <td style="padding: 24px 28px; background: rgba(239, 68, 68, 0.12); border-bottom: 1px solid rgba(239, 68, 68, 0.3);">
+                <div style="font-size: 12px; font-weight: 800; color: #ef4444; text-transform: uppercase; letter-spacing: 1.5px;">SkandX Compliance Alert</div>
+                <h2 style="margin: 6px 0 0; font-size: 20px; font-weight: 800; color: #ffffff;">${isErasure ? '🗑️ New Account Deletion Request' : `🛡️ New ${typeLabel} Request`}</h2>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px;">
+                <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; font-size: 13.5px; color: #e5e7eb; margin-bottom: 20px;">
+                  <tr>
+                    <td style="color: #9ca3af; width: 140px;"><strong>Reference ID:</strong></td>
+                    <td style="font-family: monospace; color: #10b981; font-weight: 700;">${requestId}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #9ca3af;"><strong>Client Email:</strong></td>
+                    <td><a href="mailto:${email}" style="color: #38bdf8; text-decoration: none; font-weight: 600;">${email}</a></td>
+                  </tr>
+                  <tr>
+                    <td style="color: #9ca3af;"><strong>Request Type:</strong></td>
+                    <td style="color: ${isErasure ? '#ef4444' : '#f59e0b'}; font-weight: 700;">${typeLabel}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #9ca3af;"><strong>Matched Account:</strong></td>
+                    <td>${userId ? `User ID #${userId}${username ? ` (${username})` : ''}` : 'No matching registered user found'}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #9ca3af;"><strong>Reason / Details:</strong></td>
+                    <td style="color: #f3f4f6;">${details ? String(details).replace(/</g, '&lt;') : '<em>No reason provided</em>'}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #9ca3af;"><strong>IP Address:</strong></td>
+                    <td style="font-family: monospace; color: #9ca3af;">${clientIp || 'N/A'}</td>
+                  </tr>
+                </table>
+                <div style="text-align: center; margin-top: 24px;">
+                  <a href="https://skandx.in/adminpanel" style="display: inline-block; padding: 12px 24px; background-color: #ef4444; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; border-radius: 8px;">
+                    Open Admin Panel &rarr; Account Deletions
+                  </a>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: `"SkandX Compliance" <${gmailUser}>`,
+        to: adminRecipients,
+        replyTo: email,
+        subject: `🚨 [SkandX Admin] ${isErasure ? 'Account Deletion Request' : typeLabel}: ${email} (${requestId})`,
+        text: `New ${typeLabel} Request\nReference ID: ${requestId}\nClient Email: ${email}\nMatched User ID: ${userId || 'None'}\nReason/Details: ${details || 'N/A'}\nManage at: https://skandx.in/adminpanel`,
+        html: adminHtml
+      });
+
+      // 2. Send acknowledgment email to the requesting client
+      const clientHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
+            <tr>
+              <td style="padding: 28px 28px 20px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #10b981;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Privacy & Compliance Desk</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px;">
+                <h2 style="margin: 0 0 12px; font-size: 18px; color: #f3f4f6;">We Have Received Your Request</h2>
+                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                  Your <strong>${typeLabel}</strong> request for <strong>${email}</strong> has been logged with our Grievance & Privacy Desk.
+                </p>
+                <div style="background-color: #0a0d14; border: 1px solid #10b981; border-radius: 8px; padding: 16px; text-align: center; margin: 0 0 20px;">
+                  <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Tracking Reference ID</div>
+                  <div style="font-size: 20px; font-weight: 800; color: #10b981; font-family: monospace; margin-top: 4px;">${requestId}</div>
+                </div>
+                <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #6b7280;">
+                  Our compliance team will verify and process your request within 48 business hours. You will receive a final confirmation email once completed. If you did not submit this request, please reply to this email immediately.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        to: email,
+        replyTo: 'skandx.in@gmail.com',
+        subject: `SkandX: ${isErasure ? 'Account Deletion' : 'Data Rights'} Request Received (${requestId})`,
+        text: `Your ${typeLabel} request for ${email} has been received (Reference ID: ${requestId}). Our compliance team will process it within 48 business hours.`,
+        html: clientHtml
+      });
+
+      return true;
+    }
+
+    if (event === 'COMPLETED' || event === 'DELETED') {
+      const doneHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
+            <tr>
+              <td style="padding: 28px 28px 20px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #10b981;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Privacy & Compliance Desk</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px;">
+                <h2 style="margin: 0 0 12px; font-size: 18px; color: #10b981;">${event === 'DELETED' ? 'Account Permanently Deleted' : 'Data Rights Request Completed'}</h2>
+                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
+                  ${event === 'DELETED'
+                    ? `In accordance with your erasure request (Reference: <strong>${requestId}</strong>), your SkandX account (<strong>${email}</strong>), profile credentials, and associated personal data have been permanently erased from our active systems.`
+                    : `Your data rights request (Reference: <strong>${requestId}</strong>) for <strong>${email}</strong> has been resolved by our compliance team.`}
+                </p>
+                ${adminNotes ? `<div style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9ca3af; margin-bottom: 16px;"><strong>Compliance Note:</strong> ${String(adminNotes).replace(/</g, '&lt;')}</div>` : ''}
+                <p style="margin: 0; font-size: 12.5px; color: #6b7280;">
+                  Thank you for using SkandX. For any further privacy inquiries, contact <a href="mailto:skandx.in@gmail.com" style="color: #10b981;">skandx.in@gmail.com</a>.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        to: email,
+        replyTo: 'skandx.in@gmail.com',
+        subject: `SkandX: ${event === 'DELETED' ? 'Account Deletion Completed' : 'Data Rights Request Resolved'} (${requestId})`,
+        text: `${event === 'DELETED' ? 'Your SkandX account and personal data have been permanently deleted.' : 'Your SkandX data rights request has been completed.'} Reference ID: ${requestId}.`,
+        html: doneHtml
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('[DATA RIGHTS EMAIL] Failed to send notification email:', err.message);
+  }
+  return false;
+}
+
 module.exports = {
   getFirebaseAdminAuth,
   ensureFirebaseUser,
@@ -427,6 +617,7 @@ module.exports = {
   syncFirebaseUserPassword,
   sendFirebaseLoginEmail,
   sendEmailOtpViaService,
+  sendDataRightsNotificationEmail,
   verifyFirebasePhoneToken,
   verifyFirebasePasswordResetOobCode,
   verifyFirebasePassword

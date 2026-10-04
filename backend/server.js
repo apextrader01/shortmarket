@@ -2877,25 +2877,61 @@ app.post('/api/user/data-rights-request', async (req, res) => {
       } catch (e) {}
     }
 
-    if (!userId) {
-      const u = await db('users').where({ email: cleanEmail }).first();
-      if (u) userId = u.id;
+    let matchedUser = null;
+    if (userId) {
+      matchedUser = await db('users').where({ id: userId }).first();
+    } else {
+      matchedUser = await db('users').whereRaw('LOWER(email) = ?', [cleanEmail]).first();
+      if (matchedUser) userId = matchedUser.id;
     }
 
     const crypto = require('crypto');
     const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
     const requestId = `DRR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomSuffix}`;
     const clientIp = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '').replace(/^::ffff:/, '').trim();
+    const cleanDetails = details ? String(details).trim().slice(0, 2000) : null;
 
     await db('data_rights_requests').insert({
       request_id: requestId,
       user_id: userId,
       email: cleanEmail,
       request_type: cleanType,
-      details: details ? String(details).trim().slice(0, 2000) : null,
+      details: cleanDetails,
       status: 'PENDING',
       ip_address: clientIp
     });
+
+    // Notify Admin & Client via Email asynchronously
+    try {
+      const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+      if (typeof sendDataRightsNotificationEmail === 'function') {
+        sendDataRightsNotificationEmail({
+          event: 'SUBMITTED',
+          requestId,
+          email: cleanEmail,
+          requestType: cleanType,
+          details: cleanDetails,
+          userId,
+          username: matchedUser?.username || matchedUser?.full_name || null,
+          clientIp
+        }).catch(err => console.warn('[DATA RIGHTS EMAIL ERROR]', err.message));
+      }
+    } catch (e) {}
+
+    // Notify connected Admin Dashboard in real-time via Socket.IO
+    try {
+      if (typeof io !== 'undefined' && io) {
+        io.emit('admin_data_rights_request', {
+          request_id: requestId,
+          user_id: userId,
+          email: cleanEmail,
+          request_type: cleanType,
+          details: cleanDetails,
+          status: 'PENDING',
+          created_at: new Date().toISOString()
+        });
+      }
+    } catch (e) {}
 
     res.json({
       success: true,
@@ -2903,6 +2939,185 @@ app.post('/api/user/data-rights-request', async (req, res) => {
       message: `Your data rights request (${cleanType}) has been logged. Under Section 13 of the DPDP Act 2023, our Grievance Redressal Officer will acknowledge within 24 hours and resolve your request within 30 days.`
     });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: List all Account Deletion & DPDP Data Rights Requests
+app.get('/api/admin/data-rights-requests', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const requests = await db('data_rights_requests as drr')
+      .leftJoin('users as u', function () {
+        this.on('drr.user_id', '=', 'u.id').orOn(db.raw('LOWER(drr.email) = LOWER(u.email)'));
+      })
+      .select(
+        'drr.id',
+        'drr.request_id',
+        'drr.user_id',
+        'drr.email',
+        'drr.request_type',
+        'drr.details',
+        'drr.status',
+        'drr.admin_notes',
+        'drr.ip_address',
+        'drr.created_at',
+        'drr.updated_at',
+        'u.id as matched_user_id',
+        'u.username as matched_username',
+        'u.full_name as matched_full_name',
+        'u.balance as matched_balance',
+        'u.subscription_tier as matched_tier',
+        'u.is_admin as matched_is_admin'
+      )
+      .orderBy('drr.created_at', 'desc')
+      .limit(250);
+
+    const pendingCount = requests.filter(r => r.status === 'PENDING').length;
+    const erasurePendingCount = requests.filter(r => r.status === 'PENDING' && r.request_type === 'ERASURE').length;
+
+    res.json({
+      success: true,
+      requests,
+      pendingCount,
+      erasurePendingCount
+    });
+  } catch (err) {
+    console.error('Admin Data Rights List Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Resolve or Execute Account Deletion for a Data Rights Request
+app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const reqRow = await db('data_rights_requests').where({ id: req.params.id }).first();
+    if (!reqRow) return res.status(404).json({ error: 'Request not found' });
+
+    const { action, admin_notes } = req.body; // 'DELETE_ACCOUNT' | 'COMPLETED' | 'REJECTED'
+    const cleanAction = String(action || 'COMPLETED').toUpperCase();
+    const notes = admin_notes ? String(admin_notes).trim().slice(0, 1000) : null;
+
+    if (cleanAction === 'DELETE_ACCOUNT') {
+      // Find user by user_id or email
+      let targetUser = null;
+      if (reqRow.user_id) {
+        targetUser = await db('users').where({ id: reqRow.user_id }).first();
+      }
+      if (!targetUser && reqRow.email) {
+        targetUser = await db('users').whereRaw('LOWER(email) = ?', [String(reqRow.email).toLowerCase().trim()]).first();
+      }
+
+      if (targetUser) {
+        if (targetUser.is_admin) {
+          return res.status(400).json({ error: 'Cannot delete an administrator account.' });
+        }
+        const targetUserId = targetUser.id;
+        let ordersToClean = [];
+
+        await db.transaction(async (trx) => {
+          await trx.raw('SELECT pg_advisory_xact_lock(?)', [targetUserId]);
+
+          ordersToClean = await trx('orders')
+            .where({ user_id: targetUserId })
+            .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
+
+          await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
+          await trx('orders').where({ user_id: targetUserId }).del();
+          await trx('positions').where({ user_id: targetUserId }).del();
+          await trx('ledger').where({ user_id: targetUserId }).del();
+          await trx('holdings').where({ user_id: targetUserId }).del();
+          await trx('sips').where({ user_id: targetUserId }).del();
+          await trx('deposit_requests').where({ user_id: targetUserId }).del();
+          await trx('user_sessions').where({ user_id: targetUserId }).del();
+          await trx('users').where({ id: targetUserId }).del();
+
+          await trx('data_rights_requests').where({ id: reqRow.id }).update({
+            user_id: null,
+            status: 'COMPLETED',
+            admin_notes: notes || `Account #${targetUserId} (${targetUser.email}) permanently deleted by Admin.`,
+            updated_at: new Date()
+          });
+        });
+
+        const { banCache } = require('./middleware/auth');
+        if (banCache) {
+          banCache.set(Number(targetUserId), { exists: false, is_banned: false, ts: Date.now() });
+          banCache.set(String(targetUserId), { exists: false, is_banned: false, ts: Date.now() });
+        }
+
+        const triggerEngine = require('./services/triggerEngine');
+        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+        for (const ord of ordersToClean) {
+          triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+          try {
+            volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+          } catch (e) {}
+        }
+      } else {
+        // User already deleted or never existed; mark request completed
+        await db('data_rights_requests').where({ id: reqRow.id }).update({
+          status: 'COMPLETED',
+          admin_notes: notes || 'No active user account found for this email; marked completed.',
+          updated_at: new Date()
+        });
+      }
+
+      // Send deletion confirmation email to client
+      try {
+        const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        if (typeof sendDataRightsNotificationEmail === 'function') {
+          sendDataRightsNotificationEmail({
+            event: 'DELETED',
+            requestId: reqRow.request_id,
+            email: reqRow.email,
+            requestType: reqRow.request_type,
+            adminNotes: notes
+          }).catch(() => {});
+        }
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        message: targetUser
+          ? `Account for ${reqRow.email} has been permanently deleted and request ${reqRow.request_id} marked COMPLETED.`
+          : `No matching account found for ${reqRow.email}; request ${reqRow.request_id} marked COMPLETED.`
+      });
+    }
+
+    const nextStatus = cleanAction === 'REJECTED' ? 'REJECTED' : 'COMPLETED';
+    await db('data_rights_requests').where({ id: reqRow.id }).update({
+      status: nextStatus,
+      admin_notes: notes || `Marked ${nextStatus} by Admin.`,
+      updated_at: new Date()
+    });
+
+    if (nextStatus === 'COMPLETED') {
+      try {
+        const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        if (typeof sendDataRightsNotificationEmail === 'function') {
+          sendDataRightsNotificationEmail({
+            event: 'COMPLETED',
+            requestId: reqRow.request_id,
+            email: reqRow.email,
+            requestType: reqRow.request_type,
+            adminNotes: notes
+          }).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      message: `Request ${reqRow.request_id} marked as ${nextStatus}.`
+    });
+  } catch (err) {
+    console.error('Admin Data Rights Resolve Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
