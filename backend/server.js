@@ -1083,6 +1083,46 @@ async function findUserByIdentifier(identifier) {
   }).first();
 }
 
+// ─── Live Username / Full Name Availability Check (6–15 chars, One User One Name) ───
+app.get('/api/auth/check-username', async (req, res) => {
+  try {
+    const raw = String(req.query.username || '');
+    const cleanName = raw.replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+
+    if (!cleanName || cleanName.length < 6 || cleanName.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanName) || letterCount < 5) {
+      return res.json({
+        available: false,
+        valid: false,
+        message: 'Name must contain letters only and be 6 to 15 characters.'
+      });
+    }
+
+    const normalizedKey = cleanName.replace(/\s+/g, '').toLowerCase();
+    let query = db('users').whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedKey]);
+    if (req.query.exclude_id && !isNaN(Number(req.query.exclude_id))) {
+      query = query.whereNot('id', Number(req.query.exclude_id));
+    }
+
+    const existingUser = await query.select('id', 'username').first();
+    if (existingUser) {
+      return res.json({
+        available: false,
+        valid: true,
+        message: `"${cleanName}" is unavailable. This name is already taken.`
+      });
+    }
+
+    return res.json({
+      available: true,
+      valid: true,
+      message: `"${cleanName}" is available.`
+    });
+  } catch (err) {
+    res.status(500).json({ available: false, error: err.message });
+  }
+});
+
 // ─── Send Registration OTP ──────────────────────────────────────────────────
 app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
   const { username, email, phone } = req.body || {};
@@ -1108,14 +1148,15 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'An account with this phone number already exists.' });
     }
     if (username) {
-      const trimmedUser = String(username).trim();
+      const trimmedUser = String(username).replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
       const letterCount = trimmedUser.replace(/[^A-Za-z]/g, '').length;
-      if (!/^[A-Za-z\s]{5,15}$/.test(trimmedUser) || letterCount < 5) {
-        return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
+      if (trimmedUser.length < 6 || trimmedUser.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(trimmedUser) || letterCount < 5) {
+        return res.status(400).json({ error: 'Name must contain letters only and be between 6 and 15 characters.' });
       }
-      const existingUser = await db('users').whereRaw('LOWER(username) = ?', [trimmedUser.toLowerCase()]).first();
+      const normalizedKey = trimmedUser.replace(/\s+/g, '').toLowerCase();
+      const existingUser = await db('users').whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedKey]).first();
       if (existingUser) {
-        return res.status(400).json({ error: 'Username is already taken. Please choose another username.' });
+        return res.status(400).json({ error: `"${trimmedUser}" is unavailable. This name is already taken by another user.` });
       }
     }
 
@@ -1166,11 +1207,11 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
   const cleanEmail = String(email).toLowerCase().trim();
   const cleanPhone = String(phone).replace(/\D/g, '');
-  const cleanUsername = String(username).trim();
+  const cleanUsername = String(username).replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
   const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
 
-  if (!/^[A-Za-z\s]{5,15}$/.test(cleanUsername) || letterCount < 5) {
-    return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
+  if (cleanUsername.length < 6 || cleanUsername.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanUsername) || letterCount < 5) {
+    return res.status(400).json({ error: 'Name must contain letters only and be between 6 and 15 characters.' });
   }
 
   if (cleanPhone.length !== 10) {
@@ -1195,17 +1236,19 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   }
 
   try {
-    // Check for existing duplicates
-    const existingUser = await db('users')
-      .whereRaw('LOWER(email) = ?', [cleanEmail])
-      .orWhere('phone', cleanPhone)
-      .orWhereRaw('LOWER(username) = ?', [cleanUsername.toLowerCase()])
-      .first();
-
-    if (existingUser) {
-      if (existingUser.email && existingUser.email.toLowerCase() === cleanEmail) return res.status(400).json({ error: 'An account with this email already exists.' });
-      if (existingUser.phone === cleanPhone) return res.status(400).json({ error: 'An account with this phone number already exists.' });
-      if (existingUser.username && existingUser.username.toLowerCase() === cleanUsername.toLowerCase()) return res.status(400).json({ error: 'Username is already taken.' });
+    // Check for existing duplicates (strictly one user per name, email, and phone)
+    const normalizedUsernameKey = cleanUsername.replace(/\s+/g, '').toLowerCase();
+    const existingEmailUser = await db('users').whereRaw('LOWER(email) = ?', [cleanEmail]).first();
+    if (existingEmailUser) {
+      return res.status(400).json({ error: 'An account with this email already exists.' });
+    }
+    const existingPhoneUser = await db('users').where('phone', cleanPhone).first();
+    if (existingPhoneUser) {
+      return res.status(400).json({ error: 'An account with this phone number already exists.' });
+    }
+    const existingNameUser = await db('users').whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedUsernameKey]).first();
+    if (existingNameUser) {
+      return res.status(400).json({ error: `"${cleanUsername}" is unavailable. This name is already registered by another user.` });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -2747,22 +2790,6 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/user/details', authenticateToken, async (req, res) => {
-  try {
-    const { phone, pan_card, aadhar_number, address } = req.body;
-    const updateObj = {};
-    if (phone !== undefined) updateObj.phone = phone;
-    if (pan_card !== undefined) updateObj.pan_card = pan_card;
-    if (aadhar_number !== undefined) updateObj.aadhar_number = aadhar_number;
-    if (address !== undefined) updateObj.address = address;
-
-    await db('users').where({ id: req.user.id }).update(updateObj);
-    res.json({ success: true, ...updateObj });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.post('/api/user/kyc', authenticateToken, async (req, res) => {
   try {
     const { kyc_pan_url, kyc_aadhar_url, consent_kyc_processing } = req.body;
@@ -3188,25 +3215,27 @@ app.post('/api/user/password', authenticateToken, async (req, res) => {
 
 const handleUpdateUserDetails = async (req, res) => {
   try {
-    const { username, phone, pan_card, address, upi_id, bank_account_no, bank_ifsc } = req.body || {};
+    const { username, phone, pan_card, aadhar_number, address, upi_id, bank_account_no, bank_ifsc } = req.body || {};
     const updates = {};
     if (username !== undefined) {
-      const cleanName = String(username).trim();
+      const cleanName = String(username).replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
       const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
-      if (!/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
-        return res.status(400).json({ error: 'Name must contain letters only and be between 5 and 15 characters.' });
+      if (cleanName.length < 6 || cleanName.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanName) || letterCount < 5) {
+        return res.status(400).json({ error: 'Name must contain letters only and be between 6 and 15 characters.' });
       }
+      const normalizedKey = cleanName.replace(/\s+/g, '').toLowerCase();
       const existingUser = await db('users')
-        .whereRaw('LOWER(username) = ?', [cleanName.toLowerCase()])
+        .whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedKey])
         .whereNot('id', req.user.id)
         .first();
       if (existingUser) {
-        return res.status(400).json({ error: 'Name is already taken by another user.' });
+        return res.status(400).json({ error: `"${cleanName}" is unavailable. This name is already taken by another user.` });
       }
       updates.username = cleanName;
     }
     if (phone !== undefined) updates.phone = String(phone).trim();
     if (pan_card !== undefined) updates.pan_card = String(pan_card).trim().toUpperCase();
+    if (aadhar_number !== undefined) updates.aadhar_number = String(aadhar_number).trim();
     if (address !== undefined) updates.address = String(address).trim();
     if (upi_id !== undefined) updates.upi_id = String(upi_id).trim();
     if (bank_account_no !== undefined) updates.bank_account_no = String(bank_account_no).trim();

@@ -124,12 +124,52 @@ export default function SettingsView() {
     }
   }, [user]);
 
+  const [profileNameAvailability, setProfileNameAvailability] = useState({ status: 'idle', message: '' });
+
+  useEffect(() => {
+    if (!isEditingProfile) {
+      setProfileNameAvailability({ status: 'idle', message: '' });
+      return;
+    }
+    const cleanName = String(profileForm.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    const currentClean = String(user?.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+    if (!cleanName || cleanName.length < 6 || letterCount < 5 || cleanName.replace(/\s+/g, '').toLowerCase() === currentClean.replace(/\s+/g, '').toLowerCase()) {
+      setProfileNameAvailability({ status: 'idle', message: '' });
+      return;
+    }
+
+    setProfileNameAvailability({ status: 'checking', message: 'Checking availability...' });
+    const timer = setTimeout(async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${API_URL}/api/auth/check-username?username=${encodeURIComponent(cleanName)}&exclude_id=${encodeURIComponent(user?.id || '')}`);
+        const data = await res.json();
+        if (data && data.valid === false) {
+          setProfileNameAvailability({ status: 'idle', message: '' });
+        } else if (data && data.available) {
+          setProfileNameAvailability({ status: 'available', message: `"${cleanName}" is available` });
+        } else {
+          setProfileNameAvailability({ status: 'unavailable', message: data?.message || `"${cleanName}" is unavailable` });
+        }
+      } catch (e) {
+        setProfileNameAvailability({ status: 'idle', message: '' });
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [profileForm.username, isEditingProfile, user?.id, user?.username]);
+
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    const cleanName = (profileForm.username || '').replace(/[^A-Za-z\s]/g, '').trim();
+    const cleanName = (profileForm.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
     const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
-    if (!cleanName || !/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
-      setProfileMsg({ type: 'error', text: 'Name must contain letters only and be between 5 and 15 characters.' });
+    if (!cleanName || cleanName.length < 6 || cleanName.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanName) || letterCount < 5) {
+      setProfileMsg({ type: 'error', text: 'Name must contain letters only and be between 6 and 15 characters.' });
+      return;
+    }
+    if (profileNameAvailability.status === 'unavailable') {
+      setProfileMsg({ type: 'error', text: `"${cleanName}" is unavailable. Please choose another name.` });
       return;
     }
     setProfileLoading(true);
@@ -281,23 +321,45 @@ export default function SettingsView() {
               <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Full Name</label>
-                    <span style={{ fontSize: '11px', color: (profileForm.username || '').replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)', fontWeight: '600' }}>
-                      Letters only (5–15) · {(profileForm.username || '').length}/15
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Full Name (Unique)</label>
+                    <span style={{
+                      fontSize: '11px',
+                      color: profileNameAvailability.status === 'unavailable'
+                        ? '#ef4444'
+                        : profileNameAvailability.status === 'available'
+                          ? '#10b981'
+                          : ((profileForm.username || '').trim().length >= 6 && (profileForm.username || '').replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)'),
+                      fontWeight: '700'
+                    }}>
+                      {profileNameAvailability.status === 'unavailable'
+                        ? `✗ Unavailable · ${(profileForm.username || '').length}/15`
+                        : profileNameAvailability.status === 'available'
+                          ? `✓ Available · ${(profileForm.username || '').length}/15`
+                          : `Letters only (6–15) · ${(profileForm.username || '').length}/15`}
                     </span>
                   </div>
                   <input
                     type="text"
                     required
-                    minLength={5}
+                    minLength={6}
                     maxLength={15}
-                    pattern="[A-Za-z\s]{5,15}"
-                    title="Letters only, minimum 5 and maximum 15 characters"
+                    pattern="[A-Za-z\s]{6,15}"
+                    title="Letters only, minimum 6 and maximum 15 characters"
                     className="input"
                     value={profileForm.username || ''}
                     onChange={e => setProfileForm({ ...profileForm, username: e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15) })}
-                    placeholder="John Doe (5-15 letters)"
+                    placeholder="e.g. Hari J (6-15 letters)"
                   />
+                  {profileNameAvailability.status === 'unavailable' && (
+                    <div style={{ marginTop: '5px', fontSize: '11.5px', color: '#ef4444', fontWeight: '600' }}>
+                      ⚠️ {profileNameAvailability.message}
+                    </div>
+                  )}
+                  {profileNameAvailability.status === 'available' && (
+                    <div style={{ marginTop: '5px', fontSize: '11.5px', color: '#10b981', fontWeight: '600' }}>
+                      ✓ {profileNameAvailability.message}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Phone Number</label>

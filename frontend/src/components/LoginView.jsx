@@ -95,6 +95,42 @@ export default function LoginView() {
   const [consentDataProcessing, setConsentDataProcessing] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
 
+  // Real-time Full Name / Username Availability State (6-15 chars, One User One Name)
+  const [nameAvailability, setNameAvailability] = useState({ status: 'idle', message: '' });
+
+  useEffect(() => {
+    if (view !== 'register') {
+      setNameAvailability({ status: 'idle', message: '' });
+      return;
+    }
+    const cleanName = String(username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+    if (!cleanName || cleanName.length < 6 || letterCount < 5) {
+      setNameAvailability({ status: 'idle', message: '' });
+      return;
+    }
+
+    setNameAvailability({ status: 'checking', message: 'Checking availability...' });
+    const timer = setTimeout(async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${API_URL}/api/auth/check-username?username=${encodeURIComponent(cleanName)}`);
+        const data = await res.json();
+        if (data && data.valid === false) {
+          setNameAvailability({ status: 'idle', message: '' });
+        } else if (data && data.available) {
+          setNameAvailability({ status: 'available', message: `"${cleanName}" is available` });
+        } else {
+          setNameAvailability({ status: 'unavailable', message: data?.message || `"${cleanName}" is unavailable` });
+        }
+      } catch (e) {
+        setNameAvailability({ status: 'idle', message: '' });
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [username, view]);
+
   const setupRecaptchaVerifier = () => {
     if (window.recaptchaVerifier) {
       return window.recaptchaVerifier;
@@ -268,10 +304,15 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
-      const cleanName = username.replace(/[^A-Za-z\s]/g, '').trim();
+      const cleanName = username.replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
       const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
-      if (!cleanName || !/^[A-Za-z\s]{5,15}$/.test(cleanName) || letterCount < 5) {
-        useStore.setState({ authError: 'Name must contain letters only and be between 5 and 15 characters.' });
+      if (!cleanName || cleanName.length < 6 || cleanName.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanName) || letterCount < 5) {
+        useStore.setState({ authError: 'Name must contain letters only and be between 6 and 15 characters.' });
+        setLoading(false);
+        return;
+      }
+      if (nameAvailability.status === 'unavailable') {
+        useStore.setState({ authError: `"${cleanName}" is unavailable. Please choose another name.` });
         setLoading(false);
         return;
       }
@@ -735,23 +776,54 @@ export default function LoginView() {
           {view === 'register' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Full Name</label>
-                <span style={{ fontSize: '11px', color: username.replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)', fontWeight: '600' }}>
-                  Letters only (5–15) · {username.length}/15
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Full Name (Unique)</label>
+                <span style={{
+                  fontSize: '11px',
+                  color: nameAvailability.status === 'unavailable'
+                    ? '#ef4444'
+                    : nameAvailability.status === 'available'
+                      ? '#10b981'
+                      : (username.trim().length >= 6 && username.replace(/[^A-Za-z]/g, '').length >= 5 ? '#10b981' : 'var(--text-secondary)'),
+                  fontWeight: '700'
+                }}>
+                  {nameAvailability.status === 'unavailable'
+                    ? `✗ Unavailable · ${username.length}/15`
+                    : nameAvailability.status === 'available'
+                      ? `✓ Available · ${username.length}/15`
+                      : `Letters only (6–15) · ${username.length}/15`}
                 </span>
               </div>
               <input
                 type="text"
                 required
-                minLength={5}
+                minLength={6}
                 maxLength={15}
-                pattern="[A-Za-z\s]{5,15}"
-                title="Letters only, minimum 5 and maximum 15 characters"
+                pattern="[A-Za-z\s]{6,15}"
+                title="Letters only, minimum 6 and maximum 15 characters"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z\s]/g, '').slice(0, 15))}
                 className="premium-input"
-                placeholder="John Doe (5-15 letters)"
+                placeholder="e.g. Hari J (6-15 letters)"
+                style={{
+                  borderColor: nameAvailability.status === 'unavailable'
+                    ? '#ef4444'
+                    : nameAvailability.status === 'available'
+                      ? '#10b981'
+                      : undefined
+                }}
               />
+              {nameAvailability.status === 'unavailable' && (
+                <div style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>⚠️</span>
+                  <span>{nameAvailability.message}</span>
+                </div>
+              )}
+              {nameAvailability.status === 'available' && (
+                <div style={{ marginTop: '6px', fontSize: '12px', color: '#10b981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>✓</span>
+                  <span>{nameAvailability.message}</span>
+                </div>
+              )}
             </div>
           )}
 
