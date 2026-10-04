@@ -659,7 +659,63 @@ app.disable('x-powered-by');
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginOpenerPolicy: false,
-  contentSecurityPolicy: false, // Managed at reverse proxy / frontend layer
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "https://checkout.razorpay.com",
+        "https://www.googletagmanager.com",
+        "https://www.google-analytics.com",
+        "https://apis.google.com"
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://fonts.googleapis.com",
+        "https://checkout.razorpay.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "data:",
+        "https://fonts.gstatic.com"
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https:",
+        "https://*.razorpay.com",
+        "https://www.google-analytics.com"
+      ],
+      connectSrc: [
+        "'self'",
+        "https://*.skandx.in",
+        "https://api.razorpay.com",
+        "https://checkout.razorpay.com",
+        "https://*.firebaseio.com",
+        "https://*.googleapis.com",
+        "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+        "https://www.google-analytics.com",
+        "wss:",
+        "ws:"
+      ],
+      frameSrc: [
+        "'self'",
+        "https://api.razorpay.com",
+        "https://checkout.razorpay.com"
+      ],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      upgradeInsecureRequests: []
+    }
+  },
   dnsPrefetchControl: { allow: false },
   frameguard: { action: 'sameorigin' },
   hidePoweredBy: true,
@@ -667,6 +723,13 @@ app.use(helmet({
   noSniff: true,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
+
+// 🛡️ Security Hardening Headers (Permissions-Policy & Cross-Origin-Opener-Policy)
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), usb=(), bluetooth=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 
 const allowedOrigins = [
   'https://skandx.in',
