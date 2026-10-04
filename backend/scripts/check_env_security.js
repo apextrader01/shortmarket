@@ -144,15 +144,19 @@ for (const item of secretFiles) {
   console.log('------------------------------------------------------------------------');
   try {
     require('dotenv').config({ path: backendEnvPath, quiet: true });
-    const db = require('../database/db');
-    const rows = await db('system_settings').select('key', 'value').orderBy('key', 'asc');
-    if (!rows || rows.length === 0) {
-      console.log('  ⚪ No rows found in system_settings table.');
+    if (!process.env.DATABASE_URL) {
+      console.log('  ⚪ DATABASE_URL not set in backend/.env — skipping DB query.');
     } else {
-      for (const r of rows) {
-        const isSecret = /secret|token|pin|totp|key|password/i.test(r.key);
-        const display = isSecret ? maskValue(r.key, r.value) : String(r.value || '').slice(0, 60);
-        console.log(`  ✅ ${String(r.key).padEnd(28)} = ${display}`);
+      const db = require('../database/db');
+      const rows = await db('system_settings').select('key', 'value').orderBy('key', 'asc');
+      if (!rows || rows.length === 0) {
+        console.log('  ⚪ No rows found in system_settings table.');
+      } else {
+        for (const r of rows) {
+          const isSecret = /secret|token|pin|totp|key|password/i.test(r.key);
+          const display = isSecret ? maskValue(r.key, r.value) : String(r.value || '').slice(0, 60);
+          console.log(`  ✅ ${String(r.key).padEnd(28)} = ${display}`);
+        }
       }
     }
   } catch (err) {
