@@ -71,6 +71,7 @@ const BrokerConnectModal = lazyWithRetry(() => import('./components/BrokerConnec
 const WealthPersonalFinanceModal = lazyWithRetry(() => import('./components/WealthPersonalFinanceModal'));
 const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/MutualFundsExplorerModal'));
 const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBridgeDashboardModal'));
+const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -86,7 +87,7 @@ import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles } from 'lucide-react';
+import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -402,6 +403,7 @@ function App() {
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
       'home': 'Home',
+      'algo': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
       'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
       'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
       'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
@@ -439,6 +441,7 @@ function App() {
     if (activeTab) {
       let newPath = '/';
       if (activeTab === 'Home') newPath = '/';
+      else if (activeTab === 'Algo') newPath = '/algo';
       else if (activeTab === 'TradeDiary') newPath = '/trade-diary';
       else if (activeTab === 'PrimaryMarkets') newPath = '/primary-markets';
       else newPath = `/${activeTab.toLowerCase()}`;
@@ -458,6 +461,7 @@ function App() {
       }
       const tabsMap = {
         'home': 'Home',
+        'algo': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
@@ -832,7 +836,7 @@ function App() {
             }} 
             onOpenMutualFunds={() => setShowMutualFundsModal(true)} 
             onOpenLeaderboard={() => setActiveTab('Leaderboard')} 
-            onOpenAlgoBridge={() => setShowAlgoBridgeModal(true)} 
+            onOpenAlgoBridge={() => setActiveTab('Algo')} 
           />
         </Suspense>
       ) : activeTab === 'PrimaryMarkets' ? (
@@ -849,6 +853,13 @@ function App() {
             onBack={() => setActiveTab('Home')} 
             onOpenProfile={() => setActiveTab('ClientData')}
             onNavigate={(tab) => setActiveTab(tab)}
+          />
+        </Suspense>
+      ) : activeTab === 'Algo' ? (
+        <Suspense fallback={<TabLoader />}>
+          <SkandxAlgoView 
+            onBack={() => setActiveTab('Home')} 
+            onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
         </Suspense>
       ) : (
@@ -915,6 +926,7 @@ function App() {
                   {[
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
+                    { key: 'Algo', label: 'SkandX Algo' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
@@ -1270,6 +1282,7 @@ function App() {
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
+            { label: 'SkandX Algo Platform', key: 'Algo', icon: Cpu },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
