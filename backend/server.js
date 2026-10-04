@@ -11407,12 +11407,12 @@ Key context:
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🌟 ALGODELTA MULTI-BROKER DEMAT & WEBHOOK BRIDGE SUITE (HUB 12)
+// 🌟 SKANDX ALGO MULTI-BROKER DEMAT & WEBHOOK BRIDGE SUITE (HUB 11 / HUB 12)
 // ─────────────────────────────────────────────────────────────────────────────
 let bridgeOrdersStore = [
   {
     id: 'BO-98210',
-    timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: '09:25 AM',
     broker: 'Zerodha Kite',
     account: 'ZER-6641',
     symbol: 'NSE:NIFTY24OCTFUT',
@@ -11424,7 +11424,7 @@ let bridgeOrdersStore = [
   },
   {
     id: 'BO-98209',
-    timestamp: new Date(Date.now() - 3600000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: '09:18 AM',
     broker: 'Angel One',
     account: 'ANG-9012',
     symbol: 'NSE:BANKNIFTY24OCTFUT',
@@ -11440,15 +11440,172 @@ let bridgeConfig = {
   allowConnectAccount: true,
   allowPurchaseIp: true,
   connectionToken: 'skandx_broker_demat_9433',
-  availableCredit: 0.00,
-  totalDemat: 2,
+  availableCredit: 2500.00,
+  totalDemat: 3,
   disconnectedDemat: 0,
   expiredDemat: 2,
-  totalStaticIp: 2,
-  availableStaticIp: 0
+  totalStaticIp: 3,
+  availableStaticIp: 1
 };
 
+let dematAccountsStore = [
+  {
+    id: 'ACC-01',
+    broker: 'Zerodha Kite Connect',
+    brokerKey: 'zerodha',
+    clientCode: 'ZER-6641',
+    name: 'Harikrishnan Primary',
+    apiKey: 'kite_live_94a382b',
+    status: 'EXPIRED',
+    tradingActive: true,
+    ip: '103.212.120.45',
+    lastLogin: 'Today, 08:30 AM',
+    expiresIn: 'Expired (Requires Daily TOTP Auth)',
+    segment: 'Equity, F&O, Currency'
+  },
+  {
+    id: 'ACC-02',
+    broker: 'Angel One SmartAPI',
+    brokerKey: 'angel',
+    clientCode: 'ANG-9012',
+    name: 'Harikrishnan Alpha Hedge',
+    apiKey: 'smartapi_a89bc2',
+    status: 'EXPIRED',
+    tradingActive: true,
+    ip: '103.212.120.46',
+    lastLogin: 'Yesterday, 03:20 PM',
+    expiresIn: 'Expired (TOTP Re-auth required)',
+    segment: 'Futures & Options'
+  },
+  {
+    id: 'ACC-03',
+    broker: 'Upstox Pro API v2',
+    brokerKey: 'upstox',
+    clientCode: 'UPS-5501',
+    name: 'Momentum Scalper',
+    apiKey: 'upstox_live_7718',
+    status: 'ACTIVE',
+    tradingActive: true,
+    ip: '103.212.120.45',
+    lastLogin: 'Today, 09:15 AM',
+    expiresIn: 'Active (Valid 14h)',
+    segment: 'NSE Equities'
+  }
+];
+
+let staticIpsStore = [
+  {
+    id: 'IP-01',
+    ip: '103.212.120.45',
+    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+    status: 'WHITELISTED',
+    latency: '1.8 ms',
+    assignedTo: 'ZER-6641 (Zerodha), UPS-5501 (Upstox)',
+    port: '8080 (SOCKS5/HTTP)',
+    expiresAt: '30 Days Remaining'
+  },
+  {
+    id: 'IP-02',
+    ip: '103.212.120.46',
+    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+    status: 'WHITELISTED',
+    latency: '2.1 ms',
+    assignedTo: 'ANG-9012 (Angel One)',
+    port: '8080 (SOCKS5/HTTP)',
+    expiresAt: '28 Days Remaining'
+  },
+  {
+    id: 'IP-03',
+    ip: '103.212.120.47',
+    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+    status: 'AVAILABLE',
+    latency: '1.9 ms',
+    assignedTo: 'Unassigned (Ready for Demat)',
+    port: '8080 (SOCKS5/HTTP)',
+    expiresAt: 'Dedicated Pool'
+  }
+];
+
+let linkedUsersStore = [
+  {
+    id: 'LNK-101',
+    clientName: 'Rajesh Kumar',
+    email: 'rajesh.k@gmail.com',
+    broker: 'Zerodha Kite',
+    clientCode: 'RK7821',
+    connectedAt: '02 Oct 2026, 11:40 AM',
+    status: 'CONNECTED',
+    allowTrading: true,
+    copyRatio: '1.0x'
+  },
+  {
+    id: 'LNK-102',
+    clientName: 'Priya Sharma',
+    email: 'priya.invests@outlook.com',
+    broker: 'Groww Demat',
+    clientCode: 'GW5540',
+    connectedAt: '03 Oct 2026, 02:15 PM',
+    status: 'CONNECTED',
+    allowTrading: true,
+    copyRatio: '0.5x'
+  },
+  {
+    id: 'LNK-103',
+    clientName: 'Vikram Patel',
+    email: 'vikram.p@yahoo.in',
+    broker: 'Angel One',
+    clientCode: 'VP9912',
+    connectedAt: '03 Oct 2026, 05:30 PM',
+    status: 'PENDING_REAUTH',
+    allowTrading: false,
+    copyRatio: '1.0x'
+  }
+];
+
+let watchlistStore = [
+  { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend', algoActive: true },
+  { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3', algoActive: true },
+  { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Reversion', algoActive: false },
+  { id: 'WL-04', symbol: 'NSE:HDFCBANK', ltp: 1682.10, change: '+14.60 (+0.88%)', isUp: true, high: 1690.00, low: 1665.00, algoStrategy: 'Breakout 15M', algoActive: true },
+  { id: 'WL-05', symbol: 'MCX:GOLD26OCTFUT', ltp: 76450.00, change: '+180.00 (+0.24%)', isUp: true, high: 76600.00, low: 76220.00, algoStrategy: 'ATR Volatility', algoActive: false }
+];
+
+let copyGroupsStore = {
+  groupName: 'SkandX High-Alpha Mirror Group',
+  masterAccount: 'ZER-6641',
+  status: 'ACTIVE',
+  maxLossLimit: 15000,
+  followers: [
+    { id: 'FOL-01', accountCode: 'ANG-9012', broker: 'Angel One', multiplier: 1.0, maxRiskPerTrade: 3000, status: 'ACTIVE' },
+    { id: 'FOL-02', accountCode: 'UPS-5501', broker: 'Upstox', multiplier: 0.5, maxRiskPerTrade: 1500, status: 'ACTIVE' }
+  ]
+};
+
+// 1. Unified state endpoint
+app.get('/api/v1/bridge/all', (req, res) => {
+  const expiredCount = dematAccountsStore.filter(a => a.status === 'EXPIRED').length;
+  bridgeConfig.totalDemat = dematAccountsStore.length;
+  bridgeConfig.expiredDemat = expiredCount;
+  bridgeConfig.disconnectedDemat = dematAccountsStore.filter(a => a.status === 'DISCONNECTED').length;
+  bridgeConfig.totalStaticIp = staticIpsStore.length;
+  bridgeConfig.availableStaticIp = staticIpsStore.filter(i => i.status === 'AVAILABLE').length;
+
+  res.json({
+    success: true,
+    stats: bridgeConfig,
+    demats: dematAccountsStore,
+    staticIps: staticIpsStore,
+    linkedUsers: linkedUsersStore,
+    watchlist: watchlistStore,
+    copyGroups: copyGroupsStore,
+    orders: bridgeOrdersStore
+  });
+});
+
 app.get('/api/v1/bridge/stats', (req, res) => {
+  const expiredCount = dematAccountsStore.filter(a => a.status === 'EXPIRED').length;
+  bridgeConfig.totalDemat = dematAccountsStore.length;
+  bridgeConfig.expiredDemat = expiredCount;
   res.json({ success: true, stats: bridgeConfig, orders: bridgeOrdersStore });
 });
 
@@ -11465,9 +11622,160 @@ app.post('/api/v1/bridge/regenerate-token', (req, res) => {
   res.json({ success: true, token: bridgeConfig.connectionToken });
 });
 
+// 2. Demat CRUD & Session Renewals
+app.post('/api/v1/bridge/demats', (req, res) => {
+  try {
+    const { broker, clientCode, name, apiKey, ip } = req.body;
+    if (!clientCode) return res.status(400).json({ error: 'Client code is required' });
+
+    const newAcc = {
+      id: 'ACC-' + Math.floor(10 + Math.random() * 90),
+      broker: broker || 'Zerodha Kite Connect',
+      brokerKey: (broker || '').toLowerCase().includes('angel') ? 'angel' : 'zerodha',
+      clientCode: clientCode.toUpperCase(),
+      name: name || `${clientCode} Trading A/C`,
+      apiKey: apiKey || 'kite_' + Math.random().toString(36).substring(2, 8),
+      status: 'ACTIVE',
+      tradingActive: true,
+      ip: ip || '103.212.120.45',
+      lastLogin: 'Just now',
+      expiresIn: 'Active (Valid 24h)',
+      segment: 'Equity, F&O, Currency'
+    };
+
+    dematAccountsStore.unshift(newAcc);
+    res.json({ success: true, account: newAcc, demats: dematAccountsStore });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/demats/:id/renew', (req, res) => {
+  const acc = dematAccountsStore.find(a => a.id === req.params.id);
+  if (acc) {
+    acc.status = 'ACTIVE';
+    acc.lastLogin = 'Just now';
+    acc.expiresIn = 'Active (Valid 24h)';
+    return res.json({ success: true, account: acc });
+  }
+  res.status(404).json({ error: 'Account not found' });
+});
+
+app.post('/api/v1/bridge/demats/:id/toggle-trade', (req, res) => {
+  const acc = dematAccountsStore.find(a => a.id === req.params.id);
+  if (acc) {
+    acc.tradingActive = !acc.tradingActive;
+    return res.json({ success: true, account: acc });
+  }
+  res.status(404).json({ error: 'Account not found' });
+});
+
+app.delete('/api/v1/bridge/demats/:id', (req, res) => {
+  dematAccountsStore = dematAccountsStore.filter(a => a.id !== req.params.id);
+  res.json({ success: true, demats: dematAccountsStore });
+});
+
 app.post('/api/v1/bridge/renew-demat', (req, res) => {
+  dematAccountsStore.forEach(a => {
+    a.status = 'ACTIVE';
+    a.expiresIn = 'Active (Valid 24h)';
+    a.lastLogin = 'Just now';
+  });
   bridgeConfig.expiredDemat = 0;
-  res.json({ success: true, message: 'Demat tokens renewed successfully for Zerodha Kite and Angel One' });
+  res.json({ success: true, message: 'All Demat tokens renewed successfully!' });
+});
+
+// 3. Static IP Allocation
+app.post('/api/v1/bridge/ips/purchase', (req, res) => {
+  const octet = Math.floor(50 + Math.random() * 150);
+  const newIp = {
+    id: 'IP-0' + (staticIpsStore.length + 1),
+    ip: `103.212.120.${octet}`,
+    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+    status: 'AVAILABLE',
+    latency: (1.5 + Math.random()).toFixed(1) + ' ms',
+    assignedTo: 'Unassigned (Dedicated Pool)',
+    port: '8080 (SOCKS5/HTTP)',
+    expiresAt: '30 Days Remaining'
+  };
+  staticIpsStore.push(newIp);
+  res.json({ success: true, ip: newIp, ips: staticIpsStore });
+});
+
+// 4. Watchlist Management & Trading
+app.post('/api/v1/bridge/watchlist/add', (req, res) => {
+  const { symbol, ltp } = req.body;
+  if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+  const item = {
+    id: 'WL-' + Math.floor(10 + Math.random() * 90),
+    symbol: symbol.toUpperCase(),
+    ltp: Number(ltp) || 2450.00,
+    change: '+15.20 (+0.62%)',
+    isUp: true,
+    high: (Number(ltp) || 2450) * 1.01,
+    low: (Number(ltp) || 2450) * 0.99,
+    algoStrategy: 'EMA Breakout',
+    algoActive: true
+  };
+  watchlistStore.push(item);
+  res.json({ success: true, item, watchlist: watchlistStore });
+});
+
+app.delete('/api/v1/bridge/watchlist/:id', (req, res) => {
+  watchlistStore = watchlistStore.filter(w => w.id !== req.params.id);
+  res.json({ success: true, watchlist: watchlistStore });
+});
+
+// 5. Emergency Kill Switch
+app.post('/api/v1/bridge/kill-switch', (req, res) => {
+  copyGroupsStore.status = 'PAUSED';
+  dematAccountsStore.forEach(a => { a.tradingActive = false; });
+  const killOrder = {
+    id: 'KILL-' + Math.floor(1000 + Math.random() * 9000),
+    timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    broker: 'ALL BROKERS',
+    account: 'MASTER & SLAVES',
+    symbol: 'ALL POSITIONS',
+    side: 'EXIT_ALL',
+    qty: 0,
+    price: 0,
+    status: 'SQUARED_OFF',
+    source: 'Emergency Kill Switch'
+  };
+  bridgeOrdersStore.unshift(killOrder);
+  res.json({ success: true, message: 'EMERGENCY KILL SWITCH ENGAGED: All algo positions exited and copy trading paused!' });
+});
+
+// 6. Credit Recharge
+app.post('/api/v1/bridge/credit/recharge', (req, res) => {
+  const amount = Number(req.body.amount) || 1000;
+  bridgeConfig.availableCredit += amount;
+  res.json({ success: true, credit: bridgeConfig.availableCredit });
+});
+
+// 7. Order Placement & Webhook Trigger
+app.post('/api/v1/bridge/order', (req, res) => {
+  try {
+    const payload = req.body || {};
+    const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
+    const newOrder = {
+      id: orderId,
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      broker: payload.broker || 'Zerodha Kite',
+      account: payload.account || 'ZER-6641',
+      symbol: payload.symbol || 'NSE:NIFTY24OCTFUT',
+      side: payload.side || payload.action || 'BUY',
+      qty: Number(payload.qty) || 50,
+      price: Number(payload.price) || 25014.60,
+      status: 'COMPLETED',
+      source: payload.source || 'Manual Algo Placement'
+    };
+    bridgeOrdersStore.unshift(newOrder);
+    if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
+    res.json({ success: true, orderId, order: newOrder });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/v1/bridge/webhook', (req, res) => {

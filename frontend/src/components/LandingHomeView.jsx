@@ -248,16 +248,16 @@ export default function LandingHomeView({
       id: 11,
       hubNum: '11',
       category: 'TRADING',
-      title: 'AlgoDelta Multi-Broker Demat & Bridge Suite',
+      title: 'SkandX Algo Multi-Broker Demat & Bridge Suite',
       shortDesc: 'Multi-broker Demat connection, Dedicated Static IPs, TradingView JSON Webhook Bridge & copy trading.',
       icon: Cpu,
-      color: '#ef4444',
-      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(249, 115, 22, 0.05))',
-      border: 'rgba(239, 68, 68, 0.35)',
-      badge: 'ALGODELTA v4.9',
-      badgeColor: '#ef4444',
+      color: '#0284c7',
+      gradient: 'linear-gradient(135deg, rgba(2, 132, 199, 0.22), rgba(56, 189, 248, 0.05))',
+      border: 'rgba(56, 189, 248, 0.35)',
+      badge: 'SKANDX ALGO PRO',
+      badgeColor: '#38bdf8',
       tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts'],
-      actionLabel: 'Launch AlgoDelta Console',
+      actionLabel: 'Launch SkandX Algo Console',
       primaryAction: onOpenAlgoBridge || onOpenPaperTrading,
       quickLinks: [
         { label: 'Share Demat Link', action: onOpenAlgoBridge },
@@ -389,7 +389,7 @@ export default function LandingHomeView({
             onClick={onOpenAlgoBridge}
             style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', borderRadius: '6px' }}
           >
-            AlgoDelta Demat Bridge
+            SkandX Algo Bridge
           </button>
           <button 
             onClick={() => onOpenWealthFinance('AI_COPILOT')}
