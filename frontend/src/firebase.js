@@ -3,9 +3,9 @@ import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
-// Your web app's Firebase configuration
+// Firebase configuration loaded from environment variables (.env)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "skandx-1020f.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "skandx-1020f",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "skandx-1020f.firebasestorage.app",
@@ -14,23 +14,28 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3NQ59H44ZX"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Export storage to be used in components
-export const storage = getStorage(app);
-
-export const auth = getAuth(app);
-
-// Initialize Google Analytics conditionally (respecting environment and browser capabilities)
+let app = null;
+let storage = null;
+let auth = null;
 let analytics = null;
-if (typeof window !== 'undefined') {
-  isSupported().then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-      window.__SKANDX_FIREBASE_ANALYTICS__ = analytics;
+
+try {
+  if (firebaseConfig.apiKey) {
+    app = initializeApp(firebaseConfig);
+    storage = getStorage(app);
+    auth = getAuth(app);
+
+    if (typeof window !== 'undefined') {
+      isSupported().then((supported) => {
+        if (supported && app) {
+          analytics = getAnalytics(app);
+          window.__SKANDX_FIREBASE_ANALYTICS__ = analytics;
+        }
+      }).catch(() => {});
     }
-  }).catch(() => {});
+  }
+} catch (err) {
+  console.warn('[Firebase] Client initialization skipped:', err.message);
 }
 
-export { analytics };
+export { storage, auth, analytics };

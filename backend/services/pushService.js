@@ -3,24 +3,34 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../database/db');
 
-// 🔑 Load VAPID keys for Web Push
+// 🔑 Load VAPID keys for Web Push from .env or gitignored config/vapid.json
 let vapidKeys = {
-  publicKey: process.env.VAPID_PUBLIC_KEY || 'BEcmTWGEu-kOR8KQTZ2vr-DhQpAYvNz6UQHFVsXaoZx9cg0gO_Qnqqd8VEO5Sz2GsCbBNOH0K8FPGSWK1j5JBTk',
-  privateKey: process.env.VAPID_PRIVATE_KEY || 'opP1qZnwuiocr837GG8XfVcHOXANrnhyfwAgYKaBNYw'
+  publicKey: process.env.VAPID_PUBLIC_KEY || '',
+  privateKey: process.env.VAPID_PRIVATE_KEY || ''
 };
 
 try {
-  const configPath = path.join(__dirname, '../config/vapid.json');
-  if (fs.existsSync(configPath)) {
+  const configDir = path.join(__dirname, '../config');
+  const configPath = path.join(configDir, 'vapid.json');
+  if ((!vapidKeys.publicKey || !vapidKeys.privateKey) && fs.existsSync(configPath)) {
     vapidKeys = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
-} catch(e) {}
+  if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+    vapidKeys = webpush.generateVAPIDKeys();
+    try {
+      if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify(vapidKeys, null, 2), { mode: 0o600 });
+    } catch (_) {}
+  }
+} catch (e) {}
 
-webpush.setVapidDetails(
-  'mailto:skandx.in@gmail.com',
-  vapidKeys.publicKey,
-  vapidKeys.privateKey
-);
+if (vapidKeys.publicKey && vapidKeys.privateKey) {
+  webpush.setVapidDetails(
+    'mailto:skandx.in@gmail.com',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+}
 
 // 📱 Firebase Admin SDK for Native Android / iOS Push Notifications (FCM)
 let fcmMessaging = null;

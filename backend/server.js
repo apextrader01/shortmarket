@@ -11387,7 +11387,42 @@ app.delete('/api/journal/rules/:id', authenticateToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 🌟 24/7 PERSONAL AI WEALTH COPILOT (Powered by Google Gemini 3.8 Flash)
 // ─────────────────────────────────────────────────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || Buffer.from('QVEuQWI4Uk42SkQ0RUk5bnpIY0xHb05LX1BOYWJ0UFNrZFZRd1Z4cF9vaGROdXpEbUhGQmc=', 'base64').toString('utf8');
+let _cachedDbGeminiKey = null;
+let _lastDbGeminiKeyCheck = 0;
+
+async function resolveGeminiApiKey() {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+  try {
+    const keyFilePath = path.join(__dirname, 'config', 'gemini.key');
+    if (fs.existsSync(keyFilePath)) {
+      const fileKey = fs.readFileSync(keyFilePath, 'utf8').trim();
+      if (fileKey) return fileKey;
+    }
+  } catch (_) {}
+
+  const now = Date.now();
+  if (_cachedDbGeminiKey && (now - _lastDbGeminiKeyCheck < 300000)) {
+    return _cachedDbGeminiKey;
+  }
+  try {
+    const row = await db('system_settings').where({ key: 'gemini_api_key' }).first();
+    _lastDbGeminiKeyCheck = now;
+    if (row && row.value && String(row.value).trim()) {
+      _cachedDbGeminiKey = String(row.value).trim();
+      return _cachedDbGeminiKey;
+    }
+  } catch (_) {}
+  return '';
+}
+
+const aiCopilotLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many AI queries. Please wait a moment before asking again.' },
+  keyGenerator: (req) => getClientIp(req)
+});
 
 // Quantitative Financial Solver for Instant Context-Aware Math & Fallback
 function buildQuantitativeWealthReply(cleanQuery, cleanHistory) {
@@ -11490,15 +11525,15 @@ function buildQuantitativeWealthReply(cleanQuery, cleanHistory) {
     `Share your **age, monthly salary, and target corpus** (e.g., *"Age 25, ₹20k salary, need ₹15L in 10 years"*) for an exact rupee-by-rupee calculation!`;
 }
 
-app.post('/api/ai/wealth-copilot', async (req, res) => {
+app.post('/api/ai/wealth-copilot', aiCopilotLimiter, async (req, res) => {
   try {
-    const { query, history } = req.body;
+    const { query, history } = req.body || {};
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'Query is required' });
     }
 
-    const cleanQuery = query.trim();
-    const cleanHistory = Array.isArray(history) ? history : [];
+    const cleanQuery = query.trim().slice(0, 1500);
+    const cleanHistory = Array.isArray(history) ? history.slice(-20) : [];
 
     // Build strictly alternating user -> model -> user conversation contents for Gemini API
     const systemPrompt = `You are SkandX's Elite AI Wealth, Trading & Personal Finance Copilot.
@@ -11515,7 +11550,7 @@ Key rules:
     const rawTurns = [];
     for (const item of cleanHistory) {
       if (!item || !item.text) continue;
-      const text = String(item.text).trim();
+      const text = String(item.text).trim().slice(0, 2000);
       if (!text) continue;
       // Skip initial static greeting from model so contents[0] is always 'user'
       if (rawTurns.length === 0 && item.sender !== 'user') continue;
@@ -11544,15 +11579,15 @@ Key rules:
       }
     }
 
+    const geminiApiKey = await resolveGeminiApiKey();
     const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
     let aiResponseText = null;
-    let lastError = null;
 
-    if (GEMINI_API_KEY) {
+    if (geminiApiKey) {
       for (const model of modelsToTry) {
         try {
           const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -11577,12 +11612,9 @@ Key rules:
               aiResponseText = text;
               break;
             }
-          } else {
-            const errData = await geminiRes.json().catch(() => ({}));
-            lastError = errData?.error?.message || `HTTP ${geminiRes.status}`;
           }
-        } catch (err) {
-          lastError = err.message;
+        } catch (_) {
+          // Continue to next model or quantitative fallback
         }
       }
     }
@@ -11592,16 +11624,26 @@ Key rules:
     }
 
     const fallbackReply = buildQuantitativeWealthReply(cleanQuery, cleanHistory);
-    return res.json({ success: true, reply: fallbackReply, source: 'quant-engine', note: lastError });
+    return res.json({ success: true, reply: fallbackReply, source: 'quant-engine' });
   } catch (err) {
-    console.error('Wealth Copilot Error:', err);
-    res.status(500).json({ error: 'Failed to process AI query', details: err.message });
+    console.error('Wealth Copilot Error:', err.message);
+    res.status(500).json({ error: 'Failed to process AI query' });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🌟 SKANDX ALGO MULTI-BROKER DEMAT & WEBHOOK BRIDGE SUITE (HUB 11 / HUB 12)
 // ─────────────────────────────────────────────────────────────────────────────
+function maskBrokerApiKey(rawKey) {
+  const clean = String(rawKey || '').trim();
+  if (!clean) return 'kite_••••382b';
+  if (clean.includes('••••')) return clean;
+  if (clean.length <= 6) return clean.slice(0, 2) + '••••';
+  return `${clean.slice(0, 4)}••••${clean.slice(-4)}`;
+}
+
+app.use('/api/v1/bridge', apiLimiter);
+
 let bridgeOrdersStore = [
   {
     id: 'BO-98210',
@@ -11648,7 +11690,7 @@ let dematAccountsStore = [
     brokerKey: 'zerodha',
     clientCode: 'ZER-6641',
     name: 'Harikrishnan Primary',
-    apiKey: 'kite_live_94a382b',
+    apiKey: 'kite_••••382b',
     status: 'EXPIRED',
     tradingActive: true,
     ip: '103.212.120.45',
@@ -11662,7 +11704,7 @@ let dematAccountsStore = [
     brokerKey: 'angel',
     clientCode: 'ANG-9012',
     name: 'Harikrishnan Alpha Hedge',
-    apiKey: 'smartapi_a89bc2',
+    apiKey: 'smar••••9bc2',
     status: 'EXPIRED',
     tradingActive: true,
     ip: '103.212.120.46',
@@ -11676,7 +11718,7 @@ let dematAccountsStore = [
     brokerKey: 'upstox',
     clientCode: 'UPS-5501',
     name: 'Momentum Scalper',
-    apiKey: 'upstox_live_7718',
+    apiKey: 'upst••••7718',
     status: 'ACTIVE',
     tradingActive: true,
     ip: '103.212.120.45',
@@ -11803,43 +11845,46 @@ app.get('/api/v1/bridge/stats', (req, res) => {
 });
 
 app.post('/api/v1/bridge/config', (req, res) => {
-  const { allowConnectAccount, allowPurchaseIp, connectionToken } = req.body;
+  const { allowConnectAccount, allowPurchaseIp, connectionToken } = req.body || {};
   if (allowConnectAccount !== undefined) bridgeConfig.allowConnectAccount = !!allowConnectAccount;
   if (allowPurchaseIp !== undefined) bridgeConfig.allowPurchaseIp = !!allowPurchaseIp;
-  if (connectionToken) bridgeConfig.connectionToken = String(connectionToken);
+  if (connectionToken) bridgeConfig.connectionToken = String(connectionToken).slice(0, 64);
   res.json({ success: true, stats: bridgeConfig });
 });
 
 app.post('/api/v1/bridge/regenerate-token', (req, res) => {
-  bridgeConfig.connectionToken = 'skandx_demat_' + Math.random().toString(36).substring(2, 9);
+  const crypto = require('crypto');
+  bridgeConfig.connectionToken = 'skandx_demat_' + crypto.randomBytes(6).toString('hex');
   res.json({ success: true, token: bridgeConfig.connectionToken });
 });
 
 // 2. Demat CRUD & Session Renewals
 app.post('/api/v1/bridge/demats', (req, res) => {
   try {
-    const { broker, clientCode, name, apiKey, ip } = req.body;
+    const { broker, clientCode, name, apiKey, ip } = req.body || {};
     if (!clientCode) return res.status(400).json({ error: 'Client code is required' });
+    const safeClientCode = String(clientCode).trim().slice(0, 24).toUpperCase();
 
     const newAcc = {
       id: 'ACC-' + Math.floor(10 + Math.random() * 90),
-      broker: broker || 'Zerodha Kite Connect',
-      brokerKey: (broker || '').toLowerCase().includes('angel') ? 'angel' : 'zerodha',
-      clientCode: clientCode.toUpperCase(),
-      name: name || `${clientCode} Trading A/C`,
-      apiKey: apiKey || 'kite_' + Math.random().toString(36).substring(2, 8),
+      broker: String(broker || 'Zerodha Kite Connect').slice(0, 48),
+      brokerKey: String(broker || '').toLowerCase().includes('angel') ? 'angel' : 'zerodha',
+      clientCode: safeClientCode,
+      name: String(name || `${safeClientCode} Trading A/C`).slice(0, 48),
+      apiKey: maskBrokerApiKey(apiKey),
       status: 'ACTIVE',
       tradingActive: true,
-      ip: ip || '103.212.120.45',
+      ip: String(ip || '103.212.120.45').slice(0, 32),
       lastLogin: 'Just now',
       expiresIn: 'Active (Valid 24h)',
       segment: 'Equity, F&O, Currency'
     };
 
     dematAccountsStore.unshift(newAcc);
+    if (dematAccountsStore.length > 25) dematAccountsStore.pop();
     res.json({ success: true, account: newAcc, demats: dematAccountsStore });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to add Demat account' });
   }
 });
 
@@ -11892,16 +11937,17 @@ app.post('/api/v1/bridge/ips/purchase', (req, res) => {
     expiresAt: '30 Days Remaining'
   };
   staticIpsStore.push(newIp);
+  if (staticIpsStore.length > 25) staticIpsStore.shift();
   res.json({ success: true, ip: newIp, ips: staticIpsStore });
 });
 
 // 4. Watchlist Management & Trading
 app.post('/api/v1/bridge/watchlist/add', (req, res) => {
-  const { symbol, ltp } = req.body;
+  const { symbol, ltp } = req.body || {};
   if (!symbol) return res.status(400).json({ error: 'Symbol required' });
   const item = {
     id: 'WL-' + Math.floor(10 + Math.random() * 90),
-    symbol: symbol.toUpperCase(),
+    symbol: String(symbol).slice(0, 32).toUpperCase(),
     ltp: Number(ltp) || 2450.00,
     change: '+15.20 (+0.62%)',
     isUp: true,
@@ -11911,6 +11957,7 @@ app.post('/api/v1/bridge/watchlist/add', (req, res) => {
     algoActive: true
   };
   watchlistStore.push(item);
+  if (watchlistStore.length > 30) watchlistStore.shift();
   res.json({ success: true, item, watchlist: watchlistStore });
 });
 
@@ -11936,12 +11983,13 @@ app.post('/api/v1/bridge/kill-switch', (req, res) => {
     source: 'Emergency Kill Switch'
   };
   bridgeOrdersStore.unshift(killOrder);
+  if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
   res.json({ success: true, message: 'EMERGENCY KILL SWITCH ENGAGED: All algo positions exited and copy trading paused!' });
 });
 
 // 6. Credit Recharge
 app.post('/api/v1/bridge/credit/recharge', (req, res) => {
-  const amount = Number(req.body.amount) || 1000;
+  const amount = Math.max(0, Math.min(1000000, Number(req.body?.amount) || 1000));
   bridgeConfig.availableCredit += amount;
   res.json({ success: true, credit: bridgeConfig.availableCredit });
 });
@@ -11954,20 +12002,20 @@ app.post('/api/v1/bridge/order', (req, res) => {
     const newOrder = {
       id: orderId,
       timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: payload.broker || 'Zerodha Kite',
-      account: payload.account || 'ZER-6641',
-      symbol: payload.symbol || 'NSE:NIFTY24OCTFUT',
-      side: payload.side || payload.action || 'BUY',
-      qty: Number(payload.qty) || 50,
-      price: Number(payload.price) || 25014.60,
+      broker: String(payload.broker || 'Zerodha Kite').slice(0, 32),
+      account: String(payload.account || 'ZER-6641').slice(0, 24),
+      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 32),
+      side: String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase(),
+      qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
+      price: Math.max(0, Number(payload.price) || 25014.60),
       status: 'COMPLETED',
-      source: payload.source || 'Manual Algo Placement'
+      source: String(payload.source || 'Manual Algo Placement').slice(0, 48)
     };
     bridgeOrdersStore.unshift(newOrder);
     if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
     res.json({ success: true, orderId, order: newOrder });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: 'Invalid order payload' });
   }
 });
 
@@ -11978,12 +12026,12 @@ app.post('/api/v1/bridge/webhook', (req, res) => {
     const newOrder = {
       id: orderId,
       timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: payload.broker || 'Zerodha Kite',
-      account: payload.account || 'ZER-6641',
-      symbol: payload.symbol || 'NSE:NIFTY24OCTFUT',
-      side: payload.action || payload.side || 'BUY',
-      qty: Number(payload.qty) || 50,
-      price: Number(payload.price) || 24850.00,
+      broker: String(payload.broker || 'Zerodha Kite').slice(0, 32),
+      account: String(payload.account || 'ZER-6641').slice(0, 24),
+      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 32),
+      side: String(payload.action || payload.side || 'BUY').slice(0, 12).toUpperCase(),
+      qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
+      price: Math.max(0, Number(payload.price) || 24850.00),
       status: 'COMPLETED',
       source: 'TradingView Webhook'
     };
@@ -11991,7 +12039,7 @@ app.post('/api/v1/bridge/webhook', (req, res) => {
     if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
     res.json({ success: true, orderId, status: 'ORDER_PLACED', order: newOrder });
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(400).json({ success: false, error: 'Invalid webhook payload' });
   }
 });
 

@@ -1,18 +1,40 @@
 node_modules/
-.env
-backend/database/shortmarket.db
-backend/database/shortmarket.db-journal
 backend/node_modules/
 frontend/node_modules/
 .DS_Store
 
+# Environment & Secret Files (Strictly Excluded from Git)
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.production
+.jwt_secret
+backend/.jwt_secret
+backend/config/
+*service-account*.json
+*google-services.json
+*.pem
+*.key
+
+# Local Databases & Journals
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+backend/database/shortmarket.db
+backend/database/shortmarket.db-journal
+
+# Build & Runtime Artifacts
 backend/logs/
 frontend/dist/
 dist/
 *.bak
-*service-account.json
-backend/config/
 *.log
 test-results/
-.jwt_secret
-backend/.jwt_secret

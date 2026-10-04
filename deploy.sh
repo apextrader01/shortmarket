@@ -19,14 +19,24 @@ NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 # 2. Frontend Build (Full, complete installation)
 echo "🌐 Installing Frontend Dependencies & Building..."
+if [ -f backend/.env ] && [ ! -f frontend/.env ]; then
+  FB_KEY=$(grep -E '^FIREBASE_API_KEY=' backend/.env | cut -d '=' -f2- | tr -d '\r')
+  if [ -n "$FB_KEY" ]; then
+    echo "VITE_FIREBASE_API_KEY=$FB_KEY" > frontend/.env
+  fi
+fi
 cd frontend
 npm install
 npm run build
 cd ..
 
-# 3. Backend Dependencies (Full, complete installation)
+# 3. Backend Dependencies & Environment Verification
 echo "⚙️  Installing Backend Dependencies..."
 cd backend
+if [ ! -f .env ]; then
+  echo "⚠️  WARNING: backend/.env not found! Creating from .env.example (please populate secrets in backend/.env)..."
+  cp .env.example .env 2>/dev/null || touch .env
+fi
 npm install --omit=dev
 
 # 4. Run Critical Database Schema Migrations

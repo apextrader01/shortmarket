@@ -3,6 +3,7 @@ const db = require('../database/db').default || require('../database/db');
 const fs = require('fs');
 const path = require('path');
 const { verifyFyersAuth } = require('./fyers');
+const { JWT_SECRET } = require('../middleware/auth');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
 
 function base32tohex(base32) {
@@ -46,7 +47,7 @@ function generateTOTP(secret, epochTime = Date.now()) {
 function encryptSecret(plaintext) {
     if (!plaintext || typeof plaintext !== 'string') return '';
     if (plaintext.startsWith('enc:')) return plaintext;
-    const secret = process.env.JWT_SECRET || '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3';
+    const secret = process.env.JWT_SECRET || JWT_SECRET;
     const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -65,7 +66,7 @@ function decryptSecret(ciphertext) {
 
     const candidateSecrets = Array.from(new Set([
         process.env.JWT_SECRET,
-        '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3',
+        JWT_SECRET,
         'shortmarket_totp_encryption_secret_key_2026'
     ].filter(Boolean)));
 
