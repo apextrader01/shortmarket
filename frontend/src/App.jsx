@@ -941,8 +941,6 @@ function App() {
                   {[
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
-                    { key: 'Calculators', label: 'Calculators' },
-                    { key: 'Algo', label: 'SkandX Algo' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
@@ -1302,8 +1300,6 @@ function App() {
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
-            { label: 'Calculators Suite', key: 'Calculators', icon: Calculator },
-            { label: 'SkandX Algo Platform', key: 'Algo', icon: Cpu },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
