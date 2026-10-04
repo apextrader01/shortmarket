@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap');
+/* Fonts loaded asynchronously via <link rel="preconnect"> in index.html for high-performance mobile LCP */
 
 :root {
   /* Brand Colors from Logo */
@@ -16,7 +16,7 @@
   --bg-secondary: #111827;
   --bg-panel: rgba(15, 32, 60, 0.4);
   --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
+  --text-secondary: #CBD5E1; /* WCAG AAA compliant high-contrast slate-300 */
   --border-color: rgba(255, 255, 255, 0.1);
   --border-highlight: rgba(255, 255, 255, 0.2);
   

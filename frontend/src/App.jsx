@@ -29,26 +29,26 @@ const lazyWithRetry = (importFn) => lazy(async () => {
   }
 });
 
-// ⚡ Core Dashboard Views (Imported directly for instant 0ms switching with zero "Loading module..." delay)
-import ChartWidget from './components/ChartWidget';
-import PositionsView from './components/PositionsView';
-import OrdersView from './components/OrdersView';
-import PortfolioView from './components/PortfolioView';
-import ClientDataView from './components/ClientDataView';
-import OptionChainView from './components/OptionChainView';
-import MutualFundsView from './components/MutualFundsView';
-import AnalyticsView from './components/AnalyticsView';
-import LeaderboardView from './components/LeaderboardView';
-import PricingView from './components/PricingView';
-import AboutUsView from './components/AboutUsView';
-import ReferralsView from './components/ReferralsView';
-import OrderModal from './components/OrderModal';
-import EditOrderModal from './components/EditOrderModal';
-import DepositModal from './components/DepositModal';
-import BasketModal from './components/BasketModal';
-import BroadcastToast from './components/BroadcastToast';
-import NotificationDrawer from './components/NotificationDrawer';
-import BroadcastModal from './components/BroadcastModal';
+// ⚡ Lazy Loaded Dashboard Views for Sub-2s Mobile LCP & Fast Initial Paint
+const ChartWidget = lazyWithRetry(() => import('./components/ChartWidget'));
+const PositionsView = lazyWithRetry(() => import('./components/PositionsView'));
+const OrdersView = lazyWithRetry(() => import('./components/OrdersView'));
+const PortfolioView = lazyWithRetry(() => import('./components/PortfolioView'));
+const ClientDataView = lazyWithRetry(() => import('./components/ClientDataView'));
+const OptionChainView = lazyWithRetry(() => import('./components/OptionChainView'));
+const MutualFundsView = lazyWithRetry(() => import('./components/MutualFundsView'));
+const AnalyticsView = lazyWithRetry(() => import('./components/AnalyticsView'));
+const LeaderboardView = lazyWithRetry(() => import('./components/LeaderboardView'));
+const PricingView = lazyWithRetry(() => import('./components/PricingView'));
+const AboutUsView = lazyWithRetry(() => import('./components/AboutUsView'));
+const ReferralsView = lazyWithRetry(() => import('./components/ReferralsView'));
+const OrderModal = lazyWithRetry(() => import('./components/OrderModal'));
+const EditOrderModal = lazyWithRetry(() => import('./components/EditOrderModal'));
+const DepositModal = lazyWithRetry(() => import('./components/DepositModal'));
+const BasketModal = lazyWithRetry(() => import('./components/BasketModal'));
+const BroadcastToast = lazyWithRetry(() => import('./components/BroadcastToast'));
+const NotificationDrawer = lazyWithRetry(() => import('./components/NotificationDrawer'));
+const BroadcastModal = lazyWithRetry(() => import('./components/BroadcastModal'));
 
 // ⚡ Lazy Loaded Secondary / Heavy Auxiliary Views
 const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard'));
@@ -1150,7 +1150,7 @@ function App() {
                 )}
                 
                 {/* Tab Navigation */}
-                <div className="hide-on-mobile" style={{
+                <nav aria-label="Main Navigation" className="hide-on-mobile" style={{
                   display: 'flex', alignItems: 'center', gap: '2px',
                   fontSize: '9.5px', fontWeight: '700', marginRight: '2px', whiteSpace: 'nowrap'
                 }}>
@@ -1181,7 +1181,7 @@ function App() {
                       {tabItem.label}
                     </div>
                   ))}
-                </div>
+                </nav>
 
                 {/* Real-time Notification Bell (Desktop & Mobile) */}
                 <button
@@ -1467,26 +1467,24 @@ function App() {
         </ErrorBoundary>
       </Suspense>
 
-      {/* Real-time Broadcast Toast */}
-      <BroadcastToast />
-
-      {/* Slide-out Notification Drawer */}
-      <NotificationDrawer
-        isOpen={notificationDrawerOpen}
-        onClose={() => setNotificationDrawerOpen(false)}
-        onOpenBroadcastModal={() => {
-          setNotificationDrawerOpen(false);
-          setBroadcastModalOpen(true);
-        }}
-      />
-
-      {/* Broadcast Studio Modal for Admin */}
-      {broadcastModalOpen && (
-        <BroadcastModal
-          isOpen={broadcastModalOpen}
-          onClose={() => setBroadcastModalOpen(false)}
+      {/* Real-time Broadcast Toast & Notifications */}
+      <Suspense fallback={null}>
+        <BroadcastToast />
+        <NotificationDrawer
+          isOpen={notificationDrawerOpen}
+          onClose={() => setNotificationDrawerOpen(false)}
+          onOpenBroadcastModal={() => {
+            setNotificationDrawerOpen(false);
+            setBroadcastModalOpen(true);
+          }}
         />
-      )}
+        {broadcastModalOpen && (
+          <BroadcastModal
+            isOpen={broadcastModalOpen}
+            onClose={() => setBroadcastModalOpen(false)}
+          />
+        )}
+      </Suspense>
       
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${showMobileMenu ? 'open' : ''}`}>
@@ -1581,7 +1579,7 @@ function App() {
       
       {/* Mobile Bottom Navigation (Only for Paper Trading Terminal) */}
       {!['Home', 'TradeDiary', 'PrimaryMarkets', 'Calculators', 'Algo', 'WealthOS'].includes(activeTab) && (
-        <div className="mobile-bottom-nav">
+        <nav aria-label="Mobile Navigation" className="mobile-bottom-nav">
           <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
             <List size={20} />
             <span>Watchlist</span>
@@ -1602,7 +1600,7 @@ function App() {
             <User size={20} />
             <span>Profile</span>
           </div>
-        </div>
+        </nav>
       )}
 
       {/* DPDP Act 2023 & GDPR Cookie / Privacy Consent Banner */}
