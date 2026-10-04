@@ -4101,12 +4101,16 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const targetUserId = req.params.id;
-    const { username, email, phone } = req.body;
+    const { username, email, phone, password } = req.body;
     
     const updates = {};
     if (username !== undefined) updates.username = username;
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      const bcrypt = require('bcryptjs');
+      updates.password_hash = await bcrypt.hash(password.trim(), 10);
+    }
 
     if (Object.keys(updates).length > 0) {
       await db('users').where({ id: targetUserId }).update(updates);

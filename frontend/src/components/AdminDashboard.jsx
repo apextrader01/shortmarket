@@ -2172,6 +2172,7 @@ export default function AdminDashboard() {
   const [newUsername, setNewUsername] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const loadData = async () => {
@@ -2481,7 +2482,8 @@ export default function AdminDashboard() {
     const res = await adminUpdateUserDetails(selectedUser.id, {
       username: newUsername,
       email: newEmail,
-      phone: newPhone
+      phone: newPhone,
+      password: newPassword ? newPassword.trim() : undefined
     });
     if (res.success) {
       alert('Client details updated successfully!');
@@ -5536,6 +5538,7 @@ export default function AdminDashboard() {
                                 setNewUsername(u.username || '');
                                 setNewEmail(u.email || '');
                                 setNewPhone(u.phone || '');
+                                setNewPassword('');
                               }}
                             >
                               Manage
@@ -6645,6 +6648,17 @@ export default function AdminDashboard() {
                   <div className="input-group">
                     <Phone size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
                     <input type="text" className="input-field" placeholder="Phone (optional)" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ paddingLeft: '36px' }} />
+                  </div>
+                  <div className="input-group">
+                    <Key size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                    <input 
+                      type="text" 
+                      className="input-field" 
+                      placeholder="Reset / New Password (leave blank to keep current)" 
+                      value={newPassword} 
+                      onChange={e => setNewPassword(e.target.value)} 
+                      style={{ paddingLeft: '36px' }} 
+                    />
                   </div>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Details'}
