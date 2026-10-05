@@ -678,7 +678,8 @@ app.use(helmet({
         "https://tpc.googlesyndication.com",
         "https://fundingchoicesmessages.google.com",
         "https://ep1.adtrafficquality.google",
-        "https://ep2.adtrafficquality.google"
+        "https://ep2.adtrafficquality.google",
+        "https://*.adtrafficquality.google"
       ],
       styleSrc: [
         "'self'",
@@ -706,10 +707,12 @@ app.use(helmet({
         "https://*.google.com",
         "https://*.google.co.in",
         "https://ep1.adtrafficquality.google",
-        "https://ep2.adtrafficquality.google"
+        "https://ep2.adtrafficquality.google",
+        "https://*.adtrafficquality.google"
       ],
       connectSrc: [
         "'self'",
+        "https://skandx.in",
         "https://*.skandx.in",
         "https://api.razorpay.com",
         "https://checkout.razorpay.com",
@@ -718,6 +721,7 @@ app.use(helmet({
         "https://securetoken.googleapis.com",
         "https://accounts.google.com",
         "https://www.google-analytics.com",
+        "https://csi.gstatic.com",
         "https://pagead2.googlesyndication.com",
         "https://*.googlesyndication.com",
         "https://googleads.g.doubleclick.net",
@@ -727,6 +731,7 @@ app.use(helmet({
         "https://fundingchoicesmessages.google.com",
         "https://ep1.adtrafficquality.google",
         "https://ep2.adtrafficquality.google",
+        "https://*.adtrafficquality.google",
         "wss:",
         "ws:"
       ],
@@ -742,7 +747,8 @@ app.use(helmet({
         "https://fundingchoicesmessages.google.com",
         "https://www.google.com",
         "https://ep1.adtrafficquality.google",
-        "https://ep2.adtrafficquality.google"
+        "https://ep2.adtrafficquality.google",
+        "https://*.adtrafficquality.google"
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],

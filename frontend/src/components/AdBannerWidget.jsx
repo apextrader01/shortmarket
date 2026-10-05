@@ -295,39 +295,68 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
           flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{
-              background: mode === 'post_order'
-                ? 'rgba(16, 185, 129, 0.18)'
-                : mode === 'pre_exit'
-                  ? 'rgba(239, 68, 68, 0.18)'
-                  : 'rgba(245, 158, 11, 0.18)',
-              color: mode === 'post_order'
-                ? '#34d399'
-                : mode === 'pre_exit'
-                  ? '#f87171'
-                  : '#fbbf24',
-              border: `1px solid ${mode === 'post_order' ? 'rgba(16, 185, 129, 0.4)' : mode === 'pre_exit' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
-              fontSize: '10px',
-              fontWeight: '800',
-              padding: '3px 8px',
-              borderRadius: '6px',
-              letterSpacing: '0.5px'
-            }}>
-              {mode === 'post_order'
-                ? `✅ ORDER ${triggerContext?.status || 'PLACED'} • AD`
-                : mode === 'pre_exit'
-                  ? '🎬 SPONSORED AD • BEFORE EXIT'
-                  : '🎬 REWARDED AD'}
-            </span>
-            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>
-              {mode === 'pre_exit' ? (
-                <>Exit Table for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Position'}</strong> opens after ad</>
-              ) : mode === 'post_order' ? (
-                <><strong style={{ color: '#38bdf8' }}>{triggerContext?.side || 'BUY'} {cleanSymbol}</strong> • Sponsored Break</>
-              ) : (
-                <>Reward: <strong style={{ color: '#10b981' }}>+₹{rewardAmount.toLocaleString('en-IN')}</strong></>
-              )}
-            </span>
+            {(() => {
+              const sideUpper = String(triggerContext?.side || '').toUpperCase();
+              const isDownload = sideUpper.includes('EXPORT') || sideUpper.includes('DOWNLOAD');
+              const isModify = sideUpper === 'MODIFY';
+              const isConvert = sideUpper === 'CONVERT';
+              const isShare = sideUpper.includes('SHARE');
+
+              let badgeLabel = '🎬 REWARDED AD';
+              if (mode === 'post_order') {
+                badgeLabel = `✅ ORDER ${triggerContext?.status || 'PLACED'} • AD`;
+              } else if (mode === 'pre_exit') {
+                if (isDownload) badgeLabel = '🎬 SPONSORED AD • REPORT EXPORT';
+                else if (isModify) badgeLabel = '🎬 SPONSORED AD • MODIFY ORDER';
+                else if (isConvert) badgeLabel = '🎬 SPONSORED AD • CONVERT POSITION';
+                else if (isShare) badgeLabel = '🎬 SPONSORED AD • SHARE P&L CARD';
+                else badgeLabel = '🎬 SPONSORED AD • BEFORE EXIT';
+              }
+
+              return (
+                <>
+                  <span style={{
+                    background: mode === 'post_order'
+                      ? 'rgba(16, 185, 129, 0.18)'
+                      : mode === 'pre_exit'
+                        ? 'rgba(239, 68, 68, 0.18)'
+                        : 'rgba(245, 158, 11, 0.18)',
+                    color: mode === 'post_order'
+                      ? '#34d399'
+                      : mode === 'pre_exit'
+                        ? '#f87171'
+                        : '#fbbf24',
+                    border: `1px solid ${mode === 'post_order' ? 'rgba(16, 185, 129, 0.4)' : mode === 'pre_exit' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
+                    fontSize: '10px',
+                    fontWeight: '800',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {badgeLabel}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>
+                    {mode === 'pre_exit' ? (
+                      isDownload ? (
+                        <>Download for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Report'}</strong> starts after ad</>
+                      ) : isModify ? (
+                        <>Modify Order for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Order'}</strong> opens after ad</>
+                      ) : isConvert ? (
+                        <>Convert Window for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Position'}</strong> opens after ad</>
+                      ) : isShare ? (
+                        <>P&L Card for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Trade'}</strong> opens after ad</>
+                      ) : (
+                        <>Exit Table for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Position'}</strong> opens after ad</>
+                      )
+                    ) : mode === 'post_order' ? (
+                      <><strong style={{ color: '#38bdf8' }}>{triggerContext?.side || 'BUY'} {cleanSymbol}</strong> • Sponsored Break</>
+                    ) : (
+                      <>Reward: <strong style={{ color: '#10b981' }}>+₹{rewardAmount.toLocaleString('en-IN')}</strong></>
+                    )}
+                  </span>
+                </>
+              );
+            })()}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -354,7 +383,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                 fontSize: '11.5px',
                 fontWeight: '800'
               }}>
-                {mode === 'pre_exit' ? '✓ Opening Exit Table...' : '✓ Ad Complete!'}
+                {mode === 'pre_exit' ? '✓ Action Unlocked!' : '✓ Ad Complete!'}
               </div>
             )}
 
@@ -363,7 +392,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
               onClick={() => {
                 if (secondsLeft > 0) {
                   const confirmMsg = mode === 'pre_exit'
-                    ? `Please wait ${secondsLeft}s for the ad to finish to open the Exit Table. Cancel exiting this position?`
+                    ? `Please wait ${secondsLeft}s for the ad to finish to continue. Cancel this action?`
                     : mode === 'post_order'
                       ? `Please wait ${secondsLeft}s for the sponsored ad to finish. Close anyway?`
                       : `Close before timer finishes? You will not receive the +₹${rewardAmount.toLocaleString('en-IN')} reward.`;
@@ -534,13 +563,20 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                         headline: 'Multi-Timeframe Charts + Strategy Payoff Visualizer',
                         sub: 'Test straddles, strangles, and iron condors risk-free before deploying real capital.'
                       },
-                      {
+                      mode === 'reward' ? {
                         icon: '🎁',
                         tag: 'REWARD READY',
                         headline: `Unlock +₹${rewardAmount.toLocaleString('en-IN')} Instant Demo Trading Capital`,
                         sub: secondsLeft > 0
                           ? `Keep watching for ${secondsLeft} more second${secondsLeft === 1 ? '' : 's'} to unlock your green Claim button below!`
                           : '30-second ad complete! Click the green button below to credit your account immediately.'
+                      } : {
+                        icon: '✅',
+                        tag: 'ALMOST READY',
+                        headline: 'Thank You for Supporting Free Real-Time Paper Trading',
+                        sub: secondsLeft > 0
+                          ? `Sponsored break finishes in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}. Upgrade to PRO anytime for an instant 100% ad-free terminal.`
+                          : '30-second sponsored break complete! Click the button below to continue immediately.'
                       }
                     ];
                     const cur = scenes[sceneIdx] || scenes[0];
@@ -684,17 +720,70 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
 
               {/* Action Button(s) */}
               {mode === 'pre_exit' ? (
+                (() => {
+                  const sideUpper = String(triggerContext?.side || '').toUpperCase();
+                  const isDownload = sideUpper.includes('EXPORT') || sideUpper.includes('DOWNLOAD');
+                  const isModify = sideUpper === 'MODIFY';
+                  const isConvert = sideUpper === 'CONVERT';
+                  const isShare = sideUpper.includes('SHARE');
+
+                  let waitText = `⏱ Please Wait ${secondsLeft}s — Opening Exit Table After Ad...`;
+                  let readyText = `🚀 OPEN EXIT TABLE FOR ${cleanSymbol || 'POSITION'} NOW →`;
+                  if (isDownload) {
+                    waitText = `⏱ Please Wait ${secondsLeft}s — Preparing Download After Ad...`;
+                    readyText = `🚀 DOWNLOAD ${cleanSymbol || 'REPORT'} NOW →`;
+                  } else if (isModify) {
+                    waitText = `⏱ Please Wait ${secondsLeft}s — Opening Modify Order After Ad...`;
+                    readyText = `🚀 MODIFY ${cleanSymbol || 'ORDER'} NOW →`;
+                  } else if (isConvert) {
+                    waitText = `⏱ Please Wait ${secondsLeft}s — Opening Convert Window After Ad...`;
+                    readyText = `🚀 CONVERT ${cleanSymbol || 'POSITION'} NOW →`;
+                  } else if (isShare) {
+                    waitText = `⏱ Please Wait ${secondsLeft}s — Opening P&L Card After Ad...`;
+                    readyText = `🚀 OPEN P&L CARD FOR ${cleanSymbol || 'TRADE'} NOW →`;
+                  }
+
+                  return (
+                    <button
+                      type="button"
+                      disabled={secondsLeft > 0}
+                      onClick={() => {
+                        if (secondsLeft > 0) return;
+                        onClose();
+                        if (typeof triggerContext?.onProceed === 'function') {
+                          window.__lastPreExitAdTs = Date.now();
+                          triggerContext.onProceed();
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: secondsLeft > 0
+                          ? 'rgba(255, 255, 255, 0.08)'
+                          : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: secondsLeft > 0 ? '#94a3b8' : '#fff',
+                        fontSize: '14px',
+                        fontWeight: '800',
+                        cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(239, 68, 68, 0.35)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {secondsLeft > 0 ? waitText : readyText}
+                    </button>
+                  );
+                })()
+              ) : mode === 'post_order' ? (
                 <button
                   type="button"
                   disabled={secondsLeft > 0}
-                  onClick={() => {
-                    if (secondsLeft > 0) return;
-                    onClose();
-                    if (typeof triggerContext?.onProceed === 'function') {
-                      window.__lastPreExitAdTs = Date.now();
-                      triggerContext.onProceed();
-                    }
-                  }}
+                  onClick={onClose}
                   style={{
                     width: '100%',
                     padding: '14px',
@@ -702,7 +791,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                     border: 'none',
                     background: secondsLeft > 0
                       ? 'rgba(255, 255, 255, 0.08)'
-                      : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: secondsLeft > 0 ? '#94a3b8' : '#fff',
                     fontSize: '14px',
                     fontWeight: '800',
@@ -711,73 +800,14 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(239, 68, 68, 0.35)',
+                    boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.35)',
                     transition: 'all 0.2s ease'
                   }}
                 >
                   {secondsLeft > 0
-                    ? `⏱ Please Wait ${secondsLeft}s — Opening Exit Table After Ad...`
-                    : `🚀 OPEN EXIT TABLE FOR ${cleanSymbol || 'POSITION'} NOW →`}
+                    ? `⏱ Sponsored Ad Playing (${secondsLeft}s remaining)...`
+                    : `✅ CONTINUE TRADING (AD COMPLETE) →`}
                 </button>
-              ) : mode === 'post_order' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button
-                    type="button"
-                    disabled={secondsLeft > 0}
-                    onClick={onClose}
-                    style={{
-                      width: '100%',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: secondsLeft > 0
-                        ? 'rgba(255, 255, 255, 0.08)'
-                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: secondsLeft > 0 ? '#94a3b8' : '#fff',
-                      fontSize: '14px',
-                      fontWeight: '800',
-                      cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.35)',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {secondsLeft > 0
-                      ? `⏱ Sponsored Ad Playing (${secondsLeft}s remaining)...`
-                      : `✅ CONTINUE TRADING (AD COMPLETE) →`}
-                  </button>
-
-                  {secondsLeft === 0 && config.reward_enabled && (
-                    <button
-                      type="button"
-                      disabled={claiming}
-                      onClick={handleClaimReward}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(56, 189, 248, 0.4)',
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        color: '#38bdf8',
-                        fontSize: '12.5px',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Gift size={15} />
-                      {claiming
-                        ? 'Crediting Bonus...'
-                        : `🎁 Also Claim +₹${rewardAmount.toLocaleString('en-IN')} Bonus Demo Funds`}
-                    </button>
-                  )}
-                </div>
               ) : (
                 <button
                   type="button"
