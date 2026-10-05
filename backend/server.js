@@ -10668,7 +10668,10 @@ async function loadAdConfigFromDb() {
         ...parsed,
         adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
         adsense_banner_slot: parsed.adsense_banner_slot || adConfigCache.adsense_banner_slot || '5099870662',
-        adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '2846165854'
+        adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '2846165854',
+        impressions: Math.max(Number(adConfigCache.impressions || 0), Number(parsed.impressions || 0)),
+        clicks: Math.max(Number(adConfigCache.clicks || 0), Number(parsed.clicks || 0)),
+        reward_claims: Math.max(Number(adConfigCache.reward_claims || 0), Number(parsed.reward_claims || 0))
       };
     }
   } catch (e) {}
@@ -10729,7 +10732,7 @@ setInterval(async () => {
       .onConflict('key')
       .merge();
   } catch (e) {}
-}, 60000).unref();
+}, 10000).unref();
 
 // Claim 30-Second Rewarded Video Ad Bonus (Atomic Transaction + Double-Entry Ledger)
 app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
@@ -10749,8 +10752,9 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const todayClaimsRow = await db('fund_ledger')
-      .where({ user_id: userId, type: 'AD_REWARD' })
+    const todayClaimsRow = await db('ledger')
+      .where({ user_id: userId, type: 'DEPOSIT' })
+      .where('description', 'like', '30s Rewarded Video Ad Bonus%')
       .where('created_at', '>=', startOfToday)
       .count('id as cnt')
       .first();
@@ -10773,18 +10777,21 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
       updatedBalance = parseFloat((Number(userRow.balance || 0) + rewardAmount).toFixed(2));
       await trx('users').where({ id: userId }).update({ balance: updatedBalance });
 
-      await trx('fund_ledger').insert({
+      await trx('ledger').insert({
         user_id: userId,
-        type: 'AD_REWARD',
+        type: 'DEPOSIT',
         amount: rewardAmount,
-        balance_after: updatedBalance,
         description: `30s Rewarded Video Ad Bonus (+₹${rewardAmount.toLocaleString('en-IN')})`,
         created_at: new Date()
       });
     });
 
     adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
-    adStatsDirty = true;
+    await db('system_settings')
+      .insert({ key: 'ads_monetization_config', value: JSON.stringify(adConfigCache), updated_at: new Date() })
+      .onConflict('key')
+      .merge()
+      .catch(() => {});
 
     res.json({
       success: true,
@@ -10803,6 +10810,15 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
 app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await loadAdConfigFromDb();
+    const totalRewardsRow = await db('ledger')
+      .where({ type: 'DEPOSIT' })
+      .where('description', 'like', '30s Rewarded Video Ad Bonus%')
+      .count('id as cnt')
+      .first()
+      .catch(() => null);
+    if (totalRewardsRow && totalRewardsRow.cnt !== undefined) {
+      adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), Number(totalRewardsRow.cnt || 0));
+    }
     res.json({ success: true, config: adConfigCache });
   } catch (err) {
     res.status(500).json({ error: err.message });

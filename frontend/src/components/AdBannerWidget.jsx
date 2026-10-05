@@ -367,15 +367,136 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
                     {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
                   </button>
                 </div>
-              ) : null}
+              ) : (
+                /* Animated 30-Second Video-Style Showcase Stage (active while AdSense is in 'Getting ready' review or when no direct MP4 is set) */
+                <div style={{
+                  position: 'relative',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  marginBottom: '16px',
+                  background: 'radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.22) 0%, rgba(56, 189, 248, 0.16) 45%, rgba(2, 6, 23, 0.98) 100%)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  padding: '18px 16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      color: '#10b981',
+                      background: 'rgba(16, 185, 129, 0.14)',
+                      border: '1px solid rgba(16, 185, 129, 0.35)',
+                      padding: '3px 8px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.5px'
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                      LIVE 30s SPONSOR SPOTLIGHT • SCENE {Math.min(5, Math.floor((duration - secondsLeft) / 6) + 1)} OF 5
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#38bdf8' }}>
+                      {Math.round(progressPct)}% Watched
+                    </span>
+                  </div>
 
-              {/* If Google AdSense Rewarded/Display slot is configured, render AdSense unit */}
+                  {(() => {
+                    const sceneIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
+                    const scenes = [
+                      {
+                        icon: '⚡',
+                        tag: 'INSTANT EXECUTION',
+                        headline: 'Sub-Second Options & Futures Order Routing',
+                        sub: 'Experience institutional-grade NSE, BSE & MCX paper trading with real-time tick-by-tick Greeks.'
+                      },
+                      {
+                        icon: '📊',
+                        tag: 'DEEP ANALYTICS',
+                        headline: 'Live Option Chain with IV, Delta, Theta & PCR',
+                        sub: 'Spot high-probability setups faster with live Open Interest buildup and Max Pain tracking.'
+                      },
+                      {
+                        icon: '🛡️',
+                        tag: 'ZERO BROKERAGE',
+                        headline: config.sponsor_title || 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC',
+                        sub: config.sponsor_subtitle || 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution & TradingView Charts.'
+                      },
+                      {
+                        icon: '🤖',
+                        tag: 'PRO ALGO & CHARTS',
+                        headline: 'Multi-Timeframe Charts + Strategy Payoff Visualizer',
+                        sub: 'Test straddles, strangles, and iron condors risk-free before deploying real capital.'
+                      },
+                      {
+                        icon: '🎁',
+                        tag: 'REWARD READY',
+                        headline: `Unlock +₹${rewardAmount.toLocaleString('en-IN')} Instant Demo Trading Capital`,
+                        sub: secondsLeft > 0
+                          ? `Keep watching for ${secondsLeft} more second${secondsLeft === 1 ? '' : 's'} to unlock your green Claim button below!`
+                          : '30-second ad complete! Click the green button below to credit your account immediately.'
+                      }
+                    ];
+                    const cur = scenes[sceneIdx] || scenes[0];
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{
+                          width: '52px',
+                          height: '52px',
+                          borderRadius: '12px',
+                          background: 'rgba(56, 189, 248, 0.14)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '26px',
+                          flexShrink: 0
+                        }}>
+                          {cur.icon}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '10px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.6px', marginBottom: '2px' }}>
+                            {cur.tag}
+                          </div>
+                          <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.3', marginBottom: '4px' }}>
+                            {cur.headline}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.45' }}>
+                            {cur.sub}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 5-scene step indicators */}
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                    {[0, 1, 2, 3, 4].map(idx => {
+                      const activeIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
+                      const passed = idx <= activeIdx;
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            flex: 1,
+                            height: '4px',
+                            borderRadius: '999px',
+                            background: passed ? 'linear-gradient(90deg, #10b981, #38bdf8)' : 'rgba(255,255,255,0.12)',
+                            transition: 'background 0.3s ease'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* If Google AdSense Rewarded/Display slot is configured, render AdSense unit without forcing a blank 180px box when unfilled */}
               {config.adsense_client_id && config.adsense_rewarded_slot ? (
-                <div style={{ minHeight: '180px', marginBottom: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden' }}>
                   <ins
                     ref={adsenseRef}
                     className="adsbygoogle"
-                    style={{ display: 'block', width: '100%', minHeight: '180px' }}
+                    style={{ display: 'block', width: '100%' }}
                     data-ad-client={config.adsense_client_id}
                     data-ad-slot={config.adsense_rewarded_slot}
                     data-ad-format="auto"
@@ -534,44 +655,41 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         gap: '10px',
         flexShrink: 0
       }}>
-        {/* Left: Google AdSense unit OR Direct Sponsor Banner */}
-        {config.adsense_client_id && config.adsense_banner_slot ? (
-          <div style={{ flex: 1, minWidth: '250px' }}>
-            <ins
-              ref={adsenseBannerRef}
-              className="adsbygoogle"
-              style={{ display: 'block' }}
-              data-ad-client={config.adsense_client_id}
-              data-ad-slot={config.adsense_banner_slot}
-              data-ad-format="auto"
-              data-full-width-responsive="true"
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
-            <span style={{
-              fontSize: '9.5px',
-              fontWeight: '800',
-              background: 'rgba(56, 189, 248, 0.14)',
-              color: '#38bdf8',
-              border: '1px solid rgba(56, 189, 248, 0.35)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap',
-              letterSpacing: '0.4px'
-            }}>
-              {config.sponsor_badge || 'AD'}
-            </span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {config.sponsor_title}
-              </div>
-              <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {config.sponsor_subtitle}
-              </div>
+        {/* Left: Always show Sponsor Headline + Google AdSense unit when filled */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
+          <span style={{
+            fontSize: '9.5px',
+            fontWeight: '800',
+            background: 'rgba(56, 189, 248, 0.14)',
+            color: '#38bdf8',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.4px'
+          }}>
+            {config.sponsor_badge || 'AD'}
+          </span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {config.sponsor_title}
             </div>
+            <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {config.sponsor_subtitle}
+            </div>
+            {config.adsense_client_id && config.adsense_banner_slot && (
+              <ins
+                ref={adsenseBannerRef}
+                className="adsbygoogle"
+                style={{ display: 'block', width: '100%' }}
+                data-ad-client={config.adsense_client_id}
+                data-ad-slot={config.adsense_banner_slot}
+                data-ad-format="auto"
+                data-full-width-responsive="true"
+              />
+            )}
           </div>
-        )}
+        </div>
 
         {/* Right Actions: CTA + Watch 30s Ad for Free Capital + Remove Ads */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
