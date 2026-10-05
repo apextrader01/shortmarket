@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Trophy, Award, Send, ShieldAlert, Loader2, Save, Bell, Power } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
 import BroadcastModal from './BroadcastModal';
-import { updateCachedAdConfig } from './AdBannerWidget';
+import { updateCachedAdConfig, RewardedAdModal } from './AdBannerWidget';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
   const now = new Date();
@@ -1513,6 +1513,7 @@ export default function AdminDashboard() {
   });
   const [adSaving, setAdSaving] = useState(false);
   const [adStatusMsg, setAdStatusMsg] = useState({ type: '', text: '' });
+  const [showPreviewRewardModal, setShowPreviewRewardModal] = useState(false);
 
   const fetchAdminAdConfig = async () => {
     try {
@@ -4131,6 +4132,25 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
+                  onClick={() => setShowPreviewRewardModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: '1px solid rgba(16, 185, 129, 0.5)',
+                    color: '#fff',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Play size={13} fill="#fff" /> Test 30s Rewarded Ad Popup
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleSaveAdConfig(null, true)}
                   style={{
                     background: 'rgba(255,255,255,0.06)',
@@ -4147,6 +4167,13 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+
+            <RewardedAdModal
+              isOpen={showPreviewRewardModal}
+              onClose={() => setShowPreviewRewardModal(false)}
+              customConfig={adConfig}
+              onRewardClaimed={() => fetchAdminAdConfig()}
+            />
 
             {/* Live Performance Metrics Strip */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '14px' }}>
