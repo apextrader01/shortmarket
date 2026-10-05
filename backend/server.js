@@ -2184,7 +2184,6 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         email,
         password_hash: passwordHash,
         balance: 1000000.00,
-        default_funds: 1000000.00,
         profile_picture_url: decoded.picture || null,
         client_id: clientId,
         subscription_tier: 'BASIC',
