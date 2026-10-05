@@ -2355,21 +2355,41 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         const updatePayload = { phone: cleanPhone };
         const cleanUsername = String(requestedUsername || user.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
         const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
-        if (cleanUsername && cleanUsername.length >= 6 && cleanUsername.length <= 15 && letterCount >= 5) {
-          const normalizedUsernameKey = cleanUsername.replace(/\s+/g, '').toLowerCase();
-          const existingName = await db('users')
-            .whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedUsernameKey])
-            .whereNot({ id: user.id })
-            .first();
-          if (existingName) {
-            return res.status(400).json({ error: `"${cleanUsername}" is already taken. Please choose another unique Full Name.` });
-          }
-          updatePayload.username = cleanUsername;
-          user.username = cleanUsername;
+        if (!cleanUsername || cleanUsername.length < 6 || cleanUsername.length > 15 || letterCount < 5) {
+          return res.status(400).json({ error: 'Full Name must be 6 to 15 letters only (no numbers or special characters).' });
         }
+        const normalizedUsernameKey = cleanUsername.replace(/\s+/g, '').toLowerCase();
+        const existingName = await db('users')
+          .whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedUsernameKey])
+          .whereNot({ id: user.id })
+          .first();
+        if (existingName) {
+          return res.status(400).json({ error: `"${cleanUsername}" is already taken. Please choose another unique Full Name.` });
+        }
+        updatePayload.username = cleanUsername;
+        user.username = cleanUsername;
 
         await db('users').where({ id: user.id }).update(updatePayload).catch(() => {});
         user.phone = cleanPhone;
+
+        // Record DPDP Consents if provided during profile completion
+        if (consents && typeof consents === 'object') {
+          try {
+            const consentTypes = ['terms_and_privacy', 'data_processing', 'marketing_communications'];
+            for (const cType of consentTypes) {
+              if (consents[cType] !== undefined) {
+                await db('user_consents').insert({
+                  user_id: user.id,
+                  consent_type: cType,
+                  consented: Boolean(consents[cType]),
+                  consent_version: 'v2026.1',
+                  ip_address: clientIp,
+                  user_agent: req.headers['user-agent'] || ''
+                }).catch(() => {});
+              }
+            }
+          } catch (cErr) {}
+        }
       }
     }
 
@@ -10617,11 +10637,11 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 
 // ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Zero Server Overhead) ───
 let adConfigCache = {
-  enabled: true,
+  enabled: Boolean(process.env.ADSENSE_CLIENT_ID),
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || '',
   adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '',
   adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '',
-  reward_enabled: true,
+  reward_enabled: Boolean(process.env.ADSENSE_CLIENT_ID && process.env.ADSENSE_REWARDED_SLOT),
   reward_amount: 100000,
   reward_daily_limit: 3,
   sponsor_badge: 'SPONSORED PARTNER',

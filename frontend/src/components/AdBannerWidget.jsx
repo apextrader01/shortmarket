@@ -22,6 +22,17 @@ function injectAdSenseScript(clientId) {
   adsenseScriptInjected = true;
 }
 
+export function updateCachedAdConfig(newConfig) {
+  if (!newConfig) return;
+  cachedAdConfig = { ...(cachedAdConfig || {}), ...newConfig };
+  if (cachedAdConfig.adsense_client_id) {
+    injectAdSenseScript(cachedAdConfig.adsense_client_id);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('skandx-ad-config-updated', { detail: cachedAdConfig }));
+  }
+}
+
 export function useAdConfig() {
   const [config, setConfig] = useState(cachedAdConfig);
 
@@ -30,22 +41,24 @@ export function useAdConfig() {
       const res = await fetch(`${API}/api/ads/config`);
       const data = await res.json();
       if (data && data.success && data.config) {
-        cachedAdConfig = data.config;
+        updateCachedAdConfig(data.config);
         setConfig(data.config);
-        if (data.config.adsense_client_id) {
-          injectAdSenseScript(data.config.adsense_client_id);
-        }
       }
     } catch (e) {}
   };
 
   useEffect(() => {
+    const handleConfigUpdate = (e) => {
+      if (e.detail) setConfig(e.detail);
+    };
+    window.addEventListener('skandx-ad-config-updated', handleConfigUpdate);
+
     if (cachedAdConfig) {
       setConfig(cachedAdConfig);
       if (cachedAdConfig.adsense_client_id) {
         injectAdSenseScript(cachedAdConfig.adsense_client_id);
       }
-      return;
+      return () => window.removeEventListener('skandx-ad-config-updated', handleConfigUpdate);
     }
     if (!fetchingPromise) {
       fetchingPromise = fetch(`${API}/api/ads/config`)
@@ -65,6 +78,8 @@ export function useAdConfig() {
     fetchingPromise.then(cfg => {
       if (cfg) setConfig(cfg);
     });
+
+    return () => window.removeEventListener('skandx-ad-config-updated', handleConfigUpdate);
   }, []);
 
   return { config, refresh };

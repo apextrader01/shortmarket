@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Trophy, Award, Send, ShieldAlert, Loader2, Save, Bell, Power } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
 import BroadcastModal from './BroadcastModal';
+import { updateCachedAdConfig } from './AdBannerWidget';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
   const now = new Date();
@@ -1423,6 +1424,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchDataRightsRequests();
     fetchRazorpayCreds();
+    fetchAdminAdConfig();
   }, []);
 
   // Razorpay Gateway Admin State
@@ -1492,11 +1494,11 @@ export default function AdminDashboard() {
 
   // Ads & Monetization Admin State
   const [adConfig, setAdConfig] = useState({
-    enabled: true,
+    enabled: false,
     adsense_client_id: '',
     adsense_banner_slot: '',
     adsense_rewarded_slot: '',
-    reward_enabled: true,
+    reward_enabled: false,
     reward_amount: 100000,
     reward_daily_limit: 3,
     sponsor_badge: 'SPONSORED PARTNER',
@@ -1522,6 +1524,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data && data.success && data.config) {
         setAdConfig(prev => ({ ...prev, ...data.config }));
+        updateCachedAdConfig(data.config);
       }
     } catch (e) {
       console.warn('Failed to fetch ad config:', e);
@@ -1545,7 +1548,10 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data && data.success) {
-        if (data.config) setAdConfig(prev => ({ ...prev, ...data.config }));
+        if (data.config) {
+          setAdConfig(prev => ({ ...prev, ...data.config }));
+          updateCachedAdConfig(data.config);
+        }
         setAdStatusMsg({ type: 'success', text: `✅ ${data.message || 'Ad settings saved!'}` });
       } else {
         setAdStatusMsg({ type: 'error', text: data.error || 'Failed to save ad settings' });
@@ -2295,6 +2301,10 @@ export default function AdminDashboard() {
         await fetchAdminContests?.();
       } else if (activeTab === 'deletions') {
         await fetchDataRightsRequests();
+      } else if (activeTab === 'ads') {
+        await fetchAdminAdConfig();
+      } else if (activeTab === 'razorpay') {
+        await fetchRazorpayCreds();
       } else if (activeTab === 'ledger') {
         const { startDate, endDate } = calculateDateBounds(ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd);
         const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch, startDate, endDate);
