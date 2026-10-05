@@ -10643,7 +10643,7 @@ let adConfigCache = {
   enabled: true,
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
   adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '5099870662',
-  adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '5099870662',
+  adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '2846165854',
   reward_enabled: true,
   reward_amount: 100000,
   reward_daily_limit: 3,
@@ -10668,7 +10668,7 @@ async function loadAdConfigFromDb() {
         ...parsed,
         adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
         adsense_banner_slot: parsed.adsense_banner_slot || adConfigCache.adsense_banner_slot || '5099870662',
-        adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '5099870662'
+        adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '2846165854'
       };
     }
   } catch (e) {}
@@ -10692,7 +10692,7 @@ app.get('/api/ads/config', (req, res) => {
       enabled: Boolean(adConfigCache.enabled),
       adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
       adsense_banner_slot: adConfigCache.adsense_banner_slot || '5099870662',
-      adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '5099870662',
+      adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '2846165854',
       reward_enabled: Boolean(adConfigCache.reward_enabled),
       reward_amount: Number(adConfigCache.reward_amount || 100000),
       reward_daily_limit: Number(adConfigCache.reward_daily_limit || 3),

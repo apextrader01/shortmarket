@@ -1497,7 +1497,7 @@ export default function AdminDashboard() {
     enabled: true,
     adsense_client_id: 'ca-pub-1001083475331869',
     adsense_banner_slot: '5099870662',
-    adsense_rewarded_slot: '5099870662',
+    adsense_rewarded_slot: '2846165854',
     reward_enabled: true,
     reward_amount: 100000,
     reward_daily_limit: 3,
