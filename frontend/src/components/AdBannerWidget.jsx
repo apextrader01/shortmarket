@@ -157,6 +157,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
   const [claimedData, setClaimedData] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [muted, setMuted] = useState(true);
+  const [modalAdFilled, setModalAdFilled] = useState(false);
   const adsenseRef = useRef(null);
   const completionTrackedRef = useRef(false);
   const autoProceededRef = useRef(false);
@@ -170,6 +171,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
     setWatchedSeconds(0);
     setClaimedData(null);
     setErrorMsg('');
+    setModalAdFilled(false);
     completionTrackedRef.current = false;
     autoProceededRef.current = false;
     trackAdEvent('impression');
@@ -215,11 +217,18 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
   }, [isOpen, secondsLeft, mode, onClose, onAdCompleted, triggerContext]);
 
   useEffect(() => {
-    if (isOpen && config?.adsense_client_id && config?.adsense_rewarded_slot && adsenseRef.current) {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {}
-    }
+    if (!isOpen || !config?.adsense_client_id || !config?.adsense_rewarded_slot || !adsenseRef.current) return;
+    const el = adsenseRef.current;
+    const checkStatus = () => {
+      const status = el.getAttribute('data-ad-status');
+      setModalAdFilled(status === 'filled');
+    };
+    const observer = new MutationObserver(checkStatus);
+    observer.observe(el, { attributes: true, attributeFilter: ['data-ad-status'] });
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {}
+    return () => observer.disconnect();
   }, [isOpen, config]);
 
   if (!isOpen || !config) return null;
@@ -470,172 +479,178 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
             </div>
           ) : (
             <>
-              {/* If custom MP4 video is configured, play it */}
-              {config.sponsor_video_url ? (
-                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <video
-                    src={config.sponsor_video_url}
-                    autoPlay
-                    loop
-                    muted={muted}
-                    playsInline
-                    style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMuted(!muted)}
-                    style={{
-                      position: 'absolute',
-                      bottom: '10px',
-                      right: '10px',
-                      background: 'rgba(0,0,0,0.65)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#fff',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                  </button>
-                </div>
-              ) : (
-                /* Animated 30-Second Video-Style Showcase Stage (active while AdSense is in 'Getting ready' review or when no direct MP4 is set) */
-                <div style={{
-                  position: 'relative',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  marginBottom: '16px',
-                  background: 'radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.22) 0%, rgba(56, 189, 248, 0.16) 45%, rgba(2, 6, 23, 0.98) 100%)',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  padding: '18px 16px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '10px',
-                      fontWeight: '800',
-                      color: '#10b981',
-                      background: 'rgba(16, 185, 129, 0.14)',
-                      border: '1px solid rgba(16, 185, 129, 0.35)',
-                      padding: '3px 8px',
-                      borderRadius: '999px',
-                      letterSpacing: '0.5px'
-                    }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                      LIVE 30s SPONSOR SPOTLIGHT • SCENE {Math.min(5, Math.floor((duration - secondsLeft) / 6) + 1)} OF 5
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#38bdf8' }}>
-                      {Math.round(progressPct)}% Watched
-                    </span>
+              {/* Direct Sponsor Video or Internal 30s Spotlight ONLY when Direct Sponsor is enabled */}
+              {config.direct_sponsor_enabled && (
+                config.sponsor_video_url ? (
+                  <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <video
+                      src={config.sponsor_video_url}
+                      autoPlay
+                      loop
+                      muted={muted}
+                      playsInline
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMuted(!muted)}
+                      style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        right: '10px',
+                        background: 'rgba(0,0,0,0.65)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                    </button>
                   </div>
+                ) : (
+                  <div style={{
+                    position: 'relative',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    marginBottom: '16px',
+                    background: 'radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.22) 0%, rgba(56, 189, 248, 0.16) 45%, rgba(2, 6, 23, 0.98) 100%)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    padding: '18px 16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        color: '#10b981',
+                        background: 'rgba(16, 185, 129, 0.14)',
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        padding: '3px 8px',
+                        borderRadius: '999px',
+                        letterSpacing: '0.5px'
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                        LIVE 30s SPONSOR SPOTLIGHT • SCENE {Math.min(5, Math.floor((duration - secondsLeft) / 6) + 1)} OF 5
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#38bdf8' }}>
+                        {Math.round(progressPct)}% Watched
+                      </span>
+                    </div>
 
-                  {(() => {
-                    const sceneIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
-                    const scenes = [
-                      {
-                        icon: '⚡',
-                        tag: 'INSTANT EXECUTION',
-                        headline: 'Sub-Second Options & Futures Order Routing',
-                        sub: 'Experience institutional-grade NSE, BSE & MCX paper trading with real-time tick-by-tick Greeks.'
-                      },
-                      {
-                        icon: '📊',
-                        tag: 'DEEP ANALYTICS',
-                        headline: 'Live Option Chain with IV, Delta, Theta & PCR',
-                        sub: 'Spot high-probability setups faster with live Open Interest buildup and Max Pain tracking.'
-                      },
-                      {
-                        icon: '🛡️',
-                        tag: 'ZERO BROKERAGE',
-                        headline: config.sponsor_title || 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC',
-                        sub: config.sponsor_subtitle || 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution & TradingView Charts.'
-                      },
-                      {
-                        icon: '🤖',
-                        tag: 'PRO ALGO & CHARTS',
-                        headline: 'Multi-Timeframe Charts + Strategy Payoff Visualizer',
-                        sub: 'Test straddles, strangles, and iron condors risk-free before deploying real capital.'
-                      },
-                      mode === 'reward' ? {
-                        icon: '🎁',
-                        tag: 'REWARD READY',
-                        headline: `Unlock +₹${rewardAmount.toLocaleString('en-IN')} Instant Demo Trading Capital`,
-                        sub: secondsLeft > 0
-                          ? `Keep watching for ${secondsLeft} more second${secondsLeft === 1 ? '' : 's'} to unlock your green Claim button below!`
-                          : '30-second ad complete! Click the green button below to credit your account immediately.'
-                      } : {
-                        icon: '✅',
-                        tag: 'ALMOST READY',
-                        headline: 'Thank You for Supporting Free Real-Time Paper Trading',
-                        sub: secondsLeft > 0
-                          ? `Sponsored break finishes in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}. Upgrade to PRO anytime for an instant 100% ad-free terminal.`
-                          : '30-second sponsored break complete! Click the button below to continue immediately.'
-                      }
-                    ];
-                    const cur = scenes[sceneIdx] || scenes[0];
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{
-                          width: '52px',
-                          height: '52px',
-                          borderRadius: '12px',
-                          background: 'rgba(56, 189, 248, 0.14)',
-                          border: '1px solid rgba(56, 189, 248, 0.35)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '26px',
-                          flexShrink: 0
-                        }}>
-                          {cur.icon}
-                        </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '10px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.6px', marginBottom: '2px' }}>
-                            {cur.tag}
-                          </div>
-                          <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.3', marginBottom: '4px' }}>
-                            {cur.headline}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.45' }}>
-                            {cur.sub}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* 5-scene step indicators */}
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-                    {[0, 1, 2, 3, 4].map(idx => {
-                      const activeIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
-                      const passed = idx <= activeIdx;
+                    {(() => {
+                      const sceneIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
+                      const scenes = [
+                        {
+                          icon: '⚡',
+                          tag: 'INSTANT EXECUTION',
+                          headline: 'Sub-Second Options & Futures Order Routing',
+                          sub: 'Experience institutional-grade NSE, BSE & MCX paper trading with real-time tick-by-tick Greeks.'
+                        },
+                        {
+                          icon: '📊',
+                          tag: 'DEEP ANALYTICS',
+                          headline: 'Live Option Chain with IV, Delta, Theta & PCR',
+                          sub: 'Spot high-probability setups faster with live Open Interest buildup and Max Pain tracking.'
+                        },
+                        {
+                          icon: '🛡️',
+                          tag: 'ZERO BROKERAGE',
+                          headline: config.sponsor_title || 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC',
+                          sub: config.sponsor_subtitle || 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution & TradingView Charts.'
+                        },
+                        {
+                          icon: '🤖',
+                          tag: 'PRO ALGO & CHARTS',
+                          headline: 'Multi-Timeframe Charts + Strategy Payoff Visualizer',
+                          sub: 'Test straddles, strangles, and iron condors risk-free before deploying real capital.'
+                        },
+                        mode === 'reward' ? {
+                          icon: '🎁',
+                          tag: 'REWARD READY',
+                          headline: `Unlock +₹${rewardAmount.toLocaleString('en-IN')} Instant Demo Trading Capital`,
+                          sub: secondsLeft > 0
+                            ? `Keep watching for ${secondsLeft} more second${secondsLeft === 1 ? '' : 's'} to unlock your green Claim button below!`
+                            : '30-second ad complete! Click the green button below to credit your account immediately.'
+                        } : {
+                          icon: '✅',
+                          tag: 'ALMOST READY',
+                          headline: 'Thank You for Supporting Free Real-Time Paper Trading',
+                          sub: secondsLeft > 0
+                            ? `Sponsored break finishes in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}. Upgrade to PRO anytime for an instant 100% ad-free terminal.`
+                            : '30-second sponsored break complete! Click the button below to continue immediately.'
+                        }
+                      ];
+                      const cur = scenes[sceneIdx] || scenes[0];
                       return (
-                        <div
-                          key={idx}
-                          style={{
-                            flex: 1,
-                            height: '4px',
-                            borderRadius: '999px',
-                            background: passed ? 'linear-gradient(90deg, #10b981, #38bdf8)' : 'rgba(255,255,255,0.12)',
-                            transition: 'background 0.3s ease'
-                          }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '12px',
+                            background: 'rgba(56, 189, 248, 0.14)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '26px',
+                            flexShrink: 0
+                          }}>
+                            {cur.icon}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: '10px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.6px', marginBottom: '2px' }}>
+                              {cur.tag}
+                            </div>
+                            <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.3', marginBottom: '4px' }}>
+                              {cur.headline}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.45' }}>
+                              {cur.sub}
+                            </div>
+                          </div>
+                        </div>
                       );
-                    })}
+                    })()}
+
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                      {[0, 1, 2, 3, 4].map(idx => {
+                        const activeIdx = Math.min(4, Math.floor((duration - secondsLeft) / 6));
+                        const passed = idx <= activeIdx;
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              flex: 1,
+                              height: '4px',
+                              borderRadius: '999px',
+                              background: passed ? 'linear-gradient(90deg, #10b981, #38bdf8)' : 'rgba(255,255,255,0.12)',
+                              transition: 'background 0.3s ease'
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )
               )}
 
-              {/* If Google AdSense Rewarded/Display slot is configured, render AdSense unit */}
+              {/* Google AdSense Rewarded/Display slot */}
               {config.adsense_client_id && config.adsense_rewarded_slot ? (
-                <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{
+                  marginBottom: '14px',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  maxHeight: modalAdFilled ? '340px' : '0px',
+                  transition: 'max-height 0.25s ease'
+                }}>
                   <ins
                     ref={adsenseRef}
                     className="adsbygoogle"
@@ -647,6 +662,27 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                   />
                 </div>
               ) : null}
+
+              {/* Clean Google AdSense status box when Direct Sponsor is OFF and AdSense has not filled an ad yet */}
+              {!config.direct_sponsor_enabled && !modalAdFilled && (
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: 'rgba(15, 23, 42, 0.7)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                  marginBottom: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                    GOOGLE ADSENSE UNIT ({config.adsense_rewarded_slot || 'Active'})
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                    {secondsLeft > 0
+                      ? `Sponsored Google AdSense break — continues in ${secondsLeft}s`
+                      : 'Ad timer complete — you may proceed below.'}
+                  </div>
+                </div>
+              )}
 
               {/* Rich Sponsor / Partner Showcase Card (Only shown when Direct Sponsor mode is enabled) */}
               {config.direct_sponsor_enabled && (
@@ -892,6 +928,7 @@ export default function AdBannerWidget({ onUpgradeClick }) {
   const user = useStore(state => state.user);
   const { config } = useAdConfig();
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
+  const [adSenseFilled, setAdSenseFilled] = useState(false);
   const adsenseBannerRef = useRef(null);
   const impressionTracked = useRef(false);
 
@@ -904,13 +941,53 @@ export default function AdBannerWidget({ onUpgradeClick }) {
       trackAdEvent('impression');
     }
     if (config.adsense_client_id && config.adsense_banner_slot && adsenseBannerRef.current) {
+      const el = adsenseBannerRef.current;
+      const checkStatus = () => {
+        const status = el.getAttribute('data-ad-status');
+        setAdSenseFilled(status === 'filled');
+      };
+      const observer = new MutationObserver(checkStatus);
+      observer.observe(el, { attributes: true, attributeFilter: ['data-ad-status'] });
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (e) {}
+      return () => observer.disconnect();
     }
   }, [config, isAdFree]);
 
   if (!config || !config.enabled || isAdFree) return null;
+
+  // Pure Google AdSense Mode (Direct Sponsor / Internal Ad Card is OFF):
+  // Do NOT show the internal SkandX banner wrapper ("GOOGLE ADS | Sponsored Advertisement | Watch 30s Ad").
+  // Render only the Google AdSense <ins> unit, and keep it collapsed (0px height) until Google AdSense actually fills an ad.
+  if (!config.direct_sponsor_enabled) {
+    if (!config.adsense_client_id || !config.adsense_banner_slot) return null;
+    return (
+      <div
+        style={{
+          margin: adSenseFilled ? '8px 12px' : '0px',
+          padding: adSenseFilled ? '6px 10px' : '0px',
+          maxHeight: adSenseFilled ? '280px' : '0px',
+          overflow: 'hidden',
+          background: adSenseFilled ? 'rgba(15, 23, 42, 0.92)' : 'transparent',
+          border: adSenseFilled ? '1px solid rgba(56, 189, 248, 0.18)' : 'none',
+          borderRadius: '10px',
+          flexShrink: 0,
+          transition: 'max-height 0.25s ease'
+        }}
+      >
+        <ins
+          ref={adsenseBannerRef}
+          className="adsbygoogle"
+          style={{ display: 'block', width: '100%' }}
+          data-ad-client={config.adsense_client_id}
+          data-ad-slot={config.adsense_banner_slot}
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
+      </div>
+    );
+  }
 
   const rewardAmount = Number(config.reward_amount || 100000);
 
@@ -929,7 +1006,7 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         gap: '10px',
         flexShrink: 0
       }}>
-        {/* Left: Google AdSense unit (and optional Direct Sponsor Headline when enabled) */}
+        {/* Left: Direct Sponsor Headline + optional Google AdSense unit */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
           <span style={{
             fontSize: '9.5px',
@@ -942,40 +1019,34 @@ export default function AdBannerWidget({ onUpgradeClick }) {
             whiteSpace: 'nowrap',
             letterSpacing: '0.4px'
           }}>
-            {config.direct_sponsor_enabled ? (config.sponsor_badge || 'SPONSORED') : 'GOOGLE ADS'}
+            {config.sponsor_badge || 'SPONSORED'}
           </span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            {config.direct_sponsor_enabled ? (
-              <>
-                <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {config.sponsor_title}
-                </div>
-                <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {config.sponsor_subtitle}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Sponsored Advertisement • Free Plan Supported by Google AdSense
-              </div>
-            )}
+            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {config.sponsor_title}
+            </div>
+            <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {config.sponsor_subtitle}
+            </div>
             {config.adsense_client_id && config.adsense_banner_slot && (
-              <ins
-                ref={adsenseBannerRef}
-                className="adsbygoogle"
-                style={{ display: 'block', width: '100%' }}
-                data-ad-client={config.adsense_client_id}
-                data-ad-slot={config.adsense_banner_slot}
-                data-ad-format="auto"
-                data-full-width-responsive="true"
-              />
+              <div style={{ maxHeight: adSenseFilled ? '280px' : '0px', overflow: 'hidden' }}>
+                <ins
+                  ref={adsenseBannerRef}
+                  className="adsbygoogle"
+                  style={{ display: 'block', width: '100%' }}
+                  data-ad-client={config.adsense_client_id}
+                  data-ad-slot={config.adsense_banner_slot}
+                  data-ad-format="auto"
+                  data-full-width-responsive="true"
+                />
+              </div>
             )}
           </div>
         </div>
 
-        {/* Right Actions: CTA (only when Direct Sponsor enabled) + Watch 30s Ad for Free Capital + Remove Ads */}
+        {/* Right Actions: CTA + Watch 30s Ad for Free Capital + Remove Ads */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {config.direct_sponsor_enabled && config.sponsor_target_url && (
+          {config.sponsor_target_url && (
             <a
               href={config.sponsor_target_url}
               target="_blank"
