@@ -40,25 +40,22 @@ function getInstantLotsize(sym) {
     return 1;
 }
 
-const COMMODITY_FREEZE_LIMITS = {
-    CRUDEOIL: 10000,
-    CRUDEOILM: 1000,
-    NATURALGAS: 50000,
-    NATURALGASM: 10000,
-    GOLD: 100,
-    GOLDM: 1000,
-    GOLDPETAL: 10000,
-    SILVER: 300,
-    SILVERM: 1000,
-    SILVERMIC: 10000,
-    COPPER: 25000,
-    ZINC: 50000,
-    LEAD: 50000,
-    ALUMINIUM: 50000,
-    MENTHAOIL: 3600,
-    COTTON: 2500,
-    NICKEL: 2500
+let freezeConfig = {
+    INDEX_MAX_LOTS: { BANKNIFTY: 20, NIFTY: 27, FINNIFTY: 30, MIDCPNIFTY: 28, MIDCAPNIFTY: 28, NIFTYNXT50: 24, SENSEX: 1000, BANKEX: 1000 },
+    STOCK_MAX_LOTS: 40,
+    COMMODITY_FREEZE_LIMITS: { CRUDEOIL: 10000, CRUDEOILM: 1000, NATURALGAS: 50000, NATURALGASM: 10000, GOLD: 100, GOLDM: 1000, GOLDPETAL: 10000, SILVER: 300, SILVERM: 1000, SILVERMIC: 10000, COPPER: 25000, ZINC: 50000, LEAD: 50000, ALUMINIUM: 50000, MENTHAOIL: 3600, COTTON: 2500, NICKEL: 2500 }
 };
+
+try {
+    const configPath = path.join(__dirname, '..', 'database', 'freezeLimitsConfig.json');
+    if (fs.existsSync(configPath)) {
+        freezeConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+} catch (e) {
+    console.error('Failed to load freezeLimitsConfig in taxCalculator:', e);
+}
+
+const COMMODITY_FREEZE_LIMITS = freezeConfig.COMMODITY_FREEZE_LIMITS || {};
 
 function getFreezeLimit(symbol, explicitLotsize = null) {
     if (!symbol) return 100000;
@@ -82,34 +79,40 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
         return 100000;
     }
 
-    // 2. Major Indices Check
+    // 2. Major Indices Check (Dynamic calculation: lotSize * maxLots)
+    const indexMaxLots = freezeConfig.INDEX_MAX_LOTS || {};
     if (upper.startsWith('BANKNIFTY') || upper.includes('BANKNIFTY')) {
-        return lot > 1 ? (Math.floor(900 / lot) * lot <= 600 ? Math.floor(600 / lot) * lot : 600) : 600;
+        const maxLots = indexMaxLots.BANKNIFTY || 20;
+        return lot > 1 ? lot * maxLots : 600;
     }
     if (upper.startsWith('FINNIFTY') || upper.includes('FINNIFTY')) {
-        return lot > 1 ? Math.floor(1800 / lot) * lot : 1800;
+        const maxLots = indexMaxLots.FINNIFTY || 30;
+        return lot > 1 ? lot * maxLots : 1800;
     }
     if (upper.startsWith('MIDCPNIFTY') || upper.includes('MIDCPNIFTY') || upper.startsWith('MIDCAPNIFTY') || upper.includes('MIDCAPNIFTY')) {
-        return lot > 1 ? Math.floor(2800 / lot) * lot : 2800;
+        return 2800;
     }
     if (upper.startsWith('NIFTYNXT50') || upper.includes('NIFTYNXT50') || upper.includes('NIFTYJR')) {
-        return lot > 1 ? Math.floor(600 / lot) * lot : 600;
+        const maxLots = indexMaxLots.NIFTYNXT50 || 24;
+        return lot > 1 ? lot * maxLots : 600;
     }
     if (upper.startsWith('NIFTY') || upper.includes('NIFTY')) {
-        return lot > 1 ? Math.floor(1800 / lot) * lot : 1755;
+        const maxLots = indexMaxLots.NIFTY || 27;
+        return lot > 1 ? lot * maxLots : 1755;
     }
     if (upper.startsWith('SENSEX') || upper.includes('SENSEX')) {
-        return 1000;
+        return indexMaxLots.SENSEX || 1000;
     }
     if (upper.startsWith('BANKEX') || upper.includes('BANKEX')) {
-        return 1000;
+        return indexMaxLots.BANKEX || 1000;
     }
 
     // 3. Stock F&O (Derivatives: Futures & Options for individual stocks)
     // NSE standard freeze limit for individual security F&O is 40 market lots
     if (isDeriv) {
+        const stockMaxLots = freezeConfig.STOCK_MAX_LOTS || 40;
         if (lot > 1) {
-            return lot * 40;
+            return lot * stockMaxLots;
         }
         return 1800;
     }

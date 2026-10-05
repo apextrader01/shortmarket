@@ -1,0 +1,32 @@
+{
+  "INDEX_MAX_LOTS": {
+    "BANKNIFTY": 20,
+    "NIFTY": 27,
+    "FINNIFTY": 30,
+    "MIDCPNIFTY": 28,
+    "MIDCAPNIFTY": 28,
+    "NIFTYNXT50": 24,
+    "SENSEX": 1000,
+    "BANKEX": 1000
+  },
+  "STOCK_MAX_LOTS": 40,
+  "COMMODITY_FREEZE_LIMITS": {
+    "CRUDEOIL": 10000,
+    "CRUDEOILM": 1000,
+    "NATURALGAS": 50000,
+    "NATURALGASM": 10000,
+    "GOLD": 100,
+    "GOLDM": 1000,
+    "GOLDPETAL": 10000,
+    "SILVER": 300,
+    "SILVERM": 1000,
+    "SILVERMIC": 10000,
+    "COPPER": 25000,
+    "ZINC": 50000,
+    "LEAD": 50000,
+    "ALUMINIUM": 50000,
+    "MENTHAOIL": 3600,
+    "COTTON": 2500,
+    "NICKEL": 2500
+  }
+}
