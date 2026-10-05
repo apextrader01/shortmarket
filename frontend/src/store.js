@@ -695,20 +695,15 @@ export const useStore = create(persist((set, get) => ({
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
     const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
     if (isExit && typeof window !== 'undefined') {
-      const currentUser = get().user;
-      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
-      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
-      if (!isAdFree) {
-        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
-          detail: {
-            mode: 'pre_exit',
-            symbol: symbol || '',
-            side: type || 'SELL',
-            onProceed: openNow
-          }
-        }));
-        return;
-      }
+      window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+        detail: {
+          mode: 'pre_exit',
+          symbol: symbol || '',
+          side: type || 'SELL',
+          onProceed: openNow
+        }
+      }));
+      return;
     }
     openNow();
   },
@@ -719,20 +714,15 @@ export const useStore = create(persist((set, get) => ({
   openEditOrderModal: (order) => {
     const openNow = () => set({ editOrderModal: { isOpen: true, order } });
     if (typeof window !== 'undefined') {
-      const currentUser = get().user;
-      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
-      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
-      if (!isAdFree) {
-        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
-          detail: {
-            mode: 'pre_exit',
-            symbol: order?.symbol || 'ORDER',
-            side: 'MODIFY',
-            onProceed: openNow
-          }
-        }));
-        return;
-      }
+      window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+        detail: {
+          mode: 'pre_exit',
+          symbol: order?.symbol || 'ORDER',
+          side: 'MODIFY',
+          onProceed: openNow
+        }
+      }));
+      return;
     }
     openNow();
   },

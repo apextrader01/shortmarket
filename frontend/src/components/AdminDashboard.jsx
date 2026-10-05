@@ -1495,6 +1495,7 @@ export default function AdminDashboard() {
   // Ads & Monetization Admin State
   const [adConfig, setAdConfig] = useState({
     enabled: true,
+    show_ads_to_admin: true,
     adsense_client_id: 'ca-pub-1001083475331869',
     adsense_banner_slot: '5099870662',
     adsense_rewarded_slot: '2846165854',
@@ -1515,7 +1516,7 @@ export default function AdminDashboard() {
   const [adStatusMsg, setAdStatusMsg] = useState({ type: '', text: '' });
   const [showPreviewRewardModal, setShowPreviewRewardModal] = useState(false);
 
-  const fetchAdminAdConfig = async () => {
+  const fetchAdminAdConfig = async (statsOnly = false) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
@@ -1524,8 +1525,17 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data && data.success && data.config) {
-        setAdConfig(prev => ({ ...prev, ...data.config }));
-        updateCachedAdConfig(data.config);
+        if (statsOnly) {
+          setAdConfig(prev => ({
+            ...prev,
+            impressions: data.config.impressions ?? prev.impressions,
+            clicks: data.config.clicks ?? prev.clicks,
+            reward_claims: data.config.reward_claims ?? prev.reward_claims
+          }));
+        } else {
+          setAdConfig(prev => ({ ...prev, ...data.config }));
+          updateCachedAdConfig(data.config);
+        }
       }
     } catch (e) {
       console.warn('Failed to fetch ad config:', e);
@@ -2230,7 +2240,7 @@ export default function AdminDashboard() {
     return () => clearTimeout(timer);
   }, [withdrawalSearch]);
 
-  // Live 5-second polling for Resource Telemetry tab
+  // Live polling for Resource Telemetry and Ads & Monetization tabs
   useEffect(() => {
     if (activeTab !== 'telemetry' || !isLiveTelemetry) return;
     const interval = setInterval(() => {
@@ -2238,6 +2248,14 @@ export default function AdminDashboard() {
     }, 60000);
     return () => clearInterval(interval);
   }, [activeTab, isLiveTelemetry, telemetryTimeframe]);
+
+  useEffect(() => {
+    if (activeTab !== 'ads') return;
+    const interval = setInterval(() => {
+      fetchAdminAdConfig(true);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
@@ -4170,9 +4188,13 @@ export default function AdminDashboard() {
 
             <RewardedAdModal
               isOpen={showPreviewRewardModal}
-              onClose={() => setShowPreviewRewardModal(false)}
+              onClose={() => {
+                setShowPreviewRewardModal(false);
+                fetchAdminAdConfig(true);
+              }}
               customConfig={adConfig}
-              onRewardClaimed={() => fetchAdminAdConfig()}
+              onAdCompleted={() => fetchAdminAdConfig(true)}
+              onRewardClaimed={() => fetchAdminAdConfig(true)}
             />
 
             {/* Live Performance Metrics Strip */}
@@ -4226,6 +4248,16 @@ export default function AdminDashboard() {
                     style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
                   />
                   <span>Enable Ads for All Free (BASIC) Users</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#38bdf8', background: 'rgba(56,189,248,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.25)' }}>
+                  <input
+                    type="checkbox"
+                    checked={adConfig.show_ads_to_admin !== false}
+                    onChange={(e) => setAdConfig({ ...adConfig, show_ads_to_admin: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#38bdf8' }}
+                  />
+                  <span>Also Show All Ads on Admin Account (for Live Testing)</span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#34d399', background: 'rgba(16,185,129,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.25)' }}>

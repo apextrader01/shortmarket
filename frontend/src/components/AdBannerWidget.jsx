@@ -87,18 +87,23 @@ export function useAdConfig() {
 
 export function isUserAdFreeTier(user) {
   if (!user) return false;
+  if (user.is_admin && (!cachedAdConfig || cachedAdConfig.show_ads_to_admin !== false)) {
+    return false;
+  }
   const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
   return paidTiers.includes(String(user.subscription_tier || '').toUpperCase());
 }
 
 export function trackAdEvent(event) {
   try {
-    fetch(`${API}/api/ads/track`, {
+    return fetch(`${API}/api/ads/track`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event })
-    }).catch(() => {});
-  } catch (e) {}
+    }).catch(() => null);
+  } catch (e) {
+    return Promise.resolve(null);
+  }
 }
 
 // ─── Global Ad Interstitial Helpers (Post-Order & Pre-Exit) ──────────────────
@@ -138,7 +143,7 @@ export function triggerPreExitAd(onProceed, { symbol = '', side = 'EXIT' } = {})
 }
 
 // ─── 30-Second Rewarded / Interstitial Video Ad Player Modal ─────────────────
-export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig, triggerContext }) {
+export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdCompleted, customConfig, triggerContext }) {
   const { config: fetchedConfig } = useAdConfig();
   const config = customConfig || fetchedConfig;
   const duration = 30;
@@ -187,7 +192,11 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
     if (!isOpen || secondsLeft > 0) return;
     if (!completionTrackedRef.current) {
       completionTrackedRef.current = true;
-      trackAdEvent('complete_30s');
+      trackAdEvent('complete_30s').finally(() => {
+        if (typeof onAdCompleted === 'function') {
+          onAdCompleted();
+        }
+      });
     }
     if (mode === 'pre_exit' && !autoProceededRef.current) {
       autoProceededRef.current = true;
@@ -200,7 +209,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, secondsLeft, mode, onClose, triggerContext]);
+  }, [isOpen, secondsLeft, mode, onClose, onAdCompleted, triggerContext]);
 
   useEffect(() => {
     if (isOpen && config?.adsense_client_id && config?.adsense_rewarded_slot && adsenseRef.current) {

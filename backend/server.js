@@ -10638,9 +10638,10 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
   }
 });
 
-// ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Zero Server Overhead) ───
+// ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Multi-Worker Safe) ───
 let adConfigCache = {
   enabled: true,
+  show_ads_to_admin: true,
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
   adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '5099870662',
   adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '2846165854',
@@ -10666,17 +10667,19 @@ async function loadAdConfigFromDb() {
       adConfigCache = {
         ...adConfigCache,
         ...parsed,
+        show_ads_to_admin: parsed.show_ads_to_admin !== undefined ? Boolean(parsed.show_ads_to_admin) : true,
         adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
         adsense_banner_slot: parsed.adsense_banner_slot || adConfigCache.adsense_banner_slot || '5099870662',
         adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '2846165854',
-        impressions: Math.max(Number(adConfigCache.impressions || 0), Number(parsed.impressions || 0)),
-        clicks: Math.max(Number(adConfigCache.clicks || 0), Number(parsed.clicks || 0)),
-        reward_claims: Math.max(Number(adConfigCache.reward_claims || 0), Number(parsed.reward_claims || 0))
+        impressions: Number(parsed.impressions ?? adConfigCache.impressions ?? 0),
+        clicks: Number(parsed.clicks ?? adConfigCache.clicks ?? 0),
+        reward_claims: Number(parsed.reward_claims ?? adConfigCache.reward_claims ?? 0)
       };
     }
   } catch (e) {}
 }
-setTimeout(loadAdConfigFromDb, 2500);
+setTimeout(loadAdConfigFromDb, 2000);
+setInterval(loadAdConfigFromDb, 15000).unref();
 
 // Authorized Digital Sellers (ads.txt) for Google AdSense crawler verification
 app.get('/ads.txt', (req, res) => {
@@ -10693,6 +10696,7 @@ app.get('/api/ads/config', (req, res) => {
     success: true,
     config: {
       enabled: Boolean(adConfigCache.enabled),
+      show_ads_to_admin: adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true,
       adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
       adsense_banner_slot: adConfigCache.adsense_banner_slot || '5099870662',
       adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '2846165854',
@@ -10709,33 +10713,74 @@ app.get('/api/ads/config', (req, res) => {
   });
 });
 
-// Lightweight impression / click tracker in memory (flushed periodically)
-let adStatsDirty = false;
-app.post('/api/ads/track', (req, res) => {
-  const { event } = req.body || {};
-  if (event === 'impression') {
-    adConfigCache.impressions = Number(adConfigCache.impressions || 0) + 1;
-    adStatsDirty = true;
-  } else if (event === 'click') {
-    adConfigCache.clicks = Number(adConfigCache.clicks || 0) + 1;
-    adStatsDirty = true;
-  } else if (event === 'complete_30s') {
-    adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
-    adStatsDirty = true;
-  }
-  res.json({ success: true });
-});
+// Multi-worker safe impression / click / 30s completion tracker
+let adDelta = { impressions: 0, clicks: 0, reward_claims: 0 };
+let flushingAdStats = false;
 
-setInterval(async () => {
-  if (!adStatsDirty) return;
-  adStatsDirty = false;
+async function flushAdDeltaToDb() {
+  if (flushingAdStats) return;
+  if (adDelta.impressions === 0 && adDelta.clicks === 0 && adDelta.reward_claims === 0) return;
+
+  const impToAdd = adDelta.impressions;
+  const clkToAdd = adDelta.clicks;
+  const cmpToAdd = adDelta.reward_claims;
+  adDelta = { impressions: 0, clicks: 0, reward_claims: 0 };
+  flushingAdStats = true;
+
   try {
+    const row = await db('system_settings').where({ key: 'ads_monetization_config' }).first();
+    let base = { ...adConfigCache };
+    if (row && row.value) {
+      try {
+        base = { ...base, ...JSON.parse(row.value) };
+      } catch (_) {}
+    }
+    base.impressions = Number(base.impressions || 0) + impToAdd;
+    base.clicks = Number(base.clicks || 0) + clkToAdd;
+    base.reward_claims = Number(base.reward_claims || 0) + cmpToAdd;
+    adConfigCache = base;
+
     await db('system_settings')
       .insert({ key: 'ads_monetization_config', value: JSON.stringify(adConfigCache), updated_at: new Date() })
       .onConflict('key')
       .merge();
-  } catch (e) {}
-}, 10000).unref();
+  } catch (e) {
+    adDelta.impressions += impToAdd;
+    adDelta.clicks += clkToAdd;
+    adDelta.reward_claims += cmpToAdd;
+  } finally {
+    flushingAdStats = false;
+  }
+}
+
+app.post('/api/ads/track', async (req, res) => {
+  const { event } = req.body || {};
+  if (event === 'impression') {
+    adDelta.impressions += 1;
+    adConfigCache.impressions = Number(adConfigCache.impressions || 0) + 1;
+    flushAdDeltaToDb().catch(() => {});
+  } else if (event === 'click') {
+    adDelta.clicks += 1;
+    adConfigCache.clicks = Number(adConfigCache.clicks || 0) + 1;
+    await flushAdDeltaToDb();
+  } else if (event === 'complete_30s') {
+    adDelta.reward_claims += 1;
+    adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
+    await flushAdDeltaToDb();
+  }
+  res.json({
+    success: true,
+    stats: {
+      impressions: adConfigCache.impressions,
+      clicks: adConfigCache.clicks,
+      reward_claims: adConfigCache.reward_claims
+    }
+  });
+});
+
+setInterval(() => {
+  flushAdDeltaToDb().catch(() => {});
+}, 3000).unref();
 
 // Claim 30-Second Rewarded Video Ad Bonus (Atomic Transaction + Double-Entry Ledger)
 app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
@@ -10789,12 +10834,8 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
       });
     });
 
-    adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
-    await db('system_settings')
-      .insert({ key: 'ads_monetization_config', value: JSON.stringify(adConfigCache), updated_at: new Date() })
-      .onConflict('key')
-      .merge()
-      .catch(() => {});
+    await flushAdDeltaToDb();
+    await loadAdConfigFromDb();
 
     res.json({
       success: true,
@@ -10812,6 +10853,7 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
 // Admin Get & Save Ad Monetization Config
 app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    await flushAdDeltaToDb();
     await loadAdConfigFromDb();
     const totalRewardsRow = await db('ledger')
       .where({ type: 'DEPOSIT' })
@@ -10830,10 +10872,13 @@ app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, re
 
 app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    await flushAdDeltaToDb();
+    await loadAdConfigFromDb();
     const incoming = req.body || {};
     adConfigCache = {
       ...adConfigCache,
       enabled: incoming.enabled !== undefined ? Boolean(incoming.enabled) : adConfigCache.enabled,
+      show_ads_to_admin: incoming.show_ads_to_admin !== undefined ? Boolean(incoming.show_ads_to_admin) : (adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true),
       adsense_client_id: incoming.adsense_client_id !== undefined ? String(incoming.adsense_client_id).trim() : adConfigCache.adsense_client_id,
       adsense_banner_slot: incoming.adsense_banner_slot !== undefined ? String(incoming.adsense_banner_slot).trim() : adConfigCache.adsense_banner_slot,
       adsense_rewarded_slot: incoming.adsense_rewarded_slot !== undefined ? String(incoming.adsense_rewarded_slot).trim() : adConfigCache.adsense_rewarded_slot,
@@ -10849,6 +10894,7 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
     };
 
     if (incoming.reset_stats === true) {
+      adDelta = { impressions: 0, clicks: 0, reward_claims: 0 };
       adConfigCache.impressions = 0;
       adConfigCache.clicks = 0;
       adConfigCache.reward_claims = 0;
