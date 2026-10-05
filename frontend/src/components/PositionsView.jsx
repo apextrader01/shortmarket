@@ -10,6 +10,7 @@ import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContra
 import { calculateOrderSlices } from '../utils/freezeLimits';
 import { getTodayClosedPositions, isToday } from '../utils/pnlHelper';
 import { getMarketSession } from '../utils/marketTiming';
+import { triggerPreExitAd } from './AdBannerWidget';
 
 const EMPTY_PRICES = {};
 
@@ -162,11 +163,26 @@ export default function PositionsView() {
 
 
 
+  const handleOpenPartialExit = (pos) => {
+    if (pos.unencumberedQty === 0) {
+      alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+      return;
+    }
+    triggerPreExitAd(() => {
+      setPartialExitPos(pos);
+      setPartialExitIsAmo(false);
+      const ls = pos.lotSize || getInstantLotsize(pos.symbol) || 1;
+      setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+      setPartialExitType('MARKET');
+      setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+    }, { symbol: pos.symbol, side: 'EXIT' });
+  };
+
   const handleMfAction = (pos, mode = 'REDEEM') => {
     const rawSym = pos?.symbol || '';
     const cleanId = rawSym.replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const fundName = getMfName(rawSym) || pos?.name || cleanId;
-    setSelectedMfFund({
+    const openMf = () => setSelectedMfFund({
       id: cleanId,
       schemeCode: cleanId,
       name: fundName,
@@ -174,6 +190,11 @@ export default function PositionsView() {
       symbol: rawSym,
       initialMode: mode
     });
+    if (mode === 'REDEEM') {
+      triggerPreExitAd(openMf, { symbol: rawSym, side: 'REDEEM' });
+    } else {
+      openMf();
+    }
   };
 
   const [mfNames, setMfNames] = useState({
@@ -1057,15 +1078,7 @@ export default function PositionsView() {
                               title="Exit Position"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (pos.unencumberedQty === 0) {
-                                  alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
-                                  return;
-                                }
-                                setPartialExitPos(pos);
-                                const ls = pos.lotSize || getInstantLotsize(pos.symbol) || 1;
-                                setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
-                                setPartialExitType('MARKET');
-                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                                handleOpenPartialExit(pos);
                               }}
                             />
                           )}
@@ -1185,16 +1198,7 @@ export default function PositionsView() {
                       onClick={() => {
                         if (viewMode === 'CLOSED') return;
                         if (viewMode === 'OPEN') {
-                          if (pos.unencumberedQty === 0) {
-                            alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
-                            return;
-                          }
-                          setPartialExitPos(pos);
-                          setPartialExitIsAmo(false);
-                          const ls = pos.lotSize || 1;
-                          setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
-                          setPartialExitType('MARKET');
-                          setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                          handleOpenPartialExit(pos);
                         } else if (viewMode === 'HOLDINGS') {
                           if (isMf) {
                             handleMfAction(pos, 'REDEEM');
@@ -1352,16 +1356,7 @@ export default function PositionsView() {
                                   const exitQty = Math.abs(rawQty || 1);
                                   useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
                                 } else if (viewMode === 'OPEN') {
-                                  if (pos.unencumberedQty === 0) {
-                                    alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
-                                    return;
-                                  }
-                                  setPartialExitPos(pos);
-                                  setPartialExitIsAmo(false);
-                                  const ls = pos.lotSize || 1;
-                                  setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
-                                  setPartialExitType('MARKET');
-                                  setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                                  handleOpenPartialExit(pos);
                                 }
                               }}
                               style={{ 

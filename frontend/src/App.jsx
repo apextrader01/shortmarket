@@ -76,6 +76,7 @@ const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBr
 const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));
 const CalculatorsSuiteView = lazyWithRetry(() => import('./components/CalculatorsSuiteView'));
 const AdBannerWidget = lazyWithRetry(() => import('./components/AdBannerWidget'));
+const GlobalAdInterstitial = lazyWithRetry(() => import('./components/AdBannerWidget').then(m => ({ default: m.GlobalAdInterstitial })));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -1410,6 +1411,7 @@ function App() {
 
       <Suspense fallback={null}>
         <ErrorBoundary>
+          <GlobalAdInterstitial />
           {orderModal?.isOpen && <OrderModal />}
           {editOrderModal?.isOpen && <EditOrderModal />}
           {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}

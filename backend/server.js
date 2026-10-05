@@ -10719,6 +10719,9 @@ app.post('/api/ads/track', (req, res) => {
   } else if (event === 'click') {
     adConfigCache.clicks = Number(adConfigCache.clicks || 0) + 1;
     adStatsDirty = true;
+  } else if (event === 'complete_30s') {
+    adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
+    adStatsDirty = true;
   }
   res.json({ success: true });
 });

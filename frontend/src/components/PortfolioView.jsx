@@ -119,7 +119,7 @@ export default function PortfolioView() {
     const rawSym = pos.symbol || '';
     const cleanId = rawSym.replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const fundName = getMfName(rawSym) || pos.name || cleanId;
-    setSelectedMfFund({
+    const openMf = () => setSelectedMfFund({
       id: cleanId,
       schemeCode: cleanId,
       name: fundName,
@@ -127,6 +127,23 @@ export default function PortfolioView() {
       symbol: rawSym,
       initialMode: mode
     });
+    if (mode === 'REDEEM' && typeof window !== 'undefined') {
+      const currentUser = useStore.getState().user;
+      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
+      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
+      if (!isAdFree) {
+        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+          detail: {
+            mode: 'pre_exit',
+            symbol: rawSym,
+            side: 'REDEEM',
+            onProceed: openMf
+          }
+        }));
+        return;
+      }
+    }
+    openMf();
   };
 
   const { positions, holdings, orders } = useStore(

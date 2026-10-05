@@ -101,11 +101,48 @@ export function trackAdEvent(event) {
   } catch (e) {}
 }
 
-// ─── 30-Second Rewarded Video Ad Player Modal ────────────────────────────────
-export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig }) {
+// ─── Global Ad Interstitial Helpers (Post-Order & Pre-Exit) ──────────────────
+export function triggerPostOrderAd({ symbol, side = 'BUY', status = 'EXECUTED' } = {}) {
+  if (typeof window === 'undefined') return;
+  const user = useStore.getState().user;
+  if (isUserAdFreeTier(user)) return;
+  if (cachedAdConfig && cachedAdConfig.enabled === false) return;
+  window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+    detail: {
+      mode: 'post_order',
+      symbol: symbol || '',
+      side: side || 'BUY',
+      status: status || 'EXECUTED'
+    }
+  }));
+}
+
+export function triggerPreExitAd(onProceed, { symbol = '', side = 'EXIT' } = {}) {
+  if (typeof window === 'undefined') {
+    if (typeof onProceed === 'function') onProceed();
+    return;
+  }
+  const user = useStore.getState().user;
+  if (isUserAdFreeTier(user) || (cachedAdConfig && cachedAdConfig.enabled === false)) {
+    if (typeof onProceed === 'function') onProceed();
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+    detail: {
+      mode: 'pre_exit',
+      symbol: symbol || '',
+      side: side || 'EXIT',
+      onProceed
+    }
+  }));
+}
+
+// ─── 30-Second Rewarded / Interstitial Video Ad Player Modal ─────────────────
+export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig, triggerContext }) {
   const { config: fetchedConfig } = useAdConfig();
   const config = customConfig || fetchedConfig;
-  const [secondsLeft, setSecondsLeft] = useState(30);
+  const duration = 30;
+  const [secondsLeft, setSecondsLeft] = useState(duration);
   const [watchedSeconds, setWatchedSeconds] = useState(0);
   const [isPausedByTab, setIsPausedByTab] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -113,13 +150,20 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
   const [errorMsg, setErrorMsg] = useState('');
   const [muted, setMuted] = useState(true);
   const adsenseRef = useRef(null);
+  const completionTrackedRef = useRef(false);
+  const autoProceededRef = useRef(false);
+
+  const mode = triggerContext?.mode || 'reward'; // 'reward' | 'post_order' | 'pre_exit'
+  const cleanSymbol = (triggerContext?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
 
   useEffect(() => {
     if (!isOpen) return;
-    setSecondsLeft(30);
+    setSecondsLeft(duration);
     setWatchedSeconds(0);
     setClaimedData(null);
     setErrorMsg('');
+    completionTrackedRef.current = false;
+    autoProceededRef.current = false;
     trackAdEvent('impression');
 
     const handleVisibilityChange = () => {
@@ -127,7 +171,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isOpen]);
+  }, [isOpen, triggerContext]);
 
   useEffect(() => {
     if (!isOpen || secondsLeft <= 0 || isPausedByTab || claimedData) return;
@@ -137,6 +181,26 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
     }, 1000);
     return () => clearInterval(timer);
   }, [isOpen, secondsLeft, isPausedByTab, claimedData]);
+
+  // Track 30s ad completion and auto-open Exit Table when mode === 'pre_exit'
+  useEffect(() => {
+    if (!isOpen || secondsLeft > 0) return;
+    if (!completionTrackedRef.current) {
+      completionTrackedRef.current = true;
+      trackAdEvent('complete_30s');
+    }
+    if (mode === 'pre_exit' && !autoProceededRef.current) {
+      autoProceededRef.current = true;
+      const timer = setTimeout(() => {
+        if (typeof onClose === 'function') onClose();
+        if (typeof triggerContext?.onProceed === 'function') {
+          window.__lastPreExitAdTs = Date.now();
+          triggerContext.onProceed();
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, secondsLeft, mode, onClose, triggerContext]);
 
   useEffect(() => {
     if (isOpen && config?.adsense_client_id && config?.adsense_rewarded_slot && adsenseRef.current) {
@@ -149,7 +213,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
   if (!isOpen || !config) return null;
 
   const rewardAmount = Number(config.reward_amount || 100000);
-  const progressPct = Math.min(100, Math.round(((30 - secondsLeft) / 30) * 100));
+  const progressPct = Math.min(100, Math.round(((duration - secondsLeft) / duration) * 100));
 
   const handleClaimReward = async () => {
     if (secondsLeft > 0 || claiming) return;
@@ -214,23 +278,43 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          gap: '8px',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{
-              background: 'rgba(245, 158, 11, 0.18)',
-              color: '#fbbf24',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
+              background: mode === 'post_order'
+                ? 'rgba(16, 185, 129, 0.18)'
+                : mode === 'pre_exit'
+                  ? 'rgba(239, 68, 68, 0.18)'
+                  : 'rgba(245, 158, 11, 0.18)',
+              color: mode === 'post_order'
+                ? '#34d399'
+                : mode === 'pre_exit'
+                  ? '#f87171'
+                  : '#fbbf24',
+              border: `1px solid ${mode === 'post_order' ? 'rgba(16, 185, 129, 0.4)' : mode === 'pre_exit' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
               fontSize: '10px',
               fontWeight: '800',
               padding: '3px 8px',
               borderRadius: '6px',
               letterSpacing: '0.5px'
             }}>
-              🎬 REWARDED AD
+              {mode === 'post_order'
+                ? `✅ ORDER ${triggerContext?.status || 'PLACED'} • AD`
+                : mode === 'pre_exit'
+                  ? '🎬 SPONSORED AD • BEFORE EXIT'
+                  : '🎬 REWARDED AD'}
             </span>
-            <span style={{ fontSize: '12.5px', color: '#cbd5e1', fontWeight: '600' }}>
-              Reward: <strong style={{ color: '#10b981' }}>+₹{rewardAmount.toLocaleString('en-IN')}</strong>
+            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>
+              {mode === 'pre_exit' ? (
+                <>Exit Table for <strong style={{ color: '#38bdf8' }}>{cleanSymbol || 'Position'}</strong> opens after ad</>
+              ) : mode === 'post_order' ? (
+                <><strong style={{ color: '#38bdf8' }}>{triggerContext?.side || 'BUY'} {cleanSymbol}</strong> • Sponsored Break</>
+              ) : (
+                <>Reward: <strong style={{ color: '#10b981' }}>+₹{rewardAmount.toLocaleString('en-IN')}</strong></>
+              )}
             </span>
           </div>
 
@@ -258,15 +342,26 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
                 fontSize: '11.5px',
                 fontWeight: '800'
               }}>
-                ✓ Reward Unlocked!
+                {mode === 'pre_exit' ? '✓ Opening Exit Table...' : '✓ Ad Complete!'}
               </div>
             )}
 
             <button
               type="button"
               onClick={() => {
-                if (secondsLeft > 0 && !window.confirm('Close before timer finishes? You will not receive the +₹' + rewardAmount.toLocaleString('en-IN') + ' reward.')) {
-                  return;
+                if (secondsLeft > 0) {
+                  const confirmMsg = mode === 'pre_exit'
+                    ? `Please wait ${secondsLeft}s for the ad to finish to open the Exit Table. Cancel exiting this position?`
+                    : mode === 'post_order'
+                      ? `Please wait ${secondsLeft}s for the sponsored ad to finish. Close anyway?`
+                      : `Close before timer finishes? You will not receive the +₹${rewardAmount.toLocaleString('en-IN')} reward.`;
+                  if (!window.confirm(confirmMsg)) {
+                    return;
+                  }
+                  if (mode === 'pre_exit') {
+                    onClose();
+                    return;
+                  }
                 }
                 onClose();
               }}
@@ -573,43 +668,178 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, customConfig
                 </div>
               )}
 
-              {/* Action Button */}
-              <button
-                type="button"
-                disabled={secondsLeft > 0 || claiming}
-                onClick={handleClaimReward}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: secondsLeft > 0
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: secondsLeft > 0 ? '#94a3b8' : '#fff',
-                  fontSize: '14px',
-                  fontWeight: '800',
-                  cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.35)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Gift size={17} />
-                {claiming
-                  ? 'Crediting Your Account...'
-                  : secondsLeft > 0
-                    ? `Please Wait ${secondsLeft}s to Claim +₹${rewardAmount.toLocaleString('en-IN')}`
-                    : `🎉 CLAIM +₹${rewardAmount.toLocaleString('en-IN')} DEMO FUNDS NOW`}
-              </button>
+              {/* Action Button(s) */}
+              {mode === 'pre_exit' ? (
+                <button
+                  type="button"
+                  disabled={secondsLeft > 0}
+                  onClick={() => {
+                    if (secondsLeft > 0) return;
+                    onClose();
+                    if (typeof triggerContext?.onProceed === 'function') {
+                      window.__lastPreExitAdTs = Date.now();
+                      triggerContext.onProceed();
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: secondsLeft > 0
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: secondsLeft > 0 ? '#94a3b8' : '#fff',
+                    fontSize: '14px',
+                    fontWeight: '800',
+                    cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(239, 68, 68, 0.35)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {secondsLeft > 0
+                    ? `⏱ Please Wait ${secondsLeft}s — Opening Exit Table After Ad...`
+                    : `🚀 OPEN EXIT TABLE FOR ${cleanSymbol || 'POSITION'} NOW →`}
+                </button>
+              ) : mode === 'post_order' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    type="button"
+                    disabled={secondsLeft > 0}
+                    onClick={onClose}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: secondsLeft > 0
+                        ? 'rgba(255, 255, 255, 0.08)'
+                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: secondsLeft > 0 ? '#94a3b8' : '#fff',
+                      fontSize: '14px',
+                      fontWeight: '800',
+                      cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.35)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {secondsLeft > 0
+                      ? `⏱ Sponsored Ad Playing (${secondsLeft}s remaining)...`
+                      : `✅ CONTINUE TRADING (AD COMPLETE) →`}
+                  </button>
+
+                  {secondsLeft === 0 && config.reward_enabled && (
+                    <button
+                      type="button"
+                      disabled={claiming}
+                      onClick={handleClaimReward}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        color: '#38bdf8',
+                        fontSize: '12.5px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Gift size={15} />
+                      {claiming
+                        ? 'Crediting Bonus...'
+                        : `🎁 Also Claim +₹${rewardAmount.toLocaleString('en-IN')} Bonus Demo Funds`}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={secondsLeft > 0 || claiming}
+                  onClick={handleClaimReward}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: secondsLeft > 0
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: secondsLeft > 0 ? '#94a3b8' : '#fff',
+                    fontSize: '14px',
+                    fontWeight: '800',
+                    cursor: secondsLeft > 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: secondsLeft > 0 ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.35)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Gift size={17} />
+                  {claiming
+                    ? 'Crediting Your Account...'
+                    : secondsLeft > 0
+                      ? `Please Wait ${secondsLeft}s to Claim +₹${rewardAmount.toLocaleString('en-IN')}`
+                      : `🎉 CLAIM +₹${rewardAmount.toLocaleString('en-IN')} DEMO FUNDS NOW`}
+                </button>
+              )}
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Global Trade & Exit Ad Interstitial Controller (Mounted in App.jsx) ─────
+export function GlobalAdInterstitial() {
+  const user = useStore(state => state.user);
+  const { config } = useAdConfig();
+  const [activeTrigger, setActiveTrigger] = useState(null);
+
+  useEffect(() => {
+    const handleTriggerAd = (e) => {
+      const detail = e.detail || {};
+      const currentUser = useStore.getState().user;
+      if (isUserAdFreeTier(currentUser)) {
+        if (typeof detail.onProceed === 'function') detail.onProceed();
+        return;
+      }
+      if (cachedAdConfig && cachedAdConfig.enabled === false) {
+        if (typeof detail.onProceed === 'function') detail.onProceed();
+        return;
+      }
+      setActiveTrigger(detail);
+    };
+
+    window.addEventListener('skandx-trigger-ad', handleTriggerAd);
+    return () => window.removeEventListener('skandx-trigger-ad', handleTriggerAd);
+  }, []);
+
+  if (!activeTrigger || !config || !config.enabled || isUserAdFreeTier(user)) {
+    return null;
+  }
+
+  return (
+    <RewardedAdModal
+      isOpen={Boolean(activeTrigger)}
+      triggerContext={activeTrigger}
+      onClose={() => setActiveTrigger(null)}
+    />
   );
 }
 

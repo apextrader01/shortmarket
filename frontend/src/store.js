@@ -693,7 +693,24 @@ export const useStore = create(persist((set, get) => ({
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null },
   openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null) => {
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
-    set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
+    const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
+    if (isExit && typeof window !== 'undefined') {
+      const currentUser = get().user;
+      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
+      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
+      if (!isAdFree) {
+        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+          detail: {
+            mode: 'pre_exit',
+            symbol: symbol || '',
+            side: type || 'SELL',
+            onProceed: openNow
+          }
+        }));
+        return;
+      }
+    }
+    openNow();
   },
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
   closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null } }),
@@ -1741,6 +1758,24 @@ export const useStore = create(persist((set, get) => ({
         playOrderExecutedSound();
         // Sync user data non-blockingly in background for sub-100ms instant execution
         get().fetchUserData().catch(() => {});
+
+        // Show Sponsored Ad right when Buy/New order is placed (Open, Pending, AMO, or Executed)
+        if (typeof window !== 'undefined' && data.status !== 'REJECTED') {
+          const recentlyWatchedPreExit = Boolean(window.__lastPreExitAdTs && (Date.now() - window.__lastPreExitAdTs < 90000));
+          if (normalizedPayload.is_exit && recentlyWatchedPreExit) {
+            window.__lastPreExitAdTs = 0;
+          } else {
+            window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+              detail: {
+                mode: 'post_order',
+                symbol: normalizedPayload.symbol || '',
+                side: normalizedPayload.side || 'BUY',
+                status: data.status || 'EXECUTED'
+              }
+            }));
+          }
+        }
+
         return {
           ...data,
           isSliced: slices && slices.length > 1,
@@ -1765,7 +1800,20 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sipPayload)
       });
       const data = await res.json();
-      if (data.success) { get().fetchUserData(); return data; }
+      if (data.success) {
+        get().fetchUserData();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+            detail: {
+              mode: 'post_order',
+              symbol: sipPayload.symbol || 'MUTUAL FUND',
+              side: 'SIP BUY',
+              status: 'ACTIVE'
+            }
+          }));
+        }
+        return data;
+      }
       if (res.status === 401 && (data?.account_deleted || data?.error?.toLowerCase().includes('deleted') || data?.error?.toLowerCase().includes('not found'))) {
         get().logout();
       }
@@ -1802,6 +1850,16 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         get().fetchUserData().catch(() => {});
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+            detail: {
+              mode: 'post_order',
+              symbol: symWithSuffix,
+              side: 'SIP BUY',
+              status: 'ACTIVE'
+            }
+          }));
+        }
         return data;
       }
       return { success: false, error: data.error || 'Failed to create SIP' };
@@ -1827,6 +1885,16 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         get().fetchUserData().catch(() => {});
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+            detail: {
+              mode: 'post_order',
+              symbol: `${schemeCode}-MF`,
+              side: 'BUY',
+              status: 'EXECUTED'
+            }
+          }));
+        }
         return data;
       }
       return { success: false, error: data.error || 'Mutual fund purchase failed' };
