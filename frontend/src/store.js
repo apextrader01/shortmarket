@@ -716,7 +716,26 @@ export const useStore = create(persist((set, get) => ({
   closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null } }),
 
   editOrderModal: { isOpen: false, order: null },
-  openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
+  openEditOrderModal: (order) => {
+    const openNow = () => set({ editOrderModal: { isOpen: true, order } });
+    if (typeof window !== 'undefined') {
+      const currentUser = get().user;
+      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
+      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
+      if (!isAdFree) {
+        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
+          detail: {
+            mode: 'pre_exit',
+            symbol: order?.symbol || 'ORDER',
+            side: 'MODIFY',
+            onProceed: openNow
+          }
+        }));
+        return;
+      }
+    }
+    openNow();
+  },
   closeEditOrderModal: () => set({ editOrderModal: { isOpen: false, order: null } }),
 
   // ── Market Data ─────────────────────────────────────────────────────────────

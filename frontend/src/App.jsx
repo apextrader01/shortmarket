@@ -1056,6 +1056,7 @@ function App() {
             onOpenPaperTrading={() => setActiveTab('Markets')} 
             onBack={() => setActiveTab('Home')} 
           />
+          <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
       ) : activeTab === 'TradeDiary' ? (
         <Suspense fallback={<TabLoader />}>
@@ -1066,6 +1067,7 @@ function App() {
             onOpenProfile={() => setActiveTab('ClientData')}
             onNavigate={(tab) => setActiveTab(tab)}
           />
+          <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
       ) : activeTab === 'Algo' ? (
         <Suspense fallback={<TabLoader />}>
@@ -1074,6 +1076,7 @@ function App() {
             onBack={() => setActiveTab('Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
+          <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
       ) : activeTab === 'Calculators' ? (
         <Suspense fallback={<TabLoader />}>
@@ -1082,6 +1085,7 @@ function App() {
             onBack={() => setActiveTab('Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
+          <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
       ) : activeTab === 'WealthOS' ? (
         <Suspense fallback={<TabLoader />}>
@@ -1095,6 +1099,7 @@ function App() {
               setActiveTab('Calculators');
             }}
           />
+          <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
       ) : (
         <>
@@ -1398,7 +1403,7 @@ function App() {
                   </Suspense>
                 </div>
               )}
-              {['Positions', 'Orders', 'Portfolio', 'Reports', 'Leaderboard', 'MutualFunds', 'Analytics', 'Journal', 'Referrals'].includes(activeTab) && (
+              {['Markets', 'Chart', 'Options', 'Watchlist', 'Positions', 'Orders', 'Portfolio', 'Reports', 'Leaderboard', 'MutualFunds', 'Analytics', 'Journal', 'Referrals', 'ClientData', 'Settings', 'AboutUs'].includes(activeTab) && (
                 <Suspense fallback={null}>
                   <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
                 </Suspense>

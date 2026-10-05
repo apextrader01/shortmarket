@@ -15,6 +15,7 @@ import {
   generateDPHoldingReport,
   getISTDateString
 } from '../utils/clientReportGenerator';
+import { triggerPreExitAd } from './AdBannerWidget';
 const TradingJournalView = React.lazy(() => import('./TradingJournalView'));
 
 // --- Subcomponents for Tabs ---
@@ -123,25 +124,27 @@ const LedgerStatement = () => {
     fetchLedger();
   }, [token, currentPage, filterPeriod, filterType, dateRange]);
 
-  const handleExport = async (format) => {
-    try {
-      setExporting(true);
-      let query = `export=true&limit=all`;
-      if (filterType !== 'All') query += `&filterType=${filterType}`;
-      if (dateRange.start) query += `&startDate=${encodeURIComponent(dateRange.start)}`;
-      if (dateRange.end) query += `&endDate=${encodeURIComponent(dateRange.end)}`;
+  const handleExport = (format) => {
+    triggerPreExitAd(async () => {
+      try {
+        setExporting(true);
+        let query = `export=true&limit=all`;
+        if (filterType !== 'All') query += `&filterType=${filterType}`;
+        if (dateRange.start) query += `&startDate=${encodeURIComponent(dateRange.start)}`;
+        if (dateRange.end) query += `&endDate=${encodeURIComponent(dateRange.end)}`;
 
-      const res = await fetch(`${API}/api/ledger?${query}`, {
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-      });
-      const data = await res.json();
-      const exportData = (data && data.ledger) ? data.ledger : (Array.isArray(data) ? data : ledger);
-      generateLedgerReport(exportData, user || {}, filterPeriod, format);
-    } catch (err) {
-      generateLedgerReport(ledger, user || {}, filterPeriod, format);
-    } finally {
-      setExporting(false);
-    }
+        const res = await fetch(`${API}/api/ledger?${query}`, {
+          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+        });
+        const data = await res.json();
+        const exportData = (data && data.ledger) ? data.ledger : (Array.isArray(data) ? data : ledger);
+        generateLedgerReport(exportData, user || {}, filterPeriod, format);
+      } catch (err) {
+        generateLedgerReport(ledger, user || {}, filterPeriod, format);
+      } finally {
+        setExporting(false);
+      }
+    }, { symbol: 'LEDGER STATEMENT', side: `EXPORT ${(format || '').toUpperCase()}` });
   };
 
   // Consolidate consecutive sliced order ledger records (e.g. 100 slices into 1 clean consolidated entry)
@@ -720,13 +723,13 @@ const TradesAndCharges = () => {
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button 
-            onClick={() => generateTradesAndChargesReport(filteredOrders, user || {}, filterPeriod, 'excel')} 
+            onClick={() => triggerPreExitAd(() => generateTradesAndChargesReport(filteredOrders, user || {}, filterPeriod, 'excel'), { symbol: 'TRADES & CHARGES', side: 'EXPORT CSV' })} 
             style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Download size={13} /> Excel (.csv)
           </button>
           <button 
-            onClick={() => generateTradesAndChargesReport(filteredOrders, user || {}, filterPeriod, 'pdf')} 
+            onClick={() => triggerPreExitAd(() => generateTradesAndChargesReport(filteredOrders, user || {}, filterPeriod, 'pdf'), { symbol: 'TRADES & CHARGES', side: 'EXPORT PDF' })} 
             style={{ background: 'var(--color-blue)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <FileText size={13} /> PDF Statement
@@ -1070,13 +1073,13 @@ const ProfitAndLoss = () => {
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button 
-            onClick={() => generatePnLSummaryReport(filteredOrders, positions || [], user || {}, filterPeriod, 'excel')} 
+            onClick={() => triggerPreExitAd(() => generatePnLSummaryReport(filteredOrders, positions || [], user || {}, filterPeriod, 'excel'), { symbol: 'P&L STATEMENT', side: 'EXPORT CSV' })} 
             style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Download size={13} /> Excel (.csv)
           </button>
           <button 
-            onClick={() => generatePnLSummaryReport(filteredOrders, positions || [], user || {}, filterPeriod, 'pdf')} 
+            onClick={() => triggerPreExitAd(() => generatePnLSummaryReport(filteredOrders, positions || [], user || {}, filterPeriod, 'pdf'), { symbol: 'P&L STATEMENT', side: 'EXPORT PDF' })} 
             style={{ background: 'var(--color-blue)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <FileText size={13} /> PDF Statement
@@ -1384,7 +1387,7 @@ const TradingInsights = () => {
         </div>
 
         <button 
-          onClick={() => generatePnLSummaryReport(executedOrders, positions || [], user || {}, `${selectedSegment} - ${filterPeriod}`, 'pdf')} 
+          onClick={() => triggerPreExitAd(() => generatePnLSummaryReport(executedOrders, positions || [], user || {}, `${selectedSegment} - ${filterPeriod}`, 'pdf'), { symbol: 'TRADING INSIGHTS', side: 'EXPORT PDF' })} 
           style={{ background: 'var(--color-blue)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <FileText size={13} /> Export Insights (PDF)
@@ -1563,27 +1566,29 @@ const DownloadReports = () => {
     const period = selectedPeriods[reportId] || 'FY 2025-26';
     const cDates = customDates[reportId] || { start: '', end: '' };
 
-    try {
-      if (reportId === 'tax_pnl') {
-        generateTaxPnLReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
-      } else if (reportId === 'pnl_summary') {
-        generatePnLSummaryReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
-      } else if (reportId === 'trades_charges') {
-        generateTradesAndChargesReport(effectiveOrders, user, period, format, cDates.start, cDates.end);
-      } else if (reportId === 'ledger') {
-        generateLedgerReport(effectiveLedger, user, period, format, cDates.start, cDates.end);
-      } else if (reportId === 'contract_note') {
-        generateContractNoteReport(effectiveOrders, user, contractDate, format);
-      } else if (reportId === 'dp_holdings') {
-        const currentPrices = useStore.getState().prices || {};
-        generateDPHoldingReport(holdings, currentPrices, user, format);
-      }
+    triggerPreExitAd(() => {
+      try {
+        if (reportId === 'tax_pnl') {
+          generateTaxPnLReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
+        } else if (reportId === 'pnl_summary') {
+          generatePnLSummaryReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
+        } else if (reportId === 'trades_charges') {
+          generateTradesAndChargesReport(effectiveOrders, user, period, format, cDates.start, cDates.end);
+        } else if (reportId === 'ledger') {
+          generateLedgerReport(effectiveLedger, user, period, format, cDates.start, cDates.end);
+        } else if (reportId === 'contract_note') {
+          generateContractNoteReport(effectiveOrders, user, contractDate, format);
+        } else if (reportId === 'dp_holdings') {
+          const currentPrices = useStore.getState().prices || {};
+          generateDPHoldingReport(holdings, currentPrices, user, format);
+        }
 
-      showToast(`✅ ${reportTitle} (${format.toUpperCase()}) triggered successfully!`);
-    } catch (err) {
-      console.error('Download error:', err);
-      alert(`Could not generate statement: ${err.message || 'Unknown error'}`);
-    }
+        showToast(`✅ ${reportTitle} (${format.toUpperCase()}) triggered successfully!`);
+      } catch (err) {
+        console.error('Download error:', err);
+        alert(`Could not generate statement: ${err.message || 'Unknown error'}`);
+      }
+    }, { symbol: (reportTitle || 'REPORT').toUpperCase(), side: `DOWNLOAD ${(format || '').toUpperCase()}` });
   };
 
   const periodOptions = ['Today', 'This Week', 'This Month', 'FY 2025-26', 'FY 2024-25', 'All Time', 'Custom'];

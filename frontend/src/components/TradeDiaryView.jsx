@@ -60,6 +60,7 @@ import {
   Loader2
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
+import { triggerPreExitAd } from './AdBannerWidget';
 
 // Available strategies and emotions for tag selection
 export const STRATEGY_TAGS = [
@@ -1296,42 +1297,44 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       return;
     }
 
-    const sanitizeCsvCell = (val) => {
-      let str = String(val ?? '');
-      // Prevent CSV formula injection if cell starts with =, +, -, @, \t, \r
-      if (/^[=\+\-@\t\r]/.test(str)) {
-        str = `'${str}`;
-      }
-      return `"${str.replace(/"/g, '""')}"`;
-    };
+    triggerPreExitAd(() => {
+      const sanitizeCsvCell = (val) => {
+        let str = String(val ?? '');
+        // Prevent CSV formula injection if cell starts with =, +, -, @, \t, \r
+        if (/^[=\+\-@\t\r]/.test(str)) {
+          str = `'${str}`;
+        }
+        return `"${str.replace(/"/g, '""')}"`;
+      };
 
-    const headers = ['Date', 'Symbol', 'Market', 'Side', 'Quantity', 'Entry Price', 'Exit Price', 'Gross PnL', 'Charges', 'Net PnL', 'Strategy', 'Emotion', 'Notes'];
-    const rows = filteredTrades.map(t => [
-      sanitizeCsvCell(t.trade_date || todayStr),
-      sanitizeCsvCell(t.symbol),
-      sanitizeCsvCell(t.market_segment || marketSegment),
-      sanitizeCsvCell(t.trade_type),
-      Number(t.quantity || 0),
-      Number(t.entry_price || 0),
-      Number(t.exit_price || 0),
-      Number(t.realized_pnl || 0),
-      Number(t.charges || 0),
-      Number(t.net_pnl || 0),
-      sanitizeCsvCell(t.strategy || ''),
-      sanitizeCsvCell(t.emotion || ''),
-      sanitizeCsvCell(t.notes || '')
-    ]);
+      const headers = ['Date', 'Symbol', 'Market', 'Side', 'Quantity', 'Entry Price', 'Exit Price', 'Gross PnL', 'Charges', 'Net PnL', 'Strategy', 'Emotion', 'Notes'];
+      const rows = filteredTrades.map(t => [
+        sanitizeCsvCell(t.trade_date || todayStr),
+        sanitizeCsvCell(t.symbol),
+        sanitizeCsvCell(t.market_segment || marketSegment),
+        sanitizeCsvCell(t.trade_type),
+        Number(t.quantity || 0),
+        Number(t.entry_price || 0),
+        Number(t.exit_price || 0),
+        Number(t.realized_pnl || 0),
+        Number(t.charges || 0),
+        Number(t.net_pnl || 0),
+        sanitizeCsvCell(t.strategy || ''),
+        sanitizeCsvCell(t.emotion || ''),
+        sanitizeCsvCell(t.notes || '')
+      ]);
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `TradeDiary_${marketSegment}_${todayStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `TradeDiary_${marketSegment}_${todayStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, { symbol: `TRADE DIARY (${marketSegment.toUpperCase()})`, side: 'EXPORT CSV' });
   };
 
   // Handle Save New Trade Form

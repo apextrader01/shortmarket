@@ -516,72 +516,76 @@ export default function PositionsView() {
     }
 
     if (!window.confirm(`Exit ALL ${openPositions.length} open intraday position(s) at market price? Delivery, CNC, and Holdings will NOT be touched.`)) return;
-    let failed = 0;
-    let lastError = '';
-    const results = await Promise.allSettled(openPositions.map(async (pos) => {
-      // Cancel any resting pending, trigger, or partially filled orders for this symbol first
-      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-      const cancellableStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
-      const restingOrders = (store.orders || []).filter(o => {
-        if (!cancellableStatuses.includes(o.status)) return false;
-        const oClean = (o.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return o.symbol === pos.symbol || oClean === cleanSym;
-      });
-      for (const ord of restingOrders) {
-        await store.cancelOrder(ord.id).catch(() => {});
-      }
 
-      const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
-      const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
-      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type === 'INT' || pos.product_type === 'MIS' ? pos.product_type : 'INT');
-      const totalExitQty = Math.abs(Number(pos.unencumberedQty));
-      if (!totalExitQty || totalExitQty <= 0) return { success: true };
+    triggerPreExitAd(async () => {
+      let failed = 0;
+      let lastError = '';
+      const results = await Promise.allSettled(openPositions.map(async (pos) => {
+        // Cancel any resting pending, trigger, or partially filled orders for this symbol first
+        const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const cancellableStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
+        const restingOrders = (store.orders || []).filter(o => {
+          if (!cancellableStatuses.includes(o.status)) return false;
+          const oClean = (o.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          return o.symbol === pos.symbol || oClean === cleanSym;
+        });
+        for (const ord of restingOrders) {
+          await store.cancelOrder(ord.id).catch(() => {});
+        }
 
-      const slices = calculateOrderSlices(pos.symbol, totalExitQty, pos.lotSize || pos.lotsize || 1);
-      let allSliceSuccess = true;
-      let sliceError = '';
-      for (const sliceQty of slices) {
-        const payload = {
-          symbol: pos.symbol,
-          type: 'MARKET',
-          side: exitSide,
-          quantity: sliceQty,
-          price: liveLtp,
-          sl_price: null,
-          tgt_price: null,
-          margin: 0,
-          lotsize: pos.lotSize || pos.lotsize || 1,
-          product_type: effectiveProductType,
-          is_exit: true,
-          remarks: 'Exit All Positions'
-        };
-        const res = await store.placeOrder(payload);
-        if (!res || !res.success) {
-          allSliceSuccess = false;
-          sliceError = store.authError || (res && res.error) || 'Failed to place exit order slice';
-          break;
+        const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
+        const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
+        const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type === 'INT' || pos.product_type === 'MIS' ? pos.product_type : 'INT');
+        const totalExitQty = Math.abs(Number(pos.unencumberedQty));
+        if (!totalExitQty || totalExitQty <= 0) return { success: true };
+
+        const slices = calculateOrderSlices(pos.symbol, totalExitQty, pos.lotSize || pos.lotsize || 1);
+        let allSliceSuccess = true;
+        let sliceError = '';
+        for (const sliceQty of slices) {
+          window.__lastPreExitAdTs = Date.now();
+          const payload = {
+            symbol: pos.symbol,
+            type: 'MARKET',
+            side: exitSide,
+            quantity: sliceQty,
+            price: liveLtp,
+            sl_price: null,
+            tgt_price: null,
+            margin: 0,
+            lotsize: pos.lotSize || pos.lotsize || 1,
+            product_type: effectiveProductType,
+            is_exit: true,
+            remarks: 'Exit All Positions'
+          };
+          const res = await store.placeOrder(payload);
+          if (!res || !res.success) {
+            allSliceSuccess = false;
+            sliceError = store.authError || (res && res.error) || 'Failed to place exit order slice';
+            break;
+          }
+        }
+        if (allSliceSuccess) {
+          store.clearPendingTriggersForSymbol(pos.symbol);
+          return { success: true };
+        } else {
+          return { success: false, error: sliceError };
+        }
+      }));
+
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value.success) {
+          // success
+        } else {
+          failed++;
+          lastError = r.status === 'fulfilled' ? r.value.error : (r.reason?.message || 'Exit request failed');
         }
       }
-      if (allSliceSuccess) {
-        store.clearPendingTriggersForSymbol(pos.symbol);
-        return { success: true };
-      } else {
-        return { success: false, error: sliceError };
+      await store.fetchUserData();
+      if (failed > 0) {
+        alert(`${failed} order(s) failed: ${lastError}`);
       }
-    }));
-
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value.success) {
-        // success
-      } else {
-        failed++;
-        lastError = r.status === 'fulfilled' ? r.value.error : (r.reason?.message || 'Exit request failed');
-      }
-    }
-    await store.fetchUserData();
-    if (failed > 0) {
-      alert(`${failed} order(s) failed: ${lastError}`);
-    }
+    }, { symbol: 'ALL OPEN POSITIONS', side: 'EXIT ALL' });
   };
 
   return (
@@ -745,26 +749,28 @@ export default function PositionsView() {
                   return;
                 }
                 if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
-                try {
-                  const token = store.token || localStorage.getItem('token');
-                  const res = await fetch(`${API}/api/holdings/exit-all`, {
-                    credentials: 'include',
-                    method: 'POST',
-                    headers: { 
-                      'Content-Type': 'application/json',
-                      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                triggerPreExitAd(async () => {
+                  try {
+                    const token = store.token || localStorage.getItem('token');
+                    const res = await fetch(`${API}/api/holdings/exit-all`, {
+                      credentials: 'include',
+                      method: 'POST',
+                      headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                      }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      alert(data.message || 'Successfully exited all holdings!');
+                      store.fetchUserData();
+                    } else {
+                      alert(data.error || 'Failed to exit holdings');
                     }
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    alert(data.message || 'Successfully exited all holdings!');
-                    store.fetchUserData();
-                  } else {
-                    alert(data.error || 'Failed to exit holdings');
+                  } catch (e) {
+                    alert('Error exiting holdings: ' + e.message);
                   }
-                } catch (e) {
-                  alert('Error exiting holdings: ' + e.message);
-                }
+                }, { symbol: 'ALL HOLDINGS', side: 'EXIT ALL' });
               }}
               style={{
                 background: 'var(--color-red-light)', color: '#fff', border: 'none',
@@ -999,16 +1005,18 @@ export default function PositionsView() {
                             title="Share P&L Social Card"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShareModalTrade({
-                                symbol: pos.symbol,
-                                realized_pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
-                                pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
-                                avg: pos.avg,
-                                exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
-                                qty: Math.abs(pos.qty || pos.closed_quantity || holdingQty || 1),
-                                product_type: pos.productLabel || pos.product_type || (viewMode === 'HOLDINGS' ? 'DEL' : 'INT'),
-                                side: pos.qty >= 0 ? 'BUY' : 'SELL'
-                              });
+                              triggerPreExitAd(() => {
+                                setShareModalTrade({
+                                  symbol: pos.symbol,
+                                  realized_pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
+                                  pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
+                                  avg: pos.avg,
+                                  exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
+                                  qty: Math.abs(pos.qty || pos.closed_quantity || holdingQty || 1),
+                                  product_type: pos.productLabel || pos.product_type || (viewMode === 'HOLDINGS' ? 'DEL' : 'INT'),
+                                  side: pos.qty >= 0 ? 'BUY' : 'SELL'
+                                });
+                              }, { symbol: pos.symbol || 'P&L CARD', side: 'SHARE P&L' });
                             }}
                             style={{
                               background: 'rgba(56, 189, 248, 0.1)',
@@ -1047,7 +1055,9 @@ export default function PositionsView() {
                                     alert(convCheck.reason);
                                     return;
                                   }
-                                  setConvertModalPos(pos);
+                                  triggerPreExitAd(() => {
+                                    setConvertModalPos(pos);
+                                  }, { symbol: pos.symbol || 'POSITION', side: 'CONVERT' });
                                 }}
                                 style={{
                                   background: isConvBlocked ? 'rgba(148, 163, 184, 0.08)' : 'rgba(99, 102, 241, 0.1)',
@@ -1280,16 +1290,18 @@ export default function PositionsView() {
                             onClick={(e) => {
                               e.stopPropagation();
                               const relPnl = parseFloat(pos.realized_pnl) || 0;
-                              setShareModalTrade({
-                                symbol: pos.symbol,
-                                realized_pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
-                                pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
-                                avg: pos.avg,
-                                exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
-                                qty: Math.abs(pos.qty || pos.closed_quantity || 1),
-                                product_type: pos.productLabel || pos.product_type || 'INT',
-                                side: pos.qty >= 0 ? 'BUY' : 'SELL'
-                              });
+                              triggerPreExitAd(() => {
+                                setShareModalTrade({
+                                  symbol: pos.symbol,
+                                  realized_pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
+                                  pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
+                                  avg: pos.avg,
+                                  exit_price: (pos.exit_price !== null && pos.exit_price !== undefined) ? pos.exit_price : pos.ltp,
+                                  qty: Math.abs(pos.qty || pos.closed_quantity || 1),
+                                  product_type: pos.productLabel || pos.product_type || 'INT',
+                                  side: pos.qty >= 0 ? 'BUY' : 'SELL'
+                                });
+                              }, { symbol: pos.symbol || 'P&L CARD', side: 'SHARE P&L' });
                             }}
                             style={{
                               fontSize: '10px',
@@ -1327,7 +1339,9 @@ export default function PositionsView() {
                                     alert(convCheck.reason);
                                     return;
                                   }
-                                  setConvertModalPos(pos);
+                                  triggerPreExitAd(() => {
+                                    setConvertModalPos(pos);
+                                  }, { symbol: pos.symbol || 'POSITION', side: 'CONVERT' });
                                 }}
                                 style={{
                                   fontSize: '10px',
