@@ -10637,11 +10637,11 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 
 // ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Zero Server Overhead) ───
 let adConfigCache = {
-  enabled: Boolean(process.env.ADSENSE_CLIENT_ID),
-  adsense_client_id: process.env.ADSENSE_CLIENT_ID || '',
+  enabled: true,
+  adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
   adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '',
   adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '',
-  reward_enabled: Boolean(process.env.ADSENSE_CLIENT_ID && process.env.ADSENSE_REWARDED_SLOT),
+  reward_enabled: false,
   reward_amount: 100000,
   reward_daily_limit: 3,
   sponsor_badge: 'SPONSORED PARTNER',
@@ -10660,11 +10660,24 @@ async function loadAdConfigFromDb() {
     const row = await db('system_settings').where({ key: 'ads_monetization_config' }).first();
     if (row && row.value) {
       const parsed = JSON.parse(row.value);
-      adConfigCache = { ...adConfigCache, ...parsed };
+      adConfigCache = {
+        ...adConfigCache,
+        ...parsed,
+        adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869'
+      };
     }
   } catch (e) {}
 }
 setTimeout(loadAdConfigFromDb, 2500);
+
+// Authorized Digital Sellers (ads.txt) for Google AdSense crawler verification
+app.get('/ads.txt', (req, res) => {
+  const rawId = String(adConfigCache.adsense_client_id || 'ca-pub-1001083475331869').trim();
+  const pubId = rawId.startsWith('ca-') ? rawId.slice(3) : rawId;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(`google.com, ${pubId}, DIRECT, f08c47fec0942fa0\n`);
+});
 
 // Public fast RAM-cached Ad Config endpoint (0 DB queries, 0% CPU load)
 app.get('/api/ads/config', (req, res) => {
@@ -10672,7 +10685,7 @@ app.get('/api/ads/config', (req, res) => {
     success: true,
     config: {
       enabled: Boolean(adConfigCache.enabled),
-      adsense_client_id: adConfigCache.adsense_client_id || '',
+      adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
       adsense_banner_slot: adConfigCache.adsense_banner_slot || '',
       adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '',
       reward_enabled: Boolean(adConfigCache.reward_enabled),

@@ -1494,8 +1494,8 @@ export default function AdminDashboard() {
 
   // Ads & Monetization Admin State
   const [adConfig, setAdConfig] = useState({
-    enabled: false,
-    adsense_client_id: '',
+    enabled: true,
+    adsense_client_id: 'ca-pub-1001083475331869',
     adsense_banner_slot: '',
     adsense_rewarded_slot: '',
     reward_enabled: false,
