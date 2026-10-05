@@ -787,6 +787,15 @@ app.use((req, res, next) => {
 const recordTelemetry = require('./middleware/telemetry');
 app.use(recordTelemetry);
 
+// 🔒 Cache-Control: no-store for sensitive API endpoints (OWASP A04 / Pingdom Audit)
+app.use('/api', (req, res, next) => {
+  // Allow high-frequency market prices route to manage its own short 2s ETag caching
+  if (req.path !== '/prices') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+  }
+  next();
+});
 
 // ─── Health ────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
