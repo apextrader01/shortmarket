@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { playTargetHitSound } from './utils/soundManager';
 import { applyDynamicSEO } from './utils/seoEngine';
+import logoImg from './assets/logo.png';
 
 // ⚡ Resilient Lazy Loader: Auto-reloads on deployment chunk hash changes
 const lazyWithRetry = (importFn) => lazy(async () => {
@@ -1105,7 +1106,7 @@ function App() {
                     title="SkandX Trading Platform"
                   >
                     <img 
-                      src="/pwa-192x192.png" 
+                      src={logoImg} 
                       alt="SkandX Logo" 
                       style={{ width: '24px', height: '24px', borderRadius: '6px', boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)' }} 
                     />
