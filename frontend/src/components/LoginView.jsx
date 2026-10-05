@@ -95,12 +95,13 @@ export default function LoginView() {
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentDataProcessing, setConsentDataProcessing] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
+  const [googleIdToken, setGoogleIdToken] = useState(null);
 
   // Real-time Full Name / Username Availability State (6-15 chars, One User One Name)
   const [nameAvailability, setNameAvailability] = useState({ status: 'idle', message: '' });
 
   useEffect(() => {
-    if (view !== 'register') {
+    if (view !== 'register' && view !== 'google_complete') {
       setNameAvailability({ status: 'idle', message: '' });
       return;
     }
@@ -115,7 +116,8 @@ export default function LoginView() {
     const timer = setTimeout(async () => {
       try {
         const API_URL = import.meta.env.VITE_API_URL || '';
-        const res = await fetch(`${API_URL}/api/auth/check-username?username=${encodeURIComponent(cleanName)}`);
+        const excludeParam = view === 'google_complete' && email ? `&exclude_email=${encodeURIComponent(email)}` : '';
+        const res = await fetch(`${API_URL}/api/auth/check-username?username=${encodeURIComponent(cleanName)}${excludeParam}`);
         const data = await res.json();
         if (data && data.valid === false) {
           setNameAvailability({ status: 'idle', message: '' });
@@ -130,7 +132,7 @@ export default function LoginView() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [username, view]);
+  }, [username, view, email]);
 
   const setupRecaptchaVerifier = () => {
     if (window.recaptchaVerifier) {
@@ -350,6 +352,71 @@ export default function LoginView() {
       setLoading(false);
       return;
     }
+    else if (view === 'google_complete') {
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        useStore.setState({ authError: 'Please enter a valid 10-digit mobile phone number.' });
+        setLoading(false);
+        return;
+      }
+      const cleanName = String(username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+      const letterCount = cleanName.replace(/[^A-Za-z]/g, '').length;
+      if (!cleanName || cleanName.length < 6 || cleanName.length > 15 || !/^[A-Za-z\s]{6,15}$/.test(cleanName) || letterCount < 5) {
+        useStore.setState({ authError: 'Full Name must contain letters only and be between 6 and 15 characters.' });
+        setLoading(false);
+        return;
+      }
+      if (nameAvailability.status === 'unavailable') {
+        useStore.setState({ authError: `"${cleanName}" is unavailable. Please choose another name.` });
+        setLoading(false);
+        return;
+      }
+      if (!consentTerms) {
+        useStore.setState({ authError: 'Please check the box to agree to the Terms of Service and Privacy Notice.' });
+        setLoading(false);
+        return;
+      }
+      if (!consentDataProcessing) {
+        useStore.setState({ authError: 'Please check the box to consent to Personal Data Processing to continue.' });
+        setLoading(false);
+        return;
+      }
+
+      try {
+        let activeIdToken = googleIdToken;
+        if (auth.currentUser) {
+          activeIdToken = await auth.currentUser.getIdToken().catch(() => googleIdToken);
+        }
+        const res = await fetch(`${API}/api/auth/google-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken: activeIdToken,
+            phone: cleanPhone,
+            username: cleanName,
+            consent_terms: consentTerms,
+            consent_data_processing: consentDataProcessing,
+            consent_marketing: consentMarketing,
+            referral_code: localStorage.getItem('referral_code') || undefined
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          useStore.setState({ authError: data.error || 'Failed to complete Google sign-up.' });
+          setLoading(false);
+          return;
+        }
+        localStorage.setItem('token', data.token);
+        if (data.user) {
+          useStore.setState({ user: data.user, token: data.token });
+        }
+        window.location.reload();
+      } catch (err) {
+        useStore.setState({ authError: err.message || 'Failed to complete Google sign-up.' });
+      }
+      setLoading(false);
+      return;
+    }
     else if (view === 'register_otp') {
       const cleanPhone = String(phone || '').replace(/\D/g, '');
       const cleanOtp = String(phoneOtp || '').trim();
@@ -433,6 +500,7 @@ export default function LoginView() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    useStore.setState({ authError: null });
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
@@ -449,6 +517,15 @@ export default function LoginView() {
         throw new Error(data.error || 'Google login failed');
       }
 
+      if (data.needs_profile_completion) {
+        setGoogleIdToken(idToken);
+        if (data.email) setEmail(data.email);
+        if (data.suggested_name) setUsername(data.suggested_name);
+        setView('google_complete');
+        setMessage('Google account verified! Please enter your 10-digit mobile number to complete registration.');
+        return;
+      }
+
       localStorage.setItem('token', data.token);
       if (data.user) {
         useStore.setState({ user: data.user, token: data.token });
@@ -456,7 +533,7 @@ export default function LoginView() {
       window.location.reload();
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        alert(err.message || 'Google sign-in failed');
+        useStore.setState({ authError: err.message || 'Google sign-in failed' });
       }
     } finally {
       setLoading(false);
@@ -579,6 +656,7 @@ export default function LoginView() {
           <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
             {view === 'login' && 'Welcome back'}
             {view === 'register' && 'Create your account'}
+            {view === 'google_complete' && 'Complete your profile'}
             {view === 'verify_email_sent' && 'Verify your email'}
             {view === 'forgot' && 'Reset password'}
             {view === 'otp' && 'Verify identity'}
@@ -589,6 +667,7 @@ export default function LoginView() {
           <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
             {view === 'login' && 'Enter your details to access your terminal.'}
             {view === 'register' && 'Join the edge in professional trading.'}
+            {view === 'google_complete' && `Signed in with Google (${email}). Add your phone number to activate your account.`}
             {view === 'verify_email_sent' && 'We dispatched an official verification link to your email.'}
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
@@ -806,7 +885,7 @@ export default function LoginView() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {view === 'register' && (
+          {(view === 'register' || view === 'google_complete') && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>Full Name (Unique)</label>
@@ -860,10 +939,10 @@ export default function LoginView() {
             </div>
           )}
 
-          {view === 'register' && (
+          {(view === 'register' || view === 'google_complete') && (
             <div>
-              <label style={labelStyle}>Phone Number</label>
-              <input type="tel" pattern="[0-9]{10}" maxLength="10" required value={phone} onChange={(e) => setPhone(e.target.value)} className="premium-input" placeholder="1234567890" />
+              <label style={labelStyle}>Phone Number (10-Digit Mobile)</label>
+              <input type="tel" pattern="[0-9]{10}" maxLength="10" required value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="premium-input" placeholder="1234567890" />
             </div>
           )}
 
@@ -1077,7 +1156,7 @@ export default function LoginView() {
               )}
             </div>
           )}
-          {view === 'register' && (
+          {(view === 'register' || view === 'google_complete') && (
             <div style={{
               background: 'rgba(255, 255, 255, 0.02)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -1139,6 +1218,7 @@ export default function LoginView() {
               (view === 'login' ? 'LOG IN' : 
                view === 'login_otp' ? (hasTotp ? 'VERIFY AUTHENTICATOR' : 'VERIFY CODE') :
                view === 'register' ? 'CREATE ACCOUNT' : 
+               view === 'google_complete' ? 'COMPLETE SIGN UP' :
                view === 'register_otp' ? 'VERIFY OTP' : 
                view === 'forgot' ? 'SEND RESET LINK' : 
                view === 'otp' ? 'VERIFY CODE' : 'RESET PASSWORD')}
@@ -1194,12 +1274,12 @@ export default function LoginView() {
             <>
               {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
               <span
-                onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
+                onClick={() => switchMode((view === 'register' || view === 'google_complete') ? 'login' : 'register')}
                 style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
               >
                 {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
               </span>
-              {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') && (
+              {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset' || view === 'google_complete') && (
                 <div style={{ marginTop: '16px' }}>
                   <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
                 </div>

@@ -1177,6 +1177,9 @@ app.get('/api/auth/check-username', async (req, res) => {
     if (req.query.exclude_id && !isNaN(Number(req.query.exclude_id))) {
       query = query.whereNot('id', Number(req.query.exclude_id));
     }
+    if (req.query.exclude_email) {
+      query = query.whereRaw('LOWER(email) != ?', [String(req.query.exclude_email).trim().toLowerCase()]);
+    }
 
     const existingUser = await query.select('id', 'username').first();
     if (existingUser) {
@@ -2142,7 +2145,7 @@ app.post('/api/auth/logout', async (req, res) => {
 
 // ─── Google OAuth Sign-In / Sign-Up ──────────────────────────────────────────
 app.post('/api/auth/google-login', authLimiter, async (req, res) => {
-  const { idToken } = req.body || {};
+  const { idToken, phone, username: requestedUsername, consent_terms, consent_data_processing, consent_marketing, referral_code } = req.body || {};
   if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
 
   try {
@@ -2167,40 +2170,189 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
     let user = await db('users').whereRaw('LOWER(email) = ?', [email]).first();
 
     if (!user) {
-      // Auto-provision new user account for Google sign-in
-      const displayName = decoded.name || email.split('@')[0];
-      const baseUsername = displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) || 'trader';
-      let username = baseUsername;
-      while (await db('users').where({ username }).first()) {
-        username = `${baseUsername}${Math.floor(Math.random() * 8999 + 1000)}`;
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      // Option 1: If new Google user hasn't provided their 10-digit phone number yet, prompt frontend to collect it
+      if (!cleanPhone || cleanPhone.length !== 10) {
+        const rawDisplayName = String(decoded.name || email.split('@')[0] || 'Trader')
+          .replace(/[^A-Za-z\s]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 15);
+        return res.json({
+          success: true,
+          needs_profile_completion: true,
+          email,
+          suggested_name: rawDisplayName.length >= 6 ? rawDisplayName : '',
+          picture: decoded.picture || null
+        });
+      }
+
+      // Validate Full Name (6-15 letters, unique)
+      const cleanUsername = String(requestedUsername || decoded.name || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+      const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
+      if (!cleanUsername || cleanUsername.length < 6 || cleanUsername.length > 15 || letterCount < 5) {
+        return res.status(400).json({ error: 'Full Name must contain letters only and be between 6 and 15 characters.' });
+      }
+
+      if (await isPhoneBanned(cleanPhone, generalClient)) {
+        return res.status(403).json({ error: 'Registration blocked: This phone number has been restricted.' });
+      }
+
+      const existingPhoneUser = await db('users').where('phone', cleanPhone).first();
+      if (existingPhoneUser) {
+        return res.status(400).json({ error: 'An account with this phone number already exists.' });
+      }
+
+      const normalizedUsernameKey = cleanUsername.replace(/\s+/g, '').toLowerCase();
+      const existingName = await db('users').whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedUsernameKey]).first();
+      if (existingName) {
+        return res.status(400).json({ error: `"${cleanUsername}" is already taken. Please choose another unique Full Name.` });
+      }
+
+      // Enforce mandatory DPDP consents
+      if (consent_terms !== true || consent_data_processing !== true) {
+        return res.status(400).json({ error: 'You must accept the mandatory Terms of Service and Core Data Processing consents to create an account.' });
       }
 
       const randomSecret = crypto.randomBytes(32).toString('hex');
       const passwordHash = await bcrypt.hash(randomSecret, 10);
-      const clientId = 'SKX' + Math.floor(100000 + Math.random() * 900000);
+      const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+      let { city, state } = parseIpLocation(clientIp);
+      const defaultWatchlist = JSON.stringify([
+        { id: 1, name: 'Watchlist 1', symbols: ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX', 'NSE:RELIANCE', 'NSE:TCS', 'NSE:HDFCBANK', 'NSE:INFY', 'NSE:ICICIBANK', 'NSE:SBIN'] }
+      ]);
 
-      const [newUser] = await db('users').insert({
-        username,
+      const [inserted] = await db('users').insert({
+        username: cleanUsername,
         email,
+        phone: cleanPhone,
         password_hash: passwordHash,
         balance: 1000000.00,
         profile_picture_url: decoded.picture || null,
-        client_id: clientId,
         subscription_tier: 'BASIC',
+        watchlists: defaultWatchlist,
+        registration_ip: clientIp,
+        last_ip: clientIp,
+        device_model: deviceModel,
+        os_name: osName,
+        browser_name: browserName,
+        city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
+        state: (state && state !== 'Local') ? state : '',
         created_at: new Date()
       }).returning('*');
 
-      user = newUser || await db('users').where({ email }).first();
+      user = inserted || await db('users').whereRaw('LOWER(email) = ?', [email]).first();
+
+      // Generate Sequential Professional Client ID: SE + Base36(user.id) padded to 6 chars (matches standard registration)
+      const clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+      user.client_id = clientId;
+
+      // Record DPDP Consents
+      try {
+        const consentsToRecord = [
+          { type: 'TERMS_AND_PRIVACY', granted: !!consent_terms },
+          { type: 'DATA_PROCESSING_CORE', granted: !!consent_data_processing },
+          { type: 'MARKETING_PROMOTIONS', granted: !!consent_marketing }
+        ];
+        for (const item of consentsToRecord) {
+          if (item.granted) {
+            await db('user_consents').insert({
+              user_id: user.id,
+              email,
+              consent_type: item.type,
+              status: 'GRANTED',
+              consent_version: 'v2026.1',
+              ip_address: clientIp,
+              user_agent: req.headers['user-agent'] || ''
+            }).catch(() => {});
+          }
+        }
+      } catch (cErr) {}
+
+      // Link Referral if present
+      if (referral_code) {
+        try {
+          const referrer = await findUserByIdentifier(String(referral_code).trim());
+          if (referrer && referrer.id !== user.id) {
+            await db('referrals').insert({
+              referrer_id: referrer.id,
+              referred_user_id: user.id,
+              status: 'pending',
+              reward_amount: 0,
+              created_at: new Date(),
+              updated_at: new Date()
+            }).catch(() => {});
+          }
+        } catch (e) {}
+      }
     } else {
       // Update profile picture if user doesn't have one
       if (!user.profile_picture_url && decoded.picture) {
         await db('users').where({ id: user.id }).update({ profile_picture_url: decoded.picture }).catch(() => {});
         user.profile_picture_url = decoded.picture;
       }
+
+      // If existing Google user has no phone number yet (e.g. legacy Google sign-in), prompt them to complete it
+      const existingDigits = String(user.phone || '').replace(/\D/g, '');
+      if (existingDigits.length !== 10) {
+        const cleanPhone = String(phone || '').replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length !== 10) {
+          const rawDisplayName = String(user.username || decoded.name || email.split('@')[0] || 'Trader')
+            .replace(/[^A-Za-z\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 15);
+          return res.json({
+            success: true,
+            needs_profile_completion: true,
+            is_existing_user: true,
+            email,
+            suggested_name: rawDisplayName.length >= 6 ? rawDisplayName : '',
+            picture: decoded.picture || user.profile_picture_url || null
+          });
+        }
+
+        if (await isPhoneBanned(cleanPhone, generalClient)) {
+          return res.status(403).json({ error: 'This phone number has been restricted.' });
+        }
+
+        const existingPhoneUser = await db('users').where('phone', cleanPhone).whereNot({ id: user.id }).first();
+        if (existingPhoneUser) {
+          return res.status(400).json({ error: 'An account with this phone number already exists.' });
+        }
+
+        const updatePayload = { phone: cleanPhone };
+        const cleanUsername = String(requestedUsername || user.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+        const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
+        if (cleanUsername && cleanUsername.length >= 6 && cleanUsername.length <= 15 && letterCount >= 5) {
+          const normalizedUsernameKey = cleanUsername.replace(/\s+/g, '').toLowerCase();
+          const existingName = await db('users')
+            .whereRaw("LOWER(REPLACE(TRIM(username), ' ', '')) = ?", [normalizedUsernameKey])
+            .whereNot({ id: user.id })
+            .first();
+          if (existingName) {
+            return res.status(400).json({ error: `"${cleanUsername}" is already taken. Please choose another unique Full Name.` });
+          }
+          updatePayload.username = cleanUsername;
+          user.username = cleanUsername;
+        }
+
+        await db('users').where({ id: user.id }).update(updatePayload).catch(() => {});
+        user.phone = cleanPhone;
+      }
     }
 
     if (user.is_banned) {
       return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
+    }
+
+    // Standardize any legacy random SKX... or missing client_id to sequential SE00000... format
+    let clientId = user.client_id;
+    if (!clientId || String(clientId).startsWith('SKX')) {
+      clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+      user.client_id = clientId;
     }
 
     const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
@@ -2218,13 +2370,6 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       maxAge: 60 * 24 * 60 * 60 * 1000
     });
 
-    let clientId = user.client_id;
-    if (!clientId) {
-      clientId = 'SKX' + Math.floor(100000 + Math.random() * 900000);
-      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
-      user.client_id = clientId;
-    }
-
     res.json({
       success: true,
       token,
@@ -2232,6 +2377,7 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         id: user.id,
         username: user.username,
         email: user.email,
+        phone: user.phone,
         balance: user.balance,
         role: user.role,
         is_admin: user.is_admin,
@@ -13136,10 +13282,22 @@ server.listen(PORT, async () => {
     initOrderExecutor(priceCache);
     SIPEngine.init(priceCache);
 
-    // Auto-heal user email casing and link orphaned referrals
+    // Auto-heal user email casing, standardize sequential SE00000... Client IDs, and link orphaned referrals
     async function autoHealReferralsAndUsers() {
       try {
         await db.raw('UPDATE users SET email = LOWER(TRIM(email)) WHERE email != LOWER(TRIM(email))').catch(() => {});
+
+        // Convert any legacy random SKX... or missing client_id to sequential SE + Base36(id) padded to 6 chars
+        const nonStandardUsers = await db('users')
+          .whereNull('client_id')
+          .orWhere('client_id', 'like', 'SKX%')
+          .select('id', 'username', 'client_id');
+        for (const u of nonStandardUsers) {
+          const seqClientId = 'SE' + Number(u.id).toString(36).toUpperCase().padStart(6, '0');
+          await db('users').where({ id: u.id }).update({ client_id: seqClientId }).catch(() => {});
+          console.log(`✅ [AUTO-HEAL] Standardized Client ID for User ${u.id} (${u.username}): ${u.client_id || 'NULL'} -> ${seqClientId}`);
+        }
+
         const u12 = await db('users').where({ id: 12 }).first();
         const u9 = await db('users').where({ id: 9 }).first();
         if (u12 && u9) {
