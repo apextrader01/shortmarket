@@ -668,7 +668,8 @@ app.use(helmet({
         "'unsafe-inline'",
         "https://checkout.razorpay.com",
         "https://www.googletagmanager.com",
-        "https://www.google-analytics.com"
+        "https://www.google-analytics.com",
+        "https://apis.google.com"
       ],
       styleSrc: [
         "'self'",
@@ -698,6 +699,7 @@ app.use(helmet({
         "https://*.firebaseio.com",
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
+        "https://accounts.google.com",
         "https://www.google-analytics.com",
         "wss:",
         "ws:"
@@ -705,7 +707,9 @@ app.use(helmet({
       frameSrc: [
         "'self'",
         "https://api.razorpay.com",
-        "https://checkout.razorpay.com"
+        "https://checkout.razorpay.com",
+        "https://*.firebaseapp.com",
+        "https://accounts.google.com"
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
@@ -2134,6 +2138,113 @@ app.post('/api/auth/logout', async (req, res) => {
   const isHttps = isRequestSecure(req);
   res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
+});
+
+// ─── Google OAuth Sign-In / Sign-Up ──────────────────────────────────────────
+app.post('/api/auth/google-login', authLimiter, async (req, res) => {
+  const { idToken } = req.body || {};
+  if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
+
+  try {
+    const { getFirebaseAdminAuth } = require('./services/firebaseAuth');
+    const auth = getFirebaseAdminAuth();
+    if (!auth) {
+      return res.status(503).json({ error: 'Firebase authentication service temporarily unavailable' });
+    }
+
+    const decoded = await auth.verifyIdToken(idToken);
+    const email = decoded.email ? String(decoded.email).trim().toLowerCase() : null;
+    if (!email) {
+      return res.status(400).json({ error: 'Google account has no associated email address' });
+    }
+
+    const clientIp = getClientIp(req);
+    if (await isIpBanned(clientIp, generalClient)) {
+      return res.status(403).json({ error: 'Access restricted: Your IP address has been restricted.' });
+    }
+
+    // Check if user exists in PostgreSQL
+    let user = await db('users').whereRaw('LOWER(email) = ?', [email]).first();
+
+    if (!user) {
+      // Auto-provision new user account for Google sign-in
+      const displayName = decoded.name || email.split('@')[0];
+      const baseUsername = displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) || 'trader';
+      let username = baseUsername;
+      while (await db('users').where({ username }).first()) {
+        username = `${baseUsername}${Math.floor(Math.random() * 8999 + 1000)}`;
+      }
+
+      const randomSecret = crypto.randomBytes(32).toString('hex');
+      const passwordHash = await bcrypt.hash(randomSecret, 10);
+      const clientId = 'SKX' + Math.floor(100000 + Math.random() * 900000);
+
+      const [newUser] = await db('users').insert({
+        username,
+        email,
+        password_hash: passwordHash,
+        balance: 1000000.00,
+        default_funds: 1000000.00,
+        profile_picture_url: decoded.picture || null,
+        client_id: clientId,
+        subscription_tier: 'BASIC',
+        created_at: new Date()
+      }).returning('*');
+
+      user = newUser || await db('users').where({ email }).first();
+    } else {
+      // Update profile picture if user doesn't have one
+      if (!user.profile_picture_url && decoded.picture) {
+        await db('users').where({ id: user.id }).update({ profile_picture_url: decoded.picture }).catch(() => {});
+        user.profile_picture_url = decoded.picture;
+      }
+    }
+
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
+    }
+
+    const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '60d' });
+    const tokenHash = hashToken(token);
+    if (tokenHash) {
+      await upsertUserSession({ userId: user.id, tokenHash, deviceModel, browserName, osName, clientIp });
+    }
+
+    const isHttps = isRequestSecure(req);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      maxAge: 60 * 24 * 60 * 60 * 1000
+    });
+
+    let clientId = user.client_id;
+    if (!clientId) {
+      clientId = 'SKX' + Math.floor(100000 + Math.random() * 900000);
+      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+      user.client_id = clientId;
+    }
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        balance: user.balance,
+        role: user.role,
+        is_admin: user.is_admin,
+        subscription_tier: user.subscription_tier,
+        client_id: clientId,
+        profile_picture_url: user.profile_picture_url
+      }
+    });
+  } catch (err) {
+    console.error('[GOOGLE AUTH ERROR]:', err);
+    res.status(500).json({ error: 'Google login failed: ' + (err.message || 'Token verification error') });
+  }
 });
 
 // Rate limiting and attempt tracker for password reset OTP
