@@ -669,7 +669,15 @@ app.use(helmet({
         "https://checkout.razorpay.com",
         "https://www.googletagmanager.com",
         "https://www.google-analytics.com",
-        "https://apis.google.com"
+        "https://apis.google.com",
+        "https://pagead2.googlesyndication.com",
+        "https://*.googlesyndication.com",
+        "https://googleads.g.doubleclick.net",
+        "https://adservice.google.com",
+        "https://adservice.google.co.in",
+        "https://tpc.googlesyndication.com",
+        "https://ep1.adtrafficquality.google",
+        "https://ep2.adtrafficquality.google"
       ],
       styleSrc: [
         "'self'",
@@ -689,7 +697,15 @@ app.use(helmet({
         "https://*.razorpay.com",
         "https://*.googleusercontent.com",
         "https://*.gstatic.com",
-        "https://www.google-analytics.com"
+        "https://www.google-analytics.com",
+        "https://pagead2.googlesyndication.com",
+        "https://*.googlesyndication.com",
+        "https://googleads.g.doubleclick.net",
+        "https://*.doubleclick.net",
+        "https://*.google.com",
+        "https://*.google.co.in",
+        "https://ep1.adtrafficquality.google",
+        "https://ep2.adtrafficquality.google"
       ],
       connectSrc: [
         "'self'",
@@ -701,6 +717,14 @@ app.use(helmet({
         "https://securetoken.googleapis.com",
         "https://accounts.google.com",
         "https://www.google-analytics.com",
+        "https://pagead2.googlesyndication.com",
+        "https://*.googlesyndication.com",
+        "https://googleads.g.doubleclick.net",
+        "https://*.doubleclick.net",
+        "https://adservice.google.com",
+        "https://adservice.google.co.in",
+        "https://ep1.adtrafficquality.google",
+        "https://ep2.adtrafficquality.google",
         "wss:",
         "ws:"
       ],
@@ -709,7 +733,13 @@ app.use(helmet({
         "https://api.razorpay.com",
         "https://checkout.razorpay.com",
         "https://*.firebaseapp.com",
-        "https://accounts.google.com"
+        "https://accounts.google.com",
+        "https://googleads.g.doubleclick.net",
+        "https://tpc.googlesyndication.com",
+        "https://*.googlesyndication.com",
+        "https://www.google.com",
+        "https://ep1.adtrafficquality.google",
+        "https://ep2.adtrafficquality.google"
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
@@ -10580,6 +10610,203 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
       await db('system_settings').insert({ key: 'razorpay_key_secret', value: key_secret.trim(), updated_at: new Date() }).onConflict('key').merge();
     }
     res.json({ success: true, message: 'Razorpay keys saved successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Zero Server Overhead) ───
+let adConfigCache = {
+  enabled: true,
+  adsense_client_id: process.env.ADSENSE_CLIENT_ID || '',
+  adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '',
+  adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '',
+  reward_enabled: true,
+  reward_amount: 100000,
+  reward_daily_limit: 3,
+  sponsor_badge: 'SPONSORED PARTNER',
+  sponsor_title: 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC',
+  sponsor_subtitle: 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution, Option Chain Greeks & TradingView Charts.',
+  sponsor_cta_text: 'Open Free Account →',
+  sponsor_target_url: 'https://skandx.in/pricing',
+  sponsor_video_url: '',
+  impressions: 0,
+  clicks: 0,
+  reward_claims: 0
+};
+
+async function loadAdConfigFromDb() {
+  try {
+    const row = await db('system_settings').where({ key: 'ads_monetization_config' }).first();
+    if (row && row.value) {
+      const parsed = JSON.parse(row.value);
+      adConfigCache = { ...adConfigCache, ...parsed };
+    }
+  } catch (e) {}
+}
+setTimeout(loadAdConfigFromDb, 2500);
+
+// Public fast RAM-cached Ad Config endpoint (0 DB queries, 0% CPU load)
+app.get('/api/ads/config', (req, res) => {
+  res.json({
+    success: true,
+    config: {
+      enabled: Boolean(adConfigCache.enabled),
+      adsense_client_id: adConfigCache.adsense_client_id || '',
+      adsense_banner_slot: adConfigCache.adsense_banner_slot || '',
+      adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '',
+      reward_enabled: Boolean(adConfigCache.reward_enabled),
+      reward_amount: Number(adConfigCache.reward_amount || 100000),
+      reward_daily_limit: Number(adConfigCache.reward_daily_limit || 3),
+      sponsor_badge: adConfigCache.sponsor_badge || 'SPONSORED PARTNER',
+      sponsor_title: adConfigCache.sponsor_title || '',
+      sponsor_subtitle: adConfigCache.sponsor_subtitle || '',
+      sponsor_cta_text: adConfigCache.sponsor_cta_text || 'Learn More →',
+      sponsor_target_url: adConfigCache.sponsor_target_url || 'https://skandx.in/pricing',
+      sponsor_video_url: adConfigCache.sponsor_video_url || ''
+    }
+  });
+});
+
+// Lightweight impression / click tracker in memory (flushed periodically)
+let adStatsDirty = false;
+app.post('/api/ads/track', (req, res) => {
+  const { event } = req.body || {};
+  if (event === 'impression') {
+    adConfigCache.impressions = Number(adConfigCache.impressions || 0) + 1;
+    adStatsDirty = true;
+  } else if (event === 'click') {
+    adConfigCache.clicks = Number(adConfigCache.clicks || 0) + 1;
+    adStatsDirty = true;
+  }
+  res.json({ success: true });
+});
+
+setInterval(async () => {
+  if (!adStatsDirty) return;
+  adStatsDirty = false;
+  try {
+    await db('system_settings')
+      .insert({ key: 'ads_monetization_config', value: JSON.stringify(adConfigCache), updated_at: new Date() })
+      .onConflict('key')
+      .merge();
+  } catch (e) {}
+}, 60000).unref();
+
+// Claim 30-Second Rewarded Video Ad Bonus (Atomic Transaction + Double-Entry Ledger)
+app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
+  const { watchDurationSec } = req.body || {};
+  if (!adConfigCache.enabled || !adConfigCache.reward_enabled) {
+    return res.status(400).json({ error: 'Rewarded video ads are currently disabled.' });
+  }
+  if (Number(watchDurationSec || 0) < 28) {
+    return res.status(400).json({ error: 'Please watch the complete 30-second video ad to claim your reward.' });
+  }
+
+  const userId = req.user.id;
+  const rewardAmount = Math.max(1000, Math.min(10000000, Number(adConfigCache.reward_amount || 100000)));
+  const dailyLimit = Math.max(1, Math.min(20, Number(adConfigCache.reward_daily_limit || 3)));
+
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const todayClaimsRow = await db('fund_ledger')
+      .where({ user_id: userId, type: 'AD_REWARD' })
+      .where('created_at', '>=', startOfToday)
+      .count('id as cnt')
+      .first();
+
+    const claimsToday = Number(todayClaimsRow?.cnt || 0);
+    if (claimsToday >= dailyLimit) {
+      return res.status(429).json({
+        error: `Daily limit reached (${dailyLimit}/${dailyLimit} rewarded ads claimed today). Upgrade to PRO for unlimited virtual capital & zero ads!`
+      });
+    }
+
+    let updatedBalance = 0;
+    await db.transaction(async (trx) => {
+      if (trx.client.config.client === 'pg') {
+        await trx.raw('SELECT pg_advisory_xact_lock(7001, ?)', [Number(userId)]);
+      }
+      const userRow = await trx('users').where({ id: userId }).forUpdate().first();
+      if (!userRow) throw new Error('User not found');
+
+      updatedBalance = parseFloat((Number(userRow.balance || 0) + rewardAmount).toFixed(2));
+      await trx('users').where({ id: userId }).update({ balance: updatedBalance });
+
+      await trx('fund_ledger').insert({
+        user_id: userId,
+        type: 'AD_REWARD',
+        amount: rewardAmount,
+        balance_after: updatedBalance,
+        description: `30s Rewarded Video Ad Bonus (+₹${rewardAmount.toLocaleString('en-IN')})`,
+        created_at: new Date()
+      });
+    });
+
+    adConfigCache.reward_claims = Number(adConfigCache.reward_claims || 0) + 1;
+    adStatsDirty = true;
+
+    res.json({
+      success: true,
+      reward_amount: rewardAmount,
+      balance: updatedBalance,
+      claims_today: claimsToday + 1,
+      daily_limit: dailyLimit,
+      message: `🎉 +₹${rewardAmount.toLocaleString('en-IN')} Demo Funds credited to your account!`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to credit ad reward' });
+  }
+});
+
+// Admin Get & Save Ad Monetization Config
+app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await loadAdConfigFromDb();
+    res.json({ success: true, config: adConfigCache });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const incoming = req.body || {};
+    adConfigCache = {
+      ...adConfigCache,
+      enabled: incoming.enabled !== undefined ? Boolean(incoming.enabled) : adConfigCache.enabled,
+      adsense_client_id: incoming.adsense_client_id !== undefined ? String(incoming.adsense_client_id).trim() : adConfigCache.adsense_client_id,
+      adsense_banner_slot: incoming.adsense_banner_slot !== undefined ? String(incoming.adsense_banner_slot).trim() : adConfigCache.adsense_banner_slot,
+      adsense_rewarded_slot: incoming.adsense_rewarded_slot !== undefined ? String(incoming.adsense_rewarded_slot).trim() : adConfigCache.adsense_rewarded_slot,
+      reward_enabled: incoming.reward_enabled !== undefined ? Boolean(incoming.reward_enabled) : adConfigCache.reward_enabled,
+      reward_amount: incoming.reward_amount !== undefined ? Math.max(1000, Number(incoming.reward_amount) || 100000) : adConfigCache.reward_amount,
+      reward_daily_limit: incoming.reward_daily_limit !== undefined ? Math.max(1, Number(incoming.reward_daily_limit) || 3) : adConfigCache.reward_daily_limit,
+      sponsor_badge: incoming.sponsor_badge !== undefined ? String(incoming.sponsor_badge).trim() : adConfigCache.sponsor_badge,
+      sponsor_title: incoming.sponsor_title !== undefined ? String(incoming.sponsor_title).trim() : adConfigCache.sponsor_title,
+      sponsor_subtitle: incoming.sponsor_subtitle !== undefined ? String(incoming.sponsor_subtitle).trim() : adConfigCache.sponsor_subtitle,
+      sponsor_cta_text: incoming.sponsor_cta_text !== undefined ? String(incoming.sponsor_cta_text).trim() : adConfigCache.sponsor_cta_text,
+      sponsor_target_url: incoming.sponsor_target_url !== undefined ? String(incoming.sponsor_target_url).trim() : adConfigCache.sponsor_target_url,
+      sponsor_video_url: incoming.sponsor_video_url !== undefined ? String(incoming.sponsor_video_url).trim() : adConfigCache.sponsor_video_url
+    };
+
+    if (incoming.reset_stats === true) {
+      adConfigCache.impressions = 0;
+      adConfigCache.clicks = 0;
+      adConfigCache.reward_claims = 0;
+    }
+
+    await db('system_settings')
+      .insert({ key: 'ads_monetization_config', value: JSON.stringify(adConfigCache), updated_at: new Date() })
+      .onConflict('key')
+      .merge();
+
+    res.json({
+      success: true,
+      config: adConfigCache,
+      message: 'Ad Monetization & Rewarded Video settings saved and activated immediately!'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

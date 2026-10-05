@@ -1490,6 +1490,73 @@ export default function AdminDashboard() {
     }
   };
 
+  // Ads & Monetization Admin State
+  const [adConfig, setAdConfig] = useState({
+    enabled: true,
+    adsense_client_id: '',
+    adsense_banner_slot: '',
+    adsense_rewarded_slot: '',
+    reward_enabled: true,
+    reward_amount: 100000,
+    reward_daily_limit: 3,
+    sponsor_badge: 'SPONSORED PARTNER',
+    sponsor_title: 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC',
+    sponsor_subtitle: 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution, Option Chain Greeks & TradingView Charts.',
+    sponsor_cta_text: 'Open Free Account →',
+    sponsor_target_url: 'https://skandx.in/pricing',
+    sponsor_video_url: '',
+    impressions: 0,
+    clicks: 0,
+    reward_claims: 0
+  });
+  const [adSaving, setAdSaving] = useState(false);
+  const [adStatusMsg, setAdStatusMsg] = useState({ type: '', text: '' });
+
+  const fetchAdminAdConfig = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/ads/config`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success && data.config) {
+        setAdConfig(prev => ({ ...prev, ...data.config }));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch ad config:', e);
+    }
+  };
+
+  const handleSaveAdConfig = async (e, resetStats = false) => {
+    if (e?.preventDefault) e.preventDefault();
+    setAdSaving(true);
+    setAdStatusMsg({ type: '', text: '' });
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/ads/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ ...adConfig, reset_stats: resetStats })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.config) setAdConfig(prev => ({ ...prev, ...data.config }));
+        setAdStatusMsg({ type: 'success', text: `✅ ${data.message || 'Ad settings saved!'}` });
+      } else {
+        setAdStatusMsg({ type: 'error', text: data.error || 'Failed to save ad settings' });
+      }
+    } catch (err) {
+      setAdStatusMsg({ type: 'error', text: err.message || 'Network error saving ad settings' });
+    } finally {
+      setAdSaving(false);
+    }
+  };
+
   const handleResolveDataRightsRequest = async (reqItem, action) => {
     const isDelete = action === 'DELETE_ACCOUNT';
     const confirmMsg = isDelete
@@ -3097,6 +3164,12 @@ export default function AdminDashboard() {
         >
           💳 Razorpay Gateway
         </button>
+        <button 
+          onClick={() => { setActiveTab('ads'); fetchAdminAdConfig?.(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'ads' ? '2px solid #f59e0b' : '2px solid transparent', color: activeTab === 'ads' ? '#fbbf24' : 'var(--text-secondary)', fontWeight: activeTab === 'ads' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          📢 Ads & Monetization
+        </button>
       </div>
 
       {/* Content Container */}
@@ -4008,6 +4081,297 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        ) : activeTab === 'ads' ? (
+          <div style={{ padding: isMobile ? '12px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Top Header Banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(15, 23, 42, 0.92) 100%)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '16px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Sparkles size={22} color="#fbbf24" />
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#fff' }}>
+                    Ad Monetization & 30-Sec Rewarded Video Engine
+                  </h2>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    background: adConfig.enabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    color: adConfig.enabled ? '#34d399' : '#f87171',
+                    border: adConfig.enabled ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '20px',
+                    padding: '2px 10px'
+                  }}>
+                    {adConfig.enabled ? '✓ LIVE FOR BASIC USERS' : '⏸ PAUSED'}
+                  </span>
+                </div>
+                <p style={{ margin: '6px 0 0 0', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Zero server hardware load (0% CPU / 0 MB RAM). Ads & 30s Rewarded Videos show <b>only to Free (BASIC) users</b> across Web & Android App, while <b>PRO users stay 100% ad-free</b>.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSaveAdConfig(null, true)}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-secondary)',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reset Counters
+                </button>
+              </div>
+            </div>
+
+            {/* Live Performance Metrics Strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '14px' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>TOTAL AD IMPRESSIONS</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{Number(adConfig.impressions || 0).toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>PARTNER AD CLICKS</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>{Number(adConfig.clicks || 0).toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>CLICK-THROUGH RATE (CTR)</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>
+                  {adConfig.impressions > 0 ? ((Number(adConfig.clicks || 0) / Number(adConfig.impressions)) * 100).toFixed(2) : '0.00'}%
+                </div>
+              </div>
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>30s REWARDED ADS COMPLETED</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981', marginTop: '4px' }}>{Number(adConfig.reward_claims || 0).toLocaleString('en-IN')}</div>
+              </div>
+            </div>
+
+            {adStatusMsg.text && (
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: adStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                border: `1px solid ${adStatusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                color: adStatusMsg.type === 'success' ? '#34d399' : '#f87171',
+                fontSize: '13px',
+                fontWeight: '600'
+              }}>
+                {adStatusMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={(e) => handleSaveAdConfig(e, false)} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
+              {/* Left Column: Google AdSense & 30s Rewarded Video Settings */}
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#fff' }}>
+                  1. Google AdSense & 30-Sec Rewarded Video Setup
+                </h3>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#fff', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!adConfig.enabled}
+                    onChange={(e) => setAdConfig({ ...adConfig, enabled: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
+                  />
+                  <span>Enable Ads for All Free (BASIC) Users</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#34d399', background: 'rgba(16,185,129,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.25)' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!adConfig.reward_enabled}
+                    onChange={(e) => setAdConfig({ ...adConfig, reward_enabled: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
+                  />
+                  <span>Enable 30-Sec Rewarded Video Ads (+Demo Capital Bonus)</span>
+                </label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Reward Amount per 30s Ad (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={adConfig.reward_amount}
+                      onChange={(e) => setAdConfig({ ...adConfig, reward_amount: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Max Claims Per User / Day
+                    </label>
+                    <input
+                      type="number"
+                      value={adConfig.reward_daily_limit}
+                      onChange={(e) => setAdConfig({ ...adConfig, reward_daily_limit: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Google AdSense Publisher ID (Optional — e.g. ca-pub-1234567890123456)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ca-pub-XXXXXXXXXXXXXXXX"
+                    value={adConfig.adsense_client_id}
+                    onChange={(e) => setAdConfig({ ...adConfig, adsense_client_id: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      AdSense Banner Slot ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1234567890"
+                      value={adConfig.adsense_banner_slot}
+                      onChange={(e) => setAdConfig({ ...adConfig, adsense_banner_slot: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      AdSense Rewarded Video Slot ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9876543210"
+                      value={adConfig.adsense_rewarded_slot}
+                      onChange={(e) => setAdConfig({ ...adConfig, adsense_rewarded_slot: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Direct Sponsor / Broker Affiliate Banner & Video */}
+              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#fff' }}>
+                  2. Direct Sponsor / Broker Affiliate Ad Creative
+                </h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Sponsor Badge Label
+                    </label>
+                    <input
+                      type="text"
+                      value={adConfig.sponsor_badge}
+                      onChange={(e) => setAdConfig({ ...adConfig, sponsor_badge: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      CTA Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={adConfig.sponsor_cta_text}
+                      onChange={(e) => setAdConfig({ ...adConfig, sponsor_cta_text: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Ad Headline Title
+                  </label>
+                  <input
+                    type="text"
+                    value={adConfig.sponsor_title}
+                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_title: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Ad Subtitle Description
+                  </label>
+                  <input
+                    type="text"
+                    value={adConfig.sponsor_subtitle}
+                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_subtitle: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Target Click / Affiliate Link URL (e.g. Fyers / Dhan / Angel One referral link)
+                  </label>
+                  <input
+                    type="url"
+                    value={adConfig.sponsor_target_url}
+                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_target_url: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Optional MP4 Video URL for 30s Rewarded Ad Player
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://example.com/promo-video.mp4 (Optional)"
+                    value={adConfig.sponsor_video_url}
+                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_video_url: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '8px' }}>
+                  <button
+                    type="submit"
+                    disabled={adSaving}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 22px',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)'
+                    }}
+                  >
+                    {adSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    {adSaving ? 'Saving Ad Settings...' : 'Save & Publish Ad Settings'}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         ) : activeTab === 'contests' ? (
           <div style={{ padding: isMobile ? '10px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>

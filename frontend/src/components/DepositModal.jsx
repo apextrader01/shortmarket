@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { X, Wallet, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, Wallet, ArrowRight, CheckCircle, ShieldCheck, Play } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
+import { RewardedAdModal, useAdConfig, isUserAdFreeTier } from './AdBannerWidget';
 
 export default function DepositModal({ onClose }) {
   const { requestDeposit, user } = useStore(useShallow(state => ({ requestDeposit: state.requestDeposit, user: state.user })));
+  const { config: adConfig } = useAdConfig();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [rewardAdOpen, setRewardAdOpen] = useState(false);
 
   const quickAmounts = [5000, 10000, 50000, 100000];
 
@@ -73,7 +76,34 @@ export default function DepositModal({ onClose }) {
         
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '0 24px' }}>
-            
+            {adConfig?.enabled && adConfig?.reward_enabled && !isUserAdFreeTier(user) && (
+              <div style={{ marginBottom: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setRewardAdOpen(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(56, 189, 248, 0.14) 100%)',
+                    border: '1px solid rgba(16, 185, 129, 0.45)',
+                    color: '#34d399',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.15)'
+                  }}
+                >
+                  <Play size={14} fill="#34d399" />
+                  Watch 30s Video Ad → Instant +₹{Number(adConfig.reward_amount || 100000).toLocaleString('en-IN')} Free
+                </button>
+              </div>
+            )}
+
             {/* Amount Input */}
             <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px 20px', textAlign: 'center', transition: 'border-color 0.2s', ...(amount ? { borderColor: 'var(--color-blue)' } : {}) }}>
               <label style={{ fontSize: '14px', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px', fontWeight: '500' }}>Enter Amount</label>
@@ -131,6 +161,13 @@ export default function DepositModal({ onClose }) {
           </div>
         </form>
       </div>
+      <RewardedAdModal
+        isOpen={rewardAdOpen}
+        onClose={() => setRewardAdOpen(false)}
+        onRewardClaimed={() => {
+          setTimeout(() => onClose(), 1800);
+        }}
+      />
     </div>
   );
 }

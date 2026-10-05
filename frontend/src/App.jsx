@@ -75,6 +75,7 @@ const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/Mutual
 const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBridgeDashboardModal'));
 const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));
 const CalculatorsSuiteView = lazyWithRetry(() => import('./components/CalculatorsSuiteView'));
+const AdBannerWidget = lazyWithRetry(() => import('./components/AdBannerWidget'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', minHeight: '350px', color: 'var(--text-secondary)' }}>
@@ -1395,6 +1396,11 @@ function App() {
                     <LegalView initialTab="privacy" onBack={() => setActiveTab('Markets')} />
                   </Suspense>
                 </div>
+              )}
+              {['Positions', 'Orders', 'Portfolio', 'Reports', 'Leaderboard', 'MutualFunds', 'Analytics', 'Journal', 'Referrals'].includes(activeTab) && (
+                <Suspense fallback={null}>
+                  <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
+                </Suspense>
               )}
               </main>
             </div>
