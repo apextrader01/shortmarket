@@ -676,6 +676,7 @@ app.use(helmet({
         "https://adservice.google.com",
         "https://adservice.google.co.in",
         "https://tpc.googlesyndication.com",
+        "https://fundingchoicesmessages.google.com",
         "https://ep1.adtrafficquality.google",
         "https://ep2.adtrafficquality.google"
       ],
@@ -723,6 +724,7 @@ app.use(helmet({
         "https://*.doubleclick.net",
         "https://adservice.google.com",
         "https://adservice.google.co.in",
+        "https://fundingchoicesmessages.google.com",
         "https://ep1.adtrafficquality.google",
         "https://ep2.adtrafficquality.google",
         "wss:",
@@ -737,6 +739,7 @@ app.use(helmet({
         "https://googleads.g.doubleclick.net",
         "https://tpc.googlesyndication.com",
         "https://*.googlesyndication.com",
+        "https://fundingchoicesmessages.google.com",
         "https://www.google.com",
         "https://ep1.adtrafficquality.google",
         "https://ep2.adtrafficquality.google"
