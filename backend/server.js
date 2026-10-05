@@ -10642,9 +10642,9 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 let adConfigCache = {
   enabled: true,
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
-  adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '',
-  adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '',
-  reward_enabled: false,
+  adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '5099870662',
+  adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '5099870662',
+  reward_enabled: true,
   reward_amount: 100000,
   reward_daily_limit: 3,
   sponsor_badge: 'SPONSORED PARTNER',
@@ -10666,7 +10666,9 @@ async function loadAdConfigFromDb() {
       adConfigCache = {
         ...adConfigCache,
         ...parsed,
-        adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869'
+        adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
+        adsense_banner_slot: parsed.adsense_banner_slot || adConfigCache.adsense_banner_slot || '5099870662',
+        adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '5099870662'
       };
     }
   } catch (e) {}
@@ -10689,8 +10691,8 @@ app.get('/api/ads/config', (req, res) => {
     config: {
       enabled: Boolean(adConfigCache.enabled),
       adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
-      adsense_banner_slot: adConfigCache.adsense_banner_slot || '',
-      adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '',
+      adsense_banner_slot: adConfigCache.adsense_banner_slot || '5099870662',
+      adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '5099870662',
       reward_enabled: Boolean(adConfigCache.reward_enabled),
       reward_amount: Number(adConfigCache.reward_amount || 100000),
       reward_daily_limit: Number(adConfigCache.reward_daily_limit || 3),

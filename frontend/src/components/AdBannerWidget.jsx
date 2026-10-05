@@ -536,14 +536,14 @@ export default function AdBannerWidget({ onUpgradeClick }) {
       }}>
         {/* Left: Google AdSense unit OR Direct Sponsor Banner */}
         {config.adsense_client_id && config.adsense_banner_slot ? (
-          <div style={{ flex: 1, minWidth: '240px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: '250px' }}>
             <ins
               ref={adsenseBannerRef}
               className="adsbygoogle"
-              style={{ display: 'block', width: '100%', maxHeight: '70px' }}
+              style={{ display: 'block' }}
               data-ad-client={config.adsense_client_id}
               data-ad-slot={config.adsense_banner_slot}
-              data-ad-format="horizontal"
+              data-ad-format="auto"
               data-full-width-responsive="true"
             />
           </div>

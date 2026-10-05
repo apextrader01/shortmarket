@@ -1496,9 +1496,9 @@ export default function AdminDashboard() {
   const [adConfig, setAdConfig] = useState({
     enabled: true,
     adsense_client_id: 'ca-pub-1001083475331869',
-    adsense_banner_slot: '',
-    adsense_rewarded_slot: '',
-    reward_enabled: false,
+    adsense_banner_slot: '5099870662',
+    adsense_rewarded_slot: '5099870662',
+    reward_enabled: true,
     reward_amount: 100000,
     reward_daily_limit: 3,
     sponsor_badge: 'SPONSORED PARTNER',
