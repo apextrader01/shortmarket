@@ -95,6 +95,9 @@ export function isUserAdFreeTier(user) {
 }
 
 export function trackAdEvent(event) {
+  if (cachedAdConfig && !cachedAdConfig.internal_counter_enabled) {
+    return Promise.resolve(null);
+  }
   try {
     return fetch(`${API}/api/ads/track`, {
       method: 'POST',
@@ -594,7 +597,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                 </div>
               )}
 
-              {/* If Google AdSense Rewarded/Display slot is configured, render AdSense unit without forcing a blank 180px box when unfilled */}
+              {/* If Google AdSense Rewarded/Display slot is configured, render AdSense unit */}
               {config.adsense_client_id && config.adsense_rewarded_slot ? (
                 <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden' }}>
                   <ins
@@ -609,59 +612,61 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                 </div>
               ) : null}
 
-              {/* Rich Sponsor / Partner Showcase Card */}
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
-                border: '1px solid rgba(56, 189, 248, 0.25)',
-                borderRadius: '14px',
-                padding: '18px',
-                marginBottom: '18px'
-              }}>
+              {/* Rich Sponsor / Partner Showcase Card (Only shown when Direct Sponsor mode is enabled) */}
+              {config.direct_sponsor_enabled && (
                 <div style={{
-                  display: 'inline-block',
-                  fontSize: '10px',
-                  fontWeight: '800',
-                  color: '#38bdf8',
-                  background: 'rgba(56, 189, 248, 0.12)',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  marginBottom: '10px',
-                  letterSpacing: '0.6px'
+                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '14px',
+                  padding: '18px',
+                  marginBottom: '18px'
                 }}>
-                  {config.sponsor_badge || 'FEATURED PARTNER'}
-                </div>
-
-                <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#fff', margin: '0 0 8px 0', lineHeight: '1.35' }}>
-                  {config.sponsor_title || 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC'}
-                </h3>
-
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 14px 0', lineHeight: '1.5' }}>
-                  {config.sponsor_subtitle || 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution, Option Chain Greeks & TradingView Charts.'}
-                </p>
-
-                <a
-                  href={config.sponsor_target_url || '/pricing'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackAdEvent('click')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                  <div style={{
+                    display: 'inline-block',
+                    fontSize: '10px',
+                    fontWeight: '800',
                     color: '#38bdf8',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    textDecoration: 'none'
-                  }}
-                >
-                  {config.sponsor_cta_text || 'Open Free Account →'} <ExternalLink size={13} />
-                </a>
-              </div>
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    marginBottom: '10px',
+                    letterSpacing: '0.6px'
+                  }}>
+                    {config.sponsor_badge || 'FEATURED PARTNER'}
+                  </div>
+
+                  <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#fff', margin: '0 0 8px 0', lineHeight: '1.35' }}>
+                    {config.sponsor_title || 'Open a FREE Zero-Brokerage Demat & Options Account — ₹0 AMC'}
+                  </h3>
+
+                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 14px 0', lineHeight: '1.5' }}>
+                    {config.sponsor_subtitle || 'Trade Live NSE, BSE & MCX Options with Sub-Second Execution, Option Chain Greeks & TradingView Charts.'}
+                  </p>
+
+                  <a
+                    href={config.sponsor_target_url || '/pricing'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackAdEvent('click')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      color: '#38bdf8',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    {config.sponsor_cta_text || 'Open Free Account →'} <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
 
               {errorMsg && (
                 <div style={{
@@ -894,7 +899,7 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         gap: '10px',
         flexShrink: 0
       }}>
-        {/* Left: Always show Sponsor Headline + Google AdSense unit when filled */}
+        {/* Left: Google AdSense unit (and optional Direct Sponsor Headline when enabled) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
           <span style={{
             fontSize: '9.5px',
@@ -907,15 +912,23 @@ export default function AdBannerWidget({ onUpgradeClick }) {
             whiteSpace: 'nowrap',
             letterSpacing: '0.4px'
           }}>
-            {config.sponsor_badge || 'AD'}
+            {config.direct_sponsor_enabled ? (config.sponsor_badge || 'SPONSORED') : 'GOOGLE ADS'}
           </span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {config.sponsor_title}
-            </div>
-            <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {config.sponsor_subtitle}
-            </div>
+            {config.direct_sponsor_enabled ? (
+              <>
+                <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {config.sponsor_title}
+                </div>
+                <div className="hide-on-mobile" style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {config.sponsor_subtitle}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Sponsored Advertisement • Free Plan Supported by Google AdSense
+              </div>
+            )}
             {config.adsense_client_id && config.adsense_banner_slot && (
               <ins
                 ref={adsenseBannerRef}
@@ -930,9 +943,9 @@ export default function AdBannerWidget({ onUpgradeClick }) {
           </div>
         </div>
 
-        {/* Right Actions: CTA + Watch 30s Ad for Free Capital + Remove Ads */}
+        {/* Right Actions: CTA (only when Direct Sponsor enabled) + Watch 30s Ad for Free Capital + Remove Ads */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {config.sponsor_target_url && (
+          {config.direct_sponsor_enabled && config.sponsor_target_url && (
             <a
               href={config.sponsor_target_url}
               target="_blank"

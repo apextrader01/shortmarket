@@ -1496,6 +1496,8 @@ export default function AdminDashboard() {
   const [adConfig, setAdConfig] = useState({
     enabled: true,
     show_ads_to_admin: true,
+    internal_counter_enabled: false,
+    direct_sponsor_enabled: false,
     adsense_client_id: 'ca-pub-1001083475331869',
     adsense_banner_slot: '5099870662',
     adsense_rewarded_slot: '2846165854',
@@ -1542,10 +1544,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveAdConfig = async (e, resetStats = false) => {
+  const handleSaveAdConfig = async (e, resetStats = false, customPatch = null) => {
     if (e?.preventDefault) e.preventDefault();
     setAdSaving(true);
     setAdStatusMsg({ type: '', text: '' });
+    const payload = customPatch ? { ...adConfig, ...customPatch } : { ...adConfig };
+    if (customPatch) {
+      setAdConfig(payload);
+    }
     try {
       const API_URL = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
@@ -1555,7 +1561,7 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ ...adConfig, reset_stats: resetStats })
+        body: JSON.stringify({ ...payload, reset_stats: resetStats })
       });
       const data = await res.json();
       if (data && data.success) {
@@ -2250,12 +2256,12 @@ export default function AdminDashboard() {
   }, [activeTab, isLiveTelemetry, telemetryTimeframe]);
 
   useEffect(() => {
-    if (activeTab !== 'ads') return;
+    if (activeTab !== 'ads' || !adConfig.internal_counter_enabled) return;
     const interval = setInterval(() => {
       fetchAdminAdConfig(true);
     }, 4000);
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, [activeTab, adConfig.internal_counter_enabled]);
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
@@ -4147,7 +4153,27 @@ export default function AdminDashboard() {
                   Zero server hardware load (0% CPU / 0 MB RAM). Ads & 30s Rewarded Videos show <b>only to Free (BASIC) users</b> across Web & Android App, while <b>PRO users stay 100% ad-free</b>.
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSaveAdConfig(null, false, { internal_counter_enabled: !adConfig.internal_counter_enabled })}
+                  style={{
+                    background: adConfig.internal_counter_enabled ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.05)',
+                    border: adConfig.internal_counter_enabled ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid var(--border-color)',
+                    color: adConfig.internal_counter_enabled ? '#38bdf8' : 'var(--text-secondary)',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="Turn ON or OFF SkandX's internal impression & click counter boxes (Google AdSense tracks its own revenue in your AdSense Dashboard)"
+                >
+                  {adConfig.internal_counter_enabled ? '📊 Internal Ad Counter: ON' : '⏸ Internal Ad Counter: OFF'}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowPreviewRewardModal(true)}
@@ -4167,22 +4193,24 @@ export default function AdminDashboard() {
                 >
                   <Play size={13} fill="#fff" /> Test 30s Rewarded Ad Popup
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleSaveAdConfig(null, true)}
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-secondary)',
-                    borderRadius: '8px',
-                    padding: '8px 14px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Reset Counters
-                </button>
+                {adConfig.internal_counter_enabled && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAdConfig(null, true)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-secondary)',
+                      borderRadius: '8px',
+                      padding: '8px 14px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Reset Counters
+                  </button>
+                )}
               </div>
             </div>
 
@@ -4190,34 +4218,36 @@ export default function AdminDashboard() {
               isOpen={showPreviewRewardModal}
               onClose={() => {
                 setShowPreviewRewardModal(false);
-                fetchAdminAdConfig(true);
+                if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true);
               }}
               customConfig={adConfig}
-              onAdCompleted={() => fetchAdminAdConfig(true)}
-              onRewardClaimed={() => fetchAdminAdConfig(true)}
+              onAdCompleted={() => { if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true); }}
+              onRewardClaimed={() => { if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true); }}
             />
 
-            {/* Live Performance Metrics Strip */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '14px' }}>
-              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>TOTAL AD IMPRESSIONS</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{Number(adConfig.impressions || 0).toLocaleString('en-IN')}</div>
-              </div>
-              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>PARTNER AD CLICKS</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>{Number(adConfig.clicks || 0).toLocaleString('en-IN')}</div>
-              </div>
-              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>CLICK-THROUGH RATE (CTR)</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>
-                  {adConfig.impressions > 0 ? ((Number(adConfig.clicks || 0) / Number(adConfig.impressions)) * 100).toFixed(2) : '0.00'}%
+            {/* Live Performance Metrics Strip (Only shown when Internal Ad Counter is turned ON) */}
+            {adConfig.internal_counter_enabled && (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '14px' }}>
+                <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>TOTAL AD IMPRESSIONS (INTERNAL)</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{Number(adConfig.impressions || 0).toLocaleString('en-IN')}</div>
+                </div>
+                <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>PARTNER AD CLICKS</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>{Number(adConfig.clicks || 0).toLocaleString('en-IN')}</div>
+                </div>
+                <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>CLICK-THROUGH RATE (CTR)</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>
+                    {adConfig.impressions > 0 ? ((Number(adConfig.clicks || 0) / Number(adConfig.impressions)) * 100).toFixed(2) : '0.00'}%
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>30s REWARDED ADS COMPLETED</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981', marginTop: '4px' }}>{Number(adConfig.reward_claims || 0).toLocaleString('en-IN')}</div>
                 </div>
               </div>
-              <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>30s REWARDED ADS COMPLETED</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981', marginTop: '4px' }}>{Number(adConfig.reward_claims || 0).toLocaleString('en-IN')}</div>
-              </div>
-            </div>
+            )}
 
             {adStatusMsg.text && (
               <div style={{
@@ -4336,85 +4366,123 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Right Column: Direct Sponsor / Broker Affiliate Banner & Video */}
+              {/* Right Column: Direct Sponsor / Broker Affiliate Banner & Video (Optional — OFF by default so Google AdSense is primary) */}
               <div style={{ background: 'rgba(15, 23, 42, 0.65)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#fff' }}>
-                  2. Direct Sponsor / Broker Affiliate Ad Creative
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#fff' }}>
+                    2. Direct Sponsor / Broker Affiliate Ad (Optional)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAdConfig(null, false, { direct_sponsor_enabled: !adConfig.direct_sponsor_enabled })}
+                    style={{
+                      background: adConfig.direct_sponsor_enabled ? 'rgba(16, 185, 129, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                      border: adConfig.direct_sponsor_enabled ? '1px solid rgba(16, 185, 129, 0.45)' : '1px solid var(--border-color)',
+                      color: adConfig.direct_sponsor_enabled ? '#34d399' : 'var(--text-secondary)',
+                      borderRadius: '20px',
+                      padding: '4px 12px',
+                      fontSize: '11.5px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {adConfig.direct_sponsor_enabled ? '● ON (Showing Sponsor Card)' : '○ OFF (Google AdSense Only)'}
+                  </button>
+                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Sponsor Badge Label
-                    </label>
-                    <input
-                      type="text"
-                      value={adConfig.sponsor_badge}
-                      onChange={(e) => setAdConfig({ ...adConfig, sponsor_badge: e.target.value })}
-                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
-                    />
+                {!adConfig.direct_sponsor_enabled ? (
+                  <div style={{
+                    background: 'rgba(56, 189, 248, 0.06)',
+                    border: '1px dashed rgba(56, 189, 248, 0.25)',
+                    borderRadius: '10px',
+                    padding: '18px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6'
+                  }}>
+                    <div style={{ color: '#38bdf8', fontWeight: '800', fontSize: '13px', marginBottom: '6px' }}>
+                      ✓ Pure Google AdSense Mode Active
+                    </div>
+                    SkandX's internal Direct Sponsor banner & internal ad-box counter are currently turned <b>OFF</b> so you only focus on <b>Google AdSense</b> revenue.<br /><br />
+                    Once Google AdSense finishes reviewing <b>skandx.in</b> (status changes from <i>"Getting ready"</i> to <i>"Ready"</i>), all impressions, clicks, and earnings will appear directly in your <b>Google AdSense Dashboard</b>. You can turn Direct Sponsor or the Internal Counter back <b>ON</b> anytime with one click.
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      CTA Button Text
-                    </label>
-                    <input
-                      type="text"
-                      value={adConfig.sponsor_cta_text}
-                      onChange={(e) => setAdConfig({ ...adConfig, sponsor_cta_text: e.target.value })}
-                      style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                          Sponsor Badge Label
+                        </label>
+                        <input
+                          type="text"
+                          value={adConfig.sponsor_badge}
+                          onChange={(e) => setAdConfig({ ...adConfig, sponsor_badge: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                          CTA Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={adConfig.sponsor_cta_text}
+                          onChange={(e) => setAdConfig({ ...adConfig, sponsor_cta_text: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Ad Headline Title
-                  </label>
-                  <input
-                    type="text"
-                    value={adConfig.sponsor_title}
-                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_title: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Ad Headline Title
+                      </label>
+                      <input
+                        type="text"
+                        value={adConfig.sponsor_title}
+                        onChange={(e) => setAdConfig({ ...adConfig, sponsor_title: e.target.value })}
+                        style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Ad Subtitle Description
-                  </label>
-                  <input
-                    type="text"
-                    value={adConfig.sponsor_subtitle}
-                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_subtitle: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Ad Subtitle Description
+                      </label>
+                      <input
+                        type="text"
+                        value={adConfig.sponsor_subtitle}
+                        onChange={(e) => setAdConfig({ ...adConfig, sponsor_subtitle: e.target.value })}
+                        style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Target Click / Affiliate Link URL (e.g. Fyers / Dhan / Angel One referral link)
-                  </label>
-                  <input
-                    type="url"
-                    value={adConfig.sponsor_target_url}
-                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_target_url: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Target Click / Affiliate Link URL (e.g. Fyers / Dhan / Angel One referral link)
+                      </label>
+                      <input
+                        type="url"
+                        value={adConfig.sponsor_target_url}
+                        onChange={(e) => setAdConfig({ ...adConfig, sponsor_target_url: e.target.value })}
+                        style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Optional MP4 Video URL for 30s Rewarded Ad Player
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/promo-video.mp4 (Optional)"
-                    value={adConfig.sponsor_video_url}
-                    onChange={(e) => setAdConfig({ ...adConfig, sponsor_video_url: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Optional MP4 Video URL for 30s Rewarded Ad Player
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="https://example.com/promo-video.mp4 (Optional)"
+                        value={adConfig.sponsor_video_url}
+                        onChange={(e) => setAdConfig({ ...adConfig, sponsor_video_url: e.target.value })}
+                        style={{ width: '100%', padding: '9px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '8px' }}>
                   <button

@@ -10642,6 +10642,8 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 let adConfigCache = {
   enabled: true,
   show_ads_to_admin: true,
+  internal_counter_enabled: false,
+  direct_sponsor_enabled: false,
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
   adsense_banner_slot: process.env.ADSENSE_BANNER_SLOT || '5099870662',
   adsense_rewarded_slot: process.env.ADSENSE_REWARDED_SLOT || '2846165854',
@@ -10668,6 +10670,8 @@ async function loadAdConfigFromDb() {
         ...adConfigCache,
         ...parsed,
         show_ads_to_admin: parsed.show_ads_to_admin !== undefined ? Boolean(parsed.show_ads_to_admin) : true,
+        internal_counter_enabled: parsed.internal_counter_enabled === true,
+        direct_sponsor_enabled: parsed.direct_sponsor_enabled === true,
         adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
         adsense_banner_slot: parsed.adsense_banner_slot || adConfigCache.adsense_banner_slot || '5099870662',
         adsense_rewarded_slot: parsed.adsense_rewarded_slot || adConfigCache.adsense_rewarded_slot || '2846165854',
@@ -10697,6 +10701,8 @@ app.get('/api/ads/config', (req, res) => {
     config: {
       enabled: Boolean(adConfigCache.enabled),
       show_ads_to_admin: adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true,
+      internal_counter_enabled: Boolean(adConfigCache.internal_counter_enabled),
+      direct_sponsor_enabled: Boolean(adConfigCache.direct_sponsor_enabled),
       adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
       adsense_banner_slot: adConfigCache.adsense_banner_slot || '5099870662',
       adsense_rewarded_slot: adConfigCache.adsense_rewarded_slot || '2846165854',
@@ -10754,6 +10760,17 @@ async function flushAdDeltaToDb() {
 }
 
 app.post('/api/ads/track', async (req, res) => {
+  if (!adConfigCache.internal_counter_enabled) {
+    return res.json({
+      success: true,
+      disabled: true,
+      stats: {
+        impressions: 0,
+        clicks: 0,
+        reward_claims: 0
+      }
+    });
+  }
   const { event } = req.body || {};
   if (event === 'impression') {
     adDelta.impressions += 1;
@@ -10855,14 +10872,16 @@ app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, re
   try {
     await flushAdDeltaToDb();
     await loadAdConfigFromDb();
-    const totalRewardsRow = await db('ledger')
-      .where({ type: 'DEPOSIT' })
-      .where('description', 'like', '30s Rewarded Video Ad Bonus%')
-      .count('id as cnt')
-      .first()
-      .catch(() => null);
-    if (totalRewardsRow && totalRewardsRow.cnt !== undefined) {
-      adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), Number(totalRewardsRow.cnt || 0));
+    if (adConfigCache.internal_counter_enabled) {
+      const totalRewardsRow = await db('ledger')
+        .where({ type: 'DEPOSIT' })
+        .where('description', 'like', '30s Rewarded Video Ad Bonus%')
+        .count('id as cnt')
+        .first()
+        .catch(() => null);
+      if (totalRewardsRow && totalRewardsRow.cnt !== undefined) {
+        adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), Number(totalRewardsRow.cnt || 0));
+      }
     }
     res.json({ success: true, config: adConfigCache });
   } catch (err) {
@@ -10879,6 +10898,8 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
       ...adConfigCache,
       enabled: incoming.enabled !== undefined ? Boolean(incoming.enabled) : adConfigCache.enabled,
       show_ads_to_admin: incoming.show_ads_to_admin !== undefined ? Boolean(incoming.show_ads_to_admin) : (adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true),
+      internal_counter_enabled: incoming.internal_counter_enabled !== undefined ? Boolean(incoming.internal_counter_enabled) : Boolean(adConfigCache.internal_counter_enabled),
+      direct_sponsor_enabled: incoming.direct_sponsor_enabled !== undefined ? Boolean(incoming.direct_sponsor_enabled) : Boolean(adConfigCache.direct_sponsor_enabled),
       adsense_client_id: incoming.adsense_client_id !== undefined ? String(incoming.adsense_client_id).trim() : adConfigCache.adsense_client_id,
       adsense_banner_slot: incoming.adsense_banner_slot !== undefined ? String(incoming.adsense_banner_slot).trim() : adConfigCache.adsense_banner_slot,
       adsense_rewarded_slot: incoming.adsense_rewarded_slot !== undefined ? String(incoming.adsense_rewarded_slot).trim() : adConfigCache.adsense_rewarded_slot,
@@ -10893,7 +10914,7 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
       sponsor_video_url: incoming.sponsor_video_url !== undefined ? String(incoming.sponsor_video_url).trim() : adConfigCache.sponsor_video_url
     };
 
-    if (incoming.reset_stats === true) {
+    if (incoming.reset_stats === true || !adConfigCache.internal_counter_enabled) {
       adDelta = { impressions: 0, clicks: 0, reward_claims: 0 };
       adConfigCache.impressions = 0;
       adConfigCache.clicks = 0;
