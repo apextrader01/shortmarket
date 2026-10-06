@@ -19,7 +19,7 @@ This Runbook establishes immediate, repeatable forensic, containment, escalation
 
 | Role | Primary Responsibility | Emergency Contact |
 | :--- | :--- | :--- |
-| **Incident Commander (CTO)** | Technical lead, system isolation, containment authority | `incident-commander@skandx.in` |
+| **Incident Commander (CTO)** | Technical lead, system isolation, containment authority | `skandx.in@gmail.com` |
 | **Data Protection Officer (DPO)** | Regulatory reporting, DPBI notification, statutory compliance | `skandx.in@gmail.com` |
 | **Lead Security Engineer** | Forensic analysis, log preservation, patch deployment | `skandx.in@gmail.com` |
 | **Legal Counsel** | Regulatory liaising, legal copy clearance, statutory liability | `skandx.in@gmail.com` |
@@ -108,8 +108,8 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
 
 1. DATA FIDUCIARY IDENTIFIERS:
    - Organization Name: SkandX
-   - Registered Office: SkandX, Thiruvananthapuram (Trivandrum), Kerala, India
-   - Data Protection Officer (DPO): Harikrishnan (skandx.in@gmail.com / +91 94978 61379)
+   - Registered Office: SkandX, Trivandrum, Kerala
+   - Data Protection Officer (DPO): Hari (skandx.in@gmail.com / +919497861379)
 
 2. INCIDENT SUMMARY:
    - Date and Time of Incident Detection: [YYYY-MM-DD, HH:MM IST]
@@ -143,9 +143,9 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
    - Dispatch Schedule: Commenced on [YYYY-MM-DD, HH:MM IST].
 
 7. CONTACT POINT FOR REGULATORY INQUIRIES:
-   - Contact Person: Harikrishnan (Grievance & Data Protection Officer)
+   - Contact Person: Hari (Grievance & Data Protection Officer)
    - Email: skandx.in@gmail.com
-   - Direct Phone: +91 94978 61379
+   - Direct Phone: +919497861379
 
 Submitted for and on behalf of SkandX,
 Authorized Signatory / Data Protection Officer
@@ -191,7 +191,7 @@ While passwords were encrypted, as an immediate precautionary measure, we recomm
 
 5. FOR MORE INFORMATION & DEDICATED SUPPORT:
 If you have any questions or wish to exercise your statutory rights to review your personal records under the DPDP Act, our dedicated privacy response team is available to assist you:
-- Dedicated Legal & Support Phone: +91 94978 61379 (9:00 AM – 6:00 PM IST)
+- Dedicated Legal & Support Phone: +919497861379 (9:00 AM – 6:00 PM IST)
 - Official Email: skandx.in@gmail.com
 - Grievance Redressal Portal: https://skandx.in/privacy-policy
 
@@ -199,7 +199,7 @@ We sincerely regret any inconvenience or concern this incident may cause, and we
 
 Sincerely,
 The SkandX Security & Data Governance Team
-SkandX Technologies Private Limited
+SkandX
 ```
 
 ---

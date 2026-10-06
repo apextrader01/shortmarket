@@ -1235,7 +1235,7 @@ export default function LandingHomeView({
             fontSize: '11.5px'
           }}>
             <div style={{ color: '#64748b' }}>
-              &copy; {new Date().getFullYear()} SkandX • Thiruvananthapuram (Trivandrum), Kerala, India • <a href="mailto:skandx.in@gmail.com" style={{ color: '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 94978 61379</a>
+              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari • <a href="mailto:skandx.in@gmail.com" style={{ color: '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
             </div>
             <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
               <a href="/aboutus" style={{ color: '#94a3b8', textDecoration: 'none' }}>About Us</a>

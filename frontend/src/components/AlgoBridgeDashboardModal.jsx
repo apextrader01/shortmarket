@@ -44,7 +44,7 @@ export default function AlgoBridgeDashboardModal({ isOpen, onClose }) {
       broker: 'Zerodha Kite Connect',
       brokerKey: 'zerodha',
       clientCode: 'ZER-6641',
-      name: 'Harikrishnan Primary',
+      name: 'Hari Primary',
       apiKey: 'kite_live_94a382b',
       status: 'EXPIRED',
       tradingActive: true,
@@ -58,7 +58,7 @@ export default function AlgoBridgeDashboardModal({ isOpen, onClose }) {
       broker: 'Angel One SmartAPI',
       brokerKey: 'angel',
       clientCode: 'ANG-9012',
-      name: 'Harikrishnan Alpha Hedge',
+      name: 'Hari Alpha Hedge',
       apiKey: 'smartapi_a89bc2',
       status: 'EXPIRED',
       tradingActive: true,
@@ -716,7 +716,7 @@ export default function AlgoBridgeDashboardModal({ isOpen, onClose }) {
               }}>
                 H
               </span>
-              <span style={{ color: '#cbd5e1' }}>h4harikrishnan2015@gmail.com</span>
+              <span style={{ color: '#cbd5e1' }}>skandx.in@gmail.com</span>
             </div>
 
             {/* Close Button */}

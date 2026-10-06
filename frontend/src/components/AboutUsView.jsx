@@ -97,9 +97,9 @@ export default function AboutUsView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <Phone size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name & Phone</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+91 94978 61379</a>
+                Hari • <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+919497861379</a>
               </div>
             </div>
           </div>
@@ -127,11 +127,9 @@ export default function AboutUsView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px' }}>
             <MapPin size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Location</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Address</div>
               <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-                Thiruvananthapuram (Trivandrum),<br/>
-                Kerala, India<br/>
-                Phone: +91 94978 61379
+                SkandX, Trivandrum, Kerala
               </div>
             </div>
           </div>

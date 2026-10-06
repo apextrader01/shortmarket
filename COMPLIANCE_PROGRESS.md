@@ -88,8 +88,9 @@ A comprehensive audit of personal data touchpoints across SkandX was conducted:
   2. Public platform footer and drawer navigation menu.
   3. `BREACH_RUNBOOK.md`.
 - **Contact Details Published:**
-  - Name: Shri Raghavan Narayanan (Designated Grievance Redressal Officer)
-  - Address: SkandX Technologies Pvt. Ltd., Level 14, Prestige Trade Tower, Palace Road, Bengaluru, Karnataka 560001
+  - Name: Hari (Designated Grievance Redressal Officer)
+  - Address: SkandX, Trivandrum, Kerala
+  - Phone: `+919497861379`
   - Email: `skandx.in@gmail.com`
   - Grievance Portal: `https://skandx.in/data-rights`
   - Response Window: Acknowledgment within 24 hours; resolution within 30 days under Section 13(2) of the DPDP Act.
@@ -156,15 +157,14 @@ The platform security posture was evaluated against the three requested areas:
 All statutory legal text implemented in `LegalView.jsx`, `Terms of Service`, and `BREACH_RUNBOOK.md` has been flagged with `[LEGAL REVIEW REQUIRED]`. The legal team must review and approve the following items:
 
 1. **Entity Identification & Registration Numbers:**
-   - Confirm legal name: *SkandX Technologies Private Limited* (or official registered trade entity).
-   - Insert valid Corporate Identification Number (CIN) and SEBI intermediary registration number (e.g. Stock Broker / Investment Adviser / Research Analyst).
-   - Confirm official registered office address in Bengaluru.
+   - Confirm legal name: *SkandX*
+   - Confirm official registered office address: SkandX, Trivandrum, Kerala.
 2. **Grievance Redressal Officer Appointment:**
-   - Confirm the formal appointment of the named Grievance Redressal Officer (Shri Raghavan Narayanan) and official contact phone/email under DPDP Act Rule 11.
+   - Confirm the formal appointment of the named Grievance Redressal Officer (Hari, +919497861379, skandx.in@gmail.com).
 3. **PMLA vs. DPDP Erasure Retention Balance:**
    - Review the legal interaction between Section 12 of the DPDP Act (Right to Erasure) and Section 12 of PMLA, 2002 (Mandatory 8-year financial records retention). Ensure wording adequately protects the company from regulatory non-compliance when declining erasure of ledger/trading logs.
 4. **Governing Law & Arbitration Jurisdiction:**
-   - Review Dispute Resolution clause in Terms of Service (currently specified as Bengaluru, Karnataka jurisdiction under the Arbitration and Conciliation Act, 1996).
+   - Review Dispute Resolution clause in Terms of Service (Trivandrum, Kerala jurisdiction under the Arbitration and Conciliation Act, 1996).
 5. **Breach Notification Templates:**
    - Approve the draft letters in `BREACH_RUNBOOK.md` for CERT-In, the Data Protection Board of India, and affected Data Principals.
 

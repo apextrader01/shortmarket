@@ -302,10 +302,11 @@ export function applyDynamicSEO(pathname = '/') {
           name: 'SkandX',
           url: 'https://skandx.in',
           email: 'skandx.in@gmail.com',
-          telephone: '+91-9497861379',
+          telephone: '+919497861379',
           address: {
             '@type': 'PostalAddress',
-            addressLocality: 'Thiruvananthapuram',
+            streetAddress: 'SkandX',
+            addressLocality: 'Trivandrum',
             addressRegion: 'Kerala',
             addressCountry: 'IN'
           }

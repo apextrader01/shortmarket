@@ -378,7 +378,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   ${tablesHtml}
 
   <div class="footer">
-    This is a computer-generated official statement from SkandX. No physical signature is required. For discrepancies, contact skandx.in@gmail.com | +91 94978 61379.
+    This is a computer-generated official statement from SkandX, Trivandrum, Kerala. No physical signature is required. For discrepancies, contact Hari at skandx.in@gmail.com | +919497861379.
   </div>
 
   <script>
