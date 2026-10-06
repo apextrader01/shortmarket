@@ -233,7 +233,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar {
-  width: 268px;
+  width: 305px;
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   background: var(--bg-secondary);

@@ -65,22 +65,44 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
     if (onStockSelect) onStockSelect(stock.uniqueSymbol);
   };
 
+  const rawDesc = stock.description || stock.name || '';
+  const readableSubtitle = React.useMemo(() => {
+    const sym = String(stock.symbol || '').trim();
+    if (rawDesc && rawDesc !== sym && rawDesc !== stock.uniqueSymbol) {
+      return rawDesc;
+    }
+    const optMatch = sym.match(/^([A-Z]+)(\d{2}[A-Z]{3}|\d{5})(\d+(?:\.\d+)?)(CE|PE)$/i);
+    if (optMatch) {
+      return `${optMatch[1].toUpperCase()} • ${optMatch[2].toUpperCase()} • ${optMatch[3]} ${optMatch[4].toUpperCase()}`;
+    }
+    const futMatch = sym.match(/^([A-Z]+)(\d{2}[A-Z]{3})FUT$/i);
+    if (futMatch) {
+      return `${futMatch[1].toUpperCase()} • ${futMatch[2].toUpperCase()} • FUT`;
+    }
+    return rawDesc || sym;
+  }, [stock.symbol, stock.uniqueSymbol, rawDesc]);
+
   const rowContent = (
     <>
       <div 
-        style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}
+        style={{ minWidth: 0, flex: 1, paddingRight: '8px', overflow: 'hidden' }}
         onClick={() => {
           if (isSearchMode) handleSelect();
         }}
+        title={stock.symbol}
       >
-        <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
-          {stock.symbol}
-          <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '9px', padding: '1px 3px', borderRadius: '3px' }}>{stock.exchange}</span>
+        <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '11.5px', letterSpacing: '0.1px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)', minWidth: 0 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+            {stock.symbol}
+          </span>
+          <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '8.5px', padding: '1px 3px', borderRadius: '3px', flexShrink: 0 }}>{stock.exchange}</span>
           {isSearchMode && isInWatchlist && (
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.15)', color: 'var(--color-green-light)', fontWeight: '600' }}>✓ In Watchlist</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.15)', color: 'var(--color-green-light)', fontWeight: '600', flexShrink: 0 }}>✓ In Watchlist</span>
           )}
         </div>
-        <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.description || stock.name}</div>
+        <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', marginTop: '1px' }}>
+          {readableSubtitle}
+        </div>
       </div>
 
       {isSearchMode ? (
@@ -139,16 +161,16 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
           )}
         </div>
       ) : (
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: '75px', minHeight: '30px' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: '82px', minHeight: '30px', flexShrink: 0 }}>
           {/* Live Price Display - always in DOM, concealed via CSS on hover on desktop */}
-          <div className="watchlist-price-container" style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div className="watchlist-price-container" style={{ textAlign: 'right', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {data && data.ltp !== undefined ? (
               <>
-                <div className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
+                <div className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
                   {data.ltp.toFixed(2)}
                   {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
                 </div>
-                <div style={{ fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '9.5px', display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                   {data.change !== undefined && data.pct !== undefined ? `${data.pct > 0 ? '+' : ''}${Number(data.change).toFixed(2)} (${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%)` : '—'}
                 </div>
               </>
