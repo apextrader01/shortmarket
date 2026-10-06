@@ -7,7 +7,14 @@ let fetchingPromise = null;
 let adsenseScriptInjected = false;
 
 function injectAdSenseScript(clientId) {
-  if (!clientId || adsenseScriptInjected || typeof document === 'undefined') return;
+  if (typeof document === 'undefined') return;
+  if (!document.getElementById('skandx-adsense-unfilled-css')) {
+    const style = document.createElement('style');
+    style.id = 'skandx-adsense-unfilled-css';
+    style.textContent = 'ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; height: 0 !important; min-height: 0 !important; }';
+    document.head.appendChild(style);
+  }
+  if (!clientId || adsenseScriptInjected) return;
   const cleanId = String(clientId).trim();
   if (!cleanId.startsWith('ca-pub-')) return;
   if (document.querySelector(`script[src*="adsbygoogle.js"]`)) {
@@ -114,7 +121,7 @@ export function triggerPostOrderAd({ symbol, side = 'BUY', status = 'EXECUTED' }
   if (typeof window === 'undefined') return;
   const user = useStore.getState().user;
   if (isUserAdFreeTier(user)) return;
-  if (cachedAdConfig && cachedAdConfig.enabled === false) return;
+  if (cachedAdConfig && (cachedAdConfig.enabled === false || cachedAdConfig.interstitial_enabled === false)) return;
   window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
     detail: {
       mode: 'post_order',
@@ -131,7 +138,7 @@ export function triggerPreExitAd(onProceed, { symbol = '', side = 'EXIT' } = {})
     return;
   }
   const user = useStore.getState().user;
-  if (isUserAdFreeTier(user) || (cachedAdConfig && cachedAdConfig.enabled === false)) {
+  if (isUserAdFreeTier(user) || (cachedAdConfig && (cachedAdConfig.enabled === false || cachedAdConfig.interstitial_enabled === false))) {
     if (typeof onProceed === 'function') onProceed();
     return;
   }
@@ -223,13 +230,16 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
       const status = el.getAttribute('data-ad-status');
       setModalAdFilled(status === 'filled');
     };
+    checkStatus();
     const observer = new MutationObserver(checkStatus);
     observer.observe(el, { attributes: true, attributeFilter: ['data-ad-status'] });
     try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      if (!el.getAttribute('data-adsbygoogle-status')) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }
     } catch (e) {}
     return () => observer.disconnect();
-  }, [isOpen, config]);
+  }, [isOpen, config?.adsense_client_id, config?.adsense_rewarded_slot]);
 
   if (!isOpen || !config) return null;
 
@@ -899,7 +909,7 @@ export function GlobalAdInterstitial() {
         if (typeof detail.onProceed === 'function') detail.onProceed();
         return;
       }
-      if (cachedAdConfig && cachedAdConfig.enabled === false) {
+      if (cachedAdConfig && (cachedAdConfig.enabled === false || cachedAdConfig.interstitial_enabled === false)) {
         if (typeof detail.onProceed === 'function') detail.onProceed();
         return;
       }
@@ -910,7 +920,16 @@ export function GlobalAdInterstitial() {
     return () => window.removeEventListener('skandx-trigger-ad', handleTriggerAd);
   }, []);
 
-  if (!activeTrigger || !config || !config.enabled || isUserAdFreeTier(user)) {
+  useEffect(() => {
+    if (!activeTrigger || !config) return;
+    if (!config.enabled || config.interstitial_enabled === false || isUserAdFreeTier(user)) {
+      const fn = activeTrigger.onProceed;
+      setActiveTrigger(null);
+      if (typeof fn === 'function') fn();
+    }
+  }, [activeTrigger, config, user]);
+
+  if (!activeTrigger || !config || !config.enabled || config.interstitial_enabled === false || isUserAdFreeTier(user)) {
     return null;
   }
 
@@ -946,14 +965,17 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         const status = el.getAttribute('data-ad-status');
         setAdSenseFilled(status === 'filled');
       };
+      checkStatus();
       const observer = new MutationObserver(checkStatus);
       observer.observe(el, { attributes: true, attributeFilter: ['data-ad-status'] });
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        if (!el.getAttribute('data-adsbygoogle-status')) {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        }
       } catch (e) {}
       return () => observer.disconnect();
     }
-  }, [config, isAdFree]);
+  }, [config?.enabled, config?.adsense_client_id, config?.adsense_banner_slot, config?.direct_sponsor_enabled, isAdFree]);
 
   if (!config || !config.enabled || isAdFree) return null;
 

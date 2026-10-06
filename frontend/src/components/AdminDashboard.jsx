@@ -1496,6 +1496,7 @@ export default function AdminDashboard() {
   const [adConfig, setAdConfig] = useState({
     enabled: true,
     show_ads_to_admin: true,
+    interstitial_enabled: true,
     internal_counter_enabled: false,
     direct_sponsor_enabled: false,
     adsense_client_id: 'ca-pub-1001083475331869',
@@ -1512,11 +1513,16 @@ export default function AdminDashboard() {
     sponsor_video_url: '',
     impressions: 0,
     clicks: 0,
-    reward_claims: 0
+    reward_claims: 0,
+    today_reward_claims: 0,
+    total_reward_claims_db: 0,
+    total_reward_amount_credited: 0,
+    recent_claims: []
   });
   const [adSaving, setAdSaving] = useState(false);
   const [adStatusMsg, setAdStatusMsg] = useState({ type: '', text: '' });
   const [showPreviewRewardModal, setShowPreviewRewardModal] = useState(false);
+  const [previewTriggerContext, setPreviewTriggerContext] = useState(null);
 
   const fetchAdminAdConfig = async (statsOnly = false) => {
     try {
@@ -1532,7 +1538,11 @@ export default function AdminDashboard() {
             ...prev,
             impressions: data.config.impressions ?? prev.impressions,
             clicks: data.config.clicks ?? prev.clicks,
-            reward_claims: data.config.reward_claims ?? prev.reward_claims
+            reward_claims: data.config.reward_claims ?? prev.reward_claims,
+            today_reward_claims: data.config.today_reward_claims ?? prev.today_reward_claims,
+            total_reward_claims_db: data.config.total_reward_claims_db ?? prev.total_reward_claims_db,
+            total_reward_amount_credited: data.config.total_reward_amount_credited ?? prev.total_reward_amount_credited,
+            recent_claims: data.config.recent_claims ?? prev.recent_claims
           }));
         } else {
           setAdConfig(prev => ({ ...prev, ...data.config }));
@@ -4132,7 +4142,7 @@ export default function AdminDashboard() {
               gap: '16px'
             }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <Sparkles size={22} color="#fbbf24" />
                   <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#fff' }}>
                     Ad Monetization & 30-Sec Rewarded Video Engine
@@ -4162,8 +4172,8 @@ export default function AdminDashboard() {
                     border: adConfig.internal_counter_enabled ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid var(--border-color)',
                     color: adConfig.internal_counter_enabled ? '#38bdf8' : 'var(--text-secondary)',
                     borderRadius: '8px',
-                    padding: '8px 14px',
-                    fontSize: '12px',
+                    padding: '8px 12px',
+                    fontSize: '11.5px',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -4172,18 +4182,21 @@ export default function AdminDashboard() {
                   }}
                   title="Turn ON or OFF SkandX's internal impression & click counter boxes (Google AdSense tracks its own revenue in your AdSense Dashboard)"
                 >
-                  {adConfig.internal_counter_enabled ? '📊 Internal Ad Counter: ON' : '⏸ Internal Ad Counter: OFF'}
+                  {adConfig.internal_counter_enabled ? '📊 Internal Counter: ON' : '⏸ Internal Counter: OFF'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowPreviewRewardModal(true)}
+                  onClick={() => {
+                    setPreviewTriggerContext({ mode: 'reward' });
+                    setShowPreviewRewardModal(true);
+                  }}
                   style={{
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     border: '1px solid rgba(16, 185, 129, 0.5)',
                     color: '#fff',
                     borderRadius: '8px',
-                    padding: '8px 14px',
-                    fontSize: '12px',
+                    padding: '8px 12px',
+                    fontSize: '11.5px',
                     fontWeight: '800',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -4191,7 +4204,51 @@ export default function AdminDashboard() {
                     gap: '6px'
                   }}
                 >
-                  <Play size={13} fill="#fff" /> Test 30s Rewarded Ad Popup
+                  <Play size={12} fill="#fff" /> Test 30s Reward Ad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewTriggerContext({ mode: 'post_order', symbol: 'NSE:NIFTY50-INDEX', side: 'BUY', status: 'EXECUTED' });
+                    setShowPreviewRewardModal(true);
+                  }}
+                  style={{
+                    background: 'rgba(56, 189, 248, 0.16)',
+                    border: '1px solid rgba(56, 189, 248, 0.45)',
+                    color: '#38bdf8',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Play size={12} fill="#38bdf8" /> Test Post-Order Ad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewTriggerContext({ mode: 'pre_exit', symbol: 'NSE:BANKNIFTY', side: 'EXIT' });
+                    setShowPreviewRewardModal(true);
+                  }}
+                  style={{
+                    background: 'rgba(245, 158, 11, 0.16)',
+                    border: '1px solid rgba(245, 158, 11, 0.45)',
+                    color: '#fbbf24',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Play size={12} fill="#fbbf24" /> Test Pre-Exit Ad
                 </button>
                 {adConfig.internal_counter_enabled && (
                   <button
@@ -4202,8 +4259,8 @@ export default function AdminDashboard() {
                       border: '1px solid var(--border-color)',
                       color: 'var(--text-secondary)',
                       borderRadius: '8px',
-                      padding: '8px 14px',
-                      fontSize: '12px',
+                      padding: '8px 12px',
+                      fontSize: '11.5px',
                       fontWeight: '600',
                       cursor: 'pointer'
                     }}
@@ -4216,14 +4273,162 @@ export default function AdminDashboard() {
 
             <RewardedAdModal
               isOpen={showPreviewRewardModal}
+              triggerContext={previewTriggerContext}
               onClose={() => {
                 setShowPreviewRewardModal(false);
-                if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true);
+                fetchAdminAdConfig(true);
               }}
               customConfig={adConfig}
-              onAdCompleted={() => { if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true); }}
-              onRewardClaimed={() => { if (adConfig.internal_counter_enabled) fetchAdminAdConfig(true); }}
+              onAdCompleted={() => { fetchAdminAdConfig(true); }}
+              onRewardClaimed={() => { fetchAdminAdConfig(true); }}
             />
+
+            {/* Google AdSense Readiness, Active Placements & Real Reward Claims Overview */}
+            {(() => {
+              const adsbygoogleLoaded = typeof window !== 'undefined' && Boolean(window.adsbygoogle && window.adsbygoogle.loaded);
+              const cleanPubId = String(adConfig.adsense_client_id || 'ca-pub-1001083475331869').replace(/^ca-/, '');
+              return (
+                <div style={{
+                  background: 'rgba(15, 23, 42, 0.72)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#fff' }}>
+                        🌐 Google AdSense & Placement Live Diagnostics
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '2px 9px',
+                        borderRadius: '999px',
+                        background: adsbygoogleLoaded ? 'rgba(16, 185, 129, 0.16)' : 'rgba(245, 158, 11, 0.16)',
+                        color: adsbygoogleLoaded ? '#34d399' : '#fbbf24',
+                        border: `1px solid ${adsbygoogleLoaded ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+                      }}>
+                        {adsbygoogleLoaded
+                          ? '✓ adsbygoogle.js Active in Your Browser'
+                          : '⚠️ adsbygoogle.js Blocked by Your Browser (Edge Tracking Prevention / AdBlocker)'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px' }}>
+                      <a
+                        href="/ads.txt"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}
+                      >
+                        Verify /ads.txt ({cleanPubId}) ↗
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => fetchAdminAdConfig(false)}
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid var(--border-color)',
+                          color: '#cbd5e1',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ↻ Refresh Status
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
+                    <div style={{ background: 'rgba(2, 6, 23, 0.55)', border: '1px solid var(--border-color)', borderRadius: '9px', padding: '12px 14px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        1. TOP TERMINAL BANNER
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: adConfig.enabled ? '#34d399' : '#94a3b8' }}>
+                        {adConfig.enabled
+                          ? (adConfig.direct_sponsor_enabled ? 'AdSense + Sponsor Bar' : 'Pure AdSense Only (Auto-Hide Unfilled)')
+                          : 'Disabled'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', fontFamily: 'monospace' }}>
+                        Slot: {adConfig.adsense_banner_slot || 'Not Set'}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(2, 6, 23, 0.55)', border: '1px solid var(--border-color)', borderRadius: '9px', padding: '12px 14px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        2. 30s REWARDED CAPITAL AD
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: (adConfig.enabled && adConfig.reward_enabled) ? '#34d399' : '#94a3b8' }}>
+                        {(adConfig.enabled && adConfig.reward_enabled)
+                          ? `Active (+₹${Number(adConfig.reward_amount || 100000).toLocaleString('en-IN')} / ${adConfig.reward_daily_limit}x day)`
+                          : 'Disabled'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', fontFamily: 'monospace' }}>
+                        Slot: {adConfig.adsense_rewarded_slot || 'Not Set'}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(2, 6, 23, 0.55)', border: '1px solid var(--border-color)', borderRadius: '9px', padding: '12px 14px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        3. 30s ACTION POPUP ADS
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: (adConfig.enabled && adConfig.interstitial_enabled !== false) ? '#38bdf8' : '#94a3b8' }}>
+                        {(adConfig.enabled && adConfig.interstitial_enabled !== false)
+                          ? 'Active (Order / Exit / Export)'
+                          : 'Disabled'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                        Post-Order, Exit, Modify, Convert, Share, Export
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(2, 6, 23, 0.55)', border: '1px solid var(--border-color)', borderRadius: '9px', padding: '12px 14px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        4. REWARDED BONUS CLAIMS (DB)
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#fbbf24' }}>
+                        Today: {Number(adConfig.today_reward_claims || 0)} • Total: {Number(adConfig.total_reward_claims_db || 0)}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px', fontWeight: '700' }}>
+                        Credited: ₹{Number(adConfig.total_reward_amount_credited || 0).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+
+                  {Array.isArray(adConfig.recent_claims) && adConfig.recent_claims.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                        Recent 30s Bonus Claims:
+                      </span>
+                      {adConfig.recent_claims.map((c) => (
+                        <span
+                          key={c.id}
+                          style={{
+                            fontSize: '11px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.28)',
+                            color: '#cbd5e1',
+                            padding: '2px 8px',
+                            borderRadius: '6px'
+                          }}
+                        >
+                          <b style={{ color: '#fff' }}>{c.username || c.client_id || 'User'}</b>{' '}
+                          <span style={{ color: '#34d399', fontWeight: '700' }}>+₹{Number(c.amount || 0).toLocaleString('en-IN')}</span>{' '}
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
+                            ({c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''})
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Live Performance Metrics Strip (Only shown when Internal Ad Counter is turned ON) */}
             {adConfig.internal_counter_enabled && (
@@ -4297,7 +4502,17 @@ export default function AdminDashboard() {
                     onChange={(e) => setAdConfig({ ...adConfig, reward_enabled: e.target.checked })}
                     style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
                   />
-                  <span>Enable 30-Sec Rewarded Video Ads (+Demo Capital Bonus)</span>
+                  <span>Enable 30-Sec Rewarded Video Ads (+Demo Capital Bonus in Add Funds)</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#fbbf24', background: 'rgba(245,158,11,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <input
+                    type="checkbox"
+                    checked={adConfig.interstitial_enabled !== false}
+                    onChange={(e) => setAdConfig({ ...adConfig, interstitial_enabled: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#f59e0b' }}
+                  />
+                  <span>Enable 30-Sec Action Popup Ads (After Order / Before Exit, Modify, Convert, Share & Export)</span>
                 </label>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -4404,7 +4619,9 @@ export default function AdminDashboard() {
                       ✓ Pure Google AdSense Mode Active
                     </div>
                     SkandX's internal Direct Sponsor banner & internal ad-box counter are currently turned <b>OFF</b> so you only focus on <b>Google AdSense</b> revenue.<br /><br />
-                    Once Google AdSense finishes reviewing <b>skandx.in</b> (status changes from <i>"Getting ready"</i> to <i>"Ready"</i>), all impressions, clicks, and earnings will appear directly in your <b>Google AdSense Dashboard</b>. You can turn Direct Sponsor or the Internal Counter back <b>ON</b> anytime with one click.
+                    • <b>Top Terminal Banner:</b> Stays completely invisible (0px height) until Google AdSense injects a real filled ad.<br />
+                    • <b>30s Reward & Action Popups:</b> Shows your Google AdSense unit (`{adConfig.adsense_rewarded_slot}`) without internal sponsor promo text.<br /><br />
+                    Once Google AdSense finishes reviewing <b>skandx.in</b> (status changes from <i>"Getting ready"</i> to <i>"Ready"</i>), all impressions, clicks, and earnings will appear directly in your <b>Google AdSense Dashboard</b>.
                   </div>
                 ) : (
                   <>

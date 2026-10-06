@@ -10648,6 +10648,7 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 let adConfigCache = {
   enabled: true,
   show_ads_to_admin: true,
+  interstitial_enabled: true,
   internal_counter_enabled: false,
   direct_sponsor_enabled: false,
   adsense_client_id: process.env.ADSENSE_CLIENT_ID || 'ca-pub-1001083475331869',
@@ -10676,6 +10677,7 @@ async function loadAdConfigFromDb() {
         ...adConfigCache,
         ...parsed,
         show_ads_to_admin: parsed.show_ads_to_admin !== undefined ? Boolean(parsed.show_ads_to_admin) : true,
+        interstitial_enabled: parsed.interstitial_enabled !== undefined ? Boolean(parsed.interstitial_enabled) : true,
         internal_counter_enabled: parsed.internal_counter_enabled === true,
         direct_sponsor_enabled: parsed.direct_sponsor_enabled === true,
         adsense_client_id: parsed.adsense_client_id || adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
@@ -10707,6 +10709,7 @@ app.get('/api/ads/config', (req, res) => {
     config: {
       enabled: Boolean(adConfigCache.enabled),
       show_ads_to_admin: adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true,
+      interstitial_enabled: adConfigCache.interstitial_enabled !== undefined ? Boolean(adConfigCache.interstitial_enabled) : true,
       internal_counter_enabled: Boolean(adConfigCache.internal_counter_enabled),
       direct_sponsor_enabled: Boolean(adConfigCache.direct_sponsor_enabled),
       adsense_client_id: adConfigCache.adsense_client_id || 'ca-pub-1001083475331869',
@@ -10816,8 +10819,8 @@ app.post('/api/ads/claim-reward', authenticateToken, async (req, res) => {
   }
 
   const userId = req.user.id;
-  const rewardAmount = Math.max(1000, Math.min(10000000, Number(adConfigCache.reward_amount || 100000)));
-  const dailyLimit = Math.max(1, Math.min(20, Number(adConfigCache.reward_daily_limit || 3)));
+  const rewardAmount = Math.max(1000, Math.min(100000000, Number(adConfigCache.reward_amount || 100000)));
+  const dailyLimit = Math.max(1, Number(adConfigCache.reward_daily_limit || 3));
 
   try {
     const startOfToday = new Date();
@@ -10878,18 +10881,52 @@ app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, re
   try {
     await flushAdDeltaToDb();
     await loadAdConfigFromDb();
-    if (adConfigCache.internal_counter_enabled) {
-      const totalRewardsRow = await db('ledger')
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [totalRewardsRow, todayRewardsRow, recentClaims] = await Promise.all([
+      db('ledger')
         .where({ type: 'DEPOSIT' })
         .where('description', 'like', '30s Rewarded Video Ad Bonus%')
+        .select(db.raw('COUNT(id) as cnt, COALESCE(SUM(amount), 0) as total_amount'))
+        .first()
+        .catch(() => null),
+      db('ledger')
+        .where({ type: 'DEPOSIT' })
+        .where('description', 'like', '30s Rewarded Video Ad Bonus%')
+        .where('created_at', '>=', startOfToday)
         .count('id as cnt')
         .first()
-        .catch(() => null);
-      if (totalRewardsRow && totalRewardsRow.cnt !== undefined) {
-        adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), Number(totalRewardsRow.cnt || 0));
-      }
+        .catch(() => null),
+      db('ledger as l')
+        .leftJoin('users as u', 'l.user_id', 'u.id')
+        .where('l.type', 'DEPOSIT')
+        .where('l.description', 'like', '30s Rewarded Video Ad Bonus%')
+        .select('l.id', 'l.amount', 'l.created_at', 'u.username', 'u.client_id')
+        .orderBy('l.created_at', 'desc')
+        .limit(5)
+        .catch(() => [])
+    ]);
+
+    const totalClaimsDb = Number(totalRewardsRow?.cnt || 0);
+    const totalAmountCredited = Number(totalRewardsRow?.total_amount || 0);
+    const todayClaimsDb = Number(todayRewardsRow?.cnt || 0);
+
+    if (adConfigCache.internal_counter_enabled) {
+      adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), totalClaimsDb);
     }
-    res.json({ success: true, config: adConfigCache });
+
+    res.json({
+      success: true,
+      config: {
+        ...adConfigCache,
+        today_reward_claims: todayClaimsDb,
+        total_reward_claims_db: totalClaimsDb,
+        total_reward_amount_credited: totalAmountCredited,
+        recent_claims: recentClaims || []
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -10904,6 +10941,7 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
       ...adConfigCache,
       enabled: incoming.enabled !== undefined ? Boolean(incoming.enabled) : adConfigCache.enabled,
       show_ads_to_admin: incoming.show_ads_to_admin !== undefined ? Boolean(incoming.show_ads_to_admin) : (adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true),
+      interstitial_enabled: incoming.interstitial_enabled !== undefined ? Boolean(incoming.interstitial_enabled) : (adConfigCache.interstitial_enabled !== undefined ? Boolean(adConfigCache.interstitial_enabled) : true),
       internal_counter_enabled: incoming.internal_counter_enabled !== undefined ? Boolean(incoming.internal_counter_enabled) : Boolean(adConfigCache.internal_counter_enabled),
       direct_sponsor_enabled: incoming.direct_sponsor_enabled !== undefined ? Boolean(incoming.direct_sponsor_enabled) : Boolean(adConfigCache.direct_sponsor_enabled),
       adsense_client_id: incoming.adsense_client_id !== undefined ? String(incoming.adsense_client_id).trim() : adConfigCache.adsense_client_id,
@@ -10920,7 +10958,7 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
       sponsor_video_url: incoming.sponsor_video_url !== undefined ? String(incoming.sponsor_video_url).trim() : adConfigCache.sponsor_video_url
     };
 
-    if (incoming.reset_stats === true || !adConfigCache.internal_counter_enabled) {
+    if (incoming.reset_stats === true) {
       adDelta = { impressions: 0, clicks: 0, reward_claims: 0 };
       adConfigCache.impressions = 0;
       adConfigCache.clicks = 0;
