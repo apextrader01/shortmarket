@@ -84,17 +84,22 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0" "platform-tools"
 
-      - name: Generate Release Keystore
+      - name: Ensure Release Keystore Exists
         working-directory: ./frontend/android/app
         run: |
-          keytool -genkeypair -v -keystore skandx-release.keystore \
-            -alias skandx \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass "SkandX@Release2026" \
-            -keypass "SkandX@Release2026" \
-            -dname "CN=SkandX, OU=Trading, O=SkandX Technologies, L=Chennai, ST=TN, C=IN"
+          if [ -f skandx-release.keystore ]; then
+            echo "Using committed release keystore."
+          else
+            echo "Generating release keystore..."
+            keytool -genkeypair -v -keystore skandx-release.keystore \
+              -alias skandx \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "SkandX@Release2026" \
+              -keypass "SkandX@Release2026" \
+              -dname "CN=SkandX, OU=Trading, O=SkandX Technologies, L=Chennai, ST=TN, C=IN"
+          fi
 
       - name: Build Android App (AAB & APK)
         working-directory: ./frontend/android
