@@ -300,7 +300,15 @@ export function applyDynamicSEO(pathname = '/') {
         publisher: {
           '@type': 'Organization',
           name: 'SkandX',
-          url: 'https://skandx.in'
+          url: 'https://skandx.in',
+          email: 'skandx.in@gmail.com',
+          telephone: '+91-9497861379',
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: 'Thiruvananthapuram',
+            addressRegion: 'Kerala',
+            addressCountry: 'IN'
+          }
         }
       },
       {

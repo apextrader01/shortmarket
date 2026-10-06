@@ -107,10 +107,9 @@ Ministry of Electronics and Information Technology (MeitY), Government of India
 Subject: Formal Statutory Notification of Personal Data Incident — SkandX Technologies Pvt. Ltd.
 
 1. DATA FIDUCIARY IDENTIFIERS:
-   - Organization Name: SkandX Technologies Private Limited
-   - Corporate Identity Number (CIN): [LEGAL REVIEW REQUIRED: CIN-U72900KA2026PTC000000]
-   - Registered Office: Level 5, Cyber City, Bangalore, Karnataka 560100, India
-    - Data Protection Officer (DPO): Mr. H. R. Sharma (skandx.in@gmail.com / +91 80 4567 8900)
+   - Organization Name: SkandX
+   - Registered Office: SkandX, Thiruvananthapuram (Trivandrum), Kerala, India
+   - Data Protection Officer (DPO): Harikrishnan (skandx.in@gmail.com / +91 94978 61379)
 
 2. INCIDENT SUMMARY:
    - Date and Time of Incident Detection: [YYYY-MM-DD, HH:MM IST]
@@ -144,11 +143,11 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
    - Dispatch Schedule: Commenced on [YYYY-MM-DD, HH:MM IST].
 
 7. CONTACT POINT FOR REGULATORY INQUIRIES:
-   - Contact Person: Mr. H. R. Sharma (Grievance Redressal Officer & DPO)
+   - Contact Person: Harikrishnan (Grievance & Data Protection Officer)
    - Email: skandx.in@gmail.com
-   - Direct Phone: +91 80 4567 8900
+   - Direct Phone: +91 94978 61379
 
-Submitted for and on behalf of SkandX Technologies Private Limited,
+Submitted for and on behalf of SkandX,
 Authorized Signatory / Data Protection Officer
 Date: [YYYY-MM-DD]
 ```
@@ -192,9 +191,9 @@ While passwords were encrypted, as an immediate precautionary measure, we recomm
 
 5. FOR MORE INFORMATION & DEDICATED SUPPORT:
 If you have any questions or wish to exercise your statutory rights to review your personal records under the DPDP Act, our dedicated privacy response team is available to assist you:
-- Dedicated Security Helpline: 1800 123 4567 (Toll-Free, 9:00 AM – 9:00 PM IST)
+- Dedicated Legal & Support Phone: +91 94978 61379 (9:00 AM – 6:00 PM IST)
 - Official Email: skandx.in@gmail.com
-- Grievance Redressal Portal: https://skandx.in/legal?tab=data-rights
+- Grievance Redressal Portal: https://skandx.in/privacy-policy
 
 We sincerely regret any inconvenience or concern this incident may cause, and we remain fully committed to protecting your trading experience with industry-leading security controls.
 

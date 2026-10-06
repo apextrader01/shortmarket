@@ -438,14 +438,16 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#d1d5db' }}>
                   In accordance with Section 13 of the Digital Personal Data Protection Act, 2023, you may contact our designated Grievance Officer for privacy inquiries or rights enforcement:
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', fontSize: '13px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '13px' }}>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Officer Name:</span><br />
                     <strong style={{ color: '#fff' }}>Harikrishnan (Grievance & Data Protection Officer)</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#9ca3af' }}>Official Email:</span><br />
+                    <span style={{ color: '#9ca3af' }}>Official Email & Phone:</span><br />
                     <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>skandx.in@gmail.com</a>
+                    <span style={{ color: '#6b7280' }}> • </span>
+                    <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>+91 94978 61379</a>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Office Address:</span><br />
@@ -504,7 +506,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   <strong>5.1 Obligations of the Data Fiduciary:</strong> SkandX acts as a responsible Data Fiduciary under the Digital Personal Data Protection Act, 2023. We implement reasonable technical and organizational safeguards—including 256-bit TLS transit encryption, bcrypt password hashing, advisory transaction locking, and VPC firewalling—to safeguard user data against unauthorized access, destruction, or disclosure.
                 </p>
                 <p style={{ margin: '0 0 10px 0', fontSize: '13.5px' }}>
-                  <strong>5.2 Data Principal Rights:</strong> Users maintain the right to access, review, port, and rectify their personal records, and to request account erasure in accordance with statutory rules. Requests may be lodged via our interactive Data Rights Portal or by emailing <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8' }}>skandx.in@gmail.com</a>.
+                  <strong>5.2 Data Principal Rights:</strong> Users maintain the right to access, review, port, and rectify their personal records, and to request account erasure in accordance with statutory rules. Requests may be lodged via our interactive Data Rights Portal, by emailing <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8' }}>skandx.in@gmail.com</a>, or by calling <a href="tel:+919497861379" style={{ color: '#38bdf8' }}>+91 94978 61379</a>.
                 </p>
                 <p style={{ margin: '0 0 10px 0', fontSize: '13.5px' }}>
                   <strong>5.3 Security Incident Protocol:</strong> In the event of a verified personal data breach impacting user confidentiality, SkandX shall provide timely notification to the Data Protection Board of India and affected Data Principals in the form and manner prescribed by statutory law.
@@ -797,7 +799,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                     Submit Account Deletion Request
                   </button>
                   <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0' }}>
-                    Alternatively, email us directly at <strong style={{ color: '#10b981' }}>skandx.in@gmail.com</strong> with the subject "Delete Account".
+                    Alternatively, email us directly at <strong style={{ color: '#10b981' }}>skandx.in@gmail.com</strong> or call <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>+91 94978 61379</a> with the subject "Delete Account".
                   </p>
                 </form>
               )}
@@ -895,6 +897,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
                 <div>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Legal & Support Phone:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 94978 61379</a></div>
                 <div style={{ marginTop: '6px' }}>🏢 <strong>Office Location:</strong> Thiruvananthapuram (Trivandrum), Kerala, India</div>
               </div>
             </div>
@@ -905,7 +908,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         {/* Footer with Grievance Contact */}
         <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '12px', lineHeight: '1.8' }}>
           <div>&copy; 2026 SkandX. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
-          <div>Grievance Redressal Officer: Harikrishnan (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a>) | Thiruvananthapuram (Trivandrum), Kerala, India</div>
+          <div>Grievance Redressal Officer: Harikrishnan (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 94978 61379</a>) | Thiruvananthapuram (Trivandrum), Kerala, India</div>
         </div>
 
       </div>
