@@ -6,6 +6,8 @@ import { auth } from '../firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
+const googleProvider = new GoogleAuthProvider();
+
 export default function LoginView() {
   const { login, preLogin, sendLoginEmailOtp, verify2FA, register, sendRegistrationOtp, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ 
     login: state.login, 
@@ -384,8 +386,18 @@ export default function LoginView() {
 
       try {
         let activeIdToken = googleIdToken;
-        if (auth.currentUser) {
-          activeIdToken = await auth.currentUser.getIdToken().catch(() => googleIdToken);
+        if (auth?.currentUser) {
+          try {
+            activeIdToken = await auth.currentUser.getIdToken(true);
+          } catch (_) {
+            activeIdToken = googleIdToken;
+          }
+        }
+        if (!activeIdToken) {
+          useStore.setState({ authError: 'Google session expired. Please log in with Google again.' });
+          setView('login');
+          setLoading(false);
+          return;
         }
         const res = await fetch(`${API}/api/auth/google-login`, {
           method: 'POST',
@@ -499,12 +511,14 @@ export default function LoginView() {
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
     useStore.setState({ authError: null });
+    setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
+      if (!auth) {
+        throw new Error('Authentication service is initializing. Please refresh the page.');
+      }
+      // Instant popup trigger directly in the user click event
+      const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();
 
       const res = await fetch(`${API}/api/auth/google-login`, {
@@ -532,9 +546,22 @@ export default function LoginView() {
       }
       window.location.reload();
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        useStore.setState({ authError: err.message || 'Google sign-in failed' });
+      console.warn('Google sign-in error:', err);
+      // Ignore when user deliberately closes or cancels the popup
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return;
       }
+      let userFriendlyMsg = 'Google sign-in failed. Please try again.';
+      if (err.code === 'auth/popup-blocked') {
+        userFriendlyMsg = 'Pop-up was blocked by your browser. Please allow pop-ups for skandx.in (look for the pop-up icon in your address bar), or log in with Email & Password.';
+      } else if (err.code === 'auth/network-request-failed') {
+        userFriendlyMsg = 'Network connection issue. Please check your internet connection and try again.';
+      } else if (err.message && (err.message.includes('missing initial state') || err.message.includes('sessionStorage'))) {
+        userFriendlyMsg = 'Browser privacy settings prevented Google login. Please log in directly using Email & Password or standard Chrome.';
+      } else if (err.message) {
+        userFriendlyMsg = err.message;
+      }
+      useStore.setState({ authError: userFriendlyMsg });
     } finally {
       setLoading(false);
     }
