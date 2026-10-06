@@ -7,16 +7,16 @@ let fetchingPromise = null;
 let adsenseScriptInjected = false;
 
 function injectAdSenseScript(clientId) {
-  if (typeof document === 'undefined') return;
+  if (!clientId || typeof document === 'undefined') return;
+  const cleanId = String(clientId).trim();
+  if (!cleanId.startsWith('ca-pub-')) return;
   if (!document.getElementById('skandx-adsense-unfilled-css')) {
     const style = document.createElement('style');
     style.id = 'skandx-adsense-unfilled-css';
     style.textContent = 'ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; height: 0 !important; min-height: 0 !important; }';
     document.head.appendChild(style);
   }
-  if (!clientId || adsenseScriptInjected) return;
-  const cleanId = String(clientId).trim();
-  if (!cleanId.startsWith('ca-pub-')) return;
+  if (adsenseScriptInjected) return;
   if (document.querySelector(`script[src*="adsbygoogle.js"]`)) {
     adsenseScriptInjected = true;
     return;
@@ -79,7 +79,7 @@ export function useAdConfig() {
           }
           return cachedAdConfig;
         })
-        .catch(() => null)
+        .catch(() => ({ enabled: false, interstitial_enabled: false, reward_enabled: false }))
         .finally(() => { fetchingPromise = null; });
     }
     fetchingPromise.then(cfg => {
@@ -172,6 +172,16 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
   const mode = triggerContext?.mode || 'reward'; // 'reward' | 'post_order' | 'pre_exit'
   const cleanSymbol = (triggerContext?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
 
+  const executePreExitProceed = () => {
+    if (autoProceededRef.current) return;
+    autoProceededRef.current = true;
+    if (typeof onClose === 'function') onClose();
+    if (typeof triggerContext?.onProceed === 'function') {
+      window.__lastPreExitAdTs = Date.now();
+      triggerContext.onProceed();
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     setSecondsLeft(duration);
@@ -211,13 +221,8 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
       });
     }
     if (mode === 'pre_exit' && !autoProceededRef.current) {
-      autoProceededRef.current = true;
       const timer = setTimeout(() => {
-        if (typeof onClose === 'function') onClose();
-        if (typeof triggerContext?.onProceed === 'function') {
-          window.__lastPreExitAdTs = Date.now();
-          triggerContext.onProceed();
-        }
+        executePreExitProceed();
       }, 350);
       return () => clearTimeout(timer);
     }
@@ -795,11 +800,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                       disabled={secondsLeft > 0}
                       onClick={() => {
                         if (secondsLeft > 0) return;
-                        onClose();
-                        if (typeof triggerContext?.onProceed === 'function') {
-                          window.__lastPreExitAdTs = Date.now();
-                          triggerContext.onProceed();
-                        }
+                        executePreExitProceed();
                       }}
                       style={{
                         width: '100%',

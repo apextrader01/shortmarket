@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import AnalyticsView from './AnalyticsView';
 const TradingJournalView = React.lazy(() => import('./TradingJournalView'));
 import MutualFundDetailsModal from './MutualFundDetailsModal';
+import { triggerPreExitAd } from './AdBannerWidget';
 import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 import { 
   Briefcase, 
@@ -127,21 +128,9 @@ export default function PortfolioView() {
       symbol: rawSym,
       initialMode: mode
     });
-    if (mode === 'REDEEM' && typeof window !== 'undefined') {
-      const currentUser = useStore.getState().user;
-      const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
-      const isAdFree = currentUser && paidTiers.includes(String(currentUser.subscription_tier || '').toUpperCase());
-      if (!isAdFree) {
-        window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
-          detail: {
-            mode: 'pre_exit',
-            symbol: rawSym,
-            side: 'REDEEM',
-            onProceed: openMf
-          }
-        }));
-        return;
-      }
+    if (mode === 'REDEEM') {
+      triggerPreExitAd(openMf, { symbol: rawSym, side: 'REDEEM' });
+      return;
     }
     openMf();
   };

@@ -238,7 +238,7 @@ export function applyDynamicSEO(pathname = '/') {
   const cleanPath = (pathname || '/').toLowerCase().replace(/\/+$/, '') || '/';
   const matchedSeo = SEO_ROUTES[cleanPath];
   const seo = matchedSeo || SEO_ROUTES['/'];
-  const canonicalUrl = `https://skandx.in${cleanPath === '/' ? '' : cleanPath}`;
+  const canonicalUrl = cleanPath === '/' ? 'https://skandx.in/' : `https://skandx.in${cleanPath}`;
 
   // 1. Update Document Title only if this route has an explicit SEO entry
   if (matchedSeo) {

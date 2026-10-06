@@ -2266,12 +2266,12 @@ export default function AdminDashboard() {
   }, [activeTab, isLiveTelemetry, telemetryTimeframe]);
 
   useEffect(() => {
-    if (activeTab !== 'ads' || !adConfig.internal_counter_enabled) return;
+    if (activeTab !== 'ads') return;
     const interval = setInterval(() => {
       fetchAdminAdConfig(true);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(interval);
-  }, [activeTab, adConfig.internal_counter_enabled]);
+  }, [activeTab]);
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
@@ -4620,7 +4620,7 @@ export default function AdminDashboard() {
                     </div>
                     SkandX's internal Direct Sponsor banner & internal ad-box counter are currently turned <b>OFF</b> so you only focus on <b>Google AdSense</b> revenue.<br /><br />
                     • <b>Top Terminal Banner:</b> Stays completely invisible (0px height) until Google AdSense injects a real filled ad.<br />
-                    • <b>30s Reward & Action Popups:</b> Shows your Google AdSense unit (`{adConfig.adsense_rewarded_slot}`) without internal sponsor promo text.<br /><br />
+                    • <b>30s Reward & Action Popups:</b> Shows your Google AdSense unit (<code style={{ color: '#38bdf8' }}>{adConfig.adsense_rewarded_slot}</code>) without internal sponsor promo text.<br /><br />
                     Once Google AdSense finishes reviewing <b>skandx.in</b> (status changes from <i>"Getting ready"</i> to <i>"Ready"</i>), all impressions, clicks, and earnings will appear directly in your <b>Google AdSense Dashboard</b>.
                   </div>
                 ) : (

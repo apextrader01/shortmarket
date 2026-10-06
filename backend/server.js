@@ -10913,10 +10913,6 @@ app.get('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, re
     const totalAmountCredited = Number(totalRewardsRow?.total_amount || 0);
     const todayClaimsDb = Number(todayRewardsRow?.cnt || 0);
 
-    if (adConfigCache.internal_counter_enabled) {
-      adConfigCache.reward_claims = Math.max(Number(adConfigCache.reward_claims || 0), totalClaimsDb);
-    }
-
     res.json({
       success: true,
       config: {
