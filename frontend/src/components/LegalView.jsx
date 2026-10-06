@@ -333,10 +333,6 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           {/* TAB 1: PRIVACY POLICY & NOTICE */}
           {activeTab === 'privacy' && (
             <div>
-              <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '12px', color: '#fde047' }}>
-                ⚖️ <strong>[LEGAL REVIEW REQUIRED - PRELIMINARY COMPLIANCE DRAFT]:</strong> This Privacy Notice is drafted to fulfill statutory obligations under the <em>Digital Personal Data Protection Act, 2023 (DPDP Act)</em>, SEBI Master Circulars on Cybersecurity, and global privacy benchmarks. Company legal counsel must confirm regulatory registration IDs and operating entities prior to final filing.
-              </div>
-
               <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '4px' }}>
                 Privacy Notice & Data Protection Policy
               </h1>
@@ -346,7 +342,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>1. Introduction & Data Fiduciary Details</h2>
               <p>
-                SkandX Technologies Private Limited ("SkandX", "we", "our", or "us"), operating the web trading terminal at <strong>https://skandx.in</strong> and the <strong>SkandX Mobile Applications</strong>, acts as the <strong>Data Fiduciary</strong> in respect of your personal data as defined under the Digital Personal Data Protection Act, 2023.
+                SkandX ("SkandX", "we", "our", or "us"), operating the web trading terminal at <strong>https://skandx.in</strong> and the <strong>SkandX Mobile Applications</strong>, acts as the <strong>Data Fiduciary</strong> in respect of your personal data as defined under the Digital Personal Data Protection Act, 2023.
               </p>
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>2. Personal Data We Collect</h2>
@@ -445,7 +441,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', fontSize: '13px' }}>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Officer Name:</span><br />
-                    <strong style={{ color: '#fff' }}>Mr. H. R. Sharma (Data Protection Officer)</strong>
+                    <strong style={{ color: '#fff' }}>Harikrishnan (Grievance & Data Protection Officer)</strong>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Official Email:</span><br />
@@ -453,7 +449,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Office Address:</span><br />
-                    <span style={{ color: '#fff' }}>SkandX Technologies Pvt. Ltd., Level 5, Cyber City, Bangalore, KA 560100</span>
+                    <span style={{ color: '#fff' }}>SkandX, Thiruvananthapuram (Trivandrum), Kerala, India</span>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Statutory Response SLA:</span><br />
@@ -470,10 +466,6 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           {/* TAB 2: TERMS OF SERVICE */}
           {activeTab === 'terms' && (
             <div>
-              <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '12px', color: '#fde047' }}>
-                ⚖️ <strong>[LEGAL REVIEW REQUIRED - PRELIMINARY COMPLIANCE DRAFT]:</strong> Terms of Service include updated Section 5 governing Data Protection & Privacy Rights under Indian Law.
-              </div>
-
               <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
                 Terms and Conditions of Use
               </h1>
@@ -506,7 +498,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
               {/* SECTION 5: DATA PROTECTION CLAUSE */}
               <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '20px', borderRadius: '10px', marginTop: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#38bdf8', margin: '0 0 10px 0' }}>
-                  5. Data Protection, Privacy & Information Security Clause [LEGAL REVIEW REQUIRED]
+                  5. Data Protection, Privacy & Information Security Clause
                 </h2>
                 <p style={{ margin: '0 0 10px 0', fontSize: '13.5px' }}>
                   <strong>5.1 Obligations of the Data Fiduciary:</strong> SkandX acts as a responsible Data Fiduciary under the Digital Personal Data Protection Act, 2023. We implement reasonable technical and organizational safeguards—including 256-bit TLS transit encryption, bcrypt password hashing, advisory transaction locking, and VPC firewalling—to safeguard user data against unauthorized access, destruction, or disclosure.
@@ -903,8 +895,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
                 <div>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
-                <div style={{ marginTop: '6px' }}>📞 <strong>Toll Free Assistance:</strong> <a href="tel:18001234567" style={{ color: 'inherit', textDecoration: 'none' }}>1800 123 4567</a></div>
-                <div style={{ marginTop: '6px' }}>🏢 <strong>Physical Address:</strong> Level 4, Trade Centre, Financial District, Mumbai - 400051</div>
+                <div style={{ marginTop: '6px' }}>🏢 <strong>Office Location:</strong> Thiruvananthapuram (Trivandrum), Kerala, India</div>
               </div>
             </div>
           )}
@@ -913,8 +904,8 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
 
         {/* Footer with Grievance Contact */}
         <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '12px', lineHeight: '1.8' }}>
-          <div>&copy; 2026 SkandX Technologies Pvt. Ltd. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
-          <div>Grievance Redressal Officer: <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | Toll Free: 1800 123 4567 | Level 5, Cyber City, Bangalore, KA 560100</div>
+          <div>&copy; 2026 SkandX. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
+          <div>Grievance Redressal Officer: Harikrishnan (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a>) | Thiruvananthapuram (Trivandrum), Kerala, India</div>
         </div>
 
       </div>
