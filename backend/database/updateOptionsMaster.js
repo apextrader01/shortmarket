@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const zlib = require('zlib');
 
 const FYERS_URLS = [
     'https://public.fyers.in/sym_details/NSE_FO.csv',
@@ -10,23 +11,49 @@ const FYERS_URLS = [
     'https://public.fyers.in/sym_details/BSE_CM.csv'
 ];
 
-async function downloadCSV(url, timeoutMs = 25000) {
+function downloadCSVOnce(url, timeoutMs = 45000) {
     return new Promise((resolve, reject) => {
-        const req = https.get(url, { timeout: timeoutMs }, (res) => {
+        const req = https.get(url, {
+            timeout: timeoutMs,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/csv,*/*',
+                'Accept-Encoding': 'gzip, deflate'
+            }
+        }, (res) => {
             if (res.statusCode !== 200) {
                 res.resume();
                 return reject(new Error(`Failed to fetch ${url} (HTTP ${res.statusCode})`));
             }
+            const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+            let stream = res;
+            if (encoding === 'gzip') {
+                stream = res.pipe(zlib.createGunzip());
+            } else if (encoding === 'deflate') {
+                stream = res.pipe(zlib.createInflate());
+            }
             const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-            res.on('error', reject);
+            stream.on('data', chunk => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+            stream.on('error', reject);
         });
         req.on('timeout', () => {
             req.destroy(new Error(`Timeout fetching ${url} after ${timeoutMs}ms`));
         });
         req.on('error', reject);
     });
+}
+
+async function downloadCSV(url, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            return await downloadCSVOnce(url, 60000);
+        } catch (err) {
+            console.warn(`[updateOptionsMaster] Attempt ${attempt}/${retries} failed for ${url}: ${err.message}`);
+            if (attempt === retries) throw err;
+            await new Promise(r => setTimeout(r, 1500 * attempt));
+        }
+    }
 }
 
 async function updateOptionsMaster() {
@@ -140,15 +167,27 @@ async function updateOptionsMaster() {
         }
     }
 
-    // Sort futures chronologically first so nearest active contract is always at index 0
+    // Sort futures chronologically first and filter out expired futures so nearest active contract is always at index 0
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     for (const name of Object.keys(futures)) {
         futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);
+        const active = futures[name].filter(f => f.expiry >= todayStr);
+        if (active.length > 0) {
+            futures[name] = active;
+        }
     }
 
     // Generate lotsizeMap.json using the nearest active expiry (sorted chronologically)
-    const lotsizeMap = {};
+    // Seed with existing lotsizeMap on disk so a transient failure on one CSV never wipes existing lot sizes
+    let lotsizeMap = {};
+    const backendMapPath = path.join(__dirname, 'lotsizeMap.json');
+    try {
+        if (fs.existsSync(backendMapPath)) {
+            lotsizeMap = JSON.parse(fs.readFileSync(backendMapPath, 'utf8')) || {};
+        }
+    } catch (_) {}
+
     for (const underlying of Object.keys(options)) {
         const allExps = Object.keys(options[underlying]).sort();
         const activeExps = allExps.filter(e => e >= todayStr);
@@ -162,9 +201,9 @@ async function updateOptionsMaster() {
         }
     }
     for (const underlying of Object.keys(futures)) {
-        if (!lotsizeMap[underlying] && futures[underlying] && futures[underlying].length > 0) {
+        if (futures[underlying] && futures[underlying].length > 0) {
             const activeFut = futures[underlying].find(f => f.expiry >= todayStr) || futures[underlying][0];
-            if (activeFut && activeFut.lotsize) {
+            if (activeFut && activeFut.lotsize && (!options[underlying] || !lotsizeMap[underlying])) {
                 lotsizeMap[underlying] = Number(activeFut.lotsize) || 1;
             }
         }
@@ -172,25 +211,32 @@ async function updateOptionsMaster() {
 
     // ⚡ Slim options data: keep active expiries & ATM ± strikes (slims from 16MB to ~2.6MB)
     const { slim: slimmedOptions, keptCount } = slimOptionsData(options, mcxUnderlyings);
-    fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(slimmedOptions));
-    console.log(`Saved ${keptCount} Option contracts to options.json (Slimmed from ${count} contracts)!`);
+    if (keptCount > 0) {
+        fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(slimmedOptions));
+        console.log(`Saved ${keptCount} Option contracts to options.json (Slimmed from ${count} contracts)!`);
+    }
 
     fs.writeFileSync(path.join(__dirname, 'spots.json'), '{}');
 
-    fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
-    console.log(`Saved ${futCount} Future contracts to futures.json!`);
+    if (futCount > 0) {
+        fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
+        console.log(`Saved ${futCount} Future contracts to futures.json!`);
+    }
 
-    fs.writeFileSync(path.join(__dirname, 'stocks.json'), JSON.stringify(stocks));
-    console.log(`Saved ${stocks.length} Stock contracts to stocks.json!`);
+    if (stocks.length > 0) {
+        fs.writeFileSync(path.join(__dirname, 'stocks.json'), JSON.stringify(stocks));
+        console.log(`Saved ${stocks.length} Stock contracts to stocks.json!`);
+    }
 
-    const backendMapPath = path.join(__dirname, 'lotsizeMap.json');
-    fs.writeFileSync(backendMapPath, JSON.stringify(lotsizeMap, null, 2));
-    console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to backend lotsizeMap.json!`);
+    if (Object.keys(lotsizeMap).length > 0) {
+        fs.writeFileSync(backendMapPath, JSON.stringify(lotsizeMap, null, 2));
+        console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to backend lotsizeMap.json!`);
 
-    const frontendMapPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'lotsizeMap.json');
-    if (fs.existsSync(path.dirname(frontendMapPath))) {
-        fs.writeFileSync(frontendMapPath, JSON.stringify(lotsizeMap, null, 2));
-        console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to frontend lotsizeMap.json!`);
+        const frontendMapPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'lotsizeMap.json');
+        if (fs.existsSync(path.dirname(frontendMapPath))) {
+            fs.writeFileSync(frontendMapPath, JSON.stringify(lotsizeMap, null, 2));
+            console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to frontend lotsizeMap.json!`);
+        }
     }
 }
 

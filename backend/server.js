@@ -6885,8 +6885,18 @@ app.get('/api/options/chain/:symbol', async (req, res) => {
       return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
     }
 
+    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayStr = `${nowIst.getFullYear()}-${String(nowIst.getMonth() + 1).padStart(2, '0')}-${String(nowIst.getDate()).padStart(2, '0')}`;
+    const rawChain = cachedOptionsData[symbol];
+    const activeChain = {};
+    for (const [exp, strikes] of Object.entries(rawChain)) {
+      if (exp >= todayStr) {
+        activeChain[exp] = strikes;
+      }
+    }
+
     res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    res.json(cachedOptionsData[symbol]);
+    res.json(Object.keys(activeChain).length > 0 ? activeChain : rawChain);
   } catch (err) {
     console.error('/api/options/chain Error:', err.message);
     res.status(500).json({ error: 'Internal server error' });

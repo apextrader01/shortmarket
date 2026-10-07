@@ -3,11 +3,11 @@
     "BANKNIFTY": 20,
     "NIFTY": 27,
     "FINNIFTY": 30,
-    "MIDCPNIFTY": 28,
-    "MIDCAPNIFTY": 28,
+    "MIDCPNIFTY": 23,
+    "MIDCAPNIFTY": 23,
     "NIFTYNXT50": 24,
-    "SENSEX": 1000,
-    "BANKEX": 1000
+    "SENSEX": 50,
+    "BANKEX": 30
   },
   "STOCK_MAX_LOTS": 40,
   "COMMODITY_FREEZE_LIMITS": {

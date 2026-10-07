@@ -49,7 +49,8 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
     return lot > 1 ? lot * maxLots : 1800;
   }
   if (upper.startsWith('MIDCPNIFTY') || upper.includes('MIDCPNIFTY') || upper.startsWith('MIDCAPNIFTY') || upper.includes('MIDCAPNIFTY')) {
-    return 2800;
+    const maxLots = indexMaxLots.MIDCPNIFTY || indexMaxLots.MIDCAPNIFTY || 23;
+    return lot > 1 ? lot * maxLots : 2760;
   }
   if (upper.startsWith('NIFTYNXT50') || upper.includes('NIFTYNXT50') || upper.includes('NIFTYJR')) {
     const maxLots = indexMaxLots.NIFTYNXT50 || 24;
@@ -60,10 +61,12 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
     return lot > 1 ? lot * maxLots : 1755;
   }
   if (upper.startsWith('SENSEX') || upper.includes('SENSEX')) {
-    return indexMaxLots.SENSEX || 1000;
+    const maxLots = (indexMaxLots.SENSEX && indexMaxLots.SENSEX <= 200) ? indexMaxLots.SENSEX : 50;
+    return lot > 1 ? lot * maxLots : 1000;
   }
   if (upper.startsWith('BANKEX') || upper.includes('BANKEX')) {
-    return indexMaxLots.BANKEX || 1000;
+    const maxLots = (indexMaxLots.BANKEX && indexMaxLots.BANKEX <= 200) ? indexMaxLots.BANKEX : 30;
+    return lot > 1 ? lot * maxLots : 900;
   }
 
   // 3. Stock F&O (Derivatives: Futures & Options for individual stocks)
