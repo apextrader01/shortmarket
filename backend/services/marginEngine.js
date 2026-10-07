@@ -1,4 +1,4 @@
-const { resolveSingleLotSize } = require('./instrumentsCache');
+const { resolveSingleLotSize, getDiskLotsizeMap } = require('./instrumentsCache');
 
 // Fast O(1) lot size lookup using instrumentsCache
 function lookupDerivativeBySymbol(symbol) {
@@ -47,38 +47,37 @@ function calculateRequiredMargin(symbol, product_type, side, quantity, price, as
     return Number(quantity || 0) * Number(price || 0);
 }
 
-let lotsizeMap = {};
-try {
-    const lotsPath = require('path').join(__dirname, '..', 'database', 'lotsizeMap.json');
-    if (require('fs').existsSync(lotsPath)) {
-        lotsizeMap = JSON.parse(require('fs').readFileSync(lotsPath, 'utf8'));
-    }
-} catch (e) {}
-
 function getLotSize(symbol) {
     if (!symbol) return 1;
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
 
-    // 1. Lookup lot size from instruments master
+    // 1. Live lookup from in-memory instrumentsCache (contract-exact + reloaded lotsizeMap)
+    const cachedLot = resolveSingleLotSize(symbol);
+    if (cachedLot && cachedLot > 1) {
+        return Math.max(1, Number(cachedLot) || 1);
+    }
+
+    // 2. Lookup lot size from instruments master
     const deriv = lookupDerivativeBySymbol(symbol) || lookupDerivativeBySymbol(cleanSym);
-    if (deriv && deriv.lotsize) {
+    if (deriv && deriv.lotsize && Number(deriv.lotsize) > 1) {
         return Math.max(1, Number(deriv.lotsize) || 1);
     }
 
-    // 2. Lookup in lotsizeMap.json
-    if (lotsizeMap[cleanSym]) return Math.max(1, Number(lotsizeMap[cleanSym]) || 1);
-    const sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+    // 3. Lookup in live reloaded lotsizeMap.json
+    const liveMap = getDiskLotsizeMap() || {};
+    if (liveMap[cleanSym]) return Math.max(1, Number(liveMap[cleanSym]) || 1);
+    const sortedKeys = Object.keys(liveMap).sort((a, b) => b.length - a.length);
     for (const key of sortedKeys) {
-        if (cleanSym.startsWith(key)) return Math.max(1, Number(lotsizeMap[key]) || 1);
+        if (cleanSym.startsWith(key)) return Math.max(1, Number(liveMap[key]) || 1);
     }
 
-    // 3. Fallback estimates for indices
-    if (cleanSym.startsWith('SENSEX')) return 10;
-    if (cleanSym.startsWith('BANKNIFTY')) return 15;
-    if (cleanSym.startsWith('NIFTY')) return 25;
-    if (cleanSym.startsWith('FINNIFTY')) return 25;
-    if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 50;
-    if (cleanSym.startsWith('BSE') || cleanSym.startsWith('BANKEX')) return 10;
+    // 4. Fallback estimates for indices
+    if (cleanSym.startsWith('SENSEX')) return 20;
+    if (cleanSym.startsWith('BANKNIFTY')) return 30;
+    if (cleanSym.startsWith('NIFTY')) return 65;
+    if (cleanSym.startsWith('FINNIFTY')) return 60;
+    if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 120;
+    if (cleanSym.startsWith('BSE') || cleanSym.startsWith('BANKEX')) return 30;
     return 1;
 }
 

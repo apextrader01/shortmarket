@@ -941,10 +941,22 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
   try {
     const { getLotSizes } = require('./services/instrumentsCache');
     const result = getLotSizes(symbols);
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(result);
   } catch (err) {
     console.error('/api/lotsizes Error:', err);
+    res.json({});
+  }
+});
+
+app.get('/api/stocks/lotsize-map', async (req, res) => {
+  try {
+    const { getDiskLotsizeMap } = require('./services/instrumentsCache');
+    const map = getDiskLotsizeMap() || {};
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(map);
+  } catch (err) {
+    console.error('/api/stocks/lotsize-map Error:', err);
     res.json({});
   }
 });
@@ -6844,6 +6856,9 @@ async function loadOptionsAndFuturesCache() {
     }
     if (futRaw) {
       cachedFuturesData = JSON.parse(futRaw);
+    }
+    if (typeof localSearchLRU !== 'undefined' && localSearchLRU && typeof localSearchLRU.clear === 'function') {
+      localSearchLRU.clear();
     }
     console.log(`⚡ [Cache Loaded] Options (${cachedOptionsSymbols.length} underlyings) & Futures in memory.`);
   } catch (err) {
@@ -13774,8 +13789,25 @@ server.listen(PORT, async () => {
       }, 5 * 60 * 1000);
       // ---------------------------------
 
-      // Update options master in background
-      updateOptionsMaster().catch(e => console.error(e));
+      // Update options master in background & refresh all live in-memory lotsize/contract caches
+      const refreshAllContractCaches = async () => {
+        try {
+          const { initializeCache, getDiskLotsizeMap } = require('./services/instrumentsCache');
+          initializeCache();
+          await loadOptionsAndFuturesCache();
+          await loadInstrumentMaster(true);
+          if (typeof io !== 'undefined' && io) {
+            io.emit('lotsize_map_updated', getDiskLotsizeMap() || {});
+          }
+          console.log('✅ All in-memory contract & lotsize caches refreshed and broadcasted to clients.');
+        } catch (err) {
+          console.error('Error refreshing contract caches after master update:', err);
+        }
+      };
+
+      updateOptionsMaster()
+        .then(() => refreshAllContractCaches())
+        .catch(e => console.error(e));
     
     // Start Cron Jobs
     const { startSquareOffJobs } = require('./services/autoSquareOff');
@@ -13824,6 +13856,7 @@ server.listen(PORT, async () => {
       console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
       try {
         await updateOptionsMaster();
+        await refreshAllContractCaches();
       } catch(e) { console.error('Options Master update cron error:', e); }
     });
 

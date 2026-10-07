@@ -1,15 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-
-let lotsizeMap = {};
-try {
-    const lotsPath = path.join(__dirname, '..', 'database', 'lotsizeMap.json');
-    if (fs.existsSync(lotsPath)) {
-        lotsizeMap = JSON.parse(fs.readFileSync(lotsPath, 'utf8'));
-    }
-} catch (e) {
-    console.error('Failed to load lotsizeMap in taxCalculator:', e);
-}
+const { resolveSingleLotSize, getDiskLotsizeMap } = require('./instrumentsCache');
 
 function isDerivativeContract(sym) {
     if (!sym || typeof sym !== 'string') return false;
@@ -31,11 +22,14 @@ function getInstantLotsize(sym) {
     const isDeriv = isDerivativeContract(sym);
     const isComm = isCommodityContract(sym);
     if (!isDeriv && !isComm) return 1;
+    const resolved = resolveSingleLotSize(sym);
+    if (resolved && resolved > 1) return resolved;
     const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
-    if (lotsizeMap[clean]) return lotsizeMap[clean];
-    const sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+    const liveMap = getDiskLotsizeMap() || {};
+    if (liveMap[clean]) return liveMap[clean];
+    const sortedKeys = Object.keys(liveMap).sort((a, b) => b.length - a.length);
     for (const key of sortedKeys) {
-        if (clean.startsWith(key)) return lotsizeMap[key];
+        if (clean.startsWith(key)) return liveMap[key];
     }
     return 1;
 }

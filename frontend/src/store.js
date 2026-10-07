@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
-import { getInstantLotsize } from './utils/lotsizeHelper';
+import { getInstantLotsize, updateLiveLotsizeMap, syncLiveLotsizeMap, setContractLotsize } from './utils/lotsizeHelper';
 import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
 import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
 import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
@@ -692,6 +692,9 @@ export const useStore = create(persist((set, get) => ({
 
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null },
   openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null) => {
+    if (lotsize && Number(lotsize) > 1 && symbol) {
+      setContractLotsize(symbol, Number(lotsize));
+    }
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
     const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
     if (isExit && typeof window !== 'undefined') {
@@ -1047,6 +1050,20 @@ export const useStore = create(persist((set, get) => ({
       set({ alerts: [] });
     });
 
+    socket.off('lotsize_map_updated');
+    socket.on('lotsize_map_updated', (mapData) => {
+      if (mapData && typeof mapData === 'object') {
+        updateLiveLotsizeMap(mapData);
+        const currentSym = get().orderModal?.symbol;
+        if (get().orderModal?.isOpen && currentSym) {
+          const updatedLs = getInstantLotsize(currentSym);
+          if (updatedLs > 1 && updatedLs !== get().orderModal?.lotsize) {
+            get().setOrderModalLotsize(updatedLs);
+          }
+        }
+      }
+    });
+
     socket.off('trade_alert');
     socket.on('trade_alert', (data) => {
       if (!data) return;
@@ -1065,6 +1082,7 @@ export const useStore = create(persist((set, get) => ({
       if (currentUser?.id) {
         socket.emit('register_user', currentUser.id);
       }
+      syncLiveLotsizeMap(API).catch(() => {});
       get().fetchMarketStatus();
       get().fetchMarketCalendar();
       get().fetchTodayMarketSchedule();

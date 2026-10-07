@@ -108,6 +108,12 @@ function initializeCache() {
     
     cachedAllStocksJson = JSON.stringify(cachedAllStocks);
     cachedAllStocksETag = `"${crypto.createHash('md5').update(cachedAllStocksJson).digest('hex')}"`;
+
+    // Invalidate & reload disk lotsize map and F&O eligibility set so daily updates take effect immediately
+    diskLotsizeMap = null;
+    sortedDiskLotKeys = null;
+    cachedFnoSet = null;
+    getDiskLotsizeMap();
     
     console.log(`Loaded ${allInstruments.length} instruments into memory after filtering duplicates.`);
     if (typeof global.gc === 'function') {
@@ -115,11 +121,10 @@ function initializeCache() {
     }
 }
 
-// Initial load
-initializeCache();
-
 let diskLotsizeMap = null;
 let sortedDiskLotKeys = null;
+let cachedFnoSet = null;
+
 function getDiskLotsizeMap() {
     if (!diskLotsizeMap) {
         try {
@@ -138,6 +143,9 @@ function getDiskLotsizeMap() {
     }
     return diskLotsizeMap;
 }
+
+// Initial load
+initializeCache();
 
 function resolveSingleLotSize(sym) {
     if (!sym) return 1;
@@ -247,7 +255,6 @@ function isCommodityContract(sym) {
     return COMMODITIES_LIST.some(c => clean.startsWith(c));
 }
 
-let cachedFnoSet = null;
 function isFnoEligibleStock(sym) {
     if (!sym || typeof sym !== 'string') return false;
     if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;
@@ -419,5 +426,6 @@ module.exports = {
     getAssetSubsegment,
     isMCXWinterSession,
     checkPositionConversionAllowed,
-    resolveSingleLotSize
+    resolveSingleLotSize,
+    getDiskLotsizeMap
 };

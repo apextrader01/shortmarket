@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, FileText, ShoppingBag, AlertTriangle } from 'lucide-react';
-import { getInstantLotsize, isDerivativeContract, isCommodityContract, getAssetSubsegment } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, getAssetSubsegment, setContractLotsize } from '../utils/lotsizeHelper';
 import { getFreezeLimit, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
@@ -117,19 +117,23 @@ export default function OrderModal() {
         setIsCO(false);
       }
       
-      // Background sync lotsize if still 1 and looks like a derivative (contains numbers)
-      if (effectiveLotsize === 1 && /\d/.test(orderModal.symbol)) {
-        fetch(`${API}/api/stocks/lotsizes?symbols=${orderModal.symbol}`)
+      // Always verify exact contract lotsize from backend for derivatives/commodities so daily/expiry lotsize updates take effect immediately
+      if (orderModal.symbol && (isDerivativeContract(orderModal.symbol) || isCommodityContract(orderModal.symbol) || /\d/.test(orderModal.symbol))) {
+        const targetSym = orderModal.symbol;
+        fetch(`${API}/api/stocks/lotsizes?symbols=${encodeURIComponent(targetSym)}`)
           .then(r => r.json())
           .then(data => {
-            if (data[orderModal.symbol] && data[orderModal.symbol] > 1) {
-              const ls = data[orderModal.symbol];
-              useStore.getState().setOrderModalLotsize(ls);
-              if (orderModal.totalExitQty) {
+            const ls = Number(data?.[targetSym]);
+            if (ls && ls > 1) {
+              setContractLotsize(targetSym, ls);
+              if (useStore.getState().orderModal?.symbol === targetSym && useStore.getState().orderModal?.lotsize !== ls) {
+                useStore.getState().setOrderModalLotsize(ls);
+                if (orderModal.totalExitQty) {
                   const rawLots = Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / ls));
-                  const freezeLim = getFreezeLimit(orderModal.symbol, ls);
+                  const freezeLim = getFreezeLimit(targetSym, ls);
                   const maxAllowed = (ls && ls > 1) ? Math.floor(freezeLim / ls) : freezeLim;
                   setQuantity(maxAllowed > 0 ? Math.min(rawLots, maxAllowed) : rawLots);
+                }
               }
             }
           }).catch(console.error);

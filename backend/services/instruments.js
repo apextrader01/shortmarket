@@ -11,17 +11,19 @@ let globalNfoOptions = {};
 let globalNfoFutures = {};
 let globalBseSpots = {};
 
-async function loadInstrumentMaster() {
+async function loadInstrumentMaster(forceSync = false) {
     try {
         console.log('🔌 Checking instruments master in PostgreSQL...');
         const db = require('../database/db');
         
         // Wait for DB schema to be ready (rudimentary check)
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!forceSync) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
-        // Skip loading 13MB+ of monolithic JSON files if Postgres instruments table is already populated
+        // Skip loading 13MB+ of monolithic JSON files if Postgres instruments table is already populated (unless forceSync is true)
         const existingCheck = await db('instruments').count('token as count').first().catch(() => null);
-        if (existingCheck && Number(existingCheck.count) > 5000 && process.env.FORCE_INSTRUMENT_SYNC !== 'true') {
+        if (!forceSync && existingCheck && Number(existingCheck.count) > 5000 && process.env.FORCE_INSTRUMENT_SYNC !== 'true') {
             console.log(`⚡ PostgreSQL instruments table already populated (${existingCheck.count} scrips). Skipping redundant JSON disk read & RAM allocation.`);
             return;
         }
@@ -55,6 +57,9 @@ async function loadInstrumentMaster() {
             "102000000000002": { symbol: "BSE:BANKEX-INDEX", name: "Bankex", exchange: "BSE" },
         };
 
+        globalNfoOptions = {};
+        globalNfoFutures = {};
+        globalBseSpots = {};
         Object.assign(globalNfoOptions, nfoOptions);
         Object.assign(globalNfoFutures, nfoFutures);
         Object.assign(globalBseSpots, bseSpots);
@@ -91,7 +96,7 @@ async function loadInstrumentMaster() {
             Object.values(nfoFutures).forEach(futureArray => {
                 for (const fut of futureArray) {
                     fut.uniqueSymbol = fut.symbol;
-                    fut.lotsize = 1; // Force futures to have a lot size of 1
+                    fut.lotsize = Number(fut.lotsize) || 1;
                     symbolToToken[fut.uniqueSymbol] = fut.token;
                     tempStockMaster[fut.token] = fut;
                 }

@@ -10,14 +10,22 @@ const FYERS_URLS = [
     'https://public.fyers.in/sym_details/BSE_CM.csv'
 ];
 
-async function downloadCSV(url) {
+async function downloadCSV(url, timeoutMs = 25000) {
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            if (res.statusCode !== 200) return reject(new Error(`Failed to fetch ${url}`));
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve(data));
-        }).on('error', reject);
+        const req = https.get(url, { timeout: timeoutMs }, (res) => {
+            if (res.statusCode !== 200) {
+                res.resume();
+                return reject(new Error(`Failed to fetch ${url} (HTTP ${res.statusCode})`));
+            }
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+            res.on('error', reject);
+        });
+        req.on('timeout', () => {
+            req.destroy(new Error(`Timeout fetching ${url} after ${timeoutMs}ms`));
+        });
+        req.on('error', reject);
     });
 }
 
@@ -62,7 +70,9 @@ async function updateOptionsMaster() {
                         'ALUMINIUM': 5000, 'ALUMINI': 1000, 
                         'MENTHAOIL': 360, 'COTTON': 25, 'COTTONCNDL': 25 
                     };
-                    if (mcxLotSizes[underlying]) lotsize = mcxLotSizes[underlying];
+                    if ((!lotsize || lotsize <= 1) && mcxLotSizes[underlying]) {
+                        lotsize = mcxLotSizes[underlying];
+                    }
                 }
 
                 const strikeStr = cols[15];
@@ -130,21 +140,33 @@ async function updateOptionsMaster() {
         }
     }
 
-    // Generate lotsizeMap.json for frontend
+    // Sort futures chronologically first so nearest active contract is always at index 0
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    for (const name of Object.keys(futures)) {
+        futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);
+    }
+
+    // Generate lotsizeMap.json using the nearest active expiry (sorted chronologically)
     const lotsizeMap = {};
     for (const underlying of Object.keys(options)) {
-        const firstExp = Object.keys(options[underlying])[0];
-        if (firstExp) {
-            const firstStrike = Object.keys(options[underlying][firstExp])[0];
+        const allExps = Object.keys(options[underlying]).sort();
+        const activeExps = allExps.filter(e => e >= todayStr);
+        const targetExp = activeExps[0] || allExps[allExps.length - 1];
+        if (targetExp) {
+            const firstStrike = Object.keys(options[underlying][targetExp])[0];
             if (firstStrike) {
-                const item = options[underlying][firstExp][firstStrike].CE || options[underlying][firstExp][firstStrike].PE;
-                if (item && item.lotsize) lotsizeMap[underlying] = item.lotsize;
+                const item = options[underlying][targetExp][firstStrike].CE || options[underlying][targetExp][firstStrike].PE;
+                if (item && item.lotsize) lotsizeMap[underlying] = Number(item.lotsize) || 1;
             }
         }
     }
     for (const underlying of Object.keys(futures)) {
-        if (!lotsizeMap[underlying] && futures[underlying][0] && futures[underlying][0].lotsize) {
-            lotsizeMap[underlying] = futures[underlying][0].lotsize;
+        if (!lotsizeMap[underlying] && futures[underlying] && futures[underlying].length > 0) {
+            const activeFut = futures[underlying].find(f => f.expiry >= todayStr) || futures[underlying][0];
+            if (activeFut && activeFut.lotsize) {
+                lotsizeMap[underlying] = Number(activeFut.lotsize) || 1;
+            }
         }
     }
 
@@ -155,9 +177,6 @@ async function updateOptionsMaster() {
 
     fs.writeFileSync(path.join(__dirname, 'spots.json'), '{}');
 
-    for (const name of Object.keys(futures)) {
-        futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);
-    }
     fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
     console.log(`Saved ${futCount} Future contracts to futures.json!`);
 

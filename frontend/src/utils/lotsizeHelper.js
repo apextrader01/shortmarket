@@ -1,6 +1,54 @@
-import lotsizeMap from './lotsizeMap.json';
+import initialLotsizeMap from './lotsizeMap.json';
 
-const sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+let lotsizeMap = { ...(initialLotsizeMap || {}) };
+let sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+const contractLotsizeCache = {};
+
+export function updateLiveLotsizeMap(newMap) {
+  if (!newMap || typeof newMap !== 'object') return;
+  let changed = false;
+  for (const [k, v] of Object.entries(newMap)) {
+    const num = Number(v);
+    if (num >= 1 && lotsizeMap[k] !== num) {
+      lotsizeMap[k] = num;
+      changed = true;
+    }
+  }
+  if (changed) {
+    sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+  }
+}
+
+export function setContractLotsize(sym, ls) {
+  const num = Number(ls);
+  if (!sym || !(num > 1)) return;
+  const upper = String(sym).toUpperCase().trim();
+  const clean = upper.replace(/^(NSE:|BSE:|MCX:)/i, '');
+  contractLotsizeCache[upper] = num;
+  contractLotsizeCache[clean] = num;
+}
+
+let _syncPromise = null;
+let _lastSyncTs = 0;
+export function syncLiveLotsizeMap(apiBase = '') {
+  const now = Date.now();
+  if (_syncPromise) return _syncPromise;
+  if (now - _lastSyncTs < 30000) return Promise.resolve(lotsizeMap);
+  _syncPromise = fetch(`${apiBase}/api/stocks/lotsize-map`)
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => {
+      if (data && typeof data === 'object') {
+        updateLiveLotsizeMap(data);
+        _lastSyncTs = Date.now();
+      }
+      return lotsizeMap;
+    })
+    .catch(() => lotsizeMap)
+    .finally(() => {
+      _syncPromise = null;
+    });
+  return _syncPromise;
+}
 
 export function isDerivativeContract(sym) {
   if (!sym || typeof sym !== 'string') return false;
@@ -26,7 +74,12 @@ export function getInstantLotsize(sym) {
     return 1; // Cash Equity / ETF / MF is always lotsize 1
   }
 
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+  const upper = sym.toUpperCase().trim();
+  const clean = upper.replace(/^(NSE:|BSE:|MCX:)/i, '');
+
+  // Exact contract match cached from backend /api/stocks/lotsizes or OptionChain/Search
+  if (contractLotsizeCache[upper] && contractLotsizeCache[upper] > 1) return contractLotsizeCache[upper];
+  if (contractLotsizeCache[clean] && contractLotsizeCache[clean] > 1) return contractLotsizeCache[clean];
   
   // Direct match
   if (lotsizeMap[clean]) return lotsizeMap[clean];
