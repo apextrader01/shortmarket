@@ -13453,6 +13453,40 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   ]);
 });
 
+// ─── Firebase Auth Transparent Reverse Proxy (Same-Origin Mobile Fix) ────────
+app.use('/__/auth', async (req, res) => {
+  try {
+    const targetUrl = `https://skandx-1020f.firebaseapp.com${req.originalUrl}`;
+    const headers = { ...req.headers };
+    delete headers['connection'];
+    delete headers['host'];
+    headers.host = 'skandx-1020f.firebaseapp.com';
+
+    const body = (req.method !== 'GET' && req.method !== 'HEAD')
+      ? (typeof req.body === 'object' && !Buffer.isBuffer(req.body) ? JSON.stringify(req.body) : req.body)
+      : undefined;
+
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body,
+      redirect: 'follow'
+    });
+
+    response.headers.forEach((val, key) => {
+      if (key.toLowerCase() !== 'content-encoding') {
+        res.setHeader(key, val);
+      }
+    });
+    res.status(response.status);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch (err) {
+    console.error('[AUTH PROXY] Handler error:', err.message);
+    res.status(502).send('Auth proxy gateway error');
+  }
+});
+
 app.use((req, res) => {
   // If the request is for an API endpoint that wasn't found, return 404 JSON instead of HTML!
   if (req.path.startsWith('/api/')) {

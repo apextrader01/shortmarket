@@ -647,12 +647,6 @@ export default function LoginView() {
 
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
-    // If Google Identity Services is available, prompt native bottom sheet
-    if (window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.prompt();
-      } catch (_) {}
-    }
     setLoading(true);
     setGoogleLoading(true);
     try {

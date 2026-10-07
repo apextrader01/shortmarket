@@ -3,10 +3,23 @@ import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
+// Compute auth domain dynamically:
+// When served on production (*skandx.in), use first-party domain to eliminate mobile storage partitioning.
+// Otherwise fallback to Firebase default domain for local dev and staging.
+const getAuthDomain = () => {
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes('skandx.in')) {
+      return host;
+    }
+  }
+  return import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "skandx-1020f.firebaseapp.com";
+};
+
 // Firebase configuration loaded from environment variables (.env)
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "skandx-1020f.firebaseapp.com",
+  authDomain: getAuthDomain(),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "skandx-1020f",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "skandx-1020f.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "942129499307",
