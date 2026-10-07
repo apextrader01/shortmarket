@@ -2542,9 +2542,13 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!selectedUser || !newSubTier) return;
     
-    // Set expiry to 1 year from now if PRO, else null
+    // Set proper expiry based on tier: 1 month for MONTHLY, 1 year for YEARLY/HIGHEST/PRO, null for BASIC/MASTERCLASS/LIFETIME
     let expires = null;
-    if (newSubTier === 'PRO') {
+    if (newSubTier === 'MONTHLY') {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 1);
+      expires = d.toISOString();
+    } else if (['PRO', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(newSubTier)) {
       const d = new Date();
       d.setFullYear(d.getFullYear() + 1);
       expires = d.toISOString();
@@ -2562,8 +2566,8 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         alert('Subscription updated successfully!');
-        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, subscription_tier: newSubTier, subscription_expires: expires } : u));
-        setSelectedUser({ ...selectedUser, subscription_tier: newSubTier, subscription_expires: expires });
+        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, subscription_tier: newSubTier, subscription_expires: expires } : u));
+        setSelectedUser(prev => prev ? { ...prev, subscription_tier: newSubTier, subscription_expires: expires } : prev);
       } else throw new Error(data.error);
     } catch (err) {
       alert(err.message);
@@ -6178,7 +6182,9 @@ export default function AdminDashboard() {
                                 </span>
                                 <span>{u.username || 'Unknown User'}</span>
                                 {u.is_admin && <span style={{ fontSize: '8px', background: 'var(--color-red)', padding: '1px 3px', borderRadius: '3px' }}>ADMIN</span>}
-                                {['HIGHEST', 'FEATURE'].includes(u.subscription_tier) && <span style={{ fontSize: '8px', background: 'linear-gradient(135deg, rgba(234,179,8,0.3), rgba(168,85,247,0.3))', color: '#fbbf24', border: '1px solid #eab308', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>👑 VIP</span>}
+                                {u.subscription_tier === 'LIFETIME' && <span style={{ fontSize: '8px', background: 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(59,130,246,0.25))', color: '#34d399', border: '1px solid #10b981', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>💎 LIFETIME</span>}
+                                {u.subscription_tier === 'MASTERCLASS' && <span style={{ fontSize: '8px', background: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.45)', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>🎓 MASTERCLASS</span>}
+                                {['HIGHEST', 'FEATURE', 'VIP'].includes(u.subscription_tier) && <span style={{ fontSize: '8px', background: 'linear-gradient(135deg, rgba(234,179,8,0.3), rgba(168,85,247,0.3))', color: '#fbbf24', border: '1px solid #eab308', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>👑 VIP</span>}
                                 {u.subscription_tier === 'YEARLY' && <span style={{ fontSize: '8px', background: 'rgba(234,179,8,0.15)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.4)', padding: '1px 4px', borderRadius: '3px', fontWeight: '800' }}>⭐ YEARLY</span>}
                                 {(u.subscription_tier === 'MONTHLY' || u.subscription_tier === 'PRO') && <span style={{ fontSize: '8px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>⚡ PRO</span>}
                                 {(!u.subscription_tier || u.subscription_tier === 'BASIC' || u.subscription_tier === 'NORMAL') && <span style={{ fontSize: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>NORMAL</span>}

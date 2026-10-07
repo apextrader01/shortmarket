@@ -4523,6 +4523,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     let userQuery = query
       .select(
         'users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance',
+        'users.subscription_tier', 'users.subscription_expires',
         'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number',
         'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at',
         'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name',

@@ -11,6 +11,10 @@ export default function OnboardingWizard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  const [dobDay, setDobDay] = useState('');
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobYear, setDobYear] = useState('');
+
   const [formData, setFormData] = useState({
     dob: '',
     gender: '',
@@ -25,6 +29,69 @@ export default function OnboardingWizard() {
     primary_strategy: '',
     hear_about_us: ''
   });
+
+  const maxBirthYear = new Date().getFullYear() - 18;
+  const birthYears = useMemo(() => {
+    const years = [];
+    for (let y = maxBirthYear; y >= 1940; y--) {
+      years.push(String(y));
+    }
+    return years;
+  }, [maxBirthYear]);
+
+  const birthMonths = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+  ];
+
+  const daysInSelectedMonth = useMemo(() => {
+    const y = parseInt(dobYear, 10) || 2000;
+    const m = parseInt(dobMonth, 10) || 1;
+    const maxDays = new Date(y, m, 0).getDate();
+    const days = [];
+    for (let d = 1; d <= maxDays; d++) {
+      days.push(String(d).padStart(2, '0'));
+    }
+    return days;
+  }, [dobYear, dobMonth]);
+
+  const handleDobPartChange = (part, val) => {
+    let nextDay = part === 'day' ? val : dobDay;
+    const nextMonth = part === 'month' ? val : dobMonth;
+    const nextYear = part === 'year' ? val : dobYear;
+
+    if (nextDay && nextMonth) {
+      const y = parseInt(nextYear, 10) || 2000;
+      const m = parseInt(nextMonth, 10);
+      const maxD = new Date(y, m, 0).getDate();
+      if (parseInt(nextDay, 10) > maxD) {
+        nextDay = String(maxD).padStart(2, '0');
+      }
+    }
+
+    if (part === 'day') setDobDay(nextDay);
+    if (part === 'month') {
+      setDobMonth(nextMonth);
+      if (nextDay !== dobDay) setDobDay(nextDay);
+    }
+    if (part === 'year') {
+      setDobYear(nextYear);
+      if (nextDay !== dobDay) setDobDay(nextDay);
+    }
+
+    const combinedDob = (nextYear && nextMonth && nextDay) ? `${nextYear}-${nextMonth}-${nextDay}` : '';
+    setFormData(prev => ({ ...prev, dob: combinedDob }));
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -44,7 +111,7 @@ export default function OnboardingWizard() {
   const handleNext = () => {
     if (step === 1) {
       if (!formData.dob || !formData.gender || !formData.state || !formData.city) {
-        return setError('Please fill all fields to continue.');
+        return setError('Please fill all fields (including Day, Month, and Year of Birth) to continue.');
       }
     } else if (step === 2) {
       if (!formData.occupation || !formData.annual_income || !formData.financial_goal) {
@@ -137,16 +204,39 @@ export default function OnboardingWizard() {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Date of Birth</label>
-              <input 
-                type="date" 
-                name="dob" 
-                value={formData.dob} 
-                onChange={handleChange} 
-                min="1900-01-01"
-                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }} 
-              />
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Date of Birth (18+ Years)</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <select
+                  value={dobDay}
+                  onChange={(e) => handleDobPartChange('day', e.target.value)}
+                  style={{ flex: 1, padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: dobDay ? 'white' : 'var(--text-secondary)' }}
+                >
+                  <option value="" disabled>Day</option>
+                  {daysInSelectedMonth.map(d => (
+                    <option key={d} value={d} style={{ color: 'white', background: '#111827' }}>{parseInt(d, 10)}</option>
+                  ))}
+                </select>
+                <select
+                  value={dobMonth}
+                  onChange={(e) => handleDobPartChange('month', e.target.value)}
+                  style={{ flex: 1.4, padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: dobMonth ? 'white' : 'var(--text-secondary)' }}
+                >
+                  <option value="" disabled>Month</option>
+                  {birthMonths.map(m => (
+                    <option key={m.value} value={m.value} style={{ color: 'white', background: '#111827' }}>{m.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={dobYear}
+                  onChange={(e) => handleDobPartChange('year', e.target.value)}
+                  style={{ flex: 1.1, padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: dobYear ? 'white' : 'var(--text-secondary)' }}
+                >
+                  <option value="" disabled>Year</option>
+                  {birthYears.map(y => (
+                    <option key={y} value={y} style={{ color: 'white', background: '#111827' }}>{y}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Gender</label>
