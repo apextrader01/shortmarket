@@ -13453,6 +13453,40 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   ]);
 });
 
+// ─── Firebase Hosting Emulated Init Endpoints (Required for auth handler domain validation) ──
+app.get('/__/firebase/init.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const host = req.headers.host || 'www.skandx.in';
+  res.json({
+    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
+    appId: process.env.FIREBASE_APP_ID || "1:942129499307:web:f53e4fe15964389c0bfbee",
+    authDomain: host,
+    databaseURL: "https://skandx-1020f.firebaseio.com",
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "942129499307",
+    projectId: process.env.FIREBASE_PROJECT_ID || "skandx-1020f",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "skandx-1020f.firebasestorage.app",
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-3NQ59H44ZX"
+  });
+});
+
+app.get('/__/firebase/init.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const host = req.headers.host || 'www.skandx.in';
+  const cfg = {
+    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
+    appId: process.env.FIREBASE_APP_ID || "1:942129499307:web:f53e4fe15964389c0bfbee",
+    authDomain: host,
+    databaseURL: "https://skandx-1020f.firebaseio.com",
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "942129499307",
+    projectId: process.env.FIREBASE_PROJECT_ID || "skandx-1020f",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "skandx-1020f.firebasestorage.app",
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-3NQ59H44ZX"
+  };
+  res.send(`if (typeof firebase === 'undefined') throw new Error('firebase is undefined'); firebase.initializeApp(${JSON.stringify(cfg)});`);
+});
+
 // ─── Firebase Auth Transparent Reverse Proxy (Same-Origin Mobile Fix) ────────
 app.use('/__/auth', async (req, res) => {
   try {
