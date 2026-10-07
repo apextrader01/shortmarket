@@ -2254,7 +2254,7 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       }
 
       const randomSecret = crypto.randomBytes(32).toString('hex');
-      const passwordHash = await bcrypt.hash(randomSecret, 10);
+      const passwordHash = await bcrypt.hash(randomSecret, 6);
       const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
       let { city, state } = parseIpLocation(clientIp);
       const defaultWatchlist = JSON.stringify([
@@ -2287,25 +2287,26 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
       user.client_id = clientId;
 
-      // Record DPDP Consents
+      // Record DPDP Consents in batch
       try {
         const consentsToRecord = [
           { type: 'TERMS_AND_PRIVACY', granted: !!consent_terms },
           { type: 'DATA_PROCESSING_CORE', granted: !!consent_data_processing },
           { type: 'MARKETING_PROMOTIONS', granted: !!consent_marketing }
         ];
-        for (const item of consentsToRecord) {
-          if (item.granted) {
-            await db('user_consents').insert({
-              user_id: user.id,
-              email,
-              consent_type: item.type,
-              status: 'GRANTED',
-              consent_version: 'v2026.1',
-              ip_address: clientIp,
-              user_agent: req.headers['user-agent'] || ''
-            }).catch(() => {});
-          }
+        const consentRows = consentsToRecord
+          .filter(item => item.granted)
+          .map(item => ({
+            user_id: user.id,
+            email,
+            consent_type: item.type,
+            status: 'GRANTED',
+            consent_version: 'v2026.1',
+            ip_address: clientIp,
+            user_agent: req.headers['user-agent'] || ''
+          }));
+        if (consentRows.length > 0) {
+          await db('user_consents').insert(consentRows).catch(() => {});
         }
       } catch (cErr) {}
 

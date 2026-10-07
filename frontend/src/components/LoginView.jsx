@@ -81,6 +81,7 @@ export default function LoginView() {
   const [registerOtpMethod,  setRegisterOtpMethod]  = useState('phone'); // 'phone' | 'email'
   const [sendingRegOtp,     setSendingRegOtp]     = useState(false);
   const [loading,  setLoading]  = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [message,  setMessage]  = useState('');
 
   // 2FA & 30-Day Device Trust States
@@ -420,9 +421,16 @@ export default function LoginView() {
         }
         localStorage.setItem('token', data.token);
         if (data.user) {
-          useStore.setState({ user: data.user, token: data.token });
+          useStore.setState({
+            user: data.user,
+            token: data.token,
+            watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+          });
+          useStore.getState().fetchUserData?.();
         }
-        window.location.reload();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.history.pushState({}, '', '/');
+        }
       } catch (err) {
         useStore.setState({ authError: err.message || 'Failed to complete Google sign-up.' });
       }
@@ -513,6 +521,7 @@ export default function LoginView() {
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
     setLoading(true);
+    setGoogleLoading(true);
     try {
       if (!auth) {
         throw new Error('Authentication service is initializing. Please refresh the page.');
@@ -542,9 +551,16 @@ export default function LoginView() {
 
       localStorage.setItem('token', data.token);
       if (data.user) {
-        useStore.setState({ user: data.user, token: data.token });
+        useStore.setState({
+          user: data.user,
+          token: data.token,
+          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+        });
+        useStore.getState().fetchUserData?.();
       }
-      window.location.reload();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.history.pushState({}, '', '/');
+      }
     } catch (err) {
       console.warn('Google sign-in error:', err);
       // Ignore when user deliberately closes or cancels the popup
@@ -563,6 +579,7 @@ export default function LoginView() {
       }
       useStore.setState({ authError: userFriendlyMsg });
     } finally {
+      setGoogleLoading(false);
       setLoading(false);
     }
   };
@@ -1262,7 +1279,7 @@ export default function LoginView() {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={loading}
+                disabled={loading || googleLoading}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -1276,19 +1293,29 @@ export default function LoginView() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  cursor: 'pointer',
+                  cursor: (loading || googleLoading) ? 'not-allowed' : 'pointer',
+                  opacity: (loading || googleLoading) ? 0.8 : 1,
                   transition: 'all 0.2s ease',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
                 }}
                 className="hoverable"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                </svg>
-                {view === 'register' ? 'Sign up with Google' : 'Log in with Google'}
+                {googleLoading ? (
+                  <>
+                    <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span style={{ color: '#38bdf8' }}>Connecting to Google...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                    <span>{view === 'register' ? 'Sign up with Google' : 'Log in with Google'}</span>
+                  </>
+                )}
               </button>
             </>
           )}
