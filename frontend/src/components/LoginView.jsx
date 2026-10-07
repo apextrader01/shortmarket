@@ -586,9 +586,53 @@ export default function LoginView() {
     }
   }, []);
 
-  // Initialize Google Identity Services (GIS)
+  // Detect mobile browser (popups from GIS renderButton and signInWithPopup open as new tabs
+  // on Android Chrome that cannot close themselves after clicking Continue, leaving a white screen)
+  const isMobileBrowser = typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '') ||
+    navigator.userAgentData?.mobile === true ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 1024)
+  );
+
+  // Process Google OIDC Redirect Token on Mobile Return (Same-Tab Flow via /__/auth/handler)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    let idToken = null;
+    let oauthErr = null;
+
+    if (window.location.hash && window.location.hash.length > 1) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      idToken = hashParams.get('id_token');
+      oauthErr = hashParams.get('error');
+    }
+
+    if (!idToken) {
+      try {
+        idToken = sessionStorage.getItem('skandx_google_id_token') || localStorage.getItem('skandx_google_id_token');
+      } catch (_) {}
+    }
+
+    if (idToken || oauthErr) {
+      try {
+        sessionStorage.removeItem('skandx_google_id_token');
+        localStorage.removeItem('skandx_google_id_token');
+      } catch (_) {}
+      if (window.location.hash) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+      if (idToken) {
+        handleGoogleCredentialResponse({ credential: idToken });
+      } else if (oauthErr && oauthErr !== 'access_denied') {
+        useStore.setState({ authError: `Google sign-in error: ${oauthErr}` });
+      }
+    }
+  }, [handleGoogleCredentialResponse]);
+
+  // Initialize Google Identity Services (GIS) — Desktop Only
+  // On mobile, GIS renderButton opens a popup tab to accounts.google.com/gsi/... which
+  // hangs on a white screen after clicking Continue on Android Chrome.
+  useEffect(() => {
+    if (typeof window === 'undefined' || isMobileBrowser) return;
 
     const initGis = () => {
       if (window.google?.accounts?.id) {
@@ -601,7 +645,7 @@ export default function LoginView() {
             itp_support: true
           });
           setGisLoaded(true);
-          // Try displaying native One Tap prompt on supported browsers
+          // Try displaying native One Tap prompt on supported desktop browsers
           window.google.accounts.id.prompt();
         } catch (e) {
           console.warn('[GIS] Init notice:', e.message);
@@ -624,10 +668,11 @@ export default function LoginView() {
         clearTimeout(timeout);
       };
     }
-  }, [handleGoogleCredentialResponse]);
+  }, [handleGoogleCredentialResponse, isMobileBrowser]);
 
-  // Render Google Identity Services Button
+  // Render Google Identity Services Button — Desktop Only
   useEffect(() => {
+    if (isMobileBrowser) return;
     if ((view === 'login' || view === 'register') && gisLoaded && window.google?.accounts?.id && googleBtnContainerRef.current) {
       try {
         googleBtnContainerRef.current.innerHTML = '';
@@ -644,10 +689,34 @@ export default function LoginView() {
         console.warn('[GIS] Render button notice:', e.message);
       }
     }
-  }, [gisLoaded, view]);
+  }, [gisLoaded, view, isMobileBrowser]);
 
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
+
+    // ── Mobile: Same-tab OIDC redirect via authorized /__/auth/handler (zero popups!) ──
+    if (isMobileBrowser) {
+      setLoading(true);
+      setGoogleLoading(true);
+      const origin = (typeof window !== 'undefined' && !window.location.origin.includes('localhost'))
+        ? window.location.origin
+        : 'https://www.skandx.in';
+      const redirectUri = `${origin}/__/auth/handler`;
+      const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: 'id_token',
+        scope: 'openid email profile',
+        prompt: 'select_account',
+        nonce,
+        state: 'skandx_mobile_oauth'
+      });
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      return;
+    }
+
+    // ── Desktop: Use signInWithPopup (works fine with proper window.opener) ──
     setLoading(true);
     setGoogleLoading(true);
     try {
@@ -1405,19 +1474,19 @@ export default function LoginView() {
               </div>
 
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                {/* Official Google Identity Services Native Button Container (No popups, No redirects, No storage partitioning) */}
+                {/* Official Google Identity Services Native Button Container (Desktop Only) */}
                 <div 
                   ref={googleBtnContainerRef} 
                   style={{ 
-                    display: gisLoaded ? 'flex' : 'none', 
+                    display: (gisLoaded && !isMobileBrowser) ? 'flex' : 'none', 
                     justifyContent: 'center', 
                     width: '100%', 
                     minHeight: '44px' 
                   }} 
                 />
 
-                {/* Fallback button when GIS is still loading, in-flight, or blocked by privacy extensions */}
-                {(!gisLoaded || googleLoading) && (
+                {/* Mobile same-tab OAuth button & Desktop fallback button */}
+                {(!gisLoaded || isMobileBrowser || googleLoading) && (
                   <button
                     type="button"
                     onClick={handleGoogleLogin}

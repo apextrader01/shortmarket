@@ -2186,6 +2186,37 @@ app.post('/api/auth/logout', async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Mobile-Safe Same-Tab Google OAuth Redirect Start ────────────────────────
+// Uses the already-authorized https://www.skandx.in/__/auth/handler redirect URI
+// with OpenID Connect response_type=id_token so zero popups, zero new tabs, and
+// zero client_secret are needed on mobile Chrome/Safari.
+const GOOGLE_OAUTH_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '942129499307-fer7gcbqo0h1gjhj0mr65oran7ohi92q.apps.googleusercontent.com';
+
+app.get('/api/auth/google/redirect', (req, res) => {
+  try {
+    const rawHost = String(req.headers['x-forwarded-host'] || req.headers.host || 'www.skandx.in').split(',')[0].trim();
+    const host = rawHost.includes('localhost') ? 'www.skandx.in' : rawHost;
+    const redirectUri = `https://${host}/__/auth/handler`;
+    const nonce = require('crypto').randomBytes(16).toString('hex');
+    const state = 'skandx_mobile_oauth_' + require('crypto').randomBytes(8).toString('hex');
+
+    const params = new URLSearchParams({
+      client_id: GOOGLE_OAUTH_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      nonce,
+      state
+    });
+
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  } catch (err) {
+    console.error('[GOOGLE REDIRECT] Error starting OAuth:', err.message);
+    res.redirect('/?auth_error=oauth_start_failed');
+  }
+});
+
 // ─── Google OAuth Sign-In / Sign-Up ──────────────────────────────────────────
 app.post('/api/auth/google-login', authLimiter, async (req, res) => {
   const { idToken, phone, username: requestedUsername, consent_terms, consent_data_processing, consent_marketing, referral_code } = req.body || {};
@@ -13489,6 +13520,50 @@ app.get('/__/firebase/init.js', (req, res) => {
     measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-3NQ59H44ZX"
   };
   res.send(`if (typeof firebase === 'undefined') throw new Error('firebase is undefined'); firebase.initializeApp(${JSON.stringify(cfg)});`);
+});
+
+// ─── Mobile Same-Tab Google OIDC Callback Bridge (/__/auth/handler) ──────────
+// When mobile browsers complete Google Sign-In via same-tab redirect, Google redirects
+// to https://www.skandx.in/__/auth/handler#id_token=... (an already-authorized URI).
+// If ?apiKey=... is NOT present (meaning this is our direct OIDC return, not Firebase's
+// internal popup script), we capture the id_token from the URL hash into same-origin
+// storage and immediately forward the tab to the main app root (/).
+app.get('/__/auth/handler', (req, res, next) => {
+  if (req.query && req.query.apiKey) {
+    return next();
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  return res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing in to SkandX...</title>
+</head>
+<body style="background:#0a0e17;color:#38bdf8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <div style="width:28px;height:28px;border:3px solid rgba(56,189,248,0.2);border-top-color:#38bdf8;border-radius:50%;animation:s 0.8s linear infinite;margin-bottom:14px;"></div>
+  <div style="font-size:14px;font-weight:600;">Completing Google Sign-In...</div>
+  <style>@keyframes s{to{transform:rotate(360deg)}}</style>
+  <script>
+    (function() {
+      var hash = window.location.hash || '';
+      var search = window.location.search || '';
+      if (hash.indexOf('id_token=') !== -1) {
+        try {
+          var params = new URLSearchParams(hash.substring(1));
+          var idToken = params.get('id_token');
+          if (idToken) {
+            try { sessionStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
+            try { localStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
+          }
+        } catch (e) {}
+      }
+      window.location.replace('/' + search + hash);
+    })();
+  </script>
+</body>
+</html>`);
 });
 
 // ─── Firebase Auth Transparent Reverse Proxy (Same-Origin Mobile Fix) ────────
