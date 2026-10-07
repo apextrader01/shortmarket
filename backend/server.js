@@ -13457,11 +13457,11 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 app.get('/__/firebase/init.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  const host = req.headers.host || 'www.skandx.in';
+  const authDomain = process.env.FIREBASE_AUTH_DOMAIN || 'skandx-1020f.firebaseapp.com';
   res.json({
     apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
     appId: process.env.FIREBASE_APP_ID || "1:942129499307:web:f53e4fe15964389c0bfbee",
-    authDomain: host,
+    authDomain: authDomain,
     databaseURL: "https://skandx-1020f.firebaseio.com",
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "942129499307",
     projectId: process.env.FIREBASE_PROJECT_ID || "skandx-1020f",
@@ -13473,11 +13473,11 @@ app.get('/__/firebase/init.json', (req, res) => {
 app.get('/__/firebase/init.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  const host = req.headers.host || 'www.skandx.in';
+  const authDomain = process.env.FIREBASE_AUTH_DOMAIN || 'skandx-1020f.firebaseapp.com';
   const cfg = {
     apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I",
     appId: process.env.FIREBASE_APP_ID || "1:942129499307:web:f53e4fe15964389c0bfbee",
-    authDomain: host,
+    authDomain: authDomain,
     databaseURL: "https://skandx-1020f.firebaseio.com",
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "942129499307",
     projectId: process.env.FIREBASE_PROJECT_ID || "skandx-1020f",
