@@ -670,6 +670,7 @@ app.use(helmet({
         "https://www.googletagmanager.com",
         "https://www.google-analytics.com",
         "https://apis.google.com",
+        "https://accounts.google.com",
         "https://pagead2.googlesyndication.com",
         "https://*.googlesyndication.com",
         "https://googleads.g.doubleclick.net",

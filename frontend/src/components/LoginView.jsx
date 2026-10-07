@@ -647,6 +647,12 @@ export default function LoginView() {
 
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
+    if (gisLoaded && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt();
+        return;
+      } catch (e) {}
+    }
     setLoading(true);
     setGoogleLoading(true);
     try {
