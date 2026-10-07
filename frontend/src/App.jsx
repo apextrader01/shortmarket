@@ -1516,7 +1516,7 @@ function App() {
                 {user.subscription_tier === 'MASTERCLASS' && (
                   <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>🎓 MASTERCLASS</span>
                 )}
-                {['HIGHEST', 'FEATURE'].includes(user.subscription_tier) && (
+                {['HIGHEST', 'FEATURE', 'VIP'].includes(user.subscription_tier) && (
                   <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #a855f7)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 VIP</span>
                 )}
                 {user.subscription_tier === 'YEARLY' && (

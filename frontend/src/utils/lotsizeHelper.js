@@ -93,6 +93,13 @@ export function getInstantLotsize(sym) {
   return 1;
 }
 
+export function getUnderlyingFnoLotsize(sym) {
+  if (!sym || typeof sym !== 'string') return 1;
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|INDEX|FUT)$/i, '').toUpperCase().trim();
+  if (lotsizeMap[clean]) return lotsizeMap[clean];
+  return getInstantLotsize(sym);
+}
+
 export function isFnoEligibleStock(sym) {
   if (!sym || typeof sym !== 'string') return false;
   if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;

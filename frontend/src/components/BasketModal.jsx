@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText, AlertTriangle } from 'lucide-react';
-import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
+import { getInstantLotsize, getUnderlyingFnoLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { getFuturesMarginRate } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
@@ -349,7 +349,7 @@ export default function BasketModal() {
     
     // Resolve underlying
     const underlying = item.underlying || parsed?.underlying || selectedUnderlying;
-    const effectiveLotsize = (item.lotsize && Number(item.lotsize) > 1) ? Number(item.lotsize) : (getInstantLotsize(symbol) || getInstantLotsize(underlying) || 1);
+    const effectiveLotsize = (item.lotsize && Number(item.lotsize) > 1) ? Number(item.lotsize) : (getInstantLotsize(symbol) || (isOption ? getUnderlyingFnoLotsize(underlying) : getInstantLotsize(underlying)) || 1);
     const totalQuantity = (Number(item.quantity) || 1) * effectiveLotsize;
     
     // Resolve expiry from cache if not directly present
@@ -685,7 +685,7 @@ export default function BasketModal() {
     const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : userTier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
     const isPaid = isHighest || isYearly || isMonthly;
@@ -953,7 +953,7 @@ export default function BasketModal() {
     };
 
     const spotPrice = liveSpot > 0 ? liveSpot : (fallbackSpots[targetUnderlying] || 1000);
-    const defaultLotsize = getInstantLotsize(targetUnderlying) || 1;
+    const defaultLotsize = getUnderlyingFnoLotsize(targetUnderlying) || getInstantLotsize(targetUnderlying) || 1;
 
     let newItems = [];
 

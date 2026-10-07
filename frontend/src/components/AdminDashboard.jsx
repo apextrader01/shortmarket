@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Trophy, Award, Send, ShieldAlert, Loader2, Save, Bell, Power } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
@@ -1990,7 +1990,7 @@ export default function AdminDashboard() {
     } else if (clientFilter === 'BANNED') {
       list = list.filter(u => u.is_banned);
     } else if (clientFilter === 'PRO') {
-      list = list.filter(u => ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(u.subscription_tier));
+      list = list.filter(u => ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(u.subscription_tier));
     } else if (clientFilter === 'KYC_VERIFIED') {
       list = list.filter(u => u.kyc_pan_url && u.kyc_aadhar_url);
     } else if (clientFilter === 'KYC_MISSING') {
@@ -2548,7 +2548,7 @@ export default function AdminDashboard() {
       const d = new Date();
       d.setMonth(d.getMonth() + 1);
       expires = d.toISOString();
-    } else if (['PRO', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(newSubTier)) {
+    } else if (['PRO', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP'].includes(newSubTier)) {
       const d = new Date();
       d.setFullYear(d.getFullYear() + 1);
       expires = d.toISOString();
@@ -2556,7 +2556,7 @@ export default function AdminDashboard() {
     
     setUpdating(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '';
+      const API_URL = API || import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/api/admin/user/${selectedUser.id}/subscription`, {
         method: 'POST',
@@ -2568,6 +2568,10 @@ export default function AdminDashboard() {
         alert('Subscription updated successfully!');
         setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, subscription_tier: newSubTier, subscription_expires: expires } : u));
         setSelectedUser(prev => prev ? { ...prev, subscription_tier: newSubTier, subscription_expires: expires } : prev);
+        const currentStoreUser = useStore.getState().user;
+        if (currentStoreUser && String(currentStoreUser.id) === String(selectedUser.id)) {
+          useStore.setState({ user: { ...currentStoreUser, subscription_tier: newSubTier, subscription_expires: expires } });
+        }
       } else throw new Error(data.error);
     } catch (err) {
       alert(err.message);
@@ -7451,7 +7455,7 @@ export default function AdminDashboard() {
                   <Activity size={14} style={{ color: 'var(--color-blue)' }} /> Subscription Tier
                 </h4>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Current Tier: <strong style={{ color: ['HIGHEST', 'FEATURE'].includes(selectedUser.subscription_tier) ? '#fbbf24' : selectedUser.subscription_tier === 'YEARLY' ? '#f59e0b' : (selectedUser.subscription_tier === 'MONTHLY' || selectedUser.subscription_tier === 'PRO') ? 'var(--color-green-light)' : 'var(--text-primary)' }}>{selectedUser.subscription_tier || 'BASIC'}</strong>
+                  Current Tier: <strong style={{ color: ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(selectedUser.subscription_tier) ? '#fbbf24' : selectedUser.subscription_tier === 'YEARLY' ? '#f59e0b' : (selectedUser.subscription_tier === 'MONTHLY' || selectedUser.subscription_tier === 'PRO') ? 'var(--color-green-light)' : 'var(--text-primary)' }}>{selectedUser.subscription_tier || 'BASIC'}</strong>
                   {selectedUser.subscription_expires && ` (Expires: ${new Date(selectedUser.subscription_expires).toLocaleDateString()})`}
                 </div>
                 <form onSubmit={handleUpdateSubscription} style={{ display: 'flex', gap: '12px' }}>

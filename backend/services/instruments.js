@@ -167,6 +167,7 @@ async function loadInstrumentMaster(forceSync = false) {
 loadInstrumentMaster();
 
 module.exports = {
+    loadInstrumentMaster,
     STOCK_MASTER,
     symbolToToken,
     tokenToSymbol,

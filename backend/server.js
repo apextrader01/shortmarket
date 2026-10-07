@@ -4791,7 +4791,14 @@ app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res)
       subscription_tier: tier,
       subscription_expires: expires || null
     });
-    res.json({ success: true });
+    if (typeof io !== 'undefined' && io) {
+      io.to(`user_${req.params.id}`).emit('subscription_updated', {
+        userId: Number(req.params.id),
+        subscription_tier: tier,
+        subscription_expires: expires || null
+      });
+    }
+    res.json({ success: true, subscription_tier: tier, subscription_expires: expires || null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -6869,6 +6876,22 @@ async function loadOptionsAndFuturesCache() {
 // Initial async load at server boot
 loadOptionsAndFuturesCache();
 
+// Watch options.json and futures.json on disk so all PM2 cluster workers reload when master updates them
+try {
+  const dbDir = path.join(__dirname, 'database');
+  if (fs.existsSync(dbDir)) {
+    let optWatchTimer = null;
+    fs.watch(dbDir, (eventType, filename) => {
+      if (filename === 'options.json' || filename === 'futures.json') {
+        if (optWatchTimer) clearTimeout(optWatchTimer);
+        optWatchTimer = setTimeout(() => {
+          loadOptionsAndFuturesCache();
+        }, 1500);
+      }
+    });
+  }
+} catch (e) {}
+
 app.get('/api/options/chain/:symbol', async (req, res) => {
   try {
     const symbol = req.params.symbol.toUpperCase();
@@ -7159,7 +7182,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
   // Exits and square-off orders are NEVER blocked so traders can always close open positions.
   const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires').first();
-  const isPaidTier = userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date());
+  const isPaidTier = userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date());
   
   if (!isPaidTier && !isExplicitExit) {
     const now = new Date();
@@ -11464,16 +11487,16 @@ function applyTierFilterToQuery(query, accessTier) {
   const tier = String(accessTier).toUpperCase();
   const now = new Date();
 
-  // MONTHLY_PLUS: Allowed tiers: MONTHLY, YEARLY, HIGHEST, FEATURE, PRO
+  // MONTHLY_PLUS: Allowed tiers: MONTHLY, YEARLY, HIGHEST, FEATURE, PRO, VIP, MASTERCLASS, LIFETIME
   if (tier === 'MONTHLY_PLUS') {
-    query.whereIn('users.subscription_tier', ['MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'PRO'])
+    query.whereIn('users.subscription_tier', ['MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'PRO', 'VIP', 'MASTERCLASS', 'LIFETIME'])
          .where(builder => {
            builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
          });
   } 
-  // YEARLY_PLUS: Allowed tiers: YEARLY, HIGHEST, FEATURE
+  // YEARLY_PLUS: Allowed tiers: YEARLY, HIGHEST, FEATURE, VIP, MASTERCLASS, LIFETIME
   else if (tier === 'YEARLY_PLUS') {
-    query.whereIn('users.subscription_tier', ['YEARLY', 'HIGHEST', 'FEATURE'])
+    query.whereIn('users.subscription_tier', ['YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'])
          .where(builder => {
            builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
          });
@@ -13803,6 +13826,7 @@ server.listen(PORT, async () => {
       const refreshAllContractCaches = async () => {
         try {
           const { initializeCache, getDiskLotsizeMap } = require('./services/instrumentsCache');
+          const { loadInstrumentMaster } = require('./services/instruments');
           initializeCache();
           await loadOptionsAndFuturesCache();
           await loadInstrumentMaster(true);

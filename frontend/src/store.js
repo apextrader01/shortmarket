@@ -1064,6 +1064,21 @@ export const useStore = create(persist((set, get) => ({
       }
     });
 
+    socket.off('subscription_updated');
+    socket.on('subscription_updated', (data) => {
+      if (!data) return;
+      const curUser = get().user;
+      if (curUser && (!data.userId || String(curUser.id) === String(data.userId))) {
+        set({
+          user: {
+            ...curUser,
+            subscription_tier: data.subscription_tier || 'BASIC',
+            subscription_expires: data.subscription_expires ?? null
+          }
+        });
+      }
+    });
+
     socket.off('trade_alert');
     socket.on('trade_alert', (data) => {
       if (!data) return;

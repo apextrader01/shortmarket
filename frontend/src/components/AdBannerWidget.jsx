@@ -97,8 +97,10 @@ export function isUserAdFreeTier(user) {
   if (user.is_admin && (!cachedAdConfig || cachedAdConfig.show_ads_to_admin !== false)) {
     return false;
   }
-  const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'MASTERCLASS'];
-  return paidTiers.includes(String(user.subscription_tier || '').toUpperCase());
+  const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS'];
+  const isPaid = paidTiers.includes(String(user.subscription_tier || '').toUpperCase());
+  const isNotExpired = !user.subscription_expires || new Date(user.subscription_expires).getTime() > Date.now();
+  return isPaid && isNotExpired;
 }
 
 export function trackAdEvent(event) {

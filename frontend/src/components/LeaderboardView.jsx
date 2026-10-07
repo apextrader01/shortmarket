@@ -146,7 +146,7 @@ export default function LeaderboardView({ onNavigateTab, setActiveTab: setParent
 
   const getTierLevel = (t) => {
     const tier = (t || 'BASIC').toUpperCase();
-    if (['HIGHEST', 'FEATURE', 'ELITE', 'VIP'].includes(tier)) return 3;
+    if (['HIGHEST', 'FEATURE', 'ELITE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(tier)) return 3;
     if (tier === 'YEARLY') return 2;
     if (['MONTHLY', 'PRO'].includes(tier)) return 1;
     return 0; // BASIC / NORMAL
