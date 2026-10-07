@@ -767,9 +767,12 @@ app.use(helmet({
 }));
 
 // 🛡️ Security Hardening Headers (Permissions-Policy & Cross-Origin-Opener-Policy)
+// Note: Cross-Origin-Opener-Policy must NOT be 'same-origin-allow-popups' because Chrome severs
+// window.opener when popups navigate cross-origin to accounts.google.com/firebaseapp.com,
+// breaking Google Auth / Firebase signInWithPopup. We use 'unsafe-none' to preserve window.opener.
 app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), usb=(), bluetooth=()');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
   next();
 });
 

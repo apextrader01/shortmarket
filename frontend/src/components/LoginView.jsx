@@ -7,6 +7,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '942129499307-fer7gcbqo0h1gjhj0mr65oran7ohi92q.apps.googleusercontent.com';
 
 export default function LoginView() {
@@ -647,12 +648,6 @@ export default function LoginView() {
 
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
-    if (gisLoaded && window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.prompt();
-        return;
-      } catch (e) {}
-    }
     setLoading(true);
     setGoogleLoading(true);
     try {
