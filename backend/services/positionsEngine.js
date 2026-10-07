@@ -706,6 +706,19 @@ class PositionsEngine {
                                     description: `${realizedPnl >= 0 ? 'Realized profit' : 'Realized loss'} on expired worthless holding contract: ${item.symbol}`
                                 });
                             }
+                            await trx('orders').insert({
+                                user_id: item.user_id,
+                                symbol: item.symbol,
+                                side: item.quantity > 0 ? 'SELL' : 'BUY',
+                                quantity: orderQty,
+                                price: 0,
+                                average_price: 0,
+                                status: 'EXECUTED',
+                                order_type: 'MARKET',
+                                product_type: 'DEL',
+                                realized_pnl: realizedPnl,
+                                remarks: 'Auto square-off: Expired worthless holding at ₹0 (Lapsed at Expiry)'
+                            }).catch(() => {});
                         } else {
                             const entryPrice = Math.abs(parseFloat(item.average_price) || 0);
                             const realizedPnl = item.quantity > 0 ? -entryPrice * orderQty : entryPrice * orderQty;
@@ -745,6 +758,19 @@ class PositionsEngine {
                                     description: `${realizedPnl >= 0 ? 'Realized profit' : 'Realized loss'} on expired worthless contract: ${item.symbol}`
                                 });
                             }
+                            await trx('orders').insert({
+                                user_id: item.user_id,
+                                symbol: item.symbol,
+                                side: item.quantity > 0 ? 'SELL' : 'BUY',
+                                quantity: orderQty,
+                                price: 0,
+                                average_price: 0,
+                                status: 'EXECUTED',
+                                order_type: 'MARKET',
+                                product_type: item.product_type || 'INTRADAY',
+                                realized_pnl: realizedPnl,
+                                remarks: 'Auto square-off: Expired worthless at ₹0 (Lapsed at Expiry)'
+                            }).catch(() => {});
                         }
                     });
                     if (triggerEngine && triggerEngine.io) {

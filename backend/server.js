@@ -3126,6 +3126,49 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
       }
     } catch (_) {}
 
+    // Bridge expired worthless contracts from ledger & positions so they accurately reflect in Trade Analytics
+    try {
+      const expiredLedger = await db('ledger')
+        .where({ user_id: req.user.id, type: 'REALIZED_PNL' })
+        .where('description', 'ilike', '%expired worthless%')
+        .select('id', 'amount as realized_pnl', 'description', 'created_at');
+
+      if (expiredLedger && expiredLedger.length > 0) {
+        const existingKeys = new Set(rawOrders.map(o => `${o.symbol}_${Math.round(Math.abs(parseFloat(o.realized_pnl) || 0))}`));
+        for (const el of expiredLedger) {
+          const match = el.description?.match(/contract:\s*([A-Za-z0-9:_-]+)/i);
+          const sym = match ? match[1].trim() : 'EXPIRED_OPTION';
+          const pnlVal = parseFloat(el.realized_pnl) || 0;
+          const key = `${sym}_${Math.round(Math.abs(pnlVal))}`;
+          if (!existingKeys.has(key)) {
+            let tradeQty = 1;
+            try {
+              const posRow = await db('positions')
+                .where({ user_id: req.user.id, symbol: sym })
+                .orderBy('id', 'desc')
+                .first();
+              if (posRow) {
+                tradeQty = Math.abs(parseFloat(posRow.closed_quantity) || parseFloat(posRow.quantity) || 1);
+              }
+            } catch (_) {}
+
+            rawOrders.push({
+              id: `exp_led_${el.id}`,
+              symbol: sym,
+              side: pnlVal < 0 ? 'SELL' : 'BUY',
+              quantity: tradeQty,
+              realized_pnl: pnlVal,
+              created_at: el.created_at,
+              slice_group_id: null,
+              remarks: 'Option expired worthless at ₹0 (Lapsed at Expiry)'
+            });
+            existingKeys.add(key);
+          }
+        }
+        rawOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      }
+    } catch (_) {}
+
     // Consolidate sliced iceberg orders into single unified trades
     const groupMap = new Map();
     const orders = [];
