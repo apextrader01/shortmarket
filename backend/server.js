@@ -2194,8 +2194,27 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       return res.status(503).json({ error: 'Firebase authentication service temporarily unavailable' });
     }
 
-    const decoded = await auth.verifyIdToken(idToken);
-    const email = decoded.email ? String(decoded.email).trim().toLowerCase() : null;
+    let decoded = null;
+    try {
+      decoded = await auth.verifyIdToken(idToken);
+    } catch (fbErr) {
+      // Fallback: If idToken is a raw Google ID Token directly from Google Identity Services (GIS / One Tap)
+      try {
+        const { OAuth2Client } = require('google-auth-library');
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || '942129499307-fer7gcbqo0h1gjhj0mr65oran7ohi92q.apps.googleusercontent.com';
+        const client = new OAuth2Client(googleClientId);
+        const ticket = await client.verifyIdToken({
+          idToken,
+          audience: googleClientId
+        });
+        decoded = ticket.getPayload();
+      } catch (gErr) {
+        console.error('[AUTH] ID token verification failed:', fbErr.message, gErr.message);
+        return res.status(401).json({ error: 'Invalid or expired Google authorization token. Please try again.' });
+      }
+    }
+
+    const email = decoded && decoded.email ? String(decoded.email).trim().toLowerCase() : null;
     if (!email) {
       return res.status(400).json({ error: 'Google account has no associated email address' });
     }

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 const googleProvider = new GoogleAuthProvider();
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '942129499307-fer7gcbqo0h1gjhj0mr65oran7ohi92q.apps.googleusercontent.com';
 
 export default function LoginView() {
   const { login, preLogin, sendLoginEmailOtp, verify2FA, register, sendRegistrationOtp, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ 
@@ -82,6 +83,8 @@ export default function LoginView() {
   const [sendingRegOtp,     setSendingRegOtp]     = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [gisLoaded, setGisLoaded] = useState(false);
+  const googleBtnContainerRef = useRef(null);
   const [message,  setMessage]  = useState('');
 
   // 2FA & 30-Day Device Trust States
@@ -518,8 +521,138 @@ export default function LoginView() {
     setLoading(false);
   };
 
+  // Handle Google Identity Services (GIS / FedCM / One Tap) response
+  const handleGoogleCredentialResponse = useCallback(async (response) => {
+    if (!response || !response.credential) return;
+    useStore.setState({ authError: null });
+    setLoading(true);
+    setGoogleLoading(true);
+    try {
+      const googleToken = response.credential;
+      let idTokenToSend = googleToken;
+
+      // Exchange with Firebase Auth client if available
+      if (auth) {
+        try {
+          const cred = GoogleAuthProvider.credential(googleToken);
+          const userCred = await signInWithCredential(auth, cred);
+          if (userCred?.user) {
+            idTokenToSend = await userCred.user.getIdToken();
+          }
+        } catch (fbExchangeErr) {
+          console.warn('[AUTH] Firebase client exchange notice, passing Google token to backend:', fbExchangeErr.message);
+          idTokenToSend = googleToken;
+        }
+      }
+
+      const res = await fetch(`${API}/api/auth/google-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idTokenToSend })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Google login failed');
+      }
+
+      if (data.needs_profile_completion) {
+        setGoogleIdToken(idTokenToSend);
+        if (data.email) setEmail(data.email);
+        if (data.suggested_name) setUsername(data.suggested_name);
+        setView('google_complete');
+        setMessage('Google account verified! Please enter your 10-digit mobile number to complete registration.');
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      if (data.user) {
+        useStore.setState({
+          user: data.user,
+          token: data.token,
+          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+        });
+        useStore.getState().fetchUserData?.();
+      }
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.history.pushState({}, '', '/');
+      }
+    } catch (err) {
+      console.warn('Google sign-in error:', err);
+      useStore.setState({ authError: err.message || 'Google sign-in failed. Please try again.' });
+    } finally {
+      setGoogleLoading(false);
+      setLoading(false);
+    }
+  }, []);
+
+  // Initialize Google Identity Services (GIS)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const initGis = () => {
+      if (window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            itp_support: true
+          });
+          setGisLoaded(true);
+          // Try displaying native One Tap prompt on supported browsers
+          window.google.accounts.id.prompt();
+        } catch (e) {
+          console.warn('[GIS] Init notice:', e.message);
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGis();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          initGis();
+          clearInterval(interval);
+        }
+      }, 200);
+      const timeout = setTimeout(() => clearInterval(interval), 4000);
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [handleGoogleCredentialResponse]);
+
+  // Render Google Identity Services Button
+  useEffect(() => {
+    if ((view === 'login' || view === 'register') && gisLoaded && window.google?.accounts?.id && googleBtnContainerRef.current) {
+      try {
+        googleBtnContainerRef.current.innerHTML = '';
+        window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+          type: 'standard',
+          theme: 'filled_black',
+          size: 'large',
+          text: view === 'register' ? 'signup_with' : 'signin_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: 320
+        });
+      } catch (e) {
+        console.warn('[GIS] Render button notice:', e.message);
+      }
+    }
+  }, [gisLoaded, view]);
+
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
+    // If Google Identity Services is available, prompt native bottom sheet
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt();
+      } catch (_) {}
+    }
     setLoading(true);
     setGoogleLoading(true);
     try {
@@ -1276,47 +1409,63 @@ export default function LoginView() {
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.12)' }}></div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={loading || googleLoading}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: '#fff',
-                  fontSize: '13.5px',
-                  fontWeight: '700',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  cursor: (loading || googleLoading) ? 'not-allowed' : 'pointer',
-                  opacity: (loading || googleLoading) ? 0.8 : 1,
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
-                }}
-                className="hoverable"
-              >
-                {googleLoading ? (
-                  <>
-                    <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    <span style={{ color: '#38bdf8' }}>Connecting to Google...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg width="18" height="18" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                    </svg>
-                    <span>{view === 'register' ? 'Sign up with Google' : 'Log in with Google'}</span>
-                  </>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                {/* Official Google Identity Services Native Button Container (No popups, No redirects, No storage partitioning) */}
+                <div 
+                  ref={googleBtnContainerRef} 
+                  style={{ 
+                    display: gisLoaded ? 'flex' : 'none', 
+                    justifyContent: 'center', 
+                    width: '100%', 
+                    minHeight: '44px' 
+                  }} 
+                />
+
+                {/* Fallback button when GIS is still loading, in-flight, or blocked by privacy extensions */}
+                {(!gisLoaded || googleLoading) && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading || googleLoading}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255, 255, 255, 0.18)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: '#fff',
+                      fontSize: '13.5px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      cursor: (loading || googleLoading) ? 'not-allowed' : 'pointer',
+                      opacity: (loading || googleLoading) ? 0.8 : 1,
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+                    }}
+                    className="hoverable"
+                  >
+                    {googleLoading ? (
+                      <>
+                        <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        <span style={{ color: '#38bdf8' }}>Connecting to Google...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="18" height="18" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                        </svg>
+                        <span>{view === 'register' ? 'Sign up with Google' : 'Log in with Google'}</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             </>
           )}
         </form>
