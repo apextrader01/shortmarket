@@ -389,22 +389,6 @@ const OptionChainViewInternal = () => {
           useStore.getState().showToast('🔒 Index Buying is exclusive to Pro subscribers. Upgrade to trade Nifty & BankNifty options.', 'error', 'Subscription Required');
           return;
         }
-
-        const positions = useStore.getState().positions || [];
-        const activeIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-        if (activeIndexPos) {
-          const symLabel = (activeIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-          useStore.getState().showToast(`⚠️ Only 1 active index trade allowed at a time. Active: ${symLabel} (${activeIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPos.quantity)} qty). Close it before buying another.`, 'warning', 'Single Index Limit');
-          return;
-        }
-
-        const orders = useStore.getState().orders || [];
-        const pendingIndexOrder = orders.find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
-        if (pendingIndexOrder) {
-          const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-          useStore.getState().showToast(`⚠️ Only 1 active index trade allowed at a time. Pending: ${symLabel}. Cancel or wait for execution.`, 'warning', 'Pending Index Order');
-          return;
-        }
       }
 
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price

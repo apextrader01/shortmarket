@@ -170,8 +170,6 @@ export default function OrderModal() {
   });
   const isCoveringShort = Boolean(existingShortPos && Math.abs(Number(existingShortPos.quantity)) > 0);
 
-  const activeIndexPosition = (positions || []).find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-  const pendingIndexOrder = (orders || []).find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
   
   // Fetch Estimated Charges
   useEffect(() => {
@@ -623,20 +621,10 @@ export default function OrderModal() {
       }
     }
 
-    // Index Buy Restriction (Subscription Required & Single Active Index Trade Limit)
+    // Index Buy Restriction (Subscription Required)
     if (isBuy && isTargetIndex && !isTrueExit && !isCoveringShort) {
       if (!isPaidTier) {
         failValidation("🔒 Index Buying is exclusive to Pro subscribers. Please upgrade your subscription to trade Nifty, BankNifty, Sensex and other index contracts.");
-        return;
-      }
-      if (activeIndexPosition) {
-        const symLabel = (activeIndexPosition.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-        failValidation(`⚠️ Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${activeIndexPosition.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPosition.quantity)} qty). Please close your existing index position before buying another index.`);
-        return;
-      }
-      if (pendingIndexOrder) {
-        const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-        failValidation(`⚠️ Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please wait for execution or cancel it before buying another index.`);
         return;
       }
     }
@@ -909,24 +897,6 @@ export default function OrderModal() {
               >
                 Upgrade Now
               </button>
-            </div>
-          ) : (activeIndexPosition || pendingIndexOrder) ? (
-            <div style={{
-              margin: '12px 18px 0 18px',
-              background: 'rgba(245, 158, 11, 0.12)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              borderRadius: '8px',
-              padding: '10px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: '12px', color: '#fcd34d', lineHeight: '1.4' }}>
-                <strong>Single Index Limit:</strong> Only 1 active index trade allowed at a time.
-                {activeIndexPosition && ` You hold ${activeIndexPosition.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '')} (${activeIndexPosition.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPosition.quantity)} qty). Close it before buying another.`}
-                {!activeIndexPosition && pendingIndexOrder && ` You have a pending ${pendingIndexOrder.status} order for ${pendingIndexOrder.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '')}.`}
-              </div>
             </div>
           ) : null
         )}

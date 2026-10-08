@@ -7589,41 +7589,6 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           tier: userRecord?.subscription_tier || 'BASIC'
         });
       }
-
-      // 2. Enforce Single Active Index Trade at a Time
-      // Check existing open index positions (quantity != 0)
-      const openPositions = await db('positions')
-        .where({ user_id: req.user.id })
-        .where('quantity', '!=', 0)
-        .select('id', 'symbol', 'quantity', 'product_type');
-
-      const existingIndexPos = openPositions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-      if (existingIndexPos) {
-        const cleanExistingSym = existingIndexPos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return res.status(400).json({
-          error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${cleanExistingSym} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`,
-          index_limit_reached: true,
-          active_index_symbol: cleanExistingSym,
-          active_index_quantity: existingIndexPos.quantity
-        });
-      }
-
-      // Check existing pending index BUY orders
-      const pendingOrders = await db('orders')
-        .where({ user_id: req.user.id })
-        .whereRaw('UPPER(side) = ?', ['BUY'])
-        .whereIn('status', ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'])
-        .select('id', 'symbol', 'status');
-
-      const existingPendingIndex = pendingOrders.find(o => isIndexContract(o.symbol));
-      if (existingPendingIndex) {
-        const cleanPendingSym = existingPendingIndex.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return res.status(400).json({
-          error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${existingPendingIndex.status} order for ${cleanPendingSym}. Please cancel it or wait for execution before placing another index buy order.`,
-          index_limit_reached: true,
-          pending_index_symbol: cleanPendingSym
-        });
-      }
     }
   }
 
@@ -9517,45 +9482,6 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     });
   }
 
-  // ── Index Buy Restriction (Single Active Index Trade Limit) in Basket Orders ──
-  const indexBuyItems = items.filter(item => String(item.side).toUpperCase() === 'BUY' && isIndexContract(item.symbol));
-  if (indexBuyItems.length > 1) {
-    return res.status(400).json({
-      error: 'Index limit reached: Only 1 active index buy trade is allowed at a time. Your basket contains multiple index buy orders.',
-      index_limit_reached: true
-    });
-  }
-
-  if (indexBuyItems.length === 1) {
-    const openPositions = await db('positions')
-      .where({ user_id: req.user.id })
-      .where('quantity', '!=', 0)
-      .select('id', 'symbol', 'quantity');
-
-    const existingIndexPos = openPositions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-    if (existingIndexPos) {
-      const cleanExistingSym = existingIndexPos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-      return res.status(400).json({
-        error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${cleanExistingSym} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`,
-        index_limit_reached: true
-      });
-    }
-
-    const pendingOrders = await db('orders')
-      .where({ user_id: req.user.id })
-      .whereRaw('UPPER(side) = ?', ['BUY'])
-      .whereIn('status', ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'])
-      .select('id', 'symbol', 'status');
-
-    const existingPendingIndex = pendingOrders.find(o => isIndexContract(o.symbol));
-    if (existingPendingIndex) {
-      const cleanPendingSym = existingPendingIndex.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-      return res.status(400).json({
-        error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${existingPendingIndex.status} order for ${cleanPendingSym}. Please cancel it or wait for execution before placing another index buy order.`,
-        index_limit_reached: true
-      });
-    }
-  }
 
   // Block new orders when market is closed
   for (const item of items) {

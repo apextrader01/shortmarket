@@ -98,7 +98,7 @@ function simulateOrderValidation({ user, order, positions = [], pendingOrders = 
     const isCoveringShort = Boolean(coveringShortPos && Math.abs(Number(coveringShortPos.quantity)) > 0);
 
     if (!isCoveringShort) {
-      // 1. Subscription Check
+      // 1. Subscription Check (Exclusive to Pro/Paid subscribers)
       if (!isPaidTier) {
         return {
           status: 403,
@@ -106,27 +106,7 @@ function simulateOrderValidation({ user, order, positions = [], pendingOrders = 
           requires_subscription: true
         };
       }
-
-      // 2. Single Active Index Trade Limit
-      const existingIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-      if (existingIndexPos) {
-        const cleanExistingSym = existingIndexPos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return {
-          status: 400,
-          error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${cleanExistingSym}.`,
-          index_limit_reached: true
-        };
-      }
-
-      const existingPendingIndex = pendingOrders.find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
-      if (existingPendingIndex) {
-        const cleanPendingSym = existingPendingIndex.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return {
-          status: 400,
-          error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${existingPendingIndex.status} order for ${cleanPendingSym}.`,
-          index_limit_reached: true
-        };
-      }
+      // Note: Traders can now buy multiple index contracts simultaneously across NSE & BSE!
     }
   }
 
@@ -176,26 +156,18 @@ test('Monthly and Yearly Elite users both have index buying permissions (same fe
   assert.strictEqual(yearlyRes.status, 200);
 });
 
-test('Subscribed (PRO) user with no existing index trades can buy index', () => {
-  const result = simulateOrderValidation({
-    user: { id: 102, subscription_tier: 'PRO', is_admin: false },
-    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
-  });
-  assert.strictEqual(result.status, 200);
-  assert.strictEqual(result.success, true);
-});
-
-test('Subscribed user holding active index position is blocked from buying another index (1 at a time)', () => {
+test('Subscribed user CAN buy more than one index at a time across NSE and BSE', () => {
+  // User already holds NIFTY position and buys BANKNIFTY -> MUST SUCCEED (200 OK)
   const result = simulateOrderValidation({
     user: { id: 102, subscription_tier: 'PRO', is_admin: false },
     order: { symbol: 'NSE:BANKNIFTY24OCT52000CE', side: 'BUY' },
     positions: [
-      { symbol: 'NSE:NIFTY24OCT25000CE', quantity: 50 } // Already has 1 open NIFTY position
+      { symbol: 'NSE:NIFTY24OCT25000CE', quantity: 50 }, // Existing NIFTY position
+      { symbol: 'BSE:SENSEX24OCT82000CE', quantity: 10 }  // Existing SENSEX position
     ]
   });
-  assert.strictEqual(result.status, 400);
-  assert.strictEqual(result.index_limit_reached, true);
-  assert.ok(result.error.includes('Only 1 active index trade is allowed at a time'));
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.success, true);
 });
 
 test('Subscribed user holding active index position CAN still buy non-index equities', () => {
@@ -203,14 +175,14 @@ test('Subscribed user holding active index position CAN still buy non-index equi
     user: { id: 102, subscription_tier: 'PRO', is_admin: false },
     order: { symbol: 'NSE:RELIANCE', side: 'BUY' },
     positions: [
-      { symbol: 'NSE:NIFTY24OCT25000CE', quantity: 50 } // Holds index position
+      { symbol: 'NSE:NIFTY24OCT25000CE', quantity: 50 }
     ]
   });
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.success, true);
 });
 
-test('Subscribed user with pending index BUY order is blocked from placing another index BUY', () => {
+test('Subscribed user with pending index BUY order CAN place another index BUY order', () => {
   const result = simulateOrderValidation({
     user: { id: 102, subscription_tier: 'PRO', is_admin: false },
     order: { symbol: 'NSE:BANKNIFTY24OCT52000CE', side: 'BUY' },
@@ -219,9 +191,8 @@ test('Subscribed user with pending index BUY order is blocked from placing anoth
       { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY', status: 'OPEN' }
     ]
   });
-  assert.strictEqual(result.status, 400);
-  assert.strictEqual(result.index_limit_reached, true);
-  assert.ok(result.error.includes('Only 1 active index trade is allowed at a time'));
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.success, true);
 });
 
 test('Selling to exit existing long index position is NEVER blocked', () => {
@@ -250,15 +221,15 @@ test('Buying to cover existing short index position is NEVER blocked', () => {
   assert.strictEqual(result.success, true);
 });
 
-test('Code inspection: server.js and store.js enforce index buy subscription and 1-index limit', () => {
+test('Code inspection: server.js and store.js enforce index buy subscription without artificial 1-index blockage', () => {
   const serverCode = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   assert.ok(serverCode.includes('function isIndexContract'), 'server.js must define isIndexContract');
   assert.ok(serverCode.includes('Index buying is exclusive to Pro subscribers'), 'server.js must require pro subscription for index buy');
-  assert.ok(serverCode.includes('Only 1 active index trade is allowed at a time'), 'server.js must enforce single index trade limit');
+  assert.ok(!serverCode.includes('Only 1 active index trade is allowed at a time'), 'server.js must NOT block multiple index trades');
 
   const storeCode = fs.readFileSync(path.join(__dirname, '../frontend/src/store.js'), 'utf8');
   assert.ok(storeCode.includes('export function isIndexContract'), 'store.js must export isIndexContract');
-  assert.ok(storeCode.includes('Index limit reached: Only 1 active index trade is allowed at a time'), 'store.js must enforce single index limit');
+  assert.ok(!storeCode.includes('Index limit reached: Only 1 active index trade is allowed at a time'), 'store.js must NOT block multiple index trades');
 });
 
-console.log('\n🎉 ALL INDEX BUY SUBSCRIPTION & SINGLE-TRADE LIMIT TESTS PASSED PERFECTLY!\n');
+console.log('\n🎉 ALL INDEX BUY SUBSCRIPTION & MULTI-TRADE TESTS PASSED PERFECTLY!\n');

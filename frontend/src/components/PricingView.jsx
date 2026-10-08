@@ -153,7 +153,7 @@ export default function PricingView({ setActiveTab }) {
     ]},
     { category: 'Order Execution & Risk Control', items: [
       { name: 'Daily Order Limits', normal: '25 Trades / mo (Cash)', monthly: '500 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders / day', masterclass: '25 Trades / mo (Cash)', lifetime: '500 Orders / day (Forever)' },
-      { name: 'Index Buying (Nifty/BankNifty)', normal: '—', monthly: '✓ Allowed (1 at a time)', yearly: '✓ Allowed (1 at a time)', highest: '✓ Allowed (1 at a time)', masterclass: '— (Sub Required)', lifetime: '✓ Allowed (Forever)' },
+      { name: 'Index Buying (Nifty/BankNifty)', normal: '—', monthly: '✓ Allowed', yearly: '✓ Allowed', highest: '✓ Allowed', masterclass: '— (Sub Required)', lifetime: '✓ Allowed (Forever)' },
       { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '20-Depth (Level 2)', yearly: '20-Depth (Level 2)', highest: '20-Depth + DOM Ladder', masterclass: '5-Depth (Level 1)', lifetime: '20-Depth (Level 2)' },
       { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 15 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: '—', lifetime: 'Up to 15 legs' },
       { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '10 resets / month', yearly: '10 resets / month', highest: 'Unlimited instant resets', masterclass: '1 every 30 days', lifetime: '10 resets / month (Forever)' }

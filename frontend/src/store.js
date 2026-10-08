@@ -737,32 +737,7 @@ export const useStore = create(persist((set, get) => ({
   placeBasketOrder: async (basketPayload) => {
     try {
       const items = basketPayload?.items || [];
-      const indexBuyItems = items.filter(item => String(item.side).toUpperCase() === 'BUY' && isIndexContract(item.symbol));
-      if (indexBuyItems.length > 1) {
-        return { success: false, error: 'Index limit reached: Only 1 active index buy trade is allowed at a time. Your basket contains multiple index buy orders.' };
-      }
-
-      if (indexBuyItems.length === 1) {
-        const positions = get().positions || [];
-        const existingIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-        if (existingIndexPos) {
-          const symLabel = (existingIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-          return {
-            success: false,
-            error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`
-          };
-        }
-
-        const orders = get().orders || [];
-        const pendingIndexOrder = orders.find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
-        if (pendingIndexOrder) {
-          const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-          return {
-            success: false,
-            error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please cancel it or wait for execution before placing another index buy order.`
-          };
-        }
-      }
+      if (items.length === 0) return { success: false, error: 'Basket is empty' };
 
       const token = localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };
@@ -1906,27 +1881,6 @@ export const useStore = create(persist((set, get) => ({
             const err = 'Index trading (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.) is an exclusive Pro feature. Please upgrade your subscription to trade index options and futures.';
             if (get().showToast) get().showToast(err, 'error', 'Subscription Required');
             return { success: false, error: err, requires_subscription: true };
-          }
-
-          const existingIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
-          if (existingIndexPos) {
-            const symLabel = (existingIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-            const err = `Index limit reached: Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before buying another index.`;
-            if (get().showToast) get().showToast(err, 'warning', 'Single Index Limit');
-            return { success: false, error: err, index_limit_reached: true };
-          }
-
-          const orders = get().orders || [];
-          const pendingIndexOrder = orders.find(o => {
-            if (String(o.side).toUpperCase() !== 'BUY') return false;
-            if (!['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status)) return false;
-            return isIndexContract(o.symbol);
-          });
-          if (pendingIndexOrder) {
-            const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-            const err = `Index limit reached: Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please wait for execution or cancel it before buying another index.`;
-            if (get().showToast) get().showToast(err, 'warning', 'Pending Index Order');
-            return { success: false, error: err, index_limit_reached: true };
           }
         }
       }
