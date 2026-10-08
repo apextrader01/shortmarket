@@ -14,6 +14,7 @@ import {
 
 export default function LandingHomeView({
   onOpenPaperTrading,
+  onOpenCommunity,
   onOpenOptionChain,
   onOpenTradeDiary,
   onOpenPrimaryMarkets,
@@ -45,6 +46,7 @@ export default function LandingHomeView({
       else if (hubId === 4) import('./CalculatorsSuiteView');
       else if (hubId === 5) import('./WealthPersonalFinanceModal');
       else if (hubId === 6) import('./SkandxAlgoView');
+      else if (hubId === 7) import('./CommunityFeedView');
     } catch (_) {}
   };
 
@@ -314,6 +316,7 @@ export default function LandingHomeView({
   ];
 
   const SPOTLIGHT_TOOLS = [
+    { label: '💬 Traders Community & Clubs', action: () => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading()), color: '#38bdf8' },
     { label: '🧮 SIP & Step-Up Calculator', action: () => onOpenCalculators('sip'), color: '#38bdf8' },
     { label: '🏠 Reducing Balance Loan EMI', action: () => onOpenCalculators('reducing-loan'), color: '#10b981' },
     { label: '🏦 Fixed / Flat Rate Loan', action: () => onOpenCalculators('fixed-loan'), color: '#f59e0b' },
@@ -441,6 +444,13 @@ export default function LandingHomeView({
           >
             <span>Explore Hubs</span>
             <ChevronDown size={14} />
+          </button>
+          <button 
+            onClick={() => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading())}
+            onMouseEnter={() => prefetchHubChunk(7)}
+            style={{ padding: '6px 12px', background: 'rgba(37, 99, 235, 0.14)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#60a5fa', fontSize: '12.5px', fontWeight: '700', cursor: 'pointer', borderRadius: '6px' }}
+          >
+            💬 Community & Clubs
           </button>
           <button 
             onClick={() => onOpenTradeDiary('CHECKLIST')}

@@ -11242,6 +11242,14 @@ app.get('/api/fyers-debug', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// ─── Traders Community Hub & Tiered WebP Photo Vault ──────────────────────
+const { communityRouter, UPLOADS_ROOT } = require('./services/communityRoutes');
+app.use('/uploads/community', express.static(UPLOADS_ROOT, {
+  maxAge: '30d',
+  immutable: true
+}));
+app.use('/api/community', apiLimiter, communityRouter);
+
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist'), {
   maxAge: '1y',
@@ -13545,6 +13553,10 @@ const SERVER_SEO_MAP = {
   '/tax-hub': {
     title: 'Trader Tax Hub — FY25 STCG 20% / LTCG 12.5% & F&O Tax Harvesting | SkandX',
     desc: 'Calculate Indian capital gains taxes (STCG 20%, LTCG 12.5%), F&O business income tax, and actionable tax-loss harvesting opportunities.'
+  },
+  '/community': {
+    title: 'Traders Community & Clubs — Live Nifty, Options & Stock Setups | SkandX',
+    desc: 'Join India’s fastest traders community. Share chart screenshots, live F&O trade setups, and discuss Nifty, BankNifty, IPOs & stocks across specialized clubs.'
   }
 };
 
@@ -13703,7 +13715,7 @@ app.use((req, res) => {
     return res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
   }
   // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
-  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|mjs|map)$/)) {
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|webp|ico|svg|woff|woff2|ttf|eot|mjs|map)$/)) {
     return res.status(404).send('Asset not found');
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

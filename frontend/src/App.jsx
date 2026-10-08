@@ -75,6 +75,7 @@ const MutualFundsExplorerModal = lazyWithRetry(() => import('./components/Mutual
 const AlgoBridgeDashboardModal = lazyWithRetry(() => import('./components/AlgoBridgeDashboardModal'));
 const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));
 const CalculatorsSuiteView = lazyWithRetry(() => import('./components/CalculatorsSuiteView'));
+const CommunityFeedView = lazyWithRetry(() => import('./components/CommunityFeedView'));
 const AdBannerWidget = lazyWithRetry(() => import('./components/AdBannerWidget'));
 const GlobalAdInterstitial = lazyWithRetry(() => import('./components/AdBannerWidget').then(m => ({ default: m.GlobalAdInterstitial })));
 
@@ -92,7 +93,7 @@ import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { TrendingUp, TrendingDown, LogOut, User, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu } from 'lucide-react';
+import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -433,6 +434,7 @@ function App() {
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
       'leaderboard': 'Leaderboard',
+      'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
       'aboutus': 'AboutUs', 'about': 'AboutUs'
@@ -492,7 +494,7 @@ function App() {
         'algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge',
         'markets', 'paper-trading', 'papertrading', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
         'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
-        'pricing', 'referrals', 'leaderboard', 'journal', 'tradingjournal', 'trading-journal',
+        'pricing', 'referrals', 'leaderboard', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
         'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
         'adminpanel', 'clientdata', 'profile', 'account', 'settings',
         'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
@@ -515,6 +517,7 @@ function App() {
       else if (activeTab === 'PrimaryMarkets') newPath = ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos'].includes(seg0) ? `/${seg0}` : '/primary-markets';
       else if (activeTab === 'Markets') newPath = ['markets', 'paper-trading', 'papertrading'].includes(seg0) ? `/${seg0}` : '/markets';
       else if (activeTab === 'Journal') newPath = ['journal', 'tradingjournal', 'trading-journal'].includes(seg0) ? `/${seg0}` : '/journal';
+      else if (activeTab === 'Community') newPath = '/community';
       else if (activeTab === 'AboutUs') newPath = ['aboutus', 'about'].includes(seg0) ? `/${seg0}` : '/aboutus';
       else newPath = `/${activeTab.toLowerCase()}`;
 
@@ -556,6 +559,7 @@ function App() {
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
         'leaderboard': 'Leaderboard',
+        'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
         'aboutus': 'AboutUs', 'about': 'AboutUs'
@@ -1024,6 +1028,7 @@ function App() {
         <Suspense fallback={<TabLoader />}>
           <LandingHomeView 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
+            onOpenCommunity={() => setActiveTab('Community')}
             onOpenTradeDiary={(tab) => {
               setTradeDiaryInitialTab(tab || 'DASHBOARD');
               setActiveTab('TradeDiary');
@@ -1165,6 +1170,7 @@ function App() {
                   {[
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
+                    { key: 'Community', label: 'Community' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
@@ -1275,7 +1281,7 @@ function App() {
             </header>
 
           <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
+            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'Community', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
               <MarketWatch 
                 className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
                 onStockSelect={(sym) => {
@@ -1342,6 +1348,16 @@ function App() {
                   </Suspense>
                 </div>
               )}
+              {activeTab === 'Community' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <CommunityFeedView
+                      onOpenPaperTrading={() => setActiveTab('Markets')}
+                      onUpgradeClick={() => setActiveTab('Pricing')}
+                    />
+                  </Suspense>
+                </div>
+              )}
               {activeTab === 'Journal' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
                   <Suspense fallback={<TabLoader />}>
@@ -1403,7 +1419,7 @@ function App() {
                   </Suspense>
                 </div>
               )}
-              {['Markets', 'Chart', 'Options', 'Watchlist', 'Positions', 'Orders', 'Portfolio', 'Reports', 'Leaderboard', 'MutualFunds', 'Analytics', 'Journal', 'Referrals', 'ClientData', 'Settings', 'AboutUs'].includes(activeTab) && (
+              {['Markets', 'Chart', 'Options', 'Watchlist', 'Positions', 'Orders', 'Portfolio', 'Reports', 'Leaderboard', 'Community', 'MutualFunds', 'Analytics', 'Journal', 'Referrals', 'ClientData', 'Settings', 'AboutUs'].includes(activeTab) && (
                 <Suspense fallback={null}>
                   <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
                 </Suspense>
@@ -1537,6 +1553,7 @@ function App() {
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
+            { label: 'Traders Community & Clubs', key: 'Community', icon: Users },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
