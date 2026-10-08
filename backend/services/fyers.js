@@ -3,29 +3,65 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ quiet: true });
 
-// 🛡️ Hotpatch Fyers SDK v3 unhandled TypeError: Cannot read properties of undefined (reading 'prepareData')
+// 🛡️ Hotpatch Fyers SDK v3 HSWebSocket:
+// 1. Detach event listeners on close() so a closing socket's async onclose event never kills a newly opened socket
+// 2. Guard onopen/onmessage/onclose/onerror against stale WebSocket instances
+// 3. Swallow unmapped topic 'prepareData' TypeError during subscription handshakes
 try {
     const HSWebSocket = require('fyers-api-v3/HSM_Package/hslib.js');
-    if (HSWebSocket && HSWebSocket.prototype && HSWebSocket.prototype.connect && !HSWebSocket.prototype._patchedForPrepareData) {
-        const origConnect = HSWebSocket.prototype.connect;
-        HSWebSocket.prototype.connect = function(...args) {
-            const res = origConnect.apply(this, args);
-            if (this.ws) {
-                const origOnMessage = this.ws.onmessage;
-                this.ws.onmessage = function(event) {
+    if (HSWebSocket && HSWebSocket.prototype && !HSWebSocket.prototype._patchedForPrepareData) {
+        if (HSWebSocket.prototype.close) {
+            const origClose = HSWebSocket.prototype.close;
+            HSWebSocket.prototype.close = function(...args) {
+                if (this.ws) {
                     try {
-                        if (origOnMessage) return origOnMessage.call(this, event);
-                    } catch (err) {
-                        if (err && err.message && err.message.includes('prepareData')) {
-                            // Safely swallow unmapped topic binary tick frames during subscription handshake
-                            return;
+                        this.ws.onopen = null;
+                        this.ws.onmessage = null;
+                        this.ws.onclose = null;
+                        this.ws.onerror = null;
+                    } catch (e) {}
+                }
+                return origClose.apply(this, args);
+            };
+        }
+        if (HSWebSocket.prototype.connect) {
+            const origConnect = HSWebSocket.prototype.connect;
+            HSWebSocket.prototype.connect = function(...args) {
+                const res = origConnect.apply(this, args);
+                if (this.ws) {
+                    const activeWs = this.ws;
+                    const origOnOpen = activeWs.onopen;
+                    const origOnMessage = activeWs.onmessage;
+                    const origOnClose = activeWs.onclose;
+                    const origOnError = activeWs.onerror;
+
+                    activeWs.onopen = (event) => {
+                        if (this.ws !== activeWs) return;
+                        if (origOnOpen) return origOnOpen.call(activeWs, event);
+                    };
+                    activeWs.onmessage = (event) => {
+                        if (this.ws !== activeWs) return;
+                        try {
+                            if (origOnMessage) return origOnMessage.call(activeWs, event);
+                        } catch (err) {
+                            if (err && err.message && err.message.includes('prepareData')) {
+                                return;
+                            }
+                            console.error('⚠️ [Fyers WebSocket onmessage error]:', err.message);
                         }
-                        console.error('⚠️ [Fyers WebSocket onmessage error]:', err.message);
-                    }
-                };
-            }
-            return res;
-        };
+                    };
+                    activeWs.onclose = (event) => {
+                        if (this.ws !== activeWs) return;
+                        if (origOnClose) return origOnClose.call(activeWs, event);
+                    };
+                    activeWs.onerror = (event) => {
+                        if (this.ws !== activeWs) return;
+                        if (origOnError) return origOnError.call(activeWs, event);
+                    };
+                }
+                return res;
+            };
+        }
         HSWebSocket.prototype._patchedForPrepareData = true;
     }
 } catch (e) {
@@ -462,18 +498,31 @@ const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 let isMarketFeedPaused = false;
 
+function cleanupDataSocketInstance() {
+    if (wsInstance) {
+        try {
+            if (wsInstance.secondcountertimer) clearInterval(wsInstance.secondcountertimer);
+            if (wsInstance.interval) clearInterval(wsInstance.interval);
+            if (wsInstance.autreconnecttimer) clearTimeout(wsInstance.autreconnecttimer);
+            if (wsInstance.close) wsInstance.close();
+            if (wsInstance.disconnect) wsInstance.disconnect();
+        } catch(e) {}
+    }
+    try {
+        if (DataSocket && DataSocket.instance) {
+            DataSocket.instance = null;
+        }
+    } catch(e) {}
+    wsInstance = null;
+}
+
 function pauseLiveFeed() {
     isMarketFeedPaused = true;
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
     }
-    if (wsInstance) {
-        try {
-            if (wsInstance.close) wsInstance.close();
-            if (wsInstance.disconnect) wsInstance.disconnect();
-        } catch(e) {}
-    }
+    cleanupDataSocketInstance();
     isFyersConnected = false;
     if (global_io) {
         global_io.emit('market_feed_status', { connected: false, isPaused: true, lastTickTime });
@@ -502,10 +551,11 @@ function startLiveWebSocket() {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
     }
-    if (wsInstance) { try { if (wsInstance.close) wsInstance.close(); if (wsInstance.disconnect) wsInstance.disconnect(); } catch(e) {} }
-    // With fyers-api-v3, we MUST use getInstance() instead of new DataSocket
-    // to prevent 'Only one instance of DataSocket is allowed' errors during reconnects.
-    // If wsInstance exists, we just let it be, but we will call connect() later.
+    isProcessingSubQueue = false;
+    // Reset DataSocket singleton and detach old WebSocket listeners BEFORE creating a new instance.
+    // Otherwise DataSocket.getInstance returns the closed instance whose secondcountertimer was cleared
+    // and whose old WebSocket's async onclose event destroys the new connection's send-queue interval.
+    cleanupDataSocketInstance();
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
     const effectiveAppId = activeAppId || process.env.FYERS_APP_ID || '';
@@ -525,15 +575,29 @@ function startLiveWebSocket() {
         return;
     }
     
+    // Drain internal SDK send-queue every 300ms instead of default 2000ms for instant subscription handshakes
+    try {
+        if (typeof wsInstance.setQueueProcessInterval === 'function') {
+            wsInstance.setQueueProcessInterval(300);
+        }
+    } catch (e) {}
+
     if (wsInstance.FullMode) {
         wsInstance.mode(wsInstance.FullMode);
     }
     
-    // Always remove old listeners and re-attach fresh ones.
-    // The singleton pattern means we get the same object back, but after a token change
-    // or pm2 restart we MUST re-register handlers so the new code takes effect.
-    try { if (wsInstance.removeAllListeners) wsInstance.removeAllListeners(); } catch(e) {}
     wsInstance.hasListenersAttached = true;
+
+    // IMPORTANT: Register 'error' BEFORE 'message' because fyers-api-v3 datasocket.min.js
+    // copies `this.socketonerror` into a local closure variable at the exact moment `.on('message')` is called!
+    wsInstance.on('error', (err) => {
+        console.error("Fyers WS Error:", err);
+        const errMsg = (err && (err.message || JSON.stringify(err) || err.toString())) || '';
+        const purged = extractAndPurgeInvalidSymbols(errMsg);
+        if (purged.length === 0 && isTokenExpired(activeAccessToken) && (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized'))) {
+            console.warn("🚨 Fyers token expired or unauthorized. Please re-authenticate Fyers via Admin Settings / API.");
+        }
+    });
     
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');
@@ -548,30 +612,23 @@ function startLiveWebSocket() {
             global_io.emit('market_feed_status', { connected: true, lastTickTime });
         }
         
-        // CRITICAL: Always enable autoreconnect unconditionally so Fyers can
-        // recover from hourly session drops even when no clients are connected at boot.
-        if (wsInstance) wsInstance.autoreconnect();
-        
-        // Re-subscribe to all existing client subscriptions
+        // Re-subscribe to all existing client subscriptions via unified subQueue
         if (clientSubscriptions.size > 0) {
             const fyersSymbols = Array.from(clientSubscriptions)
                 .map(toFyersSymbol)
                 .filter(Boolean);
-            
-                  (async () => {
-                      const chunkSize = 25;
-                      for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
-                          if (!wsInstance) break;
-                          const chunk = fyersSymbols.slice(i, i + chunkSize);
-                          wsInstance.subscribe(chunk);
-                          await new Promise(r => setTimeout(r, 300));
-                      }
-                  })();
+            fyersSymbols.forEach(fSym => {
+                if (!subQueue.includes(fSym)) subQueue.push(fSym);
+            });
+        }
+        if (subQueue.length > 0) {
+            setTimeout(() => {
+                processSubQueue();
+            }, 500);
         }
         
         // Watchdog — only trigger if we've been running for more than 2 minutes.
         // This prevents false restarts during PM2 boot when no clients have connected yet.
-        const bootGracePeriodMs = 120000; // 2 minutes
         if (watchdogInterval) clearInterval(watchdogInterval);
         watchdogInterval = setInterval(() => {
             const staleSec = (Date.now() - lastTickTime) / 1000;
@@ -699,20 +756,6 @@ function startLiveWebSocket() {
         });
     });
     
-    wsInstance.on('error', (err) => {
-        console.error("Fyers WS Error:", err);
-        const errMsg = (err && (err.message || JSON.stringify(err) || err.toString())) || '';
-        const purged = extractAndPurgeInvalidSymbols(errMsg);
-        if (purged.length === 0 && isTokenExpired(activeAccessToken) && (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized'))) {
-            console.warn("🚨 Fyers token expired or unauthorized. Please re-authenticate Fyers via Admin Settings / API.");
-        }
-    });
-    
-    wsInstance.on('general', (msg) => {
-        const msgStr = typeof msg === 'string' ? msg : JSON.stringify(msg || {});
-        extractAndPurgeInvalidSymbols(msgStr);
-    });
-    
     wsInstance.on('close', (reason) => {
         console.log("Fyers WS Closed — resetting state and scheduling reconnect.", reason || '');
         isFyersConnected = false;
@@ -754,11 +797,21 @@ async function processSubQueue() {
     isProcessingSubQueue = true;
     try {
         while (subQueue.length > 0) {
-            if (!wsInstance) break;
+            if (!wsInstance || !isFyersConnected) break;
             const rawChunk = subQueue.splice(0, 25);
             const chunk = rawChunk.filter(fSym => fSym && !invalidFyersSymbols.has(fSym) && !isExpiredContract(fSym));
             if (chunk.length > 0) {
-                wsInstance.subscribe(chunk);
+                const invalidCountBefore = invalidFyersSymbols.size;
+                await wsInstance.subscribe(chunk);
+                // If Fyers getFyToken rejected one or more invalid symbols in this chunk,
+                // getFyToken returned {} and dropped the valid symbols in the chunk too.
+                // Re-queue the remaining valid symbols from this chunk immediately!
+                if (invalidFyersSymbols.size > invalidCountBefore) {
+                    const retryValid = chunk.filter(fSym => !invalidFyersSymbols.has(fSym));
+                    if (retryValid.length > 0) {
+                        subQueue.unshift(...retryValid);
+                    }
+                }
                 await new Promise(r => setTimeout(r, 300)); // Limit rate while batching
             }
         }
