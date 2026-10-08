@@ -491,7 +491,7 @@ async function initFyers(io, pc, isMaster = true) {
                     }
                 } catch(e) {}
             }
-        }, 250); // 250ms (4 updates/sec) for real-time tick streaming across clients and cluster workers
+        }, 1000); // 1000ms (1 update/sec) for batched tick streaming across clients and cluster workers
     }
 }
 
