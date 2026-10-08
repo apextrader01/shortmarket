@@ -83,7 +83,7 @@ function simulateOrderValidation({ user, order, positions = [], pendingOrders = 
   const side = String(order.side).toUpperCase();
   const isExplicitExit = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
 
-  const isPaidTier = Boolean(user?.is_admin) || (user && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user.subscription_tier) && (!user.subscription_expires || new Date(user.subscription_expires) > new Date()));
+  const isPaidTier = Boolean(user?.is_admin) || (user && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(user.subscription_tier) && (!user.subscription_expires || new Date(user.subscription_expires) > new Date()));
 
   const isOrderBuy = side === 'BUY';
   const isTargetIndex = isIndexContract(symbol);
@@ -141,6 +141,39 @@ test('Non-subscribed (BASIC) user buying index is rejected with 403 requires_sub
   assert.strictEqual(result.status, 403);
   assert.strictEqual(result.requires_subscription, true);
   assert.ok(result.error.includes('exclusive to Pro subscribers'));
+});
+
+test('Masterclass (pure coaching) user buying index is rejected with 403 requires_subscription', () => {
+  const result = simulateOrderValidation({
+    user: { id: 103, subscription_tier: 'MASTERCLASS', is_admin: false },
+    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
+  });
+  assert.strictEqual(result.status, 403);
+  assert.strictEqual(result.requires_subscription, true);
+  assert.ok(result.error.includes('exclusive to Pro subscribers'));
+});
+
+test('Lifetime Elite user (includes Yearly plan features for life) can buy index', () => {
+  const result = simulateOrderValidation({
+    user: { id: 104, subscription_tier: 'LIFETIME', is_admin: false },
+    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
+  });
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.success, true);
+});
+
+test('Monthly and Yearly Elite users both have index buying permissions (same features)', () => {
+  const monthlyRes = simulateOrderValidation({
+    user: { id: 105, subscription_tier: 'MONTHLY', is_admin: false },
+    order: { symbol: 'NSE:BANKNIFTY24OCT52000CE', side: 'BUY' }
+  });
+  assert.strictEqual(monthlyRes.status, 200);
+
+  const yearlyRes = simulateOrderValidation({
+    user: { id: 106, subscription_tier: 'YEARLY', is_admin: false },
+    order: { symbol: 'NSE:BANKNIFTY24OCT52000CE', side: 'BUY' }
+  });
+  assert.strictEqual(yearlyRes.status, 200);
 });
 
 test('Subscribed (PRO) user with no existing index trades can buy index', () => {

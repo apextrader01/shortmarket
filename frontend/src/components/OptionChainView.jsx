@@ -383,7 +383,7 @@ const OptionChainViewInternal = () => {
         const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
         const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
         const activeTier = isExpired ? 'BASIC' : tier;
-        const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+        const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeTier);
 
         if (!isPaidTier) {
           useStore.getState().showToast('🔒 Index Buying is exclusive to Pro subscribers. Upgrade to trade Nifty & BankNifty options.', 'error', 'Subscription Required');

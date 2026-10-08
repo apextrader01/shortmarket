@@ -140,43 +140,46 @@ export default function PricingView({ setActiveTab }) {
 
   const isLifetime = activeTier === 'LIFETIME';
   const isMasterclass = activeTier === 'MASTERCLASS';
-  const isHighest = ['HIGHEST', 'FEATURE', 'ELITE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+  const isHighest = ['HIGHEST', 'FEATURE', 'ELITE', 'VIP'].includes(activeTier);
   const isYearly = activeTier === 'YEARLY';
   const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
   const isNormal = !isLifetime && !isMasterclass && !isHighest && !isYearly && !isMonthly;
 
   const comparisonRows = [
     { category: 'Watchlists & Marketwatch', items: [
-      { name: 'Max Custom Watchlists', normal: '2 Watchlists', monthly: '3 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists', masterclass: '5 Watchlists', lifetime: '5 Watchlists (Forever)' },
-      { name: 'Symbols per Watchlist', normal: '30 symbols', monthly: '50 symbols', yearly: '75 symbols', highest: '100 symbols', masterclass: '100 symbols', lifetime: '100 symbols' },
-      { name: 'Real-time WebSocket Data', normal: 'Standard (~1s)', monthly: 'High-speed (500ms)', yearly: 'Ultra-fast (200ms)', highest: 'Direct Tick Feed (<50ms)', masterclass: 'Direct Tick Feed (<50ms)', lifetime: 'Direct Tick Feed (<50ms)' }
+      { name: 'Max Custom Watchlists', normal: '2 Watchlists', monthly: '4 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists (Max)', masterclass: '2 Watchlists (Free Tier)', lifetime: '4 Watchlists (Forever)' },
+      { name: 'Symbols per Watchlist', normal: '30 symbols', monthly: '75 symbols', yearly: '75 symbols', highest: '100 symbols (Max)', masterclass: '30 symbols (Free Tier)', lifetime: '75 symbols' },
+      { name: 'Real-time WebSocket Streaming', normal: 'Standard (~1s)', monthly: 'High-speed (<200ms)', yearly: 'High-speed (<200ms)', highest: 'Direct Tick Feed (<50ms)', masterclass: 'Standard (~1s)', lifetime: 'High-speed (<200ms)' }
     ]},
     { category: 'Order Execution & Risk Control', items: [
-      { name: 'Monthly Trade Limits', normal: '25 Trades / mo', monthly: '100 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders', masterclass: 'Unlimited Orders', lifetime: 'Unlimited Orders (No Limits Forever)' },
-      { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '5-Depth (Level 1)', yearly: '20-Depth (Level 2)', highest: '20-Depth + DOM Ladder', masterclass: '20-Depth + DOM Ladder', lifetime: '20-Depth + DOM Ladder' },
-      { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 5 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: 'Unlimited legs', lifetime: 'Unlimited legs' },
-      { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '3 resets / month', yearly: '10 resets / month', highest: 'Unlimited resets', masterclass: 'Unlimited resets', lifetime: 'Unlimited instant resets' }
+      { name: 'Daily Order Limits', normal: '25 Trades / mo (Cash)', monthly: '500 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders / day', masterclass: '25 Trades / mo (Cash)', lifetime: '500 Orders / day (Forever)' },
+      { name: 'Index Buying (Nifty/BankNifty)', normal: '—', monthly: '✓ Allowed (1 at a time)', yearly: '✓ Allowed (1 at a time)', highest: '✓ Allowed (1 at a time)', masterclass: '— (Sub Required)', lifetime: '✓ Allowed (Forever)' },
+      { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '20-Depth (Level 2)', yearly: '20-Depth (Level 2)', highest: '20-Depth + DOM Ladder', masterclass: '5-Depth (Level 1)', lifetime: '20-Depth (Level 2)' },
+      { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 15 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: '—', lifetime: 'Up to 15 legs' },
+      { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '10 resets / month', yearly: '10 resets / month', highest: 'Unlimited instant resets', masterclass: '1 every 30 days', lifetime: '10 resets / month (Forever)' }
     ]},
     { category: 'Mentorship, Education & Research Reports', items: [
-      { name: 'Daily Pre-Market Report', normal: '—', monthly: '—', yearly: '✓ Daily Morning Outlook', highest: '✓ Priority Outlook & Levels', masterclass: '✓ Priority Outlook & Levels', lifetime: '✓ VIP Morning Setups & Key Levels' },
-      { name: 'Live Stock Market Classes (Basics to Adv)', normal: '—', monthly: '—', yearly: '—', highest: 'Webinars', masterclass: '✓ Full Live Batches (Basics to Adv)', lifetime: '✓ All Live Batches + Lifetime Vault' },
-      { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Priority NISM Mentor Q&A', lifetime: '✓ 1-on-1 Personal Mentor Calls' }
+      { name: 'Daily Pre-Market Report', normal: '—', monthly: '✓ Daily Morning Outlook', yearly: '✓ Daily Morning Outlook', highest: '✓ Priority Outlook & Levels', masterclass: '—', lifetime: '✓ Daily Morning Outlook (Forever)' },
+      { name: 'Live Classes by NISM Mentor', normal: '—', monthly: '—', yearly: '—', highest: 'Webinars (Basics to Adv)', masterclass: '✓ Full Live Batches (NISM Mentor)', lifetime: '✓ Full Live Batches (NISM Mentor)' },
+      { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Direct Q&A with NISM Mentor', lifetime: '✓ Direct Q&A + 1-on-1 Mentor Calls' },
+      { name: 'Study Materials & Recording Vault', normal: '—', monthly: '—', yearly: '—', highest: '—', masterclass: '✓ Full Vault & NISM Prep Notes', lifetime: '✓ Full Vault & NISM Prep Notes' }
     ]},
     { category: 'Derivatives & Options Suite', items: [
-      { name: 'Option Chain Greeks (Δ, θ, γ, ν)', normal: '—', monthly: '✓ Included', yearly: '✓ Included', highest: '✓ Included', masterclass: '✓ Included', lifetime: '✓ Included' },
-      { name: 'Multi-Strike OI & PCR Tracker', normal: '—', monthly: '—', yearly: '✓ Included', highest: '✓ Included', masterclass: '✓ Included', lifetime: '✓ Included' },
-      { name: 'Options Strategy Builder & Payoff', normal: '—', monthly: '—', yearly: '—', highest: '✓ Full Interactive Suite', masterclass: '✓ Full Interactive Suite', lifetime: '✓ Full Interactive Suite' }
+      { name: 'Option Chain Greeks (Δ, θ, γ, ν)', normal: '—', monthly: '✓ Included', yearly: '✓ Included', highest: '✓ Included', masterclass: '—', lifetime: '✓ Included' },
+      { name: 'Multi-Strike OI & PCR Tracker', normal: '—', monthly: '✓ Included', yearly: '✓ Included', highest: '✓ Included', masterclass: '—', lifetime: '✓ Included' },
+      { name: 'Options Strategy Builder & Payoff', normal: '—', monthly: '—', yearly: '—', highest: '✓ Full Interactive Suite', masterclass: '—', lifetime: '—' }
     ]},
     { category: 'Alerts & Intelligence', items: [
-      { name: 'Active Price Alerts', normal: '3 Alerts', monthly: '10 Alerts', yearly: '25 Alerts', highest: 'Unlimited Alerts', masterclass: 'Unlimited Alerts', lifetime: 'Unlimited Alerts' },
-      { name: 'Instant Push & Telegram Alerts', normal: '—', monthly: 'Web Push', yearly: 'Web Push + SMS', highest: 'Instant Push + Telegram VIP', masterclass: 'Instant Push + Telegram VIP', lifetime: 'Instant Push + VIP Telegram Inner Circle' },
-      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Journal with Notes & Tags', yearly: 'Win-rate Heatmaps & Sharpe', highest: 'AI Trade Strategy Audit', masterclass: 'AI Trade Strategy Audit', lifetime: 'AI Strategy Audit + Portfolio Reviews' }
+      { name: 'Active Price Alerts', normal: '3 Alerts', monthly: '25 Alerts', yearly: '25 Alerts', highest: 'Unlimited Alerts', masterclass: '3 Alerts', lifetime: '25 Alerts (Forever)' },
+      { name: 'Instant Push & Telegram Alerts', normal: '—', monthly: 'Web Push + SMS', yearly: 'Web Push + SMS', highest: 'Instant Push + Telegram VIP', masterclass: '—', lifetime: 'Web Push + SMS' },
+      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Win-rate Heatmaps & Tags', yearly: 'Win-rate Heatmaps & Tags', highest: 'AI Trade Strategy Audit', masterclass: 'Basic Ledger', lifetime: 'Win-rate Heatmaps & Tags' }
     ]},
     { category: 'Validity, Prestige & Support', items: [
-      { name: 'Platform Access Duration', normal: 'Free Tier', monthly: '30 Days', yearly: '365 Days', highest: '365 Days', masterclass: '1 Full Year VIP Access', lifetime: '👑 Permanent Lifetime (Never Expires)' },
-      { name: 'Tournament Eligibility', normal: 'Open Tournaments', monthly: 'Monthly+ & Open', yearly: 'Yearly+, Monthly+ & Open', highest: '👑 VIP Exclusives + All', masterclass: '👑 VIP Exclusives + All', lifetime: '👑 All Tournaments (Lifetime Entry)' },
-      { name: 'Leaderboard Badge', normal: 'Starter', monthly: '⚡ PRO', yearly: '⭐ YEARLY', highest: '👑 VIP Gold Crown', masterclass: '🎓 MASTERCLASS', lifetime: '👑 LIFETIME ELITE' },
-      { name: 'Customer Support', normal: 'Community FAQ', monthly: 'Email Support', yearly: '24/7 Priority Support', highest: 'VIP Dedicated Concierge', masterclass: 'Mentor Direct Hotline', lifetime: 'Dedicated 1-on-1 VIP Concierge' }
+      { name: 'Platform Trading Access Duration', normal: 'Free Tier', monthly: '30 Days (AutoPay)', yearly: '365 Days (AutoPay)', highest: '365 Days (AutoPay)', masterclass: 'Standard Free Tier (No Sub)', lifetime: '👑 Permanent Lifetime (Never Expires)' },
+      { name: 'Masterclass Coaching Access', normal: '—', monthly: '—', yearly: '—', highest: '—', masterclass: '✓ Full 1-Year Batches & Vault', lifetime: '✓ All Batches & Lifetime Vault' },
+      { name: 'Tournament Eligibility', normal: 'Open Tournaments', monthly: 'Yearly+, Monthly+ & Open', yearly: 'Yearly+, Monthly+ & Open', highest: '👑 VIP Exclusives + All', masterclass: 'Open Tournaments', lifetime: '👑 Yearly+, Monthly+ & Open (Forever)' },
+      { name: 'Leaderboard Badge', normal: 'Starter', monthly: '⚡ PRO', yearly: '⭐ YEARLY', highest: '👑 VIP Gold Crown', masterclass: '🎓 MASTERCLASS SCHOLAR', lifetime: '👑 LIFETIME ELITE' },
+      { name: 'Customer Support', normal: 'Community FAQ', monthly: '24/7 Priority Support', yearly: '24/7 Priority Support', highest: 'VIP Dedicated Concierge', masterclass: 'Mentor Batch Hotline', lifetime: 'Dedicated 1-on-1 VIP Concierge' }
     ]}
   ];
 
@@ -276,19 +279,21 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/mo</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
-            Active traders wanting monthly flexibility, Greeks, and tournament entries.
+            Full Pro trading terminal access with monthly flexibility — same powerful features as Yearly Elite.
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>3 Watchlists</strong> (50 symbols/list)</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 100 Orders / day limit</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Advanced Option Chain & Greeks</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 5-Leg Basket Orders</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 10 Active Price Alerts</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 3 Portfolio Resets / month</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Monthly+ & Open Tournaments</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Trading Journal with tags & notes</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Real-time 500ms Streaming</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#93C5FD' }}><FileText size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Key Levels)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>4 Watchlists</strong> (75 symbols/list)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 500 Orders / day limit</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Full 20-Depth Market Depth (Level 2)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 15-Leg Basket Orders</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Advanced Option Chain & Greeks</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Multi-Strike OI & PCR Tracker</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 25 Active Price Alerts</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 10 Portfolio Resets / month</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Yearly+ & Monthly+ Tournaments</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 24/7 Priority Support (&lt;200ms route)</li>
           </ul>
 
           {isMonthly ? (
@@ -319,7 +324,7 @@ export default function PricingView({ setActiveTab }) {
           boxShadow: '0 12px 32px rgba(245, 158, 11, 0.15)' 
         }}>
           <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #F59E0B, #FCD34D)', color: '#000', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            <Star size={11} fill="#000" /> BEST VALUE - SAVE 16%
+            <Star size={11} fill="#000" /> BEST VALUE - SAVE 16% (ANNUAL PASS)
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -334,7 +339,7 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr (~₹166/mo)</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
-            Full annual pass for serious traders wanting deep order books, research & analytics.
+            Full annual pass with all Pro trading features — same powerful tools as Monthly with discounted annual billing.
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
@@ -343,9 +348,10 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 500 Orders / day limit</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Full 20-Depth Market Depth (Level 2)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 15-Leg Basket Orders</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Advanced Option Chain & Greeks</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Multi-Strike OI & PCR Tracker</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 25 Active Price Alerts</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 10 Portfolio Resets / month</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Multi-Strike OI & PCR Tracker</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Yearly+ & Monthly+ Tournaments</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 24/7 Priority Support (&lt;200ms route)</li>
           </ul>
@@ -369,7 +375,7 @@ export default function PricingView({ setActiveTab }) {
         {/* 4. FEATURE PLAN / HIGHEST TIER (VIP EXCLUSIVE) */}
         <div style={{ 
           background: 'linear-gradient(180deg, rgba(168, 85, 247, 0.12) 0%, var(--bg-card) 100%)', 
-          border: (isHighest && !isMasterclass && !isLifetime) ? '2px solid #10B981' : '2px solid #A855F7', 
+          border: isHighest ? '2px solid #10B981' : '2px solid #A855F7', 
           borderRadius: isMobile ? '16px' : '22px', 
           padding: isMobile ? '26px 18px' : '34px 24px', 
           display: 'flex', 
@@ -378,14 +384,14 @@ export default function PricingView({ setActiveTab }) {
           boxShadow: '0 16px 40px rgba(168, 85, 247, 0.18)' 
         }}>
           <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #A855F7, #EC4899)', color: '#fff', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.4)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            <Crown size={12} fill="#fff" /> VIP PLATFORM
+            <Crown size={12} fill="#fff" /> VIP PLATFORM - MAXIMUM FEATURES
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
             <div style={{ background: 'rgba(168, 85, 247, 0.18)', padding: '8px', borderRadius: '10px' }}>
               <Crown size={20} style={{ color: '#C084FC' }} />
             </div>
-            <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>Feature Plan</h3>
+            <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>Feature Plan VIP</h3>
           </div>
           
           <div style={{ fontSize: isMobile ? '34px' : '40px', fontWeight: '900', marginBottom: '6px', color: '#C084FC', display: 'flex', alignItems: 'baseline' }}>
@@ -393,23 +399,24 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr (VIP Tier)</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
-            The pinnacle platform experience. Everything unlocked + exclusive VIP leagues & mentorship.
+            The pinnacle platform experience with maximum features, interactive DOM ladder, webinars & VIP tournaments.
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><GraduationCap size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Webinar Sessions</strong> (Basics to Adv)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><Award size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Doubt Clearing by NISM-Certified Mentor</strong></li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><FileText size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Priority Levels)</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Crown size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>5 Watchlists</strong> (100 symbols/list - Max)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Crown size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>5 Watchlists</strong> (100 symbols/list - Maximum)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Unlimited Orders / day (No limit)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> 20-Depth + Interactive DOM Ladder</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Unlimited Multi-Leg Basket Orders</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Options Strategy Builder & Payoff Suite</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Unlimited Alerts + Instant Telegram VIP</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Unlimited Instant Portfolio Resets</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Award size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> 👑 VIP Tournaments Exclusive Entry</li>
           </ul>
 
-          {(isHighest && !isMasterclass && !isLifetime) ? (
+          {isHighest ? (
             <button className="btn" style={{ width: '100%', padding: '13px', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px' }} disabled>
               ✓ Active VIP Plan
             </button>
@@ -437,7 +444,7 @@ export default function PricingView({ setActiveTab }) {
           boxShadow: '0 16px 40px rgba(13, 148, 136, 0.2)' 
         }}>
           <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #0D9488, #10B981)', color: '#fff', padding: '3px 14px', borderRadius: '20px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.4)', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            <GraduationCap size={12} fill="#fff" /> FULL COURSE: BASIC TO ADVANCED
+            <GraduationCap size={12} fill="#fff" /> LIVE CLASS ORIENTATION - NISM CERTIFIED MENTOR
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -452,20 +459,21 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/one-time (Full Batch)</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
-            Full comprehensive stock market education from foundational basics to institutional F&O trading. Includes 1-Year VIP Platform access!
+            Purely a comprehensive live class orientation & mentorship course conducted by NISM Certified Mentor. Focused entirely on real-market education (No platform trading subscription included — standard free-tier paper trading applies).
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Full Course: Basics to Advanced</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Live Interactive Batches</strong> by NISM Mentors</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Live Interactive Batches</strong> by NISM Certified Mentor</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Live Doubt Clearing Sessions</strong> directly with Mentor</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#5EEAD4' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> <strong>Options Hedging & Greek Strategies</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><Sparkles size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>1 Full Year VIP Platform Included</strong> (₹2,999 val)</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Technical & Price Action Mastery</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Technical Analysis & Price Action Mastery</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Risk Management & Trading Psychology</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Lifetime Recording Vault & Study Materials</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Priority Live Doubt Clearing Sessions</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 5 Watchlists + 20-Depth DOM Ladder</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 🎓 Masterclass Leaderboard Badge</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> NISM Certification Guidance & Exam Prep</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Course Completion Certificate signed by Mentor</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 🎓 Masterclass Scholar Leaderboard Badge</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}><Check size={16} style={{ color: '#94A3B8', flexShrink: 0 }}/> <em>Paper Trading: Free Tier (2 lists, 25 trades/mo)</em></li>
           </ul>
 
           {isMasterclass ? (
@@ -511,19 +519,20 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/lifetime (Zero Renewals)</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '13px', lineHeight: '1.4' }}>
-            The definitive all-in-one pass. Permanent lifetime app & web access, full masterclass, 1-on-1 mentorship, and lifetime algorithm updates.
+            The definitive all-in-one pass. Permanent lifetime access to all Yearly Plan trading features (never expires, zero renewals) PLUS the complete Stock Market Masterclass live coaching included!
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#FECDD3' }}><Crown size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>PERMANENT LIFETIME APP & WEB ACCESS</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>Full Stock Market Masterclass Included</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>1-on-1 Personal Mentorship & Portfolio Audits</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>All Live Batches + Future Advanced Batches</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Priority Pre-Market Levels & Algo Signals</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Unlimited Orders & Unlimited Watchlists Forever</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Unlimited Portfolio Resets & DOM Ladder</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Exclusive VIP Tournaments & Cash Leagues Entry</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Private Telegram Inner Circle with Founders</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#FECDD3' }}><Crown size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>YEARLY PLAN TRADING FEATURES FOR LIFETIME</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>4 Watchlists & 75 Symbols/list Permanently</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>500 Orders / day + Index Buying Allowed Forever</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>Full 20-Depth Market Depth & 15-Leg Basket Orders</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>FULL STOCK MARKET MASTERCLASS INCLUDED</strong></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Live Classes & Doubt Sessions by NISM Mentor</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Lifetime Recording Vault & Study Notes</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> 1-on-1 Personal Mentorship & Portfolio Reviews</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Daily Pre-Market Reports & 25 Price Alerts (Lifetime)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Yearly+ & Monthly+ Tournaments Forever</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Dedicated 24/7 VIP Concierge Support</li>
           </ul>
 

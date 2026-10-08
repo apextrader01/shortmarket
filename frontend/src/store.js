@@ -554,13 +554,12 @@ export const useStore = create(persist((set, get) => ({
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
-    const isYearly = activeTier === 'YEARLY';
-    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-    const maxWatchlists = isAdmin ? Infinity : (isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2)));
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(activeTier);
+    const maxWatchlists = isAdmin ? Infinity : (isHighest ? 5 : (isYearlyOrMonthly ? 4 : 2));
 
     if (!isAdmin && get().watchlists.length >= maxWatchlists) {
-      alert(`Your ${activeTier} plan allows a maximum of ${maxWatchlists} custom watchlists. Please upgrade to Pro Monthly (3), Pro Yearly (4), or Feature Plan (5) to create more watchlists.`);
+      alert(`Your ${activeTier} plan allows a maximum of ${maxWatchlists} custom watchlists. Please upgrade to Monthly/Yearly (4) or Feature Plan (5) to create more watchlists.`);
       return;
     }
 
@@ -608,10 +607,9 @@ export const useStore = create(persist((set, get) => ({
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
-    const isYearly = activeTier === 'YEARLY';
-    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-    const maxSymbols = isAdmin ? Infinity : (isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30)));
+    const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(activeTier);
+    const maxSymbols = isAdmin ? Infinity : (isHighest ? 100 : (isYearlyOrMonthly ? 75 : 30));
 
     const targetWlId = String(watchlistId);
     const targetWl = get().watchlists.find(w => String(w.id) === targetWlId);
@@ -1902,7 +1900,7 @@ export const useStore = create(persist((set, get) => ({
           const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
           const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
           const activeTier = isExpired ? 'BASIC' : tier;
-          const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+          const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeTier);
 
           if (!isPaidTier) {
             const err = 'Index trading (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.) is an exclusive Pro feature. Please upgrade your subscription to trade index options and futures.';

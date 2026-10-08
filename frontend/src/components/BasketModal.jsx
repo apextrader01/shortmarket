@@ -686,17 +686,16 @@ export default function BasketModal() {
     const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : userTier;
-    const isHighest = isAdmin || ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
-    const isYearly = activeTier === 'YEARLY';
-    const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-    const isPaid = isHighest || isYearly || isMonthly;
+    const isHighest = isAdmin || ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+    const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(activeTier);
+    const isPaid = isHighest || isYearlyOrMonthly;
 
     if (!isPaid) {
-      alert('Basket Orders (Multi-Leg) are a Pro feature. Please upgrade to Pro Monthly (up to 5 legs), Pro Yearly (up to 15 legs), or Feature Plan (unlimited legs) to place basket orders.');
+      alert('Basket Orders (Multi-Leg) are a Pro feature. Please upgrade to Monthly/Yearly (up to 15 legs) or Feature Plan (unlimited legs) to place basket orders.');
       return;
     }
 
-    const maxLegs = isHighest ? Infinity : (isYearly ? 15 : 5);
+    const maxLegs = isHighest ? Infinity : 15;
     if (basketItems.length > maxLegs) {
       alert(`Your ${activeTier} plan allows a maximum of ${maxLegs} legs per basket order (${basketItems.length} in basket). Please upgrade to add more legs.`);
       return;

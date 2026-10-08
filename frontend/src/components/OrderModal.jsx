@@ -159,7 +159,7 @@ export default function OrderModal() {
   const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
   const isSubExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
   const activeSubTier = isSubExpired ? 'BASIC' : userTier;
-  const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeSubTier);
+  const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeSubTier);
   const isTargetIndex = isIndexContract(symbol);
 
   // Check if current BUY order is covering an existing short position
