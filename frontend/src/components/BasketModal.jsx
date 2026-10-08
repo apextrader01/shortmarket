@@ -681,11 +681,12 @@ export default function BasketModal() {
   const handleExecute = async () => {
     if (basketItems.length === 0) return;
 
-    // 🛡️ Subscription Tier Check for Basket Orders
+    // 🛡️ Subscription Tier Check for Basket Orders (Admin accounts have unlimited access)
+    const isAdmin = Boolean(user?.is_admin);
     const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : userTier;
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+    const isHighest = isAdmin || ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
     const isPaid = isHighest || isYearly || isMonthly;

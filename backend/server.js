@@ -5660,21 +5660,23 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
       return res.status(400).json({ error: 'Watchlists must be an array' });
     }
     
-    // Check subscription tier
+    // Check subscription tier (Admin accounts have no limits or plan restrictions)
     const user = await db('users').where({ id: req.user.id }).first();
-    const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-    const limit = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
-    const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));
-    
-    if (watchlists.length > limit) {
-      return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
-    }
+    if (!user?.is_admin) {
+      const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const limit = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
+      const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));
+      
+      if (watchlists.length > limit) {
+        return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
+      }
 
-    for (const wl of watchlists) {
-      if (Array.isArray(wl.symbols) && wl.symbols.length > maxSymbols) {
-        return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${maxSymbols} symbols per watchlist ("${wl.name}" has ${wl.symbols.length}). Please upgrade to add more.` });
+      for (const wl of watchlists) {
+        if (Array.isArray(wl.symbols) && wl.symbols.length > maxSymbols) {
+          return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${maxSymbols} symbols per watchlist ("${wl.name}" has ${wl.symbols.length}). Please upgrade to add more.` });
+        }
       }
     }
 
@@ -7232,8 +7234,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // ── Monthly Trade Quota Enforcement for Free / Basic Plan ──────────────────
   // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
   // Exits and square-off orders are NEVER blocked so traders can always close open positions.
-  const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires').first();
-  const isPaidTier = userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date());
+  const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires', 'is_admin').first();
+  const isPaidTier = Boolean(userRecord?.is_admin) || (userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date()));
   
   if (!isPaidTier && !isExplicitExit) {
     const now = new Date();
@@ -9134,7 +9136,8 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
   // 🛡️ Subscription Tier Eligibility & Leg Limits for Basket Orders (Multi-Leg)
   const user = await db('users').where({ id: req.user.id }).first();
-  const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isAdmin = Boolean(user?.is_admin);
+  const isHighest = isAdmin || (['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date()));
   const isYearly = user?.subscription_tier === 'YEARLY' && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isPaidTier = isHighest || isYearly || isMonthly;
@@ -11710,7 +11713,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires) <= new Date();
     const activeTier = isExpired ? 'BASIC' : userTier;
     
-    const hasHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+    const hasHighest = Boolean(user?.is_admin) || ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const hasYearly = hasHighest || activeTier === 'YEARLY';
     const hasMonthly = hasYearly || ['MONTHLY', 'PRO'].includes(activeTier);
     

@@ -199,8 +199,8 @@ export default function LeaderboardView({ onNavigateTab, setActiveTab: setParent
   };
 
   const isProActive = !user?.subscription_expires || new Date(user.subscription_expires).getTime() > Date.now();
-  const userEffectiveTier = isProActive ? (user?.subscription_tier || 'BASIC') : 'BASIC';
-  const isUserEligible = getTierLevel(userEffectiveTier) >= getRequiredTierLevel(activeContest?.access_tier);
+  const userEffectiveTier = user?.is_admin ? 'ADMIN' : (isProActive ? (user?.subscription_tier || 'BASIC') : 'BASIC');
+  const isUserEligible = Boolean(user?.is_admin) || getTierLevel(userEffectiveTier) >= getRequiredTierLevel(activeContest?.access_tier);
 
   const top3 = leaderboard.slice(0, 3);
 

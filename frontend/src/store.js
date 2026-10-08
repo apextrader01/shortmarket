@@ -496,15 +496,16 @@ export const useStore = create(persist((set, get) => ({
 
   createWatchlist: (name) => {
     const user = get().user;
+    const isAdmin = Boolean(user?.is_admin);
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
     const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-    const maxWatchlists = isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2));
+    const maxWatchlists = isAdmin ? Infinity : (isHighest ? 5 : (isYearly ? 4 : (isMonthly ? 3 : 2)));
 
-    if (get().watchlists.length >= maxWatchlists) {
+    if (!isAdmin && get().watchlists.length >= maxWatchlists) {
       alert(`Your ${activeTier} plan allows a maximum of ${maxWatchlists} custom watchlists. Please upgrade to Pro Monthly (3), Pro Yearly (4), or Feature Plan (5) to create more watchlists.`);
       return;
     }
@@ -549,17 +550,18 @@ export const useStore = create(persist((set, get) => ({
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
     const user = get().user;
+    const isAdmin = Boolean(user?.is_admin);
     const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
     const activeTier = isExpired ? 'BASIC' : tier;
     const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
     const isYearly = activeTier === 'YEARLY';
     const isMonthly = activeTier === 'MONTHLY' || activeTier === 'PRO';
-    const maxSymbols = isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30));
+    const maxSymbols = isAdmin ? Infinity : (isHighest ? 100 : (isYearly ? 75 : (isMonthly ? 50 : 30)));
 
     const targetWlId = String(watchlistId);
     const targetWl = get().watchlists.find(w => String(w.id) === targetWlId);
-    if (targetWl && (targetWl.symbols || []).length >= maxSymbols && !(targetWl.symbols || []).includes(uniqueSymbol)) {
+    if (!isAdmin && targetWl && (targetWl.symbols || []).length >= maxSymbols && !(targetWl.symbols || []).includes(uniqueSymbol)) {
       alert(`Your ${activeTier} plan allows up to ${maxSymbols} symbols per watchlist. Please upgrade your plan to add more symbols.`);
       return;
     }
