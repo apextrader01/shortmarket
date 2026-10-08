@@ -91,7 +91,7 @@ import SessionExpiredModal from './components/SessionExpiredModal';
 import PermissionDenied from './components/PermissionDenied';
 import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
-import { useStore } from './store';
+import { useStore, DEFAULT_WATCHLIST_SYMBOLS, ensureWatchlistsWithDefaults } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu } from 'lucide-react';
 
@@ -685,7 +685,7 @@ function App() {
                 useStore.setState({
                   user: data.user,
                   token: data.token,
-                  watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+                  watchlists: ensureWatchlistsWithDefaults(data.user.watchlists)
                 });
                 useStore.getState().fetchUserData?.();
               }
@@ -696,15 +696,17 @@ function App() {
     }
   }, [user]);
 
-  // Pre-fetch top index prices (runs on mount regardless of auth state)
+  // Pre-fetch top index prices and default watchlist symbols (runs on mount regardless of auth state)
   useEffect(() => {
-    fetchBatchPrices(TOP_INDICES);
+    fetchBatchPrices([...TOP_INDICES, ...DEFAULT_WATCHLIST_SYMBOLS]);
+    useStore.getState().loadStocks?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialise socket and start polling
   useEffect(() => {
     purgeStaleDailyAlerts();
     initSocket();
+    useStore.getState().loadStocks?.();
     if (user) fetchUserData();
     refreshPrices();
 

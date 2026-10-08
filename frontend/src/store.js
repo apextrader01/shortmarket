@@ -73,6 +73,33 @@ export const socket = io(API, {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+export const DEFAULT_WATCHLIST_SYMBOLS = [
+  'NSE:NIFTY50-INDEX',
+  'NSE:NIFTYBANK-INDEX',
+  'BSE:SENSEX-INDEX',
+  'NSE:RELIANCE',
+  'NSE:TCS',
+  'NSE:HDFCBANK',
+  'NSE:INFY',
+  'NSE:ICICIBANK',
+  'NSE:SBIN'
+];
+
+export function ensureWatchlistsWithDefaults(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [{ id: 1, name: 'Watchlist 1', symbols: DEFAULT_WATCHLIST_SYMBOLS }];
+  }
+  const formatted = raw.map((w, idx) => ({
+    id: w.id || (idx + 1),
+    name: w.name || `Watchlist ${idx + 1}`,
+    symbols: Array.isArray(w.symbols) ? w.symbols : []
+  }));
+  if (formatted[0] && (!formatted[0].symbols || formatted[0].symbols.length === 0)) {
+    formatted[0].symbols = DEFAULT_WATCHLIST_SYMBOLS;
+  }
+  return formatted;
+}
+
 const temporaryOptionSubscriptions = new Set();
 
 /** Merge a price snapshot object into the current prices map, tagging each tick direction */
@@ -254,7 +281,7 @@ export const useStore = create(persist((set, get) => ({
           set({
             token: data.token,
             user: data.user,
-            watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+            watchlists: ensureWatchlistsWithDefaults(data.user.watchlists),
           });
           get().fetchUserData();
           syncClientTelemetry(API, true);
@@ -311,7 +338,7 @@ export const useStore = create(persist((set, get) => ({
         set({
           token: data.token,
           user: data.user,
-          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+          watchlists: ensureWatchlistsWithDefaults(data.user.watchlists),
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
@@ -354,7 +381,7 @@ export const useStore = create(persist((set, get) => ({
         set({
           token: data.token,
           user:       data.user,
-          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+          watchlists: ensureWatchlistsWithDefaults(data.user.watchlists),
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
@@ -422,7 +449,7 @@ export const useStore = create(persist((set, get) => ({
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
-          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+          watchlists: ensureWatchlistsWithDefaults(data.user.watchlists),
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
@@ -493,7 +520,7 @@ export const useStore = create(persist((set, get) => ({
 
 
   // ── Watchlists ──────────────────────────────────────────────────────────────
-  watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+  watchlists:       ensureWatchlistsWithDefaults([]),
   activeWatchlistId: (function() {
     try {
       const saved = localStorage.getItem('active_watchlist_id');
@@ -1329,8 +1356,8 @@ export const useStore = create(persist((set, get) => ({
         
         if (!get().user && !user) return;
         
-        const now = Date.now();
-        const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
+        const incomingWatchlists = user?.watchlists ? ensureWatchlistsWithDefaults(user.watchlists) : null;
+        const shouldUpdateWatchlists = (incomingWatchlists && (now - get().lastWatchlistEdit > 3000));
         
         const prevUser = get().user;
         let finalUser = prevUser;
@@ -1344,7 +1371,7 @@ export const useStore = create(persist((set, get) => ({
           sips: Array.isArray(sipsList) ? sipsList : get().sips,
           orders: Array.isArray(orders) ? orders : get().orders, 
           user: finalUser,
-          watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
+          watchlists: shouldUpdateWatchlists ? incomingWatchlists : ensureWatchlistsWithDefaults(get().watchlists)
         });
         
         if (shouldUpdateWatchlists) {
@@ -2351,6 +2378,34 @@ export const useStore = create(persist((set, get) => ({
       }
       const data = await res.json();
       return { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  adminImpersonateUser: async (userId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/impersonate/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data && data.success && data.token && data.user) {
+        localStorage.setItem('admin_token_backup', token);
+        localStorage.setItem('token', data.token);
+        set({
+          token: data.token,
+          user: data.user,
+          watchlists: ensureWatchlistsWithDefaults(data.user.watchlists)
+        });
+        get().fetchUserData();
+        return { success: true, user: data.user };
+      }
+      return { success: false, error: data?.error || 'Failed to impersonate user' };
     } catch (err) {
       return { success: false, error: err.message };
     }

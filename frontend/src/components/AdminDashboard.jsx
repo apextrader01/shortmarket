@@ -1272,7 +1272,7 @@ function MarketCalendarTab({ isMobile }) {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, adminUpdateUserDetails, toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, deleteContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, adminUpdateUserDetails: state.adminUpdateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, deleteContest: state.deleteContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, adminUpdateUserDetails, adminImpersonateUser, toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, deleteContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, adminUpdateUserDetails: state.adminUpdateUserDetails, adminImpersonateUser: state.adminImpersonateUser, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, deleteContest: state.deleteContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
 
   const [tgConfigForm, setTgConfigForm] = useState({
     global_enabled: true,
@@ -7451,6 +7451,39 @@ export default function AdminDashboard() {
                 <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '12px', background: 'rgba(59,130,246,0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.2)' }}>
                   {selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : '')}
                 </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cid = selectedUser.client_id || `SE${selectedUser.id}`;
+                    if (window.confirm(`Login to terminal as ${selectedUser.username} (${cid})?\n\nThis will instantly switch your active session to ${selectedUser.username} so you can view the terminal exactly as this client sees it.`)) {
+                      setUpdating(true);
+                      const res = await adminImpersonateUser?.(selectedUser.id);
+                      setUpdating(false);
+                      if (res?.success) {
+                        alert(`Successfully authenticated as ${selectedUser.username}! Redirecting to terminal...`);
+                        window.location.href = '/';
+                      } else {
+                        alert(`Failed: ${res?.error || 'Could not log in as client'}`);
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.25))',
+                    color: '#fbbf24',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Instantly sign into this client's terminal account"
+                >
+                  ⚡ Login as Client
+                </button>
               </div>
               <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setSelectedUser(null)} />
             </div>

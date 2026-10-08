@@ -1258,6 +1258,81 @@ async function findUserByIdentifier(identifier) {
   }).first();
 }
 
+const DEFAULT_WATCHLIST_SYMBOLS = [
+  'NSE:NIFTY50-INDEX',
+  'NSE:NIFTYBANK-INDEX',
+  'BSE:SENSEX-INDEX',
+  'NSE:RELIANCE',
+  'NSE:TCS',
+  'NSE:HDFCBANK',
+  'NSE:INFY',
+  'NSE:ICICIBANK',
+  'NSE:SBIN'
+];
+
+function formatUserWatchlists(rawWatchlists) {
+  let parsed = null;
+  if (typeof rawWatchlists === 'string') {
+    try { parsed = JSON.parse(rawWatchlists); } catch (_) {}
+  } else if (Array.isArray(rawWatchlists)) {
+    parsed = rawWatchlists;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return [{ id: 1, name: 'Watchlist 1', symbols: DEFAULT_WATCHLIST_SYMBOLS }];
+  }
+  const formatted = parsed.map((w, idx) => ({
+    id: w.id || (idx + 1),
+    name: w.name || `Watchlist ${idx + 1}`,
+    symbols: Array.isArray(w.symbols) ? w.symbols : []
+  }));
+  if (formatted[0] && (!formatted[0].symbols || formatted[0].symbols.length === 0)) {
+    formatted[0].symbols = DEFAULT_WATCHLIST_SYMBOLS;
+  }
+  return formatted;
+}
+
+function formatUserForClient(user, profile = null) {
+  if (!user) return null;
+  let clientId = user.client_id;
+  if (!clientId && user.id) {
+    clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+  }
+  const watchlists = formatUserWatchlists(user.watchlists);
+  return {
+    id: user.id,
+    client_id: clientId,
+    username: user.username,
+    email: user.email,
+    phone: user.phone || null,
+    balance: parseFloat(user.balance || 1000000.0),
+    role: user.role,
+    is_admin: Boolean(user.is_admin),
+    is_onboarded: Boolean(user.is_onboarded),
+    watchlists,
+    subscription_tier: user.subscription_tier || 'BASIC',
+    subscription_expires: user.subscription_expires || null,
+    pan_card: user.pan_card || null,
+    aadhar_number: user.aadhar_number || null,
+    kyc_pan_url: user.kyc_pan_url || null,
+    kyc_aadhar_url: user.kyc_aadhar_url || null,
+    address: user.address || null,
+    upi_id: user.upi_id || null,
+    bank_account_no: user.bank_account_no || null,
+    bank_ifsc: user.bank_ifsc || null,
+    profile_picture_url: user.profile_picture_url || null,
+    dob: profile?.dob || user.dob || null,
+    gender: profile?.gender || user.gender || null,
+    onboarding_state: profile?.state || user.onboarding_state || user.state || null,
+    onboarding_city: profile?.city || user.onboarding_city || user.city || null,
+    occupation: profile?.occupation || user.occupation || null,
+    annual_income: profile?.annual_income || user.annual_income || null,
+    financial_goal: profile?.financial_goal || user.financial_goal || null,
+    trading_experience: profile?.trading_experience || user.trading_experience || null,
+    preferred_segment: profile?.preferred_segment || user.preferred_segment || null,
+    trading_style: profile?.trading_style || user.trading_style || null
+  };
+}
+
 // ─── Live Username / Full Name Availability Check (6–15 chars, One User One Name) ───
 app.get('/api/auth/check-username', async (req, res) => {
   try {
@@ -1430,7 +1505,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
+    const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: DEFAULT_WATCHLIST_SYMBOLS }]);
     
     const clientIp = getClientIp(req);
     
@@ -1728,25 +1803,15 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
         if (!clientId) {
           clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
           await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+          user.client_id = clientId;
         }
-        const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+        const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
 
         return res.json({
           success: true,
           trusted: true,
           token,
-          user: {
-            id: user.id,
-            client_id: clientId,
-            username: user.username,
-            email: user.email,
-            phone: user.phone,
-            balance: parseFloat(user.balance || 1000000.0),
-            is_admin: Boolean(user.is_admin),
-            is_onboarded: Boolean(user.is_onboarded),
-            watchlists,
-            subscription_tier: user.subscription_tier || 'BASIC'
-          }
+          user: formatUserForClient(user, profile)
         });
       }
 
@@ -1920,25 +1985,15 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
     if (!clientId) {
       clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
       await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+      user.client_id = clientId;
     }
-    const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+    const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
 
     res.json({
       success: true,
       token,
       trusted_device_token: trustedDeviceToken,
-      user: {
-        id: user.id,
-        client_id: clientId,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        balance: parseFloat(user.balance || 1000000.0),
-        is_admin: Boolean(user.is_admin),
-        is_onboarded: Boolean(user.is_onboarded),
-        watchlists,
-        subscription_tier: user.subscription_tier || 'BASIC'
-      }
+      user: formatUserForClient(user, profile)
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2154,24 +2209,15 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     if (!clientId) {
       clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
       await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+      user.client_id = clientId;
     }
+    const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
+
     res.json({
       success: true,
       token,
       trusted_device_token: trustedDeviceToken,
-      user: {
-        id: user.id,
-        client_id: clientId,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        balance: user.balance || 1000000.0,
-        is_admin: Boolean(user.is_admin),
-        is_onboarded: Boolean(user.is_onboarded),
-        watchlists,
-        subscription_tier: user.subscription_tier || 'BASIC',
-        subscription_expires: user.subscription_expires
-      }
+      user: formatUserForClient(user, profile)
     });
   } catch (err) {
     const errorMsg = err.message || String(err);
@@ -2698,45 +2744,12 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       maxAge: 60 * 24 * 60 * 60 * 1000
     });
 
-    let parsedWatchlists = [{ id: 1, name: 'Watchlist 1', symbols: ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX', 'NSE:RELIANCE', 'NSE:TCS', 'NSE:HDFCBANK', 'NSE:INFY', 'NSE:ICICIBANK', 'NSE:SBIN'] }];
-    if (user.watchlists) {
-      try {
-        parsedWatchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists) : user.watchlists;
-      } catch (_) {}
-    }
     const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
 
     res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        balance: parseFloat(user.balance || 0),
-        role: user.role,
-        is_admin: Boolean(user.is_admin),
-        subscription_tier: user.subscription_tier,
-        client_id: clientId,
-        profile_picture_url: user.profile_picture_url,
-        is_onboarded: Boolean(user.is_onboarded),
-        watchlists: parsedWatchlists,
-        dob: profile?.dob || null,
-        gender: profile?.gender || null,
-        onboarding_state: profile?.state || user.state || null,
-        onboarding_city: profile?.city || user.city || null,
-        occupation: profile?.occupation || null,
-        annual_income: profile?.annual_income || null,
-        financial_goal: profile?.financial_goal || null,
-        trading_experience: profile?.trading_experience || null,
-        preferred_segment: profile?.preferred_segment || null,
-        trading_style: profile?.trading_style || null,
-        address: user.address || null,
-        upi_id: user.upi_id || null,
-        bank_account_no: user.bank_account_no || null,
-        bank_ifsc: user.bank_ifsc || null
-      }
+      user: formatUserForClient(user, profile)
     });
   } catch (err) {
     console.error('[GOOGLE AUTH ERROR]:', err);
@@ -2998,30 +3011,12 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user) return res.status(401).json({ error: 'User account not found or has been deleted.', account_deleted: true });
-    delete user.password_hash;
     if (!user.client_id) {
       user.client_id = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
       await db('users').where({ id: user.id }).update({ client_id: user.client_id }).catch(() => {});
     }
-    if (typeof user.watchlists === 'string') user.watchlists = JSON.parse(user.watchlists);
-    user.balance = parseFloat(user.balance || 0);
-    user.is_admin = Boolean(user.is_admin);
-    user.is_onboarded = Boolean(user.is_onboarded);
-
     const profile = await db('user_profiles').where({ user_id: req.user.id }).first().catch(() => null);
-    if (profile) {
-      user.dob = profile.dob || null;
-      user.gender = profile.gender || null;
-      user.onboarding_state = profile.state || user.state || null;
-      user.onboarding_city = profile.city || user.city || null;
-      user.occupation = profile.occupation || null;
-      user.annual_income = profile.annual_income || null;
-      user.financial_goal = profile.financial_goal || null;
-      user.trading_experience = profile.trading_experience || null;
-      user.preferred_segment = profile.preferred_segment || null;
-      user.trading_style = profile.trading_style || null;
-    }
-    res.json(user);
+    res.json(formatUserForClient(user, profile));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -3088,35 +3083,12 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
 
     if (!userRow) return res.status(401).json({ error: 'User account not found or has been deleted.', account_deleted: true });
 
-    delete userRow.password_hash;
     if (!userRow.client_id) {
       userRow.client_id = 'SE' + Number(userRow.id).toString(36).toUpperCase().padStart(6, '0');
       db('users').where({ id: userRow.id }).update({ client_id: userRow.client_id }).catch(() => {});
     }
-    if (typeof userRow.watchlists === 'string') {
-      try {
-        userRow.watchlists = JSON.parse(userRow.watchlists);
-      } catch (_) {
-        userRow.watchlists = [];
-      }
-    }
-    userRow.balance = parseFloat(userRow.balance || 0);
-    userRow.is_admin = Boolean(userRow.is_admin);
-    userRow.is_onboarded = Boolean(userRow.is_onboarded);
-
     const userProfileRow = await db('user_profiles').where({ user_id: userId }).first().catch(() => null);
-    if (userProfileRow) {
-      userRow.dob = userProfileRow.dob || null;
-      userRow.gender = userProfileRow.gender || null;
-      userRow.onboarding_state = userProfileRow.state || userRow.state || null;
-      userRow.onboarding_city = userProfileRow.city || userRow.city || null;
-      userRow.occupation = userProfileRow.occupation || null;
-      userRow.annual_income = userProfileRow.annual_income || null;
-      userRow.financial_goal = userProfileRow.financial_goal || null;
-      userRow.trading_experience = userProfileRow.trading_experience || null;
-      userRow.preferred_segment = userProfileRow.preferred_segment || null;
-      userRow.trading_style = userProfileRow.trading_style || null;
-    }
+    const formattedUser = formatUserForClient(userRow, userProfileRow);
 
     const formattedPositions = (positionsRows || []).map(p => ({
       ...p,
@@ -3161,7 +3133,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      user: userRow,
+      user: formattedUser,
       positions: formattedPositions,
       holdings: formattedHoldings,
       orders: ordersRows || [],
@@ -4799,12 +4771,16 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       query = query.where(function() {
         this.where('users.username', 'ilike', `%${search}%`)
             .orWhere('users.email', 'ilike', `%${search}%`)
-            .orWhere('users.client_id', 'ilike', `%${search}%`);
+            .orWhere('users.client_id', 'ilike', `%${search}%`)
+            .orWhere('users.phone', 'ilike', `%${search}%`)
+            .orWhere('users.last_ip', 'ilike', `%${search}%`);
       });
       countQuery = countQuery.where(function() {
         this.where('username', 'ilike', `%${search}%`)
             .orWhere('email', 'ilike', `%${search}%`)
-            .orWhere('client_id', 'ilike', `%${search}%`);
+            .orWhere('client_id', 'ilike', `%${search}%`)
+            .orWhere('phone', 'ilike', `%${search}%`)
+            .orWhere('last_ip', 'ilike', `%${search}%`);
       });
     }
 
@@ -5035,6 +5011,35 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Admin reset error:', err);
     res.status(500).json({ error: 'Failed to reset user' });
+  }
+});
+
+app.post('/api/admin/impersonate/:id', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+
+    const targetUserId = req.params.id;
+    const targetUser = await db('users').where({ id: targetUserId }).first();
+    if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+    const token = jwt.sign(
+      { id: targetUser.id, username: targetUser.username, is_admin: Boolean(targetUser.is_admin), impersonated_by: caller.id },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    const userProfile = await db('user_profiles').where({ user_id: targetUser.id }).first().catch(() => null);
+    const formattedUser = formatUserForClient(targetUser, userProfile);
+
+    res.json({
+      success: true,
+      token,
+      user: formattedUser
+    });
+  } catch (err) {
+    console.error('Admin impersonate error:', err);
+    res.status(500).json({ error: err.message || 'Failed to impersonate user' });
   }
 });
 
