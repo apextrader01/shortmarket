@@ -7,6 +7,7 @@ require('dotenv').config({ quiet: true });
 // 1. Detach event listeners on close() so a closing socket's async onclose event never kills a newly opened socket
 // 2. Guard onopen/onmessage/onclose/onerror against stale WebSocket instances
 // 3. Swallow unmapped topic 'prepareData' TypeError during subscription handshakes
+let lastActiveHSWebSocket = null;
 try {
     const HSWebSocket = require('fyers-api-v3/HSM_Package/hslib.js');
     if (HSWebSocket && HSWebSocket.prototype && !HSWebSocket.prototype._patchedForPrepareData) {
@@ -27,6 +28,7 @@ try {
         if (HSWebSocket.prototype.connect) {
             const origConnect = HSWebSocket.prototype.connect;
             HSWebSocket.prototype.connect = function(...args) {
+                lastActiveHSWebSocket = this;
                 const res = origConnect.apply(this, args);
                 if (this.ws) {
                     const activeWs = this.ws;
@@ -450,17 +452,15 @@ async function initFyers(io, pc, isMaster = true) {
             dirtySymbols.clear();
 
             if (Object.keys(batchUpdate).length > 0) {
-                // Send targeted updates to specific symbol rooms ONLY if an active user is viewing it
+                // Send targeted updates to specific symbol rooms on Master locally, and also via adapter if active viewer pinged
                 const now = Date.now();
                 for (const sym of Object.keys(batchUpdate)) {
                     const room = global_io.sockets?.adapter?.rooms?.get(sym);
                     const lastPingTime = clientViewerLastSeen.get(sym) || 0;
-                    // Active viewer if pinged within last 60s or connected locally
                     const hasActiveViewers = (now - lastPingTime <= 60000) || (room && room.size > 0);
                     if (hasActiveViewers) {
                         const p = batchUpdate[sym];
-                        // Emit compact 13-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan, upper_circuit, lower_circuit]
-                        global_io.to(sym).emit('price_snapshot', {
+                        const snapshotPayload = {
                             [sym]: [
                                 p.ltp,
                                 p.change,
@@ -476,11 +476,14 @@ async function initFyers(io, pc, isMaster = true) {
                                 p.upper_circuit || 0,
                                 p.lower_circuit || 0
                             ]
-                        });
+                        };
+                        if (room && room.size > 0) {
+                            (global_io.local || global_io).to(sym).emit('price_snapshot', snapshotPayload);
+                        }
                     }
                 }
 
-                // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)
+                // Also batch-sync this updated cache to Worker nodes via Redis (Workers will emit locally to their own symbol rooms)
                 try {
                     const { pubClient } = require('./redisClient');
                     if (pubClient) {
@@ -494,11 +497,18 @@ async function initFyers(io, pc, isMaster = true) {
 
 // ─── WEBSOCKET ──────────────────────────────────────────────────────────────
 
-const DataSocket = require("fyers-api-v3").fyersDataSocket;
+let DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 let isMarketFeedPaused = false;
+let isWsHandshakeComplete = false;
+let handshakeTimer = null;
 
 function cleanupDataSocketInstance() {
+    isWsHandshakeComplete = false;
+    if (handshakeTimer) {
+        clearTimeout(handshakeTimer);
+        handshakeTimer = null;
+    }
     if (wsInstance) {
         try {
             if (wsInstance.secondcountertimer) clearInterval(wsInstance.secondcountertimer);
@@ -508,11 +518,36 @@ function cleanupDataSocketInstance() {
             if (wsInstance.disconnect) wsInstance.disconnect();
         } catch(e) {}
     }
+    if (lastActiveHSWebSocket) {
+        try {
+            if (lastActiveHSWebSocket.hsParser && lastActiveHSWebSocket.hsParser.intervalId) {
+                clearInterval(lastActiveHSWebSocket.hsParser.intervalId);
+            }
+            if (lastActiveHSWebSocket.ws) {
+                lastActiveHSWebSocket.ws.onopen = null;
+                lastActiveHSWebSocket.ws.onmessage = null;
+                lastActiveHSWebSocket.ws.onclose = null;
+                lastActiveHSWebSocket.ws.onerror = null;
+                if (typeof lastActiveHSWebSocket.ws.terminate === 'function') {
+                    lastActiveHSWebSocket.ws.terminate();
+                } else if (typeof lastActiveHSWebSocket.ws.close === 'function') {
+                    lastActiveHSWebSocket.ws.close();
+                }
+            }
+        } catch(e) {}
+        lastActiveHSWebSocket = null;
+    }
     try {
-        if (DataSocket && DataSocket.instance) {
-            DataSocket.instance = null;
-        }
-    } catch(e) {}
+        const dsPath = require.resolve('fyers-api-v3/HSM/datasocket.min.js');
+        delete require.cache[dsPath];
+        DataSocket = require('fyers-api-v3/HSM/datasocket.min.js');
+    } catch(e) {
+        try {
+            if (DataSocket && DataSocket.instance) {
+                DataSocket.instance = null;
+            }
+        } catch(err) {}
+    }
     wsInstance = null;
 }
 
@@ -552,9 +587,8 @@ function startLiveWebSocket() {
         reconnectTimer = null;
     }
     isProcessingSubQueue = false;
-    // Reset DataSocket singleton and detach old WebSocket listeners BEFORE creating a new instance.
-    // Otherwise DataSocket.getInstance returns the closed instance whose secondcountertimer was cleared
-    // and whose old WebSocket's async onclose event destroys the new connection's send-queue interval.
+    isWsHandshakeComplete = false;
+    // Reset DataSocket singleton and module-level queue/maps BEFORE creating a new instance.
     cleanupDataSocketInstance();
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
@@ -564,6 +598,18 @@ function startLiveWebSocket() {
         return;
     }
     
+    // Ensure core indices are always seeded in clientSubscriptions & globalFyersToRequested
+    const now = Date.now();
+    ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'NSE:FINNIFTY-INDEX', 'NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYNXT50-INDEX', 'BSE:SENSEX-INDEX', 'BSE:BANKEX-INDEX'].forEach(sym => {
+        symbolLastSeen.set(sym, now);
+        clientSubscriptions.add(sym);
+        const fSym = toFyersSymbol(sym);
+        if (fSym) {
+            if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+            if (!globalFyersToRequested[fSym].includes(sym)) globalFyersToRequested[fSym].push(sym);
+        }
+    });
+
     try {
         const logPath = path.join(__dirname, '../logs');
         if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
@@ -582,10 +628,6 @@ function startLiveWebSocket() {
         }
     } catch (e) {}
 
-    if (wsInstance.FullMode) {
-        wsInstance.mode(wsInstance.FullMode);
-    }
-    
     wsInstance.hasListenersAttached = true;
 
     // IMPORTANT: Register 'error' BEFORE 'message' because fyers-api-v3 datasocket.min.js
@@ -601,6 +643,15 @@ function startLiveWebSocket() {
     
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');
+        // CRITICAL: Call wsInstance.mode(wsInstance.FullMode) INSIDE on('connect')!
+        // In datasocket.min.js, socketonOpen queues {"type":"cn"} FIRST and then calls our on('connect') callback.
+        // Calling mode(FullMode) before connect() queues {"type":"ful"} BEFORE {"type":"cn"}, causing Fyers HSM server
+        // to reject the unauthenticated "ful" packet and close the WebSocket with code 1006 after 1.74 seconds!
+        try {
+            if (wsInstance && wsInstance.FullMode) {
+                wsInstance.mode(wsInstance.FullMode);
+            }
+        } catch (e) {}
         lastTickTime = Date.now();
         isFyersConnected = true;
         reconnectAttempts = 0;
@@ -621,10 +672,19 @@ function startLiveWebSocket() {
                 if (!subQueue.includes(fSym)) subQueue.push(fSym);
             });
         }
-        if (subQueue.length > 0) {
-            setTimeout(() => {
+        if (handshakeTimer) clearTimeout(handshakeTimer);
+        handshakeTimer = setTimeout(() => {
+            isWsHandshakeComplete = true;
+            if (subQueue.length > 0) {
                 processSubQueue();
-            }, 500);
+            }
+            // Also sync open positions & pending orders from DB shortly after handshake
+            setTimeout(() => {
+                garbageCollectSubscriptions().catch(() => {});
+            }, 1500);
+        }, 900);
+        if (!gcInterval) {
+            gcInterval = setInterval(garbageCollectSubscriptions, 30000);
         }
         
         // Watchdog — only trigger if we've been running for more than 2 minutes.
@@ -759,6 +819,11 @@ function startLiveWebSocket() {
     wsInstance.on('close', (reason) => {
         console.log("Fyers WS Closed — resetting state and scheduling reconnect.", reason || '');
         isFyersConnected = false;
+        isWsHandshakeComplete = false;
+        if (handshakeTimer) {
+            clearTimeout(handshakeTimer);
+            handshakeTimer = null;
+        }
         if (global_io) {
             global_io.emit('market_feed_status', { connected: false, lastTickTime });
         }
@@ -793,11 +858,11 @@ let subQueue = [];
 let isProcessingSubQueue = false;
 
 async function processSubQueue() {
-    if (isProcessingSubQueue || !wsInstance || !isFyersConnected) return;
+    if (isProcessingSubQueue || !wsInstance || !isFyersConnected || !isWsHandshakeComplete) return;
     isProcessingSubQueue = true;
     try {
         while (subQueue.length > 0) {
-            if (!wsInstance || !isFyersConnected) break;
+            if (!wsInstance || !isFyersConnected || !isWsHandshakeComplete) break;
             const rawChunk = subQueue.splice(0, 25);
             const chunk = rawChunk.filter(fSym => fSym && !invalidFyersSymbols.has(fSym) && !isExpiredContract(fSym));
             if (chunk.length > 0) {
@@ -901,7 +966,7 @@ function handlePingSubscriptions(symbols) {
 }
 
 async function garbageCollectSubscriptions() {
-    if (!wsInstance || !isFyersConnected) return;
+    if (!wsInstance || !isFyersConnected || !isWsHandshakeComplete) return;
     
     const now = Date.now();
     const staleFyersSymbols = [];
@@ -1272,14 +1337,14 @@ function setPriceCache(pc) { sharedPriceCache = pc; }
 function registerTokens() {}
 function addSubscription(symbol) { addSubscriptionBatch([symbol]); }
 function subscribeToDepth(symbol) { 
-    if (!wsInstance || !isFyersConnected) return;
+    if (!wsInstance || !isFyersConnected || !isWsHandshakeComplete) return;
     const fSym = toFyersSymbol(symbol);
     if (fSym) {
         try { wsInstance.subscribe([fSym], "DepthUpdate"); } catch (e) { console.error(e); }
     }
 }
 function unsubscribeFromDepth(symbol) {
-    if (!wsInstance || !isFyersConnected) return;
+    if (!wsInstance || !isFyersConnected || !isWsHandshakeComplete) return;
     const fSym = toFyersSymbol(symbol);
     if (fSym) {
         try { wsInstance.subscribe([fSym], "SymbolUpdate"); } catch (e) { console.error(e); }

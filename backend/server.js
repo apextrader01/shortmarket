@@ -41,8 +41,8 @@ const {
 const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
 
-const adapterPubClient = generalClient.duplicate();
-const adapterSubClient = generalClient.duplicate();
+const adapterPubClient = generalClient.duplicate({ disableOfflineQueue: false });
+const adapterSubClient = generalClient.duplicate({ disableOfflineQueue: false });
 // CRITICAL: Must attach error handlers BEFORE connect() or unhandled
 // Redis reconnection timeouts will throw UnhandledRejection and kill the process.
 adapterPubClient.on('error', (err) => console.error('[Redis Adapter Pub] Error:', err.message));
@@ -633,11 +633,40 @@ if (!isMaster) {
         if (keys.length > 0 && updateWorkerTickTime) {
           updateWorkerTickTime();
         }
-        // Workers only update their local priceCache — trigger evaluation ONLY runs on master
+        // Workers update their local priceCache and emit price_snapshot directly to their local Socket.IO symbol rooms
         keys.forEach(symbol => {
           const priceObj = batchUpdate[symbol];
           if (symbol && priceObj) {
             priceCache[symbol] = priceObj;
+            if (symbol.includes(':')) {
+              const parts = symbol.split(':');
+              const ex = parts[0];
+              const raw = parts[1];
+              priceCache[raw] = priceObj;
+              const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+              priceCache[clean] = priceObj;
+              priceCache[`${ex}:${clean}`] = priceObj;
+            }
+            const room = io.sockets?.adapter?.rooms?.get(symbol);
+            if (room && room.size > 0) {
+              (io.local || io).to(symbol).emit('price_snapshot', {
+                [symbol]: [
+                  priceObj.ltp,
+                  priceObj.change,
+                  priceObj.pct,
+                  priceObj.timestamp,
+                  priceObj.open,
+                  priceObj.high,
+                  priceObj.low,
+                  priceObj.close,
+                  priceObj.volume,
+                  priceObj.totBuyQuan,
+                  priceObj.totSellQuan,
+                  priceObj.upper_circuit || 0,
+                  priceObj.lower_circuit || 0
+                ]
+              });
+            }
           }
         });
       } catch(e){}
