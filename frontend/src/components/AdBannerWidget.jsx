@@ -6,6 +6,44 @@ let cachedAdConfig = null;
 let fetchingPromise = null;
 let adsenseScriptInjected = false;
 
+let adsenseLayoutGuardAttached = false;
+
+function attachAdSenseLayoutGuard() {
+  if (adsenseLayoutGuardAttached || typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+  adsenseLayoutGuardAttached = true;
+
+  const stripAdSenseInlineHeight = (el) => {
+    if (!el || !el.style) return;
+    const isLayoutContainer =
+      el.id === 'root' ||
+      el.tagName === 'MAIN' ||
+      (el.classList && (
+        el.classList.contains('app-container') ||
+        el.classList.contains('content-wrapper') ||
+        el.classList.contains('main-content')
+      ));
+    if (isLayoutContainer && el.style.getPropertyValue('height') === 'auto') {
+      if (el.classList && el.classList.contains('app-container')) {
+        el.style.setProperty('height', '100vh');
+      } else {
+        el.style.removeProperty('height');
+      }
+    }
+  };
+
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === 'attributes' && m.attributeName === 'style') {
+        stripAdSenseInlineHeight(m.target);
+      }
+    }
+  });
+
+  if (document.body) {
+    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style'] });
+  }
+}
+
 function injectAdSenseScript(clientId) {
   if (!clientId || typeof document === 'undefined') return;
   const cleanId = String(clientId).trim();
@@ -16,6 +54,7 @@ function injectAdSenseScript(clientId) {
     style.textContent = 'ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; height: 0 !important; min-height: 0 !important; }';
     document.head.appendChild(style);
   }
+  attachAdSenseLayoutGuard();
   if (adsenseScriptInjected) return;
   if (document.querySelector(`script[src*="adsbygoogle.js"]`)) {
     adsenseScriptInjected = true;
@@ -992,7 +1031,7 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         style={{
           margin: adSenseFilled ? '8px 12px' : '0px',
           padding: adSenseFilled ? '6px 10px' : '0px',
-          maxHeight: adSenseFilled ? '280px' : '0px',
+          maxHeight: adSenseFilled ? '100px' : '0px',
           overflow: 'hidden',
           background: adSenseFilled ? 'rgba(15, 23, 42, 0.92)' : 'transparent',
           border: adSenseFilled ? '1px solid rgba(56, 189, 248, 0.18)' : 'none',
@@ -1004,11 +1043,11 @@ export default function AdBannerWidget({ onUpgradeClick }) {
         <ins
           ref={adsenseBannerRef}
           className="adsbygoogle"
-          style={{ display: 'block', width: '100%' }}
+          style={{ display: 'block', width: '100%', height: '90px', maxHeight: '90px' }}
           data-ad-client={config.adsense_client_id}
           data-ad-slot={config.adsense_banner_slot}
-          data-ad-format="auto"
-          data-full-width-responsive="true"
+          data-ad-format="horizontal"
+          data-full-width-responsive="false"
         />
       </div>
     );
@@ -1054,15 +1093,15 @@ export default function AdBannerWidget({ onUpgradeClick }) {
               {config.sponsor_subtitle}
             </div>
             {config.adsense_client_id && config.adsense_banner_slot && (
-              <div style={{ maxHeight: adSenseFilled ? '280px' : '0px', overflow: 'hidden' }}>
+              <div style={{ maxHeight: adSenseFilled ? '100px' : '0px', overflow: 'hidden' }}>
                 <ins
                   ref={adsenseBannerRef}
                   className="adsbygoogle"
-                  style={{ display: 'block', width: '100%' }}
+                  style={{ display: 'block', width: '100%', height: '90px', maxHeight: '90px' }}
                   data-ad-client={config.adsense_client_id}
                   data-ad-slot={config.adsense_banner_slot}
-                  data-ad-format="auto"
-                  data-full-width-responsive="true"
+                  data-ad-format="horizontal"
+                  data-full-width-responsive="false"
                 />
               </div>
             )}

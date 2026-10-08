@@ -211,6 +211,44 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
+@media (min-width: 769px) {
+  html:has(.app-container:not(.scrollable-page)),
+  body:has(.app-container:not(.scrollable-page)),
+  #root:has(.app-container:not(.scrollable-page)) {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  .app-container:not(.scrollable-page) {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  .app-container:not(.scrollable-page) > .content-wrapper {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    max-height: calc(100vh - 56px) !important;
+    overflow: hidden !important;
+  }
+
+  .app-container:not(.scrollable-page) .sidebar {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .app-container:not(.scrollable-page) .main-content,
+  .app-container:not(.scrollable-page) .main-content > main {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
 .app-container.scrollable-page {
   overflow-y: auto !important;
   overflow-x: hidden !important;
