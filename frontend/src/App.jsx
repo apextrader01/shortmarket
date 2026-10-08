@@ -612,6 +612,79 @@ function App() {
     };
     checkFyersCallback();
   }, []);
+
+  // Global Google OAuth Return URL Cleaner & Token Handover (Runs even if LoginView is unmounted)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    let extractedToken = null;
+
+    if (hash.includes('id_token=') || hash.includes('state=sk')) {
+      try {
+        const hp = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash);
+        extractedToken = hp.get('id_token');
+        if (extractedToken) {
+          sessionStorage.setItem('skandx_google_id_token', extractedToken);
+        }
+      } catch (_) {}
+    }
+
+    if (
+      hash.includes('id_token=') ||
+      hash.includes('state=sk') ||
+      search.includes('oauth_app_return=') ||
+      search.includes('google_oauth=')
+    ) {
+      try {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('oauth_app_return');
+        cleanUrl.searchParams.delete('google_oauth');
+        if (cleanUrl.searchParams.get('state')?.startsWith('skx_')) {
+          cleanUrl.searchParams.delete('state');
+        }
+        cleanUrl.hash = '';
+        window.history.replaceState({}, document.title, cleanUrl.pathname + (cleanUrl.search || ''));
+      } catch (_) {}
+    }
+
+    // If user is already logged in (so LoginView is not rendered) but a fresh Google OAuth token arrived,
+    // consume and clean it so it never lingers in storage
+    if (user) {
+      try {
+        const pendingToken = extractedToken || sessionStorage.getItem('skandx_google_id_token') || localStorage.getItem('skandx_google_id_token');
+        sessionStorage.removeItem('skandx_google_id_token');
+        sessionStorage.removeItem('skandx_pending_oauth_state');
+        sessionStorage.removeItem('skandx_pending_oauth_ts');
+        localStorage.removeItem('skandx_google_id_token');
+        localStorage.removeItem('skandx_pending_oauth_state');
+        localStorage.removeItem('skandx_pending_oauth_ts');
+        localStorage.removeItem('skandx_google_oauth_event');
+        if (pendingToken) {
+          const API_URL = import.meta.env.VITE_API_URL || '';
+          fetch(`${API_URL}/api/auth/google-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: pendingToken })
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data?.success && data?.token && data?.user) {
+                localStorage.setItem('token', data.token);
+                useStore.setState({
+                  user: data.user,
+                  token: data.token,
+                  watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+                });
+                useStore.getState().fetchUserData?.();
+              }
+            })
+            .catch(() => {});
+        }
+      } catch (_) {}
+    }
+  }, [user]);
+
   // Pre-fetch top index prices (runs on mount regardless of auth state)
   useEffect(() => {
     fetchBatchPrices(TOP_INDICES);

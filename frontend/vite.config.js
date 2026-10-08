@@ -31,6 +31,10 @@ export default defineConfig({
         orientation: 'portrait',
         categories: ['finance', 'business', 'education'],
         prefer_related_applications: false,
+        handle_links: 'preferred',
+        launch_handler: {
+          client_mode: ['focus-existing', 'navigate-existing']
+        },
         icons: [
           {
             src: 'pwa-192x192.png',

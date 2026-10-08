@@ -2244,11 +2244,167 @@ app.post('/api/auth/logout', async (req, res) => {
   res.json({ success: true });
 });
 
-// ─── Mobile-Safe Same-Tab Google OAuth Redirect Start ────────────────────────
-// Uses the already-authorized https://www.skandx.in/__/auth/handler redirect URI
-// with OpenID Connect response_type=id_token so zero popups, zero new tabs, and
-// zero client_secret are needed on mobile Chrome/Safari.
+// ─── Mobile & Standalone App Google OAuth Relay Bridge ───────────────────────
+// Bridges the Google OIDC id_token from the external Chrome browser / Custom Tab
+// directly back into the waiting installed SkandX App (PWA / WebAPK / TWA / Capacitor)
+// across all PM2 cluster workers via Redis + in-memory fallback.
 const GOOGLE_OAUTH_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '942129499307-fer7gcbqo0h1gjhj0mr65oran7ohi92q.apps.googleusercontent.com';
+const oauthRelayMemory = new Map();
+
+function pruneOauthRelayMemory() {
+  const now = Date.now();
+  for (const [k, v] of oauthRelayMemory.entries()) {
+    if (!v || now - (v.createdAt || 0) > 300000) {
+      oauthRelayMemory.delete(k);
+    }
+  }
+}
+
+async function getOauthRelayRecord(stateKey) {
+  if (!stateKey || typeof stateKey !== 'string') return null;
+  const cleanKey = stateKey.trim().slice(0, 128);
+  try {
+    if (generalClient && (generalClient.isReady || generalClient.isOpen)) {
+      const raw = await generalClient.get(`oauth:relay:${cleanKey}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        oauthRelayMemory.set(cleanKey, parsed);
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return oauthRelayMemory.get(cleanKey) || null;
+}
+
+async function setOauthRelayRecord(stateKey, record) {
+  if (!stateKey || typeof stateKey !== 'string') return;
+  const cleanKey = stateKey.trim().slice(0, 128);
+  if (oauthRelayMemory.size > 1000) pruneOauthRelayMemory();
+  oauthRelayMemory.set(cleanKey, record);
+  try {
+    if (generalClient && (generalClient.isReady || generalClient.isOpen)) {
+      await generalClient.setEx(`oauth:relay:${cleanKey}`, 300, JSON.stringify(record));
+    }
+  } catch (_) {}
+}
+
+app.post('/api/auth/google-oauth-init', async (req, res) => {
+  try {
+    const { state, isInApp, appMode } = req.body || {};
+    if (!state || typeof state !== 'string' || state.length < 6) {
+      return res.status(400).json({ error: 'Valid state parameter required' });
+    }
+    const existing = (await getOauthRelayRecord(state)) || {};
+    const inferredInApp = Boolean(
+      isInApp ||
+      existing.isInApp ||
+      state.startsWith('skx_app_') ||
+      state.startsWith('skx_pwa_') ||
+      state.startsWith('skx_cap_')
+    );
+    const inferredMode = appMode || existing.appMode || (state.startsWith('skx_cap_') ? 'cap' : (inferredInApp ? 'pwa' : 'web'));
+    await setOauthRelayRecord(state, {
+      ...existing,
+      state,
+      isInApp: inferredInApp,
+      appMode: inferredMode,
+      pollCount: existing.pollCount || 0,
+      idToken: existing.idToken || null,
+      error: existing.error || null,
+      createdAt: existing.createdAt || Date.now(),
+      updatedAt: Date.now()
+    });
+    return res.json({ success: true, isInApp: inferredInApp, appMode: inferredMode });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to initialize OAuth state' });
+  }
+});
+
+app.post('/api/auth/google-oauth-relay', async (req, res) => {
+  try {
+    const { state, idToken, error } = req.body || {};
+    if (!state || typeof state !== 'string') {
+      return res.status(400).json({ error: 'State parameter required' });
+    }
+    const existing = (await getOauthRelayRecord(state)) || {};
+    const isInApp = Boolean(
+      existing.isInApp ||
+      (existing.pollCount && existing.pollCount > 0) ||
+      state.startsWith('skx_app_') ||
+      state.startsWith('skx_pwa_') ||
+      state.startsWith('skx_cap_')
+    );
+    const appMode = existing.appMode || (state.startsWith('skx_cap_') ? 'cap' : (isInApp ? 'pwa' : 'web'));
+    const updated = {
+      ...existing,
+      state,
+      isInApp,
+      appMode,
+      idToken: idToken || existing.idToken || null,
+      error: error || existing.error || null,
+      createdAt: existing.createdAt || Date.now(),
+      relayedAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await setOauthRelayRecord(state, updated);
+    return res.json({ success: true, isInApp, appMode });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to relay OAuth token' });
+  }
+});
+
+app.get('/api/auth/google-oauth-poll', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const state = String(req.query.state || '').trim();
+    const mode = String(req.query.mode || '').trim();
+    if (!state || state.length < 6) {
+      return res.status(400).json({ error: 'Valid state required' });
+    }
+    const existing = (await getOauthRelayRecord(state)) || {};
+    if (existing.idToken) {
+      await setOauthRelayRecord(state, {
+        ...existing,
+        consumedAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      return res.json({
+        success: true,
+        status: 'authenticated',
+        idToken: existing.idToken
+      });
+    }
+    if (existing.error) {
+      return res.json({
+        success: true,
+        status: 'error',
+        error: existing.error
+      });
+    }
+    const isInApp = Boolean(
+      existing.isInApp ||
+      req.query.app === '1' ||
+      mode === 'pwa' ||
+      mode === 'cap' ||
+      state.startsWith('skx_app_') ||
+      state.startsWith('skx_pwa_') ||
+      state.startsWith('skx_cap_')
+    );
+    const appMode = existing.appMode || mode || (state.startsWith('skx_cap_') ? 'cap' : (isInApp ? 'pwa' : 'web'));
+    await setOauthRelayRecord(state, {
+      ...existing,
+      state,
+      isInApp,
+      appMode,
+      pollCount: (existing.pollCount || 0) + 1,
+      createdAt: existing.createdAt || Date.now(),
+      updatedAt: Date.now()
+    });
+    return res.json({ success: true, status: 'pending', isInApp, appMode });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to poll OAuth state' });
+  }
+});
 
 app.get('/api/auth/google/redirect', (req, res) => {
   try {
@@ -2256,7 +2412,7 @@ app.get('/api/auth/google/redirect', (req, res) => {
     const host = rawHost.includes('localhost') ? 'www.skandx.in' : rawHost;
     const redirectUri = `https://${host}/__/auth/handler`;
     const nonce = require('crypto').randomBytes(16).toString('hex');
-    const state = 'skandx_mobile_oauth_' + require('crypto').randomBytes(8).toString('hex');
+    const state = String(req.query.state || ('skx_web_' + require('crypto').randomBytes(8).toString('hex')));
 
     const params = new URLSearchParams({
       client_id: GOOGLE_OAUTH_CLIENT_ID,
@@ -13574,7 +13730,7 @@ function getIndexHtmlFromRam() {
   }
 }
 
-// Google Play Store TWA Digital Asset Links verification endpoint
+// Google Play Store TWA & Capacitor Digital Asset Links verification endpoint
 app.get('/.well-known/assetlinks.json', (req, res) => {
   const pkgName = process.env.ANDROID_PACKAGE_NAME || 'in.skandx.twa';
   const rawFingerprints = process.env.ANDROID_SHA256_CERT_FINGERPRINTS || '';
@@ -13585,16 +13741,17 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  return res.json([
-    {
+  const packages = Array.from(new Set([pkgName, 'com.skandx.app', 'in.skandx.twa']));
+  return res.json(
+    packages.map(pkg => ({
       relation: ['delegate_permission/common.handle_all_urls'],
       target: {
         namespace: 'android_app',
-        package_name: pkgName,
+        package_name: pkg,
         sha256_cert_fingerprints: fingerprints
       }
-    }
-  ]);
+    }))
+  );
 });
 
 // ─── Firebase Hosting Emulated Init Endpoints (Required for auth handler domain validation) ──
@@ -13631,12 +13788,14 @@ app.get('/__/firebase/init.js', (req, res) => {
   res.send(`if (typeof firebase === 'undefined') throw new Error('firebase is undefined'); firebase.initializeApp(${JSON.stringify(cfg)});`);
 });
 
-// ─── Mobile Same-Tab Google OIDC Callback Bridge (/__/auth/handler) ──────────
-// When mobile browsers complete Google Sign-In via same-tab redirect, Google redirects
-// to https://www.skandx.in/__/auth/handler#id_token=... (an already-authorized URI).
-// If ?apiKey=... is NOT present (meaning this is our direct OIDC return, not Firebase's
-// internal popup script), we capture the id_token from the URL hash into same-origin
-// storage and immediately forward the tab to the main app root (/).
+// ─── Mobile & Standalone In-App Google OIDC Callback Bridge (/__/auth/handler) ──
+// When mobile browsers or installed apps complete Google Sign-In, Google redirects
+// to https://www.skandx.in/__/auth/handler#id_token=...&state=...
+// 1. Immediately strips #state=...&id_token=... from the browser URL bar.
+// 2. Relays id_token to the backend (/api/auth/google-oauth-relay) + BroadcastChannel
+//    so the waiting installed SkandX App (PWA / WebAPK / TWA / Capacitor) logs in immediately.
+// 3. If launched from the installed app, closes the browser tab / triggers the Android return
+//    intent so the user returns to the SkandX app instead of staying in the browser.
 app.get('/__/auth/handler', (req, res, next) => {
   if (req.query && req.query.apiKey) {
     return next();
@@ -13647,28 +13806,239 @@ app.get('/__/auth/handler', (req, res, next) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Signing in to SkandX...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SkandX — Completing Google Sign-In</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #0a0e17;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      text-align: center;
+    }
+    @keyframes s { to { transform: rotate(360deg); } }
+    .card {
+      background: #111827;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 16px;
+      padding: 28px 22px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: s 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    .check-badge {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid #10b981;
+      color: #10b981;
+      font-size: 26px;
+      font-weight: 800;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .btn-primary {
+      display: none;
+      width: 100%;
+      padding: 13px 18px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 12px;
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
+    }
+    .btn-secondary {
+      display: none;
+      background: transparent;
+      border: none;
+      color: #64748b;
+      font-size: 12px;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 6px;
+    }
+  </style>
 </head>
-<body style="background:#0a0e17;color:#38bdf8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
-  <div style="width:28px;height:28px;border:3px solid rgba(56,189,248,0.2);border-top-color:#38bdf8;border-radius:50%;animation:s 0.8s linear infinite;margin-bottom:14px;"></div>
-  <div style="font-size:14px;font-weight:600;">Completing Google Sign-In...</div>
-  <style>@keyframes s{to{transform:rotate(360deg)}}</style>
+<body>
+  <div class="card">
+    <div id="spinner" class="spinner"></div>
+    <div id="checkBadge" class="check-badge">&#10003;</div>
+    <div id="statusTitle" class="title">Completing Google Sign-In...</div>
+    <div id="statusSub" class="subtitle">Connecting your Google account to SkandX...</div>
+    <button id="returnAppBtn" type="button" class="btn-primary">Return to SkandX App</button>
+    <button id="continueWebBtn" type="button" class="btn-secondary">Continue in browser instead</button>
+  </div>
   <script>
     (function() {
       var hash = window.location.hash || '';
       var search = window.location.search || '';
-      if (hash.indexOf('id_token=') !== -1) {
+      var hashParams = new URLSearchParams(hash.indexOf('#') === 0 ? hash.substring(1) : hash);
+      var queryParams = new URLSearchParams(search);
+
+      var idToken = hashParams.get('id_token') || queryParams.get('id_token') || '';
+      var state = hashParams.get('state') || queryParams.get('state') || '';
+      var oauthErr = hashParams.get('error') || queryParams.get('error') || '';
+      var alreadyDone = queryParams.get('done') === '1';
+
+      // 1. Immediately strip #state=...&id_token=... from the browser URL bar!
+      try {
+        if (window.history && window.history.replaceState) {
+          var cleanUrl = '/__/auth/handler' + (state ? ('?state=' + encodeURIComponent(state) + '&done=1') : '?done=1');
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (e) {}
+
+      // 2. Store token in same-origin storage & broadcast to any same-engine windows
+      if (idToken) {
+        try { sessionStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
+        try { localStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
         try {
-          var params = new URLSearchParams(hash.substring(1));
-          var idToken = params.get('id_token');
-          if (idToken) {
-            try { sessionStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
-            try { localStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
-          }
+          localStorage.setItem('skandx_google_oauth_event', JSON.stringify({
+            idToken: idToken,
+            state: state,
+            ts: Date.now()
+          }));
         } catch (e) {}
       }
-      window.location.replace('/' + search + hash);
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          var bc = new BroadcastChannel('skandx_oauth_channel');
+          bc.postMessage({ type: 'GOOGLE_OAUTH_SUCCESS', idToken: idToken, state: state, error: oauthErr });
+        }
+      } catch (e) {}
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'GOOGLE_OAUTH_SUCCESS', idToken: idToken, state: state, error: oauthErr }, window.location.origin);
+        }
+      } catch (e) {}
+
+      var isAppPrefix = state.indexOf('skx_app_') === 0 || state.indexOf('skx_pwa_') === 0 || state.indexOf('skx_cap_') === 0;
+      var isCapMode = state.indexOf('skx_cap_') === 0;
+
+      function buildAndroidReturnIntent(mode) {
+        var host = window.location.host || 'skandx.in';
+        var fallbackUrl = window.location.origin + '/__/auth/handler?done=1&state=' + encodeURIComponent(state);
+        if (mode === 'cap') {
+          return 'intent://auth?state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';end';
+        }
+        return 'intent://' + host + '/?oauth_app_return=1&state=' + encodeURIComponent(state) + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';end';
+      }
+
+      function tryCloseOrReturnToApp(mode, fromUserClick) {
+        try { window.close(); } catch (e) {}
+        try { window.open('', '_self'); window.close(); } catch (e) {}
+        if (fromUserClick || !alreadyDone) {
+          try {
+            window.location.href = buildAndroidReturnIntent(mode);
+          } catch (e) {}
+        }
+      }
+
+      function showInAppHandoverUI(mode) {
+        var spinnerEl = document.getElementById('spinner');
+        var badgeEl = document.getElementById('checkBadge');
+        var titleEl = document.getElementById('statusTitle');
+        var subEl = document.getElementById('statusSub');
+        var returnBtn = document.getElementById('returnAppBtn');
+        var webBtn = document.getElementById('continueWebBtn');
+
+        if (spinnerEl) spinnerEl.style.display = 'none';
+        if (badgeEl) badgeEl.style.display = 'flex';
+        if (titleEl) titleEl.textContent = 'Signed in to SkandX!';
+        if (subEl) {
+          subEl.textContent = 'Your SkandX App is now signed in. Tap below or switch back to the SkandX app to continue.';
+        }
+        if (returnBtn) {
+          returnBtn.style.display = 'block';
+          returnBtn.onclick = function() {
+            tryCloseOrReturnToApp(mode, true);
+          };
+        }
+        if (webBtn) {
+          webBtn.style.display = 'inline-block';
+          webBtn.onclick = function() {
+            window.location.replace('/?google_oauth=1');
+          };
+        }
+      }
+
+      if (alreadyDone && !idToken) {
+        showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
+        try { window.close(); } catch (e) {}
+        return;
+      }
+
+      // 3. Relay id_token to backend Redis/Memory store so the waiting in-app window receives it immediately
+      if (state && (idToken || oauthErr)) {
+        fetch('/api/auth/google-oauth-relay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: state, idToken: idToken, error: oauthErr }),
+          keepalive: true
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var isInApp = Boolean(isAppPrefix || (data && data.isInApp));
+          var mode = (data && data.appMode) || (isCapMode ? 'cap' : (isInApp ? 'pwa' : 'web'));
+          if (isInApp) {
+            showInAppHandoverUI(mode);
+            tryCloseOrReturnToApp(mode, false);
+          } else {
+            window.location.replace('/?google_oauth=1');
+          }
+        })
+        .catch(function() {
+          if (isAppPrefix) {
+            showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
+            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+          } else {
+            window.location.replace('/?google_oauth=1');
+          }
+        });
+      } else {
+        if (isAppPrefix) {
+          showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
+          tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+        } else {
+          window.location.replace('/?google_oauth=1');
+        }
+      }
     })();
   </script>
 </body>

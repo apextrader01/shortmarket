@@ -586,15 +586,91 @@ export default function LoginView() {
     }
   }, []);
 
-  // Detect mobile browser (popups from GIS renderButton and signInWithPopup open as new tabs
-  // on Android Chrome that cannot close themselves after clicking Continue, leaving a white screen)
+  const oauthPopupRef = useRef(null);
+  const oauthProcessingRef = useRef(false);
+  const [activeOauthState, setActiveOauthState] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlState = urlParams.get('state');
+      if (urlState && urlState.startsWith('skx_')) return urlState;
+      const savedState = sessionStorage.getItem('skandx_pending_oauth_state') || localStorage.getItem('skandx_pending_oauth_state');
+      const savedTs = parseInt(sessionStorage.getItem('skandx_pending_oauth_ts') || localStorage.getItem('skandx_pending_oauth_ts') || '0', 10);
+      if (savedState && Date.now() - savedTs < 300000) {
+        return savedState;
+      }
+    } catch (_) {}
+    return null;
+  });
+
+  // Detect mobile & standalone in-app environments (PWA WebAPK, TWA, Capacitor Android WebView)
+  const isCapacitorOrWebView = typeof window !== 'undefined' && Boolean(
+    window.Capacitor?.isNativePlatform?.() ||
+    window.Capacitor?.isNative ||
+    window.location.protocol === 'capacitor:' ||
+    /; wv\)|WebView|SkandXApp/i.test(navigator.userAgent || '')
+  );
+
+  const isStandalonePwa = typeof window !== 'undefined' && Boolean(
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.matchMedia?.('(display-mode: fullscreen)').matches ||
+    window.matchMedia?.('(display-mode: minimal-ui)').matches ||
+    window.matchMedia?.('(display-mode: window-controls-overlay)').matches ||
+    window.navigator?.standalone === true ||
+    document.referrer.includes('android-app://')
+  );
+
+  const isInApp = isCapacitorOrWebView || isStandalonePwa;
+  const appMode = isCapacitorOrWebView ? 'cap' : (isStandalonePwa ? 'pwa' : 'web');
+
   const isMobileBrowser = typeof window !== 'undefined' && (
+    isInApp ||
     /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '') ||
     navigator.userAgentData?.mobile === true ||
     (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 1024)
   );
 
-  // Process Google OIDC Redirect Token on Mobile Return (Same-Tab Flow via /__/auth/handler)
+  const clearPendingOauthStorage = useCallback(() => {
+    try {
+      sessionStorage.removeItem('skandx_pending_oauth_state');
+      sessionStorage.removeItem('skandx_pending_oauth_ts');
+      sessionStorage.removeItem('skandx_google_id_token');
+      localStorage.removeItem('skandx_pending_oauth_state');
+      localStorage.removeItem('skandx_pending_oauth_ts');
+      localStorage.removeItem('skandx_google_id_token');
+      localStorage.removeItem('skandx_google_oauth_event');
+    } catch (_) {}
+  }, []);
+
+  const consumeOauthIdToken = useCallback((idToken) => {
+    if (!idToken || oauthProcessingRef.current) return;
+    oauthProcessingRef.current = true;
+    clearPendingOauthStorage();
+    setActiveOauthState(null);
+    try {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+    } catch (_) {}
+    oauthPopupRef.current = null;
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('oauth_app_return');
+      url.searchParams.delete('google_oauth');
+      url.searchParams.delete('state');
+      url.hash = '';
+      window.history.replaceState({}, document.title, url.pathname + (url.search || ''));
+    }
+
+    handleGoogleCredentialResponse({ credential: idToken }).finally(() => {
+      setTimeout(() => {
+        oauthProcessingRef.current = false;
+      }, 1500);
+    });
+  }, [clearPendingOauthStorage, handleGoogleCredentialResponse]);
+
+  // Process Google OIDC Redirect Token on Mobile Return (Same-Tab Flow & Storage Bridge)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let idToken = null;
@@ -613,26 +689,124 @@ export default function LoginView() {
     }
 
     if (idToken || oauthErr) {
-      try {
-        sessionStorage.removeItem('skandx_google_id_token');
-        localStorage.removeItem('skandx_google_id_token');
-      } catch (_) {}
       if (window.location.hash) {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       }
       if (idToken) {
-        handleGoogleCredentialResponse({ credential: idToken });
-      } else if (oauthErr && oauthErr !== 'access_denied') {
-        useStore.setState({ authError: `Google sign-in error: ${oauthErr}` });
+        consumeOauthIdToken(idToken);
+      } else if (oauthErr) {
+        clearPendingOauthStorage();
+        setActiveOauthState(null);
+        setGoogleLoading(false);
+        setLoading(false);
+        if (oauthErr !== 'access_denied') {
+          useStore.setState({ authError: `Google sign-in error: ${oauthErr}` });
+        }
       }
     }
-  }, [handleGoogleCredentialResponse]);
+  }, [consumeOauthIdToken, clearPendingOauthStorage]);
 
-  // Initialize Google Identity Services (GIS) — Desktop Only
-  // On mobile, GIS renderButton opens a popup tab to accounts.google.com/gsi/... which
-  // hangs on a white screen after clicking Continue on Android Chrome.
+  // Poll Backend OAuth Relay & Listen on BroadcastChannel / Storage / Focus for In-App Handover
   useEffect(() => {
-    if (typeof window === 'undefined' || isMobileBrowser) return;
+    if (typeof window === 'undefined' || !activeOauthState) return;
+
+    let cancelled = false;
+
+    const checkRelayStatus = async () => {
+      if (cancelled || oauthProcessingRef.current) return;
+
+      // 1. Check same-origin storage first
+      try {
+        const localToken = sessionStorage.getItem('skandx_google_id_token') || localStorage.getItem('skandx_google_id_token');
+        if (localToken) {
+          consumeOauthIdToken(localToken);
+          return;
+        }
+      } catch (_) {}
+
+      // 2. Poll backend Redis/Memory OAuth relay (bridges Chrome Custom Tab / Browser -> Installed App)
+      try {
+        const res = await fetch(
+          `${API}/api/auth/google-oauth-poll?state=${encodeURIComponent(activeOauthState)}&mode=${encodeURIComponent(appMode)}&app=${isInApp ? '1' : '0'}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || oauthProcessingRef.current) return;
+
+        if (data && data.status === 'authenticated' && data.idToken) {
+          consumeOauthIdToken(data.idToken);
+        } else if (data && data.status === 'error' && data.error) {
+          clearPendingOauthStorage();
+          setActiveOauthState(null);
+          setGoogleLoading(false);
+          setLoading(false);
+          if (data.error !== 'access_denied') {
+            useStore.setState({ authError: `Google sign-in failed: ${data.error}` });
+          }
+        }
+      } catch (_) {}
+    };
+
+    checkRelayStatus();
+    const pollTimer = setInterval(checkRelayStatus, 650);
+
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('skandx_oauth_channel');
+        bc.onmessage = (ev) => {
+          if (ev?.data?.type === 'GOOGLE_OAUTH_SUCCESS' && ev.data.idToken) {
+            consumeOauthIdToken(ev.data.idToken);
+          }
+        };
+      }
+    } catch (_) {}
+
+    const handleWindowMessage = (ev) => {
+      if (ev?.data?.type === 'GOOGLE_OAUTH_SUCCESS' && ev.data.idToken) {
+        consumeOauthIdToken(ev.data.idToken);
+      }
+    };
+
+    const handleStorageEvent = (ev) => {
+      if (ev.key === 'skandx_google_id_token' && ev.newValue) {
+        consumeOauthIdToken(ev.newValue);
+      } else if (ev.key === 'skandx_google_oauth_event' && ev.newValue) {
+        try {
+          const parsed = JSON.parse(ev.newValue);
+          if (parsed?.idToken) consumeOauthIdToken(parsed.idToken);
+        } catch (_) {}
+      }
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (!document.hidden) {
+        checkRelayStatus();
+      }
+    };
+
+    window.addEventListener('message', handleWindowMessage);
+    window.addEventListener('storage', handleStorageEvent);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    window.addEventListener('pageshow', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollTimer);
+      try { bc?.close(); } catch (_) {}
+      window.removeEventListener('message', handleWindowMessage);
+      window.removeEventListener('storage', handleStorageEvent);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('pageshow', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [activeOauthState, appMode, isInApp, consumeOauthIdToken, clearPendingOauthStorage]);
+
+  // Initialize Google Identity Services (GIS) — Desktop & Non-WebView FedCM One-Tap
+  useEffect(() => {
+    if (typeof window === 'undefined' || isCapacitorOrWebView) return;
 
     const initGis = () => {
       if (window.google?.accounts?.id) {
@@ -642,10 +816,11 @@ export default function LoginView() {
             callback: handleGoogleCredentialResponse,
             auto_select: false,
             cancel_on_tap_outside: true,
-            itp_support: true
+            itp_support: true,
+            use_fedcm_for_prompt: true
           });
           setGisLoaded(true);
-          // Try displaying native One Tap prompt on supported desktop browsers
+          // Display native One Tap / FedCM bottom-sheet prompt (stays 100% in-app on supported browsers)
           window.google.accounts.id.prompt();
         } catch (e) {
           console.warn('[GIS] Init notice:', e.message);
@@ -668,7 +843,7 @@ export default function LoginView() {
         clearTimeout(timeout);
       };
     }
-  }, [handleGoogleCredentialResponse, isMobileBrowser]);
+  }, [handleGoogleCredentialResponse, isCapacitorOrWebView]);
 
   // Render Google Identity Services Button — Desktop Only
   useEffect(() => {
@@ -691,18 +866,54 @@ export default function LoginView() {
     }
   }, [gisLoaded, view, isMobileBrowser]);
 
+  const handleCancelGoogleLogin = () => {
+    clearPendingOauthStorage();
+    setActiveOauthState(null);
+    setGoogleLoading(false);
+    setLoading(false);
+    try {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+    } catch (_) {}
+    oauthPopupRef.current = null;
+  };
+
   const handleGoogleLogin = async () => {
     useStore.setState({ authError: null });
 
-    // ── Mobile: Same-tab OIDC redirect via authorized /__/auth/handler (zero popups!) ──
+    // ── Mobile & Installed App (PWA / WebAPK / TWA / Capacitor): OIDC with In-App Relay Bridge ──
     if (isMobileBrowser) {
       setLoading(true);
       setGoogleLoading(true);
-      const origin = (typeof window !== 'undefined' && !window.location.origin.includes('localhost'))
+      const origin = (
+        typeof window !== 'undefined' &&
+        !window.location.origin.includes('localhost') &&
+        window.location.protocol.startsWith('http')
+      )
         ? window.location.origin
         : 'https://www.skandx.in';
       const redirectUri = `${origin}/__/auth/handler`;
+      const randomPart = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      const state = `skx_${appMode}_${randomPart}`;
       const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+      try {
+        sessionStorage.setItem('skandx_pending_oauth_state', state);
+        sessionStorage.setItem('skandx_pending_oauth_ts', String(Date.now()));
+        localStorage.setItem('skandx_pending_oauth_state', state);
+        localStorage.setItem('skandx_pending_oauth_ts', String(Date.now()));
+      } catch (_) {}
+      setActiveOauthState(state);
+
+      // Register state on backend so the callback handler knows to bounce back to the app
+      fetch(`${API}/api/auth/google-oauth-init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state, isInApp, appMode }),
+        keepalive: true
+      }).catch(() => {});
+
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
         redirect_uri: redirectUri,
@@ -710,9 +921,24 @@ export default function LoginView() {
         scope: 'openid email profile',
         prompt: 'select_account',
         nonce,
-        state: 'skandx_mobile_oauth'
+        state
       });
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+      // In standalone PWA mode, opening via window.open allows Chrome Android to auto-close
+      // the OAuth tab via window.close() as soon as the account is selected!
+      if (isInApp && !isCapacitorOrWebView) {
+        let popupWin = null;
+        try {
+          popupWin = window.open(oauthUrl, 'skandx_google_oauth');
+        } catch (_) {}
+        if (popupWin) {
+          oauthPopupRef.current = popupWin;
+          return;
+        }
+      }
+
+      window.location.href = oauthUrl;
       return;
     }
 
@@ -1527,6 +1753,23 @@ export default function LoginView() {
                         <span>{view === 'register' ? 'Sign up with Google' : 'Log in with Google'}</span>
                       </>
                     )}
+                  </button>
+                )}
+                {googleLoading && (
+                  <button
+                    type="button"
+                    onClick={handleCancelGoogleLogin}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      fontSize: '12px',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: '4px 8px'
+                    }}
+                  >
+                    Cancel or retry Google Sign-In
                   </button>
                 )}
               </div>
