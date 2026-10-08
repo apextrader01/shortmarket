@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 import { getInstantLotsize, updateLiveLotsizeMap, syncLiveLotsizeMap, setContractLotsize } from './utils/lotsizeHelper';
 import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
-import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
+import { calculateOrderSlices, getFreezeLimit, updateLiveFreezeConfig, syncLiveFreezeConfig } from './utils/freezeLimits';
 import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
 import { setAppLocked } from './utils/biometricAuth';
 import { filterStaleAlerts } from './utils/alertUtils';
@@ -1064,6 +1064,13 @@ export const useStore = create(persist((set, get) => ({
       }
     });
 
+    socket.off('freeze_limits_updated');
+    socket.on('freeze_limits_updated', (cfgData) => {
+      if (cfgData && typeof cfgData === 'object') {
+        updateLiveFreezeConfig(cfgData);
+      }
+    });
+
     socket.off('subscription_updated');
     socket.on('subscription_updated', (data) => {
       if (!data) return;
@@ -1098,6 +1105,7 @@ export const useStore = create(persist((set, get) => ({
         socket.emit('register_user', currentUser.id);
       }
       syncLiveLotsizeMap(API).catch(() => {});
+      syncLiveFreezeConfig(API).catch(() => {});
       get().fetchMarketStatus();
       get().fetchMarketCalendar();
       get().fetchTodayMarketSchedule();

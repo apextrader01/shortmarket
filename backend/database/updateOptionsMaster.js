@@ -237,6 +237,109 @@ async function updateOptionsMaster() {
             fs.writeFileSync(frontendMapPath, JSON.stringify(lotsizeMap, null, 2));
             console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to frontend lotsizeMap.json!`);
         }
+
+        await syncNseFreezeLimits(lotsizeMap);
+    }
+}
+
+async function syncNseFreezeLimits(lotsizeMap = {}) {
+    const backendFreezePath = path.join(__dirname, 'freezeLimitsConfig.json');
+    const frontendFreezePath = path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'freezeLimitsConfig.json');
+
+    let config = {
+        INDEX_MAX_LOTS: {
+            BANKNIFTY: 48,
+            NIFTY: 54,
+            FINNIFTY: 54,
+            MIDCPNIFTY: 48,
+            MIDCAPNIFTY: 48,
+            NIFTYNXT50: 45,
+            NIFTYFPI: 49,
+            SENSEX: 50,
+            BANKEX: 30
+        },
+        STOCK_MAX_LOTS: 40,
+        SYMBOL_FREEZE_LOTS: {},
+        SYMBOL_FREEZE_QTY: {},
+        COMMODITY_FREEZE_LIMITS: {
+            CRUDEOIL: 10000,
+            CRUDEOILM: 1000,
+            NATURALGAS: 50000,
+            NATURALGASM: 10000,
+            GOLD: 100,
+            GOLDM: 1000,
+            GOLDPETAL: 10000,
+            SILVER: 300,
+            SILVERM: 1000,
+            SILVERMIC: 10000,
+            COPPER: 25000,
+            ZINC: 50000,
+            LEAD: 50000,
+            ALUMINIUM: 50000,
+            MENTHAOIL: 3600,
+            COTTON: 2500,
+            NICKEL: 2500
+        }
+    };
+
+    try {
+        if (fs.existsSync(backendFreezePath)) {
+            const existing = JSON.parse(fs.readFileSync(backendFreezePath, 'utf8'));
+            if (existing && typeof existing === 'object') {
+                config = {
+                    ...config,
+                    ...existing,
+                    INDEX_MAX_LOTS: { ...config.INDEX_MAX_LOTS, ...(existing.INDEX_MAX_LOTS || {}) },
+                    COMMODITY_FREEZE_LIMITS: { ...config.COMMODITY_FREEZE_LIMITS, ...(existing.COMMODITY_FREEZE_LIMITS || {}) },
+                    SYMBOL_FREEZE_LOTS: { ...(existing.SYMBOL_FREEZE_LOTS || {}) },
+                    SYMBOL_FREEZE_QTY: { ...(existing.SYMBOL_FREEZE_QTY || {}) }
+                };
+            }
+        }
+    } catch (e) {}
+
+    try {
+        console.log('Downloading NSE F&O Freeze Limits (qtyfreeze.csv)...');
+        const csvRaw = await downloadCSV('https://nsearchives.nseindia.com/content/fo/qtyfreeze.csv', 15000, 2);
+        if (csvRaw) {
+            const lines = csvRaw.trim().split('\n');
+            let count = 0;
+            const indexSet = new Set(['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'NIFTYNXT50', 'NIFTYFPI']);
+
+            for (const line of lines) {
+                const parts = line.split(',').map(s => s.trim());
+                if (parts.length < 3) continue;
+                const sym = parts[1].toUpperCase();
+                const frzQty = parseInt(parts[2], 10);
+                if (!sym || sym === 'SYMBOL' || isNaN(frzQty) || frzQty <= 0) continue;
+
+                config.SYMBOL_FREEZE_QTY[sym] = frzQty;
+                const lot = Number(lotsizeMap[sym]) || 0;
+                if (lot > 0) {
+                    const maxLots = Math.max(1, Math.round(frzQty / lot));
+                    config.SYMBOL_FREEZE_LOTS[sym] = maxLots;
+                    if (indexSet.has(sym)) {
+                        config.INDEX_MAX_LOTS[sym] = maxLots;
+                        if (sym === 'MIDCPNIFTY') {
+                            config.INDEX_MAX_LOTS.MIDCAPNIFTY = maxLots;
+                        }
+                    }
+                }
+                count++;
+            }
+
+            if (count > 0) {
+                fs.writeFileSync(backendFreezePath, JSON.stringify(config, null, 2));
+                console.log(`Saved ${count} NSE Freeze Limits to backend freezeLimitsConfig.json! (NIFTY: ${config.INDEX_MAX_LOTS.NIFTY} lots, BANKNIFTY: ${config.INDEX_MAX_LOTS.BANKNIFTY} lots)`);
+
+                if (fs.existsSync(path.dirname(frontendFreezePath))) {
+                    fs.writeFileSync(frontendFreezePath, JSON.stringify(config, null, 2));
+                    console.log(`Saved ${count} NSE Freeze Limits to frontend freezeLimitsConfig.json!`);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Warning: Failed to sync NSE qtyfreeze.csv (preserving existing freezeLimitsConfig.json):', err.message);
     }
 }
 
@@ -303,5 +406,5 @@ if (require.main === module) {
     updateOptionsMaster();
 }
 
-module.exports = { updateOptionsMaster, slimOptionsData };
+module.exports = { updateOptionsMaster, slimOptionsData, syncNseFreezeLimits };
 

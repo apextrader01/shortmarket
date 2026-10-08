@@ -35,31 +35,53 @@ function getInstantLotsize(sym) {
 }
 
 let freezeConfig = {
-    INDEX_MAX_LOTS: { BANKNIFTY: 20, NIFTY: 27, FINNIFTY: 30, MIDCPNIFTY: 28, MIDCAPNIFTY: 28, NIFTYNXT50: 24, SENSEX: 1000, BANKEX: 1000 },
+    INDEX_MAX_LOTS: { BANKNIFTY: 48, NIFTY: 54, FINNIFTY: 54, MIDCPNIFTY: 48, MIDCAPNIFTY: 48, NIFTYNXT50: 45, NIFTYFPI: 49, SENSEX: 50, BANKEX: 30 },
     STOCK_MAX_LOTS: 40,
+    SYMBOL_FREEZE_LOTS: {},
+    SYMBOL_FREEZE_QTY: {},
     COMMODITY_FREEZE_LIMITS: { CRUDEOIL: 10000, CRUDEOILM: 1000, NATURALGAS: 50000, NATURALGASM: 10000, GOLD: 100, GOLDM: 1000, GOLDPETAL: 10000, SILVER: 300, SILVERM: 1000, SILVERMIC: 10000, COPPER: 25000, ZINC: 50000, LEAD: 50000, ALUMINIUM: 50000, MENTHAOIL: 3600, COTTON: 2500, NICKEL: 2500 }
 };
+let sortedSymbolFreezeKeys = [];
 
-try {
-    const configPath = path.join(__dirname, '..', 'database', 'freezeLimitsConfig.json');
-    if (fs.existsSync(configPath)) {
-        freezeConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+function reloadFreezeConfig() {
+    try {
+        const configPath = path.join(__dirname, '..', 'database', 'freezeLimitsConfig.json');
+        if (fs.existsSync(configPath)) {
+            const loaded = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            if (loaded && typeof loaded === 'object') {
+                freezeConfig = {
+                    ...freezeConfig,
+                    ...loaded,
+                    INDEX_MAX_LOTS: { ...freezeConfig.INDEX_MAX_LOTS, ...(loaded.INDEX_MAX_LOTS || {}) },
+                    COMMODITY_FREEZE_LIMITS: { ...freezeConfig.COMMODITY_FREEZE_LIMITS, ...(loaded.COMMODITY_FREEZE_LIMITS || {}) },
+                    SYMBOL_FREEZE_LOTS: { ...(loaded.SYMBOL_FREEZE_LOTS || {}) },
+                    SYMBOL_FREEZE_QTY: { ...(loaded.SYMBOL_FREEZE_QTY || {}) }
+                };
+                sortedSymbolFreezeKeys = Object.keys(freezeConfig.SYMBOL_FREEZE_LOTS).sort((a, b) => b.length - a.length);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load freezeLimitsConfig in taxCalculator:', e);
     }
-} catch (e) {
-    console.error('Failed to load freezeLimitsConfig in taxCalculator:', e);
+    return freezeConfig;
 }
 
-const COMMODITY_FREEZE_LIMITS = freezeConfig.COMMODITY_FREEZE_LIMITS || {};
+reloadFreezeConfig();
+
+function getFreezeConfig() {
+    return freezeConfig;
+}
 
 function getFreezeLimit(symbol, explicitLotsize = null) {
     if (!symbol) return 100000;
     const upper = String(symbol).toUpperCase().replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const commLimits = freezeConfig.COMMODITY_FREEZE_LIMITS || {};
 
     // 1. Commodity Check (MCX)
     if (symbol.includes('MCX') || symbol.includes('NCDEX') || isCommodityContract(symbol)) {
-        const sortedCommKeys = Object.keys(COMMODITY_FREEZE_LIMITS).sort((a, b) => b.length - a.length);
+        const sortedCommKeys = Object.keys(commLimits).sort((a, b) => b.length - a.length);
         for (const key of sortedCommKeys) {
-            if (upper.startsWith(key)) return COMMODITY_FREEZE_LIMITS[key];
+            if (upper.startsWith(key)) return commLimits[key];
         }
         const lot = explicitLotsize || getInstantLotsize(symbol);
         return lot > 1 ? lot * 50 : 10000;
@@ -76,24 +98,28 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
     // 2. Major Indices Check (Dynamic calculation: lotSize * maxLots)
     const indexMaxLots = freezeConfig.INDEX_MAX_LOTS || {};
     if (upper.startsWith('BANKNIFTY') || upper.includes('BANKNIFTY')) {
-        const maxLots = indexMaxLots.BANKNIFTY || 20;
-        return lot > 1 ? lot * maxLots : 600;
+        const maxLots = indexMaxLots.BANKNIFTY || 48;
+        return lot > 1 ? lot * maxLots : 1440;
     }
     if (upper.startsWith('FINNIFTY') || upper.includes('FINNIFTY')) {
-        const maxLots = indexMaxLots.FINNIFTY || 30;
-        return lot > 1 ? lot * maxLots : 1800;
+        const maxLots = indexMaxLots.FINNIFTY || 54;
+        return lot > 1 ? lot * maxLots : 3240;
     }
     if (upper.startsWith('MIDCPNIFTY') || upper.includes('MIDCPNIFTY') || upper.startsWith('MIDCAPNIFTY') || upper.includes('MIDCAPNIFTY')) {
-        const maxLots = indexMaxLots.MIDCPNIFTY || indexMaxLots.MIDCAPNIFTY || 23;
-        return lot > 1 ? lot * maxLots : 2760;
+        const maxLots = indexMaxLots.MIDCPNIFTY || indexMaxLots.MIDCAPNIFTY || 48;
+        return lot > 1 ? lot * maxLots : 5760;
     }
     if (upper.startsWith('NIFTYNXT50') || upper.includes('NIFTYNXT50') || upper.includes('NIFTYJR')) {
-        const maxLots = indexMaxLots.NIFTYNXT50 || 24;
-        return lot > 1 ? lot * maxLots : 600;
+        const maxLots = indexMaxLots.NIFTYNXT50 || 45;
+        return lot > 1 ? lot * maxLots : 1125;
+    }
+    if (upper.startsWith('NIFTYFPI') || upper.includes('NIFTYFPI')) {
+        const maxLots = indexMaxLots.NIFTYFPI || 49;
+        return lot > 1 ? lot * maxLots : 53900;
     }
     if (upper.startsWith('NIFTY') || upper.includes('NIFTY')) {
-        const maxLots = indexMaxLots.NIFTY || 27;
-        return lot > 1 ? lot * maxLots : 1755;
+        const maxLots = indexMaxLots.NIFTY || 54;
+        return lot > 1 ? lot * maxLots : 3510;
     }
     if (upper.startsWith('SENSEX') || upper.includes('SENSEX')) {
         const maxLots = (indexMaxLots.SENSEX && indexMaxLots.SENSEX <= 200) ? indexMaxLots.SENSEX : 50;
@@ -105,8 +131,20 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
     }
 
     // 3. Stock F&O (Derivatives: Futures & Options for individual stocks)
-    // NSE standard freeze limit for individual security F&O is 40 market lots
     if (isDeriv) {
+        const symLotsMap = freezeConfig.SYMBOL_FREEZE_LOTS || {};
+        const symQtyMap = freezeConfig.SYMBOL_FREEZE_QTY || {};
+        for (const key of sortedSymbolFreezeKeys) {
+            if (upper.startsWith(key)) {
+                const nextChar = upper.charAt(key.length);
+                if (!nextChar || /[\d\-_\s]/.test(nextChar)) {
+                    const maxLots = symLotsMap[key];
+                    if (maxLots > 0) {
+                        return lot > 1 ? lot * maxLots : (symQtyMap[key] || 1800);
+                    }
+                }
+            }
+        }
         const stockMaxLots = freezeConfig.STOCK_MAX_LOTS || 40;
         if (lot > 1) {
             return lot * stockMaxLots;
@@ -277,5 +315,5 @@ function calculateOrderSlices(symbol, totalQty, explicitLotsize = null) {
     return slices;
 }
 
-module.exports = { calculateTaxes, getFreezeLimit, calculateOrderSlices, getInstantLotsize, isDerivativeContract, isCommodityContract };
+module.exports = { calculateTaxes, getFreezeLimit, calculateOrderSlices, getInstantLotsize, isDerivativeContract, isCommodityContract, reloadFreezeConfig, getFreezeConfig };
 

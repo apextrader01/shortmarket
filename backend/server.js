@@ -961,6 +961,18 @@ app.get('/api/stocks/lotsize-map', async (req, res) => {
   }
 });
 
+app.get('/api/stocks/freeze-limits', async (req, res) => {
+  try {
+    const { getFreezeConfig } = require('./services/taxCalculator');
+    const cfg = getFreezeConfig() || {};
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(cfg);
+  } catch (err) {
+    console.error('/api/stocks/freeze-limits Error:', err);
+    res.json({});
+  }
+});
+
 app.get('/api/stocks', async (req, res) => {
   try {
     const { getAllStocksJson, getAllStocksETag } = require('./services/instrumentsCache');
@@ -6876,7 +6888,7 @@ async function loadOptionsAndFuturesCache() {
 // Initial async load at server boot
 loadOptionsAndFuturesCache();
 
-// Watch options.json and futures.json on disk so all PM2 cluster workers reload when master updates them
+// Watch options.json, futures.json, and freezeLimitsConfig.json on disk so all PM2 cluster workers reload when master updates them
 try {
   const dbDir = path.join(__dirname, 'database');
   if (fs.existsSync(dbDir)) {
@@ -6887,6 +6899,11 @@ try {
         optWatchTimer = setTimeout(() => {
           loadOptionsAndFuturesCache();
         }, 1500);
+      } else if (filename === 'freezeLimitsConfig.json') {
+        try {
+          const { reloadFreezeConfig } = require('./services/taxCalculator');
+          reloadFreezeConfig();
+        } catch (e) {}
       }
     });
   }
@@ -13827,13 +13844,16 @@ server.listen(PORT, async () => {
         try {
           const { initializeCache, getDiskLotsizeMap } = require('./services/instrumentsCache');
           const { loadInstrumentMaster } = require('./services/instruments');
+          const { reloadFreezeConfig, getFreezeConfig } = require('./services/taxCalculator');
           initializeCache();
+          reloadFreezeConfig();
           await loadOptionsAndFuturesCache();
           await loadInstrumentMaster(true);
           if (typeof io !== 'undefined' && io) {
             io.emit('lotsize_map_updated', getDiskLotsizeMap() || {});
+            io.emit('freeze_limits_updated', getFreezeConfig() || {});
           }
-          console.log('✅ All in-memory contract & lotsize caches refreshed and broadcasted to clients.');
+          console.log('✅ All in-memory contract, lotsize, and freeze-limit caches refreshed and broadcasted to clients.');
         } catch (err) {
           console.error('Error refreshing contract caches after master update:', err);
         }
