@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore, API } from '../store';
+import { useStore, API, isIndexContract } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
@@ -376,6 +376,37 @@ const OptionChainViewInternal = () => {
         price: ''
       });
     } else if (oneClickMode) {
+      // Index Buy Restriction (Subscription Required & Single Active Index Trade Limit)
+      if (type === 'BUY' && isIndexContract(optKey)) {
+        const user = useStore.getState().user;
+        const isAdmin = Boolean(user?.is_admin);
+        const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
+        const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+        const activeTier = isExpired ? 'BASIC' : tier;
+        const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+
+        if (!isPaidTier) {
+          useStore.getState().showToast('🔒 Index Buying is exclusive to Pro subscribers. Upgrade to trade Nifty & BankNifty options.', 'error', 'Subscription Required');
+          return;
+        }
+
+        const positions = useStore.getState().positions || [];
+        const activeIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+        if (activeIndexPos) {
+          const symLabel = (activeIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          useStore.getState().showToast(`⚠️ Only 1 active index trade allowed at a time. Active: ${symLabel} (${activeIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPos.quantity)} qty). Close it before buying another.`, 'warning', 'Single Index Limit');
+          return;
+        }
+
+        const orders = useStore.getState().orders || [];
+        const pendingIndexOrder = orders.find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
+        if (pendingIndexOrder) {
+          const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          useStore.getState().showToast(`⚠️ Only 1 active index trade allowed at a time. Pending: ${symLabel}. Cancel or wait for execution.`, 'warning', 'Pending Index Order');
+          return;
+        }
+      }
+
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
       const finalQuantity = lotsize * (oneClickMultiplier || 1);

@@ -25,6 +25,24 @@ if (import.meta.env && import.meta.env.VITE_API_URL) {
   }
 }
 
+export function isIndexContract(sym) {
+  if (!sym || typeof sym !== 'string') return false;
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim().toUpperCase();
+  if (clean.includes('INDEX')) return true;
+  const INDEX_PREFIXES = [
+    'NIFTY',
+    'BANKNIFTY',
+    'FINNIFTY',
+    'MIDCPNIFTY',
+    'MIDCAPNIFTY',
+    'NIFTYNXT50',
+    'NIFTYFPI',
+    'SENSEX',
+    'BANKEX'
+  ];
+  return INDEX_PREFIXES.some(prefix => clean.startsWith(prefix));
+}
+
 // Global HTTP Fetch Interceptor to support Token-based authentication and real IP propagation
 const originalFetch = window.fetch;
 window.fetch = async function (url, options = {}) {
@@ -720,10 +738,42 @@ export const useStore = create(persist((set, get) => ({
 
   placeBasketOrder: async (basketPayload) => {
     try {
+      const items = basketPayload?.items || [];
+      const indexBuyItems = items.filter(item => String(item.side).toUpperCase() === 'BUY' && isIndexContract(item.symbol));
+      if (indexBuyItems.length > 1) {
+        return { success: false, error: 'Index limit reached: Only 1 active index buy trade is allowed at a time. Your basket contains multiple index buy orders.' };
+      }
+
+      if (indexBuyItems.length === 1) {
+        const positions = get().positions || [];
+        const existingIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+        if (existingIndexPos) {
+          const symLabel = (existingIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          return {
+            success: false,
+            error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`
+          };
+        }
+
+        const orders = get().orders || [];
+        const pendingIndexOrder = orders.find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
+        if (pendingIndexOrder) {
+          const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          return {
+            success: false,
+            error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please cancel it or wait for execution before placing another index buy order.`
+          };
+        }
+      }
+
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API}/api/basket-order`, {
         credentials: 'include',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(basketPayload),
       });
       const data = await res.json();
@@ -1829,6 +1879,57 @@ export const useStore = create(persist((set, get) => ({
             ? `Order quantity (${Number(quantity).toLocaleString('en-IN')} qty / ${Math.round(quantity / lotsize)} lots) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} qty (${maxLots} lots) for ${symbol}. Please place an order within the freeze limit.`
             : `Order quantity (${Number(quantity).toLocaleString('en-IN')} shares) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares for ${symbol}. Please place an order within the freeze limit.`;
           return { success: false, error: err };
+        }
+      }
+
+      // Index Buy Restriction (Subscription Required & Single Active Index Trade Limit)
+      const isOrderBuy = String(normalizedPayload.side).toUpperCase() === 'BUY';
+      const isTargetIndex = isIndexContract(symbol);
+      const isExit = Boolean(normalizedPayload.is_exit || (normalizedPayload.remarks && /exit|square-off|close/i.test(normalizedPayload.remarks)));
+
+      if (isOrderBuy && isTargetIndex && !isExit) {
+        const positions = get().positions || [];
+        const existingShort = positions.find(p => {
+          const s = p.symbol || '';
+          const sClean = s.includes(':') ? s.split(':')[1] : s;
+          return (s === symbol || sClean === cleanSym) && Number(p.quantity) < 0;
+        });
+        const isCoveringShort = Boolean(existingShort && Math.abs(Number(existingShort.quantity)) > 0);
+
+        if (!isCoveringShort) {
+          const user = get().user;
+          const isAdmin = Boolean(user?.is_admin);
+          const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
+          const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+          const activeTier = isExpired ? 'BASIC' : tier;
+          const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeTier);
+
+          if (!isPaidTier) {
+            const err = 'Index trading (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.) is an exclusive Pro feature. Please upgrade your subscription to trade index options and futures.';
+            if (get().showToast) get().showToast(err, 'error', 'Subscription Required');
+            return { success: false, error: err, requires_subscription: true };
+          }
+
+          const existingIndexPos = positions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+          if (existingIndexPos) {
+            const symLabel = (existingIndexPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+            const err = `Index limit reached: Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before buying another index.`;
+            if (get().showToast) get().showToast(err, 'warning', 'Single Index Limit');
+            return { success: false, error: err, index_limit_reached: true };
+          }
+
+          const orders = get().orders || [];
+          const pendingIndexOrder = orders.find(o => {
+            if (String(o.side).toUpperCase() !== 'BUY') return false;
+            if (!['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status)) return false;
+            return isIndexContract(o.symbol);
+          });
+          if (pendingIndexOrder) {
+            const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+            const err = `Index limit reached: Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please wait for execution or cancel it before buying another index.`;
+            if (get().showToast) get().showToast(err, 'warning', 'Pending Index Order');
+            return { success: false, error: err, index_limit_reached: true };
+          }
         }
       }
 

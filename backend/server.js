@@ -213,6 +213,24 @@ function isCommodityContract(sym) {
   return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 }
 
+function isIndexContract(sym) {
+  if (!sym || typeof sym !== 'string') return false;
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim().toUpperCase();
+  if (clean.includes('INDEX')) return true;
+  const INDEX_PREFIXES = [
+    'NIFTY',
+    'BANKNIFTY',
+    'FINNIFTY',
+    'MIDCPNIFTY',
+    'MIDCAPNIFTY',
+    'NIFTYNXT50',
+    'NIFTYFPI',
+    'SENSEX',
+    'BANKEX'
+  ];
+  return INDEX_PREFIXES.some(prefix => clean.startsWith(prefix));
+}
+
 function getLtpFromPriceCache(sym) {
   if (!sym || typeof sym !== 'string') return 0;
   if (priceCache[sym]?.ltp && Number(priceCache[sym].ltp) > 0) return Number(priceCache[sym].ltp);
@@ -7543,6 +7561,73 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // ── Index Buy Restriction (Subscription Required & Single Active Index Trade Limit) ──
+  // 1. Index buying (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.) is strictly allowed ONLY for Pro subscribers.
+  // 2. Only ONE active index trade is allowed at a time across all index contracts.
+  // Exits and square-off orders (closing existing short positions) are NEVER blocked.
+  const isOrderBuy = String(side).toUpperCase() === 'BUY';
+  const isTargetIndex = isIndexContract(symbol);
+
+  if (isOrderBuy && isTargetIndex && !isExplicitExit) {
+    const cleanSymForIndex = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const coveringShortPos = await db('positions')
+      .where({ user_id: req.user.id })
+      .where(builder => {
+        builder.where({ symbol }).orWhere({ symbol: cleanSymForIndex }).orWhere({ symbol: `NSE:${cleanSymForIndex}` }).orWhere({ symbol: `BSE:${cleanSymForIndex}` }).orWhere({ symbol: `MCX:${cleanSymForIndex}` });
+      })
+      .where('quantity', '<', 0)
+      .first();
+
+    const isCoveringShort = Boolean(coveringShortPos && Math.abs(Number(coveringShortPos.quantity)) > 0);
+
+    if (!isCoveringShort) {
+      // 1. Verify Active Subscription
+      if (!isPaidTier) {
+        return res.status(403).json({
+          error: 'Index buying is exclusive to Pro subscribers. Please upgrade your subscription to trade Nifty, BankNifty, Sensex and other index contracts.',
+          requires_subscription: true,
+          is_index_order: true,
+          tier: userRecord?.subscription_tier || 'BASIC'
+        });
+      }
+
+      // 2. Enforce Single Active Index Trade at a Time
+      // Check existing open index positions (quantity != 0)
+      const openPositions = await db('positions')
+        .where({ user_id: req.user.id })
+        .where('quantity', '!=', 0)
+        .select('id', 'symbol', 'quantity', 'product_type');
+
+      const existingIndexPos = openPositions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+      if (existingIndexPos) {
+        const cleanExistingSym = existingIndexPos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        return res.status(400).json({
+          error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${cleanExistingSym} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`,
+          index_limit_reached: true,
+          active_index_symbol: cleanExistingSym,
+          active_index_quantity: existingIndexPos.quantity
+        });
+      }
+
+      // Check existing pending index BUY orders
+      const pendingOrders = await db('orders')
+        .where({ user_id: req.user.id })
+        .whereRaw('UPPER(side) = ?', ['BUY'])
+        .whereIn('status', ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'])
+        .select('id', 'symbol', 'status');
+
+      const existingPendingIndex = pendingOrders.find(o => isIndexContract(o.symbol));
+      if (existingPendingIndex) {
+        const cleanPendingSym = existingPendingIndex.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        return res.status(400).json({
+          error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${existingPendingIndex.status} order for ${cleanPendingSym}. Please cancel it or wait for execution before placing another index buy order.`,
+          index_limit_reached: true,
+          pending_index_symbol: cleanPendingSym
+        });
+      }
+    }
+  }
+
   if (isExplicitExit) {
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
     const isIntProduct = (effectiveProductType === 'INT' || effectiveProductType === 'MIS' || effectiveProductType === 'BO' || effectiveProductType === 'CO');
@@ -9432,6 +9517,46 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       error: `Your ${user?.subscription_tier || 'PRO'} plan allows a maximum of ${maxLegs} legs per basket order (${items.length} submitted). Please upgrade to add more legs.`,
       max_legs: maxLegs
     });
+  }
+
+  // ── Index Buy Restriction (Single Active Index Trade Limit) in Basket Orders ──
+  const indexBuyItems = items.filter(item => String(item.side).toUpperCase() === 'BUY' && isIndexContract(item.symbol));
+  if (indexBuyItems.length > 1) {
+    return res.status(400).json({
+      error: 'Index limit reached: Only 1 active index buy trade is allowed at a time. Your basket contains multiple index buy orders.',
+      index_limit_reached: true
+    });
+  }
+
+  if (indexBuyItems.length === 1) {
+    const openPositions = await db('positions')
+      .where({ user_id: req.user.id })
+      .where('quantity', '!=', 0)
+      .select('id', 'symbol', 'quantity');
+
+    const existingIndexPos = openPositions.find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+    if (existingIndexPos) {
+      const cleanExistingSym = existingIndexPos.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+      return res.status(400).json({
+        error: `Index trading limit: Only 1 active index trade is allowed at a time. You currently have an active position in ${cleanExistingSym} (${existingIndexPos.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(existingIndexPos.quantity)} qty). Please close your existing index position before placing another index buy order.`,
+        index_limit_reached: true
+      });
+    }
+
+    const pendingOrders = await db('orders')
+      .where({ user_id: req.user.id })
+      .whereRaw('UPPER(side) = ?', ['BUY'])
+      .whereIn('status', ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'])
+      .select('id', 'symbol', 'status');
+
+    const existingPendingIndex = pendingOrders.find(o => isIndexContract(o.symbol));
+    if (existingPendingIndex) {
+      const cleanPendingSym = existingPendingIndex.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+      return res.status(400).json({
+        error: `Index trading limit: Only 1 active index trade is allowed at a time. You already have a pending ${existingPendingIndex.status} order for ${cleanPendingSym}. Please cancel it or wait for execution before placing another index buy order.`,
+        index_limit_reached: true
+      });
+    }
   }
 
   // Block new orders when market is closed

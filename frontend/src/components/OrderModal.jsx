@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
-import { useStore, API } from '../store';
-import { X, Maximize2, FileText, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { useStore, API, isIndexContract } from '../store';
+import { X, Maximize2, FileText, ShoppingBag, AlertTriangle, Lock } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract, isCommodityContract, getAssetSubsegment, setContractLotsize } from '../utils/lotsizeHelper';
 import { getFreezeLimit, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin } from '../utils/marginCalculator';
@@ -153,6 +153,25 @@ export default function OrderModal() {
   const isExceedingFreezeLimit = !isMutualFund && freezeLimit > 0 && totalQuantity > freezeLimit;
   const effectiveQuantity = totalQuantity;
   const slicesCount = getOrderSlicesCount(symbol, effectiveQuantity, orderModal.lotsize);
+
+  // Subscription & Index Trading Limits
+  const isAdmin = Boolean(user?.is_admin);
+  const userTier = (user?.subscription_tier || 'BASIC').toUpperCase();
+  const isSubExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+  const activeSubTier = isSubExpired ? 'BASIC' : userTier;
+  const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'LIFETIME'].includes(activeSubTier);
+  const isTargetIndex = isIndexContract(symbol);
+
+  // Check if current BUY order is covering an existing short position
+  const existingShortPos = (positions || []).find(p => {
+    const pSym = p.symbol || '';
+    const pClean = pSym.includes(':') ? pSym.split(':')[1] : pSym;
+    return (pSym === symbol || pClean === cleanSym) && Number(p.quantity) < 0;
+  });
+  const isCoveringShort = Boolean(existingShortPos && Math.abs(Number(existingShortPos.quantity)) > 0);
+
+  const activeIndexPosition = (positions || []).find(p => isIndexContract(p.symbol) && Math.abs(Number(p.quantity)) > 0);
+  const pendingIndexOrder = (orders || []).find(o => String(o.side).toUpperCase() === 'BUY' && ['OPEN', 'PENDING', 'TRIGGER_PENDING', 'AMO'].includes(o.status) && isIndexContract(o.symbol));
   
   // Fetch Estimated Charges
   useEffect(() => {
@@ -604,6 +623,24 @@ export default function OrderModal() {
       }
     }
 
+    // Index Buy Restriction (Subscription Required & Single Active Index Trade Limit)
+    if (isBuy && isTargetIndex && !isTrueExit && !isCoveringShort) {
+      if (!isPaidTier) {
+        failValidation("🔒 Index Buying is exclusive to Pro subscribers. Please upgrade your subscription to trade Nifty, BankNifty, Sensex and other index contracts.");
+        return;
+      }
+      if (activeIndexPosition) {
+        const symLabel = (activeIndexPosition.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        failValidation(`⚠️ Only 1 active index trade is allowed at a time. You currently have an active position in ${symLabel} (${activeIndexPosition.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPosition.quantity)} qty). Please close your existing index position before buying another index.`);
+        return;
+      }
+      if (pendingIndexOrder) {
+        const symLabel = (pendingIndexOrder.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        failValidation(`⚠️ Only 1 active index trade is allowed at a time. You already have a pending ${pendingIndexOrder.status} order for ${symLabel}. Please wait for execution or cancel it before buying another index.`);
+        return;
+      }
+    }
+
     if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
       failValidation("Please enter a valid quantity greater than 0.");
       return;
@@ -829,6 +866,70 @@ export default function OrderModal() {
             </button>
           </div>
         </div>
+
+        {/* Index Buy Restriction Banner (Subscription & Single Trade Limit) */}
+        {isTargetIndex && isBuy && !isTrueExit && !isCoveringShort && (
+          !isPaidTier ? (
+            <div style={{
+              margin: '12px 18px 0 18px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '12px', color: '#fca5a5', lineHeight: '1.4' }}>
+                  <strong>Pro Subscription Required:</strong> Index buying (NIFTY, BANKNIFTY, SENSEX) is available only for subscribed members.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeOrderModal();
+                  window.history.pushState({}, '', '/pricing');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontSize: '11.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+                }}
+              >
+                Upgrade Now
+              </button>
+            </div>
+          ) : (activeIndexPosition || pendingIndexOrder) ? (
+            <div style={{
+              margin: '12px 18px 0 18px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '12px', color: '#fcd34d', lineHeight: '1.4' }}>
+                <strong>Single Index Limit:</strong> Only 1 active index trade allowed at a time.
+                {activeIndexPosition && ` You hold ${activeIndexPosition.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '')} (${activeIndexPosition.quantity > 0 ? 'LONG' : 'SHORT'} ${Math.abs(activeIndexPosition.quantity)} qty). Close it before buying another.`}
+                {!activeIndexPosition && pendingIndexOrder && ` You have a pending ${pendingIndexOrder.status} order for ${pendingIndexOrder.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '')}.`}
+              </div>
+            </div>
+          ) : null
+        )}
 
         {/* Product Type & Order Variety Tabs */}
         {!isTrueExit && (
