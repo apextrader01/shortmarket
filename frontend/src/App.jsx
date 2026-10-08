@@ -620,24 +620,35 @@ function App() {
     const search = window.location.search || '';
     let extractedToken = null;
 
-    if (hash.includes('id_token=') || hash.includes('state=sk')) {
+    if (hash.includes('id_token=')) {
       try {
         const hp = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash);
         extractedToken = hp.get('id_token');
-        if (extractedToken) {
-          sessionStorage.setItem('skandx_google_id_token', extractedToken);
-        }
+      } catch (_) {}
+    }
+    if (!extractedToken && search.includes('id_token=')) {
+      try {
+        const sp = new URLSearchParams(search);
+        extractedToken = sp.get('id_token');
+      } catch (_) {}
+    }
+    if (extractedToken) {
+      try {
+        sessionStorage.setItem('skandx_google_id_token', extractedToken);
+        localStorage.setItem('skandx_google_id_token', extractedToken);
       } catch (_) {}
     }
 
     if (
       hash.includes('id_token=') ||
       hash.includes('state=sk') ||
+      search.includes('id_token=') ||
       search.includes('oauth_app_return=') ||
       search.includes('google_oauth=')
     ) {
       try {
         const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('id_token');
         cleanUrl.searchParams.delete('oauth_app_return');
         cleanUrl.searchParams.delete('google_oauth');
         if (cleanUrl.searchParams.get('state')?.startsWith('skx_')) {
@@ -1050,7 +1061,8 @@ function App() {
       </>
     );
   }
-  if (user && !user.is_onboarded && !hasSkippedOnboarding && !user.is_admin && window.location.pathname !== '/adminpanel') {
+  const userSkippedOnboarding = user?.id ? (localStorage.getItem(`hasSkippedOnboarding_${user.id}`) === 'true') : false;
+  if (user && !user.is_onboarded && !userSkippedOnboarding && !user.is_admin && window.location.pathname !== '/adminpanel') {
     return (
       <>
         <NetworkStatusBanner />

@@ -532,14 +532,16 @@ export default function LoginView() {
       const googleToken = response.credential;
       let idTokenToSend = googleToken;
 
-      // Exchange with Firebase Auth client if available
+      // Exchange with Firebase Auth client if available (with 1.5s race timeout to never hang on mobile)
       if (auth) {
         try {
-          const cred = GoogleAuthProvider.credential(googleToken);
-          const userCred = await signInWithCredential(auth, cred);
-          if (userCred?.user) {
-            idTokenToSend = await userCred.user.getIdToken();
-          }
+          const fbPromise = (async () => {
+            const cred = GoogleAuthProvider.credential(googleToken);
+            const userCred = await signInWithCredential(auth, cred);
+            return userCred?.user ? await userCred.user.getIdToken() : googleToken;
+          })();
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(googleToken), 1500));
+          idTokenToSend = await Promise.race([fbPromise, timeoutPromise]);
         } catch (fbExchangeErr) {
           console.warn('[AUTH] Firebase client exchange notice, passing Google token to backend:', fbExchangeErr.message);
           idTokenToSend = googleToken;
@@ -925,19 +927,7 @@ export default function LoginView() {
       });
       const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-      // In standalone PWA mode, opening via window.open allows Chrome Android to auto-close
-      // the OAuth tab via window.close() as soon as the account is selected!
-      if (isInApp && !isCapacitorOrWebView) {
-        let popupWin = null;
-        try {
-          popupWin = window.open(oauthUrl, 'skandx_google_oauth');
-        } catch (_) {}
-        if (popupWin) {
-          oauthPopupRef.current = popupWin;
-          return;
-        }
-      }
-
+      // In mobile and standalone PWA mode, navigating the same window keeps the user 100% inside the app!
       window.location.href = oauthUrl;
       return;
     }

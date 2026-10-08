@@ -216,11 +216,20 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
-  hasSkippedOnboarding: localStorage.getItem("hasSkippedOnboarding") === "true",
+  hasSkippedOnboarding: false,
   skipOnboarding: async () => {
-    localStorage.setItem("hasSkippedOnboarding", "true");
+    const currentUserId = get().user?.id;
+    if (currentUserId) {
+      localStorage.setItem(`hasSkippedOnboarding_${currentUserId}`, "true");
+    }
     set({ hasSkippedOnboarding: true });
-    try { await fetch(`${API}/api/auth/skip-onboarding`, { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }); } catch (e) {}
+    try { 
+      const token = localStorage.getItem('token') || get().token;
+      await fetch(`${API}/api/auth/skip-onboarding`, { 
+        method: "POST", 
+        headers: { "Authorization": `Bearer ${token}` } 
+      }); 
+    } catch (e) {}
   },
   
   authError: null,
@@ -1326,17 +1335,7 @@ export const useStore = create(persist((set, get) => ({
         const prevUser = get().user;
         let finalUser = prevUser;
         if (user && !user.error) {
-          if (!prevUser || 
-              prevUser.id !== user.id || 
-              Number(prevUser.balance) !== Number(user.balance) || 
-              Number(prevUser.used_margin) !== Number(user.used_margin) || 
-              prevUser.is_blocked !== user.is_blocked || 
-              prevUser.role !== user.role || 
-              prevUser.is_onboarded !== user.is_onboarded ||
-              prevUser.phone !== user.phone ||
-              prevUser.email !== user.email) {
-            finalUser = user;
-          }
+          finalUser = { ...(prevUser || {}), ...user };
         }
         
         set({
@@ -1560,10 +1559,14 @@ export const useStore = create(persist((set, get) => ({
 
   saveProfile: async (profileData) => {
     try {
+      const token = localStorage.getItem('token') || get().token;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API}/api/auth/profile`, { 
         credentials: 'include', 
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(profileData)
       });
       const data = await res.json();
@@ -2333,10 +2336,14 @@ export const useStore = create(persist((set, get) => ({
 
   adminUpdateUserDetails: async (userId, details) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/admin/user/${userId}`, { 
         credentials: 'include', 
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(details)
       });
       if (res.ok) {

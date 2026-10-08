@@ -2698,6 +2698,14 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       maxAge: 60 * 24 * 60 * 60 * 1000
     });
 
+    let parsedWatchlists = [{ id: 1, name: 'Watchlist 1', symbols: ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX', 'NSE:RELIANCE', 'NSE:TCS', 'NSE:HDFCBANK', 'NSE:INFY', 'NSE:ICICIBANK', 'NSE:SBIN'] }];
+    if (user.watchlists) {
+      try {
+        parsedWatchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists) : user.watchlists;
+      } catch (_) {}
+    }
+    const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
+
     res.json({
       success: true,
       token,
@@ -2706,12 +2714,28 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         username: user.username,
         email: user.email,
         phone: user.phone,
-        balance: user.balance,
+        balance: parseFloat(user.balance || 0),
         role: user.role,
-        is_admin: user.is_admin,
+        is_admin: Boolean(user.is_admin),
         subscription_tier: user.subscription_tier,
         client_id: clientId,
-        profile_picture_url: user.profile_picture_url
+        profile_picture_url: user.profile_picture_url,
+        is_onboarded: Boolean(user.is_onboarded),
+        watchlists: parsedWatchlists,
+        dob: profile?.dob || null,
+        gender: profile?.gender || null,
+        onboarding_state: profile?.state || user.state || null,
+        onboarding_city: profile?.city || user.city || null,
+        occupation: profile?.occupation || null,
+        annual_income: profile?.annual_income || null,
+        financial_goal: profile?.financial_goal || null,
+        trading_experience: profile?.trading_experience || null,
+        preferred_segment: profile?.preferred_segment || null,
+        trading_style: profile?.trading_style || null,
+        address: user.address || null,
+        upi_id: user.upi_id || null,
+        bank_account_no: user.bank_account_no || null,
+        bank_ifsc: user.bank_ifsc || null
       }
     });
   } catch (err) {
@@ -2983,6 +3007,20 @@ app.get('/api/user', authenticateToken, async (req, res) => {
     user.balance = parseFloat(user.balance || 0);
     user.is_admin = Boolean(user.is_admin);
     user.is_onboarded = Boolean(user.is_onboarded);
+
+    const profile = await db('user_profiles').where({ user_id: req.user.id }).first().catch(() => null);
+    if (profile) {
+      user.dob = profile.dob || null;
+      user.gender = profile.gender || null;
+      user.onboarding_state = profile.state || user.state || null;
+      user.onboarding_city = profile.city || user.city || null;
+      user.occupation = profile.occupation || null;
+      user.annual_income = profile.annual_income || null;
+      user.financial_goal = profile.financial_goal || null;
+      user.trading_experience = profile.trading_experience || null;
+      user.preferred_segment = profile.preferred_segment || null;
+      user.trading_style = profile.trading_style || null;
+    }
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3065,6 +3103,20 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
     userRow.balance = parseFloat(userRow.balance || 0);
     userRow.is_admin = Boolean(userRow.is_admin);
     userRow.is_onboarded = Boolean(userRow.is_onboarded);
+
+    const userProfileRow = await db('user_profiles').where({ user_id: userId }).first().catch(() => null);
+    if (userProfileRow) {
+      userRow.dob = userProfileRow.dob || null;
+      userRow.gender = userProfileRow.gender || null;
+      userRow.onboarding_state = userProfileRow.state || userRow.state || null;
+      userRow.onboarding_city = userProfileRow.city || userRow.city || null;
+      userRow.occupation = userProfileRow.occupation || null;
+      userRow.annual_income = userProfileRow.annual_income || null;
+      userRow.financial_goal = userProfileRow.financial_goal || null;
+      userRow.trading_experience = userProfileRow.trading_experience || null;
+      userRow.preferred_segment = userProfileRow.preferred_segment || null;
+      userRow.trading_style = userProfileRow.trading_style || null;
+    }
 
     const formattedPositions = (positionsRows || []).map(p => ({
       ...p,
@@ -4100,17 +4152,52 @@ const handleUpdateUserDetails = async (req, res) => {
     if (bank_account_no !== undefined) updates.bank_account_no = String(bank_account_no).trim();
     if (bank_ifsc !== undefined) updates.bank_ifsc = String(bank_ifsc).trim().toUpperCase();
 
-    if (Object.keys(updates).length === 0) {
+    // Support updating Onboarding / Profile fields in user_profiles
+    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style'];
+    const profileUpdates = {};
+    for (const f of profileFields) {
+      if (req.body && req.body[f] !== undefined && req.body[f] !== null) {
+        profileUpdates[f] = String(req.body[f]).trim();
+      }
+    }
+
+    if (Object.keys(profileUpdates).length > 0) {
+      const existingProfile = await db('user_profiles').where({ user_id: req.user.id }).first();
+      if (existingProfile) {
+        await db('user_profiles').where({ user_id: req.user.id }).update(profileUpdates);
+      } else {
+        await db('user_profiles').insert({ ...profileUpdates, user_id: req.user.id });
+      }
+      updates.is_onboarded = true;
+    }
+
+    if (Object.keys(updates).length === 0 && Object.keys(profileUpdates).length === 0) {
       return res.status(400).json({ error: 'No valid fields provided for update' });
     }
 
-    await db('users').where({ id: req.user.id }).update(updates);
+    if (Object.keys(updates).length > 0) {
+      await db('users').where({ id: req.user.id }).update(updates);
+    }
+
     const updatedUser = await db('users').where({ id: req.user.id }).first();
+    const updatedProfile = await db('user_profiles').where({ user_id: req.user.id }).first().catch(() => null);
     if (updatedUser) {
       delete updatedUser.password_hash;
       delete updatedUser.reset_otp;
       delete updatedUser.reset_otp_expires;
       delete updatedUser.two_factor_secret;
+      if (updatedProfile) {
+        updatedUser.dob = updatedProfile.dob || null;
+        updatedUser.gender = updatedProfile.gender || null;
+        updatedUser.onboarding_state = updatedProfile.state || updatedUser.state || null;
+        updatedUser.onboarding_city = updatedProfile.city || updatedUser.city || null;
+        updatedUser.occupation = updatedProfile.occupation || null;
+        updatedUser.annual_income = updatedProfile.annual_income || null;
+        updatedUser.financial_goal = updatedProfile.financial_goal || null;
+        updatedUser.trading_experience = updatedProfile.trading_experience || null;
+        updatedUser.preferred_segment = updatedProfile.preferred_segment || null;
+        updatedUser.trading_style = updatedProfile.trading_style || null;
+      }
     }
     res.json({ success: true, message: 'Profile details updated successfully', user: updatedUser });
   } catch (err) {
@@ -4838,15 +4925,44 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const targetUserId = req.params.id;
-    const { username, email, phone, password } = req.body;
+    const { 
+      username, email, phone, password,
+      pan_card, aadhar_number, address, upi_id, bank_account_no, bank_ifsc,
+      dob, gender, state, city, occupation, annual_income, financial_goal, trading_experience, preferred_segment, trading_style
+    } = req.body || {};
     
     const updates = {};
     if (username !== undefined) updates.username = username;
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
+    if (pan_card !== undefined) updates.pan_card = pan_card ? String(pan_card).trim().toUpperCase() : null;
+    if (aadhar_number !== undefined) updates.aadhar_number = aadhar_number ? String(aadhar_number).trim() : null;
+    if (address !== undefined) updates.address = address ? String(address).trim() : null;
+    if (upi_id !== undefined) updates.upi_id = upi_id ? String(upi_id).trim() : null;
+    if (bank_account_no !== undefined) updates.bank_account_no = bank_account_no ? String(bank_account_no).trim() : null;
+    if (bank_ifsc !== undefined) updates.bank_ifsc = bank_ifsc ? String(bank_ifsc).trim().toUpperCase() : null;
     if (password && typeof password === 'string' && password.trim().length > 0) {
       const bcrypt = require('bcryptjs');
       updates.password_hash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    // Support updating Onboarding / Profile fields in user_profiles
+    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style'];
+    const profileUpdates = {};
+    for (const f of profileFields) {
+      if (req.body && req.body[f] !== undefined && req.body[f] !== null) {
+        profileUpdates[f] = String(req.body[f]).trim();
+      }
+    }
+
+    if (Object.keys(profileUpdates).length > 0) {
+      const existingProfile = await db('user_profiles').where({ user_id: targetUserId }).first();
+      if (existingProfile) {
+        await db('user_profiles').where({ user_id: targetUserId }).update(profileUpdates);
+      } else {
+        await db('user_profiles').insert({ ...profileUpdates, user_id: targetUserId });
+      }
+      updates.is_onboarded = true;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -13951,23 +14067,29 @@ app.get('/__/auth/handler', (req, res, next) => {
       var isAppPrefix = state.indexOf('skx_app_') === 0 || state.indexOf('skx_pwa_') === 0 || state.indexOf('skx_cap_') === 0;
       var isCapMode = state.indexOf('skx_cap_') === 0;
 
-      function buildAndroidReturnIntent(mode) {
-        var host = window.location.host || 'skandx.in';
-        var fallbackUrl = window.location.origin + '/__/auth/handler?done=1&state=' + encodeURIComponent(state);
-        if (mode === 'cap') {
-          return 'intent://auth?state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';end';
-        }
-        return 'intent://' + host + '/?oauth_app_return=1&state=' + encodeURIComponent(state) + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';end';
-      }
-
       function tryCloseOrReturnToApp(mode, fromUserClick) {
         try { window.close(); } catch (e) {}
         try { window.open('', '_self'); window.close(); } catch (e) {}
-        if (fromUserClick || !alreadyDone) {
+
+        var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
+
+        if (mode === 'cap') {
           try {
-            window.location.href = buildAndroidReturnIntent(mode);
+            window.location.href = 'skandx://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state);
           } catch (e) {}
+          setTimeout(function() {
+            try {
+              window.location.href = 'intent://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;end';
+            } catch (e) {}
+          }, 350);
+          setTimeout(function() {
+            window.location.replace(targetUrl);
+          }, 1500);
+          return;
         }
+
+        // PWA or Web: Open SkandX terminal immediately with the authenticated session
+        window.location.replace(targetUrl);
       }
 
       function showInAppHandoverUI(mode) {
@@ -13982,18 +14104,21 @@ app.get('/__/auth/handler', (req, res, next) => {
         if (badgeEl) badgeEl.style.display = 'flex';
         if (titleEl) titleEl.textContent = 'Signed in to SkandX!';
         if (subEl) {
-          subEl.textContent = 'Your SkandX App is now signed in. Tap below or switch back to the SkandX app to continue.';
+          subEl.textContent = 'Your SkandX account is signed in. Tap below or continue to terminal.';
         }
         if (returnBtn) {
           returnBtn.style.display = 'block';
+          returnBtn.textContent = 'Open SkandX Terminal';
           returnBtn.onclick = function() {
             tryCloseOrReturnToApp(mode, true);
           };
         }
         if (webBtn) {
           webBtn.style.display = 'inline-block';
+          webBtn.textContent = 'Continue in browser instead';
           webBtn.onclick = function() {
-            window.location.replace('/?google_oauth=1');
+            var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
+            window.location.replace(targetUrl);
           };
         }
       }
@@ -14018,25 +14143,31 @@ app.get('/__/auth/handler', (req, res, next) => {
           var mode = (data && data.appMode) || (isCapMode ? 'cap' : (isInApp ? 'pwa' : 'web'));
           if (isInApp) {
             showInAppHandoverUI(mode);
-            tryCloseOrReturnToApp(mode, false);
+            setTimeout(function() {
+              tryCloseOrReturnToApp(mode, false);
+            }, 1200);
           } else {
-            window.location.replace('/?google_oauth=1');
+            window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
           }
         })
         .catch(function() {
           if (isAppPrefix) {
             showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+            setTimeout(function() {
+              tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+            }, 1200);
           } else {
-            window.location.replace('/?google_oauth=1');
+            window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
           }
         });
       } else {
         if (isAppPrefix) {
           showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-          tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+          setTimeout(function() {
+            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+          }, 1200);
         } else {
-          window.location.replace('/?google_oauth=1');
+          window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
         }
       }
     })();

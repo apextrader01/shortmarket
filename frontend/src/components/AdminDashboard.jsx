@@ -2282,6 +2282,25 @@ export default function AdminDashboard() {
   const [newPhone, setNewPhone] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [isEditingClientProfile, setIsEditingClientProfile] = useState(false);
+  const [clientProfileForm, setClientProfileForm] = useState({
+    dob: '',
+    gender: '',
+    state: '',
+    city: '',
+    occupation: '',
+    annual_income: '',
+    financial_goal: '',
+    trading_experience: '',
+    preferred_segment: '',
+    trading_style: '',
+    address: '',
+    upi_id: '',
+    bank_account_no: '',
+    bank_ifsc: '',
+    pan_card: '',
+    aadhar_number: ''
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -2613,6 +2632,33 @@ export default function AdminDashboard() {
       alert(`Error updating details: ${res.error}`);
     }
     setUpdating(false);
+  };
+
+  const handleSaveClientProfile = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!selectedUser) return;
+    setUpdating(true);
+    try {
+      const res = await adminUpdateUserDetails(selectedUser.id, clientProfileForm);
+      if (res.success) {
+        alert('Client profile updated successfully!');
+        const updatedSelected = {
+          ...selectedUser,
+          ...clientProfileForm,
+          onboarding_state: clientProfileForm.state,
+          onboarding_city: clientProfileForm.city
+        };
+        setSelectedUser(updatedSelected);
+        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...updatedSelected } : u));
+        setIsEditingClientProfile(false);
+      } else {
+        alert(`Error: ${res.error || 'Failed to update profile'}`);
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleResetUser = async () => {
@@ -6299,6 +6345,25 @@ export default function AdminDashboard() {
                                 setNewEmail(u.email || '');
                                 setNewPhone(u.phone || '');
                                 setNewPassword('');
+                                setClientProfileForm({
+                                  dob: u.dob || '',
+                                  gender: u.gender || '',
+                                  state: u.onboarding_state || u.state || '',
+                                  city: u.onboarding_city || u.city || '',
+                                  occupation: u.occupation || '',
+                                  annual_income: u.annual_income || '',
+                                  financial_goal: u.financial_goal || '',
+                                  trading_experience: u.trading_experience || '',
+                                  preferred_segment: u.preferred_segment || '',
+                                  trading_style: u.trading_style || '',
+                                  address: u.address || '',
+                                  upi_id: u.upi_id || '',
+                                  bank_account_no: u.bank_account_no || '',
+                                  bank_ifsc: u.bank_ifsc || '',
+                                  pan_card: u.pan_card || '',
+                                  aadhar_number: u.aadhar_number || ''
+                                });
+                                setIsEditingClientProfile(false);
                               }}
                             >
                               Manage
@@ -7536,24 +7601,268 @@ export default function AdminDashboard() {
 
               {/* User Profile Details */}
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Users size={14} style={{ color: 'var(--color-blue)' }} /> Client Profile (Onboarding Data)
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Client ID:</span> <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : 'N/A')}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_state || selectedUser.state || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_city || selectedUser.city || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: 'white' }}>{selectedUser.occupation || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: 'white' }}>{selectedUser.annual_income || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: 'white' }}>{selectedUser.financial_goal || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: 'white' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: 'white' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: 'white' }}>{selectedUser.trading_style || 'N/A'}</span></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Address:</span> <span style={{ color: 'white', fontWeight: '500' }}>{selectedUser.address || 'Not provided'}</span></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Bank / UPI:</span> <span style={{ color: '#34d399', fontWeight: '600' }}>{selectedUser.upi_id || selectedUser.bank_account_no ? `${selectedUser.upi_id ? `UPI: ${selectedUser.upi_id}` : ''}${selectedUser.upi_id && selectedUser.bank_account_no ? ' | ' : ''}${selectedUser.bank_account_no ? `Bank A/C: ${selectedUser.bank_account_no} (${selectedUser.bank_ifsc || 'N/A'})` : ''}` : 'Not provided'}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    <Users size={14} style={{ color: 'var(--color-blue)' }} /> Client Profile (Onboarding Data)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isEditingClientProfile) {
+                        setClientProfileForm({
+                          dob: selectedUser.dob || '',
+                          gender: selectedUser.gender || '',
+                          state: selectedUser.onboarding_state || selectedUser.state || '',
+                          city: selectedUser.onboarding_city || selectedUser.city || '',
+                          occupation: selectedUser.occupation || '',
+                          annual_income: selectedUser.annual_income || '',
+                          financial_goal: selectedUser.financial_goal || '',
+                          trading_experience: selectedUser.trading_experience || '',
+                          preferred_segment: selectedUser.preferred_segment || '',
+                          trading_style: selectedUser.trading_style || '',
+                          address: selectedUser.address || '',
+                          upi_id: selectedUser.upi_id || '',
+                          bank_account_no: selectedUser.bank_account_no || '',
+                          bank_ifsc: selectedUser.bank_ifsc || '',
+                          pan_card: selectedUser.pan_card || '',
+                          aadhar_number: selectedUser.aadhar_number || ''
+                        });
+                      }
+                      setIsEditingClientProfile(!isEditingClientProfile);
+                    }}
+                    style={{
+                      background: isEditingClientProfile ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                      color: isEditingClientProfile ? '#ef4444' : 'var(--color-blue)',
+                      border: `1px solid ${isEditingClientProfile ? 'rgba(239, 68, 68, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isEditingClientProfile ? 'Cancel' : '✏️ Edit Profile'}
+                  </button>
                 </div>
+
+                {isEditingClientProfile ? (
+                  <form onSubmit={handleSaveClientProfile} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Date of Birth</label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          value={clientProfileForm.dob}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, dob: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Gender</label>
+                        <select
+                          className="input-field"
+                          value={clientProfileForm.gender}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, gender: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>State</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Maharashtra"
+                          value={clientProfileForm.state}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, state: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>City</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Mumbai"
+                          value={clientProfileForm.city}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, city: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Occupation</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Salaried / Business"
+                          value={clientProfileForm.occupation}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, occupation: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Annual Income</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. 5-10 Lakhs"
+                          value={clientProfileForm.annual_income}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, annual_income: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Trading Experience</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. 1-3 years"
+                          value={clientProfileForm.trading_experience}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, trading_experience: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Financial Goal</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Wealth Creation"
+                          value={clientProfileForm.financial_goal}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, financial_goal: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Preferred Segment</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. F&O / Equity"
+                          value={clientProfileForm.preferred_segment}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, preferred_segment: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Trading Style</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Intraday / Swing"
+                          value={clientProfileForm.trading_style}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, trading_style: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>PAN Card</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="ABCDE1234F"
+                          value={clientProfileForm.pan_card}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, pan_card: e.target.value.toUpperCase() }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Aadhar Number</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="12-digit Aadhar"
+                          value={clientProfileForm.aadhar_number}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, aadhar_number: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Address</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Street, Area, Pincode"
+                          value={clientProfileForm.address}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, address: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>UPI ID</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="username@okhdfcbank"
+                          value={clientProfileForm.upi_id}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, upi_id: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Bank Account No</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Account Number"
+                          value={clientProfileForm.bank_account_no}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, bank_account_no: e.target.value }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Bank IFSC</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="HDFC0001234"
+                          value={clientProfileForm.bank_ifsc}
+                          onChange={e => setClientProfileForm(prev => ({ ...prev, bank_ifsc: e.target.value.toUpperCase() }))}
+                          style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingClientProfile(false)}
+                        className="btn"
+                        style={{ background: 'rgba(255,255,255,0.08)', color: 'white', padding: '6px 14px', fontSize: '12px' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={updating}
+                        style={{ padding: '6px 16px', fontSize: '12px' }}
+                      >
+                        {updating ? 'Saving...' : 'Save Profile'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Client ID:</span> <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : 'N/A')}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_state || selectedUser.state || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_city || selectedUser.city || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: 'white' }}>{selectedUser.occupation || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: 'white' }}>{selectedUser.annual_income || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: 'white' }}>{selectedUser.financial_goal || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: 'white' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: 'white' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: 'white' }}>{selectedUser.trading_style || 'N/A'}</span></div>
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Address:</span> <span style={{ color: 'white', fontWeight: '500' }}>{selectedUser.address || 'Not provided'}</span></div>
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Bank / UPI:</span> <span style={{ color: '#34d399', fontWeight: '600' }}>{selectedUser.upi_id || selectedUser.bank_account_no ? `${selectedUser.upi_id ? `UPI: ${selectedUser.upi_id}` : ''}${selectedUser.upi_id && selectedUser.bank_account_no ? ' | ' : ''}${selectedUser.bank_account_no ? `Bank A/C: ${selectedUser.bank_account_no} (${selectedUser.bank_ifsc || 'N/A'})` : ''}` : 'Not provided'}</span></div>
+                  </div>
+                )}
               </div>
 
               {/* KYC Documents */}
