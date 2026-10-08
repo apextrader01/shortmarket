@@ -1063,8 +1063,9 @@ function App() {
       </>
     );
   }
+  const isImpersonating = typeof window !== 'undefined' && Boolean(localStorage.getItem('admin_token_backup'));
   const userSkippedOnboarding = user?.id ? (localStorage.getItem(`hasSkippedOnboarding_${user.id}`) === 'true') : false;
-  if (user && !user.is_onboarded && !userSkippedOnboarding && !user.is_admin && window.location.pathname !== '/adminpanel') {
+  if (user && !user.is_onboarded && !userSkippedOnboarding && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel') {
     return (
       <>
         <NetworkStatusBanner />
@@ -1099,6 +1100,63 @@ function App() {
       <GlobalToast />
       <SessionExpiredModal />
       <BackgroundPriceMonitor />
+      {/* ⚡ Admin Impersonation Sticky Banner */}
+      {isImpersonating && (
+        <div style={{
+          background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
+          color: '#ffffff',
+          padding: '8px 16px',
+          fontSize: '12.5px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 99999,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+          flexShrink: 0,
+          borderBottom: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+            <span style={{ fontSize: '15px' }}>⚡</span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Admin Impersonation: Viewing terminal as <strong>{user?.name || user?.username || 'Client'}</strong> ({user?.client_id || (user?.id ? `SE${user.id}` : '')})
+            </span>
+            <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.25)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Live Client Mode
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              const backup = localStorage.getItem('admin_token_backup');
+              if (backup) {
+                localStorage.setItem('token', backup);
+                localStorage.removeItem('admin_token_backup');
+                window.location.href = '/adminpanel';
+              }
+            }}
+            style={{
+              background: '#ffffff',
+              color: '#4f46e5',
+              border: 'none',
+              padding: '5px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '12px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              marginLeft: '12px',
+              transition: 'all 0.15s ease'
+            }}
+            title="Exit client terminal session and return to Admin Dashboard"
+          >
+            ← Exit & Return to Admin Panel
+          </button>
+        </div>
+      )}
       {/* Real-time Global Announcement Banner */}
       {isAnnouncementVisible && (
         <div style={{

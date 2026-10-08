@@ -2411,6 +2411,19 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  exitImpersonation: () => {
+    try {
+      const adminToken = localStorage.getItem('admin_token_backup');
+      if (adminToken) {
+        localStorage.setItem('token', adminToken);
+        localStorage.removeItem('admin_token_backup');
+        window.location.href = '/adminpanel';
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  },
+
   fetchDepositRequests: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
       let url = `${API}/api/admin/deposits?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
@@ -2450,6 +2463,7 @@ export const useStore = create(persist((set, get) => ({
       setAppLocked(false, u.id);
     }
     localStorage.removeItem('token');
+    localStorage.removeItem('admin_token_backup');
     localStorage.removeItem('hasSkippedOnboarding');
     set({
       hasSkippedOnboarding: false,
