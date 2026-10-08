@@ -782,7 +782,7 @@ function App() {
     'algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge',
     'markets', 'paper-trading', 'papertrading', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
     'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
-    'pricing', 'referrals', 'leaderboard', 'journal', 'tradingjournal', 'trading-journal',
+    'pricing', 'referrals', 'leaderboard', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
     'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
     'adminpanel', 'clientdata', 'profile', 'account', 'settings',
     'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
@@ -821,6 +821,7 @@ function App() {
       Settings: 'Security & Terminal Settings | SkandX',
       Reports: 'P&L Reports & Tax Statements | SkandX',
       Leaderboard: 'Trader Leaderboard | SkandX',
+      Community: 'Traders Community & Clubs — Live Trade Ideas & Market Discussions | SkandX',
       Journal: 'Trading Journal & Logs | SkandX',
       TradeDiary: 'Trade Diary & Insights | SkandX',
       AdminPanel: 'System Administration | SkandX'
@@ -843,6 +844,8 @@ function App() {
         document.title = 'Subscription Plans & Pricing | SkandX';
       } else if (cleanFirstSegment === 'aboutus' || cleanFirstSegment === 'about') {
         document.title = 'About Us & Company Disclosures | SkandX';
+      } else if (['community', 'clubs', 'feed'].includes(cleanFirstSegment)) {
+        document.title = 'Traders Community & Clubs — Live Trade Ideas & Market Discussions | SkandX';
       } else if (!isKnownRoute && currentPath !== '') {
         document.title = '404 - Page Not Found | SkandX';
       } else {
@@ -919,7 +922,20 @@ function App() {
     );
   }
 
-  // Public Google Search Crawlable Tool Routes (/calculators/*, /wealth-hub, /algo-trading, /primary-markets, /trade-diary)
+  // Public Google Search Crawlable Tool Routes (/calculators/*, /wealth-hub, /algo-trading, /primary-markets, /trade-diary, /community)
+  if (!user && ['community', 'clubs', 'feed'].includes(cleanFirstSegment)) {
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary, #0a0b0d)' }}>
+          <CommunityFeedView setActiveTab={(t) => { window.location.href = t === 'Home' ? '/' : '/login'; }} />
+          <Suspense fallback={null}>
+            <ConsentBanner />
+          </Suspense>
+        </div>
+      </Suspense>
+    );
+  }
+
   if (!user && (cleanFirstSegment === 'calculators' || cleanFirstSegment === 'calculator')) {
     const slug = currentPath.split('/')[2] || 'all';
     return (

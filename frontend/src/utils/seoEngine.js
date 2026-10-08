@@ -146,6 +146,24 @@ export const SEO_ROUTES = {
     keywords: 'wealth management calculator india, tax loss harvesting calculator india, stcg ltcg tax calculator fy25, human life value insurance calculator',
     category: 'FinanceApplication'
   },
+  '/community': {
+    title: 'Trader Community Hub, Trading Clubs & Market Ideas | SkandX',
+    description: 'Join trading clubs, share live chart setups, Bullish/Bearish trade ideas, and discuss NSE/BSE/MCX market action with Indian traders on SkandX Community.',
+    keywords: 'indian stock market community, trading clubs india, nifty option trading ideas, trader social network india, skandx community',
+    category: 'FinanceApplication'
+  },
+  '/clubs': {
+    title: 'Trading Clubs & Strategy Rooms — Join Indian Market Communities | SkandX',
+    description: 'Discover and join specialized Indian trading clubs for Nifty Options, Intraday Equity, Swing Trading, Algo Strategies, and Price Action on SkandX.',
+    keywords: 'trading clubs india, stock market groups india, option trading community, skandx clubs',
+    category: 'FinanceApplication'
+  },
+  '/feed': {
+    title: 'Live Trader Feed — Chart Setups, Market Ideas & PnL Snapshots | SkandX',
+    description: 'Real-time feed of chart setups, trade ideas, and market discussions from verified paper and algo traders on SkandX.',
+    keywords: 'trader feed india, live chart setups nse, stock market ideas today, skandx feed',
+    category: 'FinanceApplication'
+  },
   '/pricing': {
     title: 'Subscription Plans & Pricing — Free Paper Trading & Pro Algo Terminal | SkandX',
     description: 'Transparent pricing for SkandX Paper Trading, Financial Calculators, Wealth OS, and Multi-Broker Algo Trading Bridge.',
