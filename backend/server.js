@@ -8665,7 +8665,21 @@ app.post('/api/ltp-batch', async (req, res) => {
       if (!sym) continue;
       
       const rawSym = sym.includes(':') ? sym.split(':')[1] : null;
-      const cached = priceCache[sym] || (rawSym ? priceCache[rawSym] : null) || priceCache[`NSE:${sym}`] || priceCache[`BSE:${sym}`] || priceCache[`MCX:${sym}`];
+      const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const baseSym = cleanSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+      const cached = priceCache[sym] || 
+                     (rawSym ? priceCache[rawSym] : null) || 
+                     priceCache[cleanSym] || 
+                     priceCache[baseSym] || 
+                     priceCache[`NSE:${cleanSym}`] || 
+                     priceCache[`NSE:${baseSym}`] || 
+                     priceCache[`NSE:${baseSym}-EQ`] || 
+                     priceCache[`BSE:${cleanSym}`] || 
+                     priceCache[`BSE:${baseSym}`] || 
+                     priceCache[`MCX:${cleanSym}`] || 
+                     priceCache[`NSE:${sym}`] || 
+                     priceCache[`BSE:${sym}`] || 
+                     priceCache[`MCX:${sym}`];
       const isStale = cached && cached.timestamp ? (now - cached.timestamp > maxCacheAge) : false;
       
       if (!force && cached && cached.ltp > 0 && !isStale) {
@@ -8689,7 +8703,15 @@ app.post('/api/ltp-batch', async (req, res) => {
             if (ltpData && ltpData.ltp > 0) {
               priceCache[sym] = ltpData;
               const rSym = sym.includes(':') ? sym.split(':')[1] : null;
-              if (rSym) priceCache[rSym] = ltpData;
+              if (rSym) {
+                priceCache[rSym] = ltpData;
+                const bSym = rSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+                if (bSym !== rSym) {
+                  priceCache[bSym] = ltpData;
+                  priceCache[`NSE:${bSym}`] = ltpData;
+                  priceCache[`NSE:${bSym}-EQ`] = ltpData;
+                }
+              }
               
               // ⚡ Real-time broadcast to socket rooms immediately
               if (io) {

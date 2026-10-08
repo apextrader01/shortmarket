@@ -21,7 +21,23 @@ export default function OrderModal() {
     holdings: state.holdings,
     positions: state.positions
   })));
-  const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
+  const rawModalSymbol = orderModal?.symbol;
+  const livePriceData = useStore(state => {
+    if (!rawModalSymbol) return null;
+    const p = state.prices;
+    if (p[rawModalSymbol]?.ltp > 0) return p[rawModalSymbol];
+    const clean = rawModalSymbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    if (p[clean]?.ltp > 0) return p[clean];
+    const base = clean.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+    if (p[base]?.ltp > 0) return p[base];
+    if (p[`NSE:${clean}`]?.ltp > 0) return p[`NSE:${clean}`];
+    if (p[`NSE:${base}`]?.ltp > 0) return p[`NSE:${base}`];
+    if (p[`NSE:${base}-EQ`]?.ltp > 0) return p[`NSE:${base}-EQ`];
+    if (p[`BSE:${clean}`]?.ltp > 0) return p[`BSE:${clean}`];
+    if (p[`BSE:${base}`]?.ltp > 0) return p[`BSE:${base}`];
+    if (p[`MCX:${clean}`]?.ltp > 0) return p[`MCX:${clean}`];
+    return p[rawModalSymbol] || p[clean] || null;
+  });
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
@@ -55,8 +71,15 @@ export default function OrderModal() {
   }, []);
 
   const symbol = orderModal.symbol;
-  const livePrice = symbol ? livePriceData?.ltp || 0 : 0;
+  const livePrice = symbol ? (livePriceData?.ltp || 0) : 0;
   const isUp = symbol ? livePriceData?.pct >= 0 : true;
+
+  // Reactively populate limit price when live quote arrives if price is currently empty or 0
+  useEffect(() => {
+    if (livePrice > 0 && (!price || parseFloat(price) === 0)) {
+      setPrice(livePrice.toFixed(2));
+    }
+  }, [livePrice]);
 
   // Initialize modal state when it opens
   useEffect(() => {
@@ -83,13 +106,29 @@ export default function OrderModal() {
       } else {
           setQuantity(1);
       }
+
+      // Proactively fetch live quote from backend if modal opened from external feed or community
+      if (orderModal.symbol) {
+        const sym = orderModal.symbol;
+        const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const base = clean.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+        const symList = [sym, clean, base, `NSE:${clean}`, `NSE:${base}`, `NSE:${base}-EQ`];
+        useStore.getState().fetchBatchPrices(symList, true);
+        if (typeof useStore.getState().subscribeToSymbol === 'function') {
+          useStore.getState().subscribeToSymbol(sym);
+        }
+      }
       
       // Fetch initial price imperatively to avoid re-running on every live tick
       if (orderModal.initialPrice && Number(orderModal.initialPrice) > 0) {
         setPrice(Number(orderModal.initialPrice).toFixed(2));
         setOrderType('LIMIT');
       } else {
-        const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
+        const prices = useStore.getState().prices;
+        const sym = orderModal.symbol || '';
+        const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const base = clean.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+        const currentLivePrice = prices[sym]?.ltp || prices[clean]?.ltp || prices[base]?.ltp || prices[`NSE:${clean}`]?.ltp || prices[`NSE:${base}`]?.ltp || prices[`NSE:${base}-EQ`]?.ltp || 0;
         setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
       }
       
@@ -788,17 +827,19 @@ export default function OrderModal() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#ffffff', letterSpacing: '0.3px' }}>
-                {isBuy ? 'Buy' : 'Sell'} {symbol.split('-')[0]}
+                {isBuy ? 'Buy' : 'Sell'} {symbol ? (symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0]) : ''}
               </h2>
               <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
                 {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}
               </span>
             </div>
             <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginTop: '3px', fontWeight: '500' }}>
-              {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice.toFixed(2)}
-              <span style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.85 }}>
-                {isUp ? '▲' : '▼'} {livePriceData?.pct !== undefined ? `${livePriceData.pct >= 0 ? '+' : ''}${livePriceData.pct.toFixed(2)}%` : ''}
-              </span>
+              {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice > 0 ? livePrice.toFixed(2) : (orderModal.initialPrice && Number(orderModal.initialPrice) > 0 ? Number(orderModal.initialPrice).toFixed(2) : (price && parseFloat(price) > 0 ? Number(price).toFixed(2) : '0.00'))}
+              {livePriceData?.pct !== undefined && (
+                <span style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.85 }}>
+                  {isUp ? '▲' : '▼'} {`${livePriceData.pct >= 0 ? '+' : ''}${livePriceData.pct.toFixed(2)}%`}
+                </span>
+              )}
             </div>
           </div>
 

@@ -203,11 +203,19 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     }
     newPrices[symbol] = tickObj;
 
-    // ⚡ Dual-key prices with and without exchange prefix so watchlists always find the price
+    // ⚡ Dual-key prices with and without exchange prefix so watchlists and modals always find the price
     // Re-use tickObj reference directly to eliminate redundant heap allocations per tick
     if (symbol.includes(':')) {
         const rawSym = symbol.split(':')[1];
         newPrices[rawSym] = tickObj;
+        const base = rawSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+        if (base !== rawSym) {
+            newPrices[base] = tickObj;
+            newPrices[`NSE:${base}`] = tickObj;
+            newPrices[`BSE:${base}`] = tickObj;
+        } else {
+            newPrices[`NSE:${base}-EQ`] = tickObj;
+        }
     } else {
         const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => symbol.startsWith(c)) || symbol.includes('-MCX');
         if (isCommodity) {
@@ -215,6 +223,14 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         } else {
             newPrices[`NSE:${symbol}`] = tickObj;
             newPrices[`BSE:${symbol}`] = tickObj;
+            const base = symbol.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+            if (base !== symbol) {
+                newPrices[base] = tickObj;
+                newPrices[`NSE:${base}`] = tickObj;
+                newPrices[`BSE:${base}`] = tickObj;
+            } else {
+                newPrices[`NSE:${base}-EQ`] = tickObj;
+            }
         }
     }
   }
@@ -768,6 +784,19 @@ export const useStore = create(persist((set, get) => ({
       setContractLotsize(symbol, Number(lotsize));
     }
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    
+    // Proactively fetch live price and subscribe to WebSocket ticks so OrderModal never opens with 0.00
+    if (symbol) {
+      const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const base = clean.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+      const symList = [symbol, clean, base, `NSE:${clean}`, `NSE:${base}`, `NSE:${base}-EQ`];
+      try {
+        if (typeof get().fetchBatchPrices === 'function') get().fetchBatchPrices(symList, true);
+        if (typeof get().subscribeToSymbol === 'function') get().subscribeToSymbol(symbol);
+        if (socket && typeof socket.emit === 'function') socket.emit('subscribe', symbol);
+      } catch (_) {}
+    }
+
     const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
     if (isExit && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {

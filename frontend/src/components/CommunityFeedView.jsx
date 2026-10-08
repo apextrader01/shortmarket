@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import AdBannerWidget from './AdBannerWidget';
 import {
@@ -142,10 +142,13 @@ function formatMembersCount(num) {
 }
 
 export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }) {
-  const { user, positions, setSelectedSymbol, openOrderModal, showToast } = useStore(
+  const { user, positions, stocks, prices, fetchBatchPrices, setSelectedSymbol, openOrderModal, showToast } = useStore(
     useShallow(state => ({
       user: state.user,
       positions: state.positions,
+      stocks: state.stocks,
+      prices: state.prices,
+      fetchBatchPrices: state.fetchBatchPrices,
       setSelectedSymbol: state.setSelectedSymbol,
       openOrderModal: state.openOrderModal,
       showToast: state.showToast
@@ -224,6 +227,131 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
   });
   const [publishingPost, setPublishingPost] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Stock Autocomplete Search for Trade Setup
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [stockSearchResults, setStockSearchResults] = useState([]);
+  const [showStockDropdown, setShowStockDropdown] = useState(false);
+  const [isSearchingStocks, setIsSearchingStocks] = useState(false);
+  const stockSearchRef = useRef(null);
+
+  useEffect(() => {
+    if (!stockSearchQuery || stockSearchQuery.trim().length < 2) {
+      setStockSearchResults([]);
+      setIsSearchingStocks(false);
+      return;
+    }
+    const q = stockSearchQuery.trim().toLowerCase();
+    setIsSearchingStocks(true);
+
+    const localMatches = (stocks || []).filter(s => {
+      const sym = (s.symbol || s.uniqueSymbol || '').toLowerCase();
+      const name = (s.name || '').toLowerCase();
+      const desc = (s.description || '').toLowerCase();
+      return sym.includes(q) || name.includes(q) || desc.includes(q);
+    }).slice(0, 20);
+
+    setStockSearchResults(localMatches);
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (res.ok) {
+          const remoteData = await res.json();
+          if (Array.isArray(remoteData)) {
+            const seen = new Set();
+            const combined = [];
+            [...remoteData, ...localMatches].forEach(item => {
+              const key = item.uniqueSymbol || item.symbol;
+              if (key && !seen.has(key)) {
+                seen.add(key);
+                combined.push(item);
+              }
+            });
+            const topResults = combined.slice(0, 20);
+            setStockSearchResults(topResults);
+            if (typeof fetchBatchPrices === 'function' && topResults.length > 0) {
+              fetchBatchPrices(topResults.map(i => i.uniqueSymbol || i.symbol));
+            }
+          }
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('Stock search error', e);
+      } finally {
+        setIsSearchingStocks(false);
+      }
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [stockSearchQuery, stocks]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (stockSearchRef.current && !stockSearchRef.current.contains(e.target)) {
+        setShowStockDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectStock = (item) => {
+    const sym = item.unique_symbol || item.uniqueSymbol || item.symbol;
+    const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const baseSym = cleanSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+    const lotSize = item.lotsize || 1;
+    const pObj = prices[sym] || prices[cleanSym] || prices[baseSym] || prices[`NSE:${baseSym}-EQ`];
+    const itemPrice = pObj?.ltp || item.last_price || 0;
+    const isIndex = sym.includes('INDEX') || sym.includes('NIFTY') || sym.includes('BANKNIFTY');
+    
+    setTradeSetupForm(prev => {
+      const nextLegs = [...prev.legs];
+      if (nextLegs[0]) {
+        nextLegs[0] = {
+          ...nextLegs[0],
+          type: isIndex ? 'CE' : 'EQ',
+          strike: item.name || baseSym || item.symbol,
+          price: itemPrice > 0 ? String(itemPrice) : nextLegs[0].price
+        };
+      }
+      return {
+        ...prev,
+        symbol: sym,
+        lotSize: String(lotSize),
+        strategy: isIndex ? 'BULL SPREAD' : 'INTRADAY / SWING SETUP',
+        legs: nextLegs
+      };
+    });
+    setStockSearchQuery('');
+    setShowStockDropdown(false);
+    if (typeof fetchBatchPrices === 'function') {
+      fetchBatchPrices([sym, cleanSym, baseSym, `NSE:${baseSym}-EQ`], true);
+    }
+  };
+
+  // Auto-fill price when live quote arrives
+  useEffect(() => {
+    if (!attachTradeSetup || !tradeSetupForm.symbol) return;
+    const sym = tradeSetupForm.symbol;
+    const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const baseSym = cleanSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+    const pObj = prices[sym] || prices[cleanSym] || prices[baseSym] || prices[`NSE:${baseSym}-EQ`];
+    const ltp = pObj?.ltp;
+    if (ltp && ltp > 0) {
+      setTradeSetupForm(prev => {
+        if (!prev.legs[0] || (prev.legs[0].price && prev.legs[0].price !== '' && prev.legs[0].price !== '0')) {
+          return prev;
+        }
+        const nextLegs = [...prev.legs];
+        nextLegs[0] = { ...nextLegs[0], price: String(ltp) };
+        return { ...prev, legs: nextLegs };
+      });
+    }
+  }, [prices, tradeSetupForm.symbol, attachTradeSetup]);
 
   const authHeaders = () => {
     const token = localStorage.getItem('token');
@@ -1406,7 +1534,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', whiteSpace: 'nowrap' }}>
                 TRENDING:
               </span>
-              {['NIFTY50', 'BANKNIFTY', 'FINNIFTY', 'RELIANCE', 'ICICIBANK', 'TCS', 'SENSEX', 'CRUDEOIL', 'OPTIONS'].map(tag => {
+              {['NIFTY50', 'BANKNIFTY', 'FINNIFTY', 'ADANI', 'RELIANCE', 'ICICIBANK', 'TCS', 'SENSEX', 'CRUDEOIL', 'OPTIONS'].map(tag => {
                 const isSelected = selectedTag === tag;
                 return (
                   <button
@@ -1726,11 +1854,12 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                                 const firstLeg = Array.isArray(post.trade_setup.legs) && post.trade_setup.legs[0];
                                 const side = firstLeg?.side ? String(firstLeg.side).toUpperCase() : 'BUY';
                                 const lotSize = parseInt(post.trade_setup.lotSize || firstLeg?.lots || '1', 10) || 1;
+                                const initialPrice = firstLeg?.price ? parseFloat(firstLeg.price) : null;
                                 if (typeof setSelectedSymbol === 'function') {
                                   setSelectedSymbol(cleanSym);
                                 }
                                 if (typeof openOrderModal === 'function') {
-                                  openOrderModal(cleanSym, side, lotSize);
+                                  openOrderModal(cleanSym, side, lotSize, 'INT', false, 0, initialPrice);
                                 }
                                 if (showToast) {
                                   showToast(`⚡ Order ticket opened for ${cleanSym}`, 'success');
@@ -1766,14 +1895,34 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                               return (
                                 <div
                                   key={lIdx}
+                                  onClick={() => {
+                                    const cleanSym = post.trade_setup.symbol;
+                                    const legSide = String(leg.side || 'BUY').toUpperCase();
+                                    const lot = parseInt(post.trade_setup.lotSize || leg.lots || '1', 10) || 1;
+                                    const p = leg.price ? parseFloat(leg.price) : null;
+                                    if (typeof setSelectedSymbol === 'function') {
+                                      setSelectedSymbol(cleanSym);
+                                    }
+                                    if (typeof openOrderModal === 'function') {
+                                      openOrderModal(cleanSym, legSide, lot, 'INT', false, 0, p);
+                                    }
+                                    if (showToast) {
+                                      showToast(`⚡ Order ticket opened for ${cleanSym} (${leg.side} ${leg.type} ${leg.strike})`, 'success');
+                                    }
+                                  }}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     fontSize: '12.5px',
-                                    padding: '4px 0',
+                                    padding: '5px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s',
                                     borderBottom: lIdx < post.trade_setup.legs.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : 'none'
                                   }}
+                                  className="hoverable"
+                                  title={`Click to trade this leg (${leg.side} ${leg.type} ${leg.strike} @ ₹${leg.price})`}
                                 >
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{
@@ -2287,11 +2436,27 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               {/* Quick #SYMBOL Tag Insertion Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>Quick Tags:</span>
-                {['#NIFTY50', '#BANKNIFTY', '#FINNIFTY', '#RELIANCE', '#ICICIBANK', '#SENSEX', '#CRUDEOIL'].map(tag => (
+                {['#NIFTY50', '#BANKNIFTY', '#FINNIFTY', '#ADANI', '#ADANIENT', '#RELIANCE', '#ICICIBANK', '#SENSEX', '#CRUDEOIL'].map(tag => (
                   <button
                     key={tag}
                     type="button"
-                    onClick={() => setComposeText(prev => `${prev}${prev.endsWith(' ') || !prev ? '' : ' '}${tag} `)}
+                    onClick={() => {
+                      setComposeText(prev => `${prev}${prev.endsWith(' ') || !prev ? '' : ' '}${tag} `);
+                      if (attachTradeSetup) {
+                        const cleanTag = tag.replace('#', '');
+                        if (cleanTag === 'ADANI' || cleanTag === 'ADANIENT') {
+                          handleSelectStock({ symbol: 'ADANIENT', unique_symbol: 'NSE:ADANIENT-EQ', lotsize: 1, name: 'ADANIENT' });
+                        } else if (cleanTag === 'NIFTY50') {
+                          handleSelectStock({ symbol: 'NIFTY50', unique_symbol: 'NSE:NIFTY50-INDEX', lotsize: 75, name: 'NIFTY50' });
+                        } else if (cleanTag === 'BANKNIFTY') {
+                          handleSelectStock({ symbol: 'BANKNIFTY', unique_symbol: 'NSE:BANKNIFTY-INDEX', lotsize: 30, name: 'BANKNIFTY' });
+                        } else if (cleanTag === 'RELIANCE') {
+                          handleSelectStock({ symbol: 'RELIANCE', unique_symbol: 'NSE:RELIANCE-EQ', lotsize: 1, name: 'RELIANCE' });
+                        } else if (cleanTag === 'ICICIBANK') {
+                          handleSelectStock({ symbol: 'ICICIBANK', unique_symbol: 'NSE:ICICIBANK-EQ', lotsize: 1, name: 'ICICIBANK' });
+                        }
+                      }
+                    }}
                     style={{
                       background: 'rgba(56, 189, 248, 0.1)',
                       border: '1px solid rgba(56, 189, 248, 0.25)',
@@ -2445,21 +2610,176 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               </div>
 
               {attachTradeSetup && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={tradeSetupForm.symbol}
-                      onChange={(e) => setTradeSetupForm(prev => ({ ...prev, symbol: e.target.value }))}
-                      placeholder="Symbol (e.g. NSE:NIFTY50-INDEX)"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px' }}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                  {/* Quick Popular Share Chips */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>⚡ Quick Shares:</span>
+                    {[
+                      { label: 'ADANIENT', symbol: 'ADANIENT', unique_symbol: 'NSE:ADANIENT-EQ', lotsize: 1, name: 'ADANI ENTERPRISES' },
+                      { label: 'ADANIPORTS', symbol: 'ADANIPORTS', unique_symbol: 'NSE:ADANIPORTS-EQ', lotsize: 1, name: 'ADANI PORTS' },
+                      { label: 'ADANIPOWER', symbol: 'ADANIPOWER', unique_symbol: 'NSE:ADANIPOWER-EQ', lotsize: 1, name: 'ADANI POWER' },
+                      { label: 'RELIANCE', symbol: 'RELIANCE', unique_symbol: 'NSE:RELIANCE-EQ', lotsize: 1, name: 'RELIANCE IND' },
+                      { label: 'ICICIBANK', symbol: 'ICICIBANK', unique_symbol: 'NSE:ICICIBANK-EQ', lotsize: 1, name: 'ICICI BANK' },
+                      { label: 'NIFTY 50', symbol: 'NIFTY50', unique_symbol: 'NSE:NIFTY50-INDEX', lotsize: 75, name: 'NIFTY 50' },
+                      { label: 'BANKNIFTY', symbol: 'BANKNIFTY', unique_symbol: 'NSE:BANKNIFTY-INDEX', lotsize: 30, name: 'BANK NIFTY' }
+                    ].map(chip => {
+                      const isSelected = tradeSetupForm.symbol && (tradeSetupForm.symbol === chip.unique_symbol || tradeSetupForm.symbol.includes(chip.symbol));
+                      return (
+                        <button
+                          key={chip.label}
+                          type="button"
+                          onClick={() => handleSelectStock(chip)}
+                          style={{
+                            background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                            color: isSelected ? '#38bdf8' : '#cbd5e1',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
+                    {/* Autocomplete Search Input */}
+                    <div ref={stockSearchRef} style={{ position: 'relative' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
+                        <input
+                          type="text"
+                          value={stockSearchQuery !== '' ? stockSearchQuery : tradeSetupForm.symbol}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setStockSearchQuery(val);
+                            setTradeSetupForm(prev => ({ ...prev, symbol: val }));
+                            setShowStockDropdown(true);
+                          }}
+                          onFocus={() => {
+                            if (stockSearchResults.length > 0 || (stockSearchQuery && stockSearchQuery.length >= 2)) {
+                              setShowStockDropdown(true);
+                            }
+                          }}
+                          placeholder="Search stock / share (e.g. ADANI)..."
+                          style={{
+                            width: '100%',
+                            background: '#131b2e',
+                            border: showStockDropdown && stockSearchResults.length > 0 ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            padding: '7px 28px 7px 30px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none'
+                          }}
+                        />
+                        {isSearchingStocks ? (
+                          <span style={{ position: 'absolute', right: '10px', fontSize: '11px', color: '#38bdf8' }}>⌛</span>
+                        ) : (stockSearchQuery || tradeSetupForm.symbol) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStockSearchQuery('');
+                              setTradeSetupForm(prev => ({ ...prev, symbol: '' }));
+                              setStockSearchResults([]);
+                              setShowStockDropdown(false);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              padding: 0
+                            }}
+                          >
+                            ✕
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {/* Autocomplete Dropdown List */}
+                      {showStockDropdown && (stockSearchResults.length > 0 || isSearchingStocks) && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 70,
+                          marginTop: '4px',
+                          background: '#0b1120',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          borderRadius: '8px',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+                          maxHeight: '220px',
+                          overflowY: 'auto'
+                        }}>
+                          {stockSearchResults.map((item, idx) => {
+                            const itemSym = item.unique_symbol || item.uniqueSymbol || item.symbol;
+                            const cleanSym = itemSym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+                            const baseSym = cleanSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+                            const pObj = prices[itemSym] || prices[item.symbol] || prices[cleanSym] || prices[baseSym];
+                            const ltp = pObj?.ltp || item.last_price || 0;
+                            const chg = pObj?.changePercent || 0;
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => handleSelectStock(item)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 10px',
+                                  cursor: 'pointer',
+                                  borderBottom: idx < stockSearchResults.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                                  transition: 'background 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              >
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#f8fafc' }}>
+                                    {item.name || item.symbol}
+                                    <span style={{ fontSize: '10px', fontWeight: '600', color: '#94a3b8', marginLeft: '6px' }}>
+                                      {item.exchange || 'NSE'}
+                                    </span>
+                                  </span>
+                                  <span style={{ fontSize: '10.5px', color: '#64748b', maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {item.description || item.name || itemSym}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                  {ltp > 0 && (
+                                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#38bdf8' }}>
+                                      ₹{Number(ltp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  )}
+                                  {chg !== 0 && (
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: chg >= 0 ? '#34d399' : '#f87171' }}>
+                                      {chg >= 0 ? '+' : ''}{Number(chg).toFixed(2)}%
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     <input
                       type="text"
                       value={tradeSetupForm.strategy}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, strategy: e.target.value }))}
                       placeholder="Strategy (e.g. BULL PUT SPREAD)"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px' }}
+                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px', outline: 'none' }}
                     />
                   </div>
 
