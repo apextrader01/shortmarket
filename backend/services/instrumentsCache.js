@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 let allInstruments = [];
+let activeSymbolSet = new Set();
 let lotSizeMap = {};
 let cachedAllStocks = [];
 let cachedAllStocksJson = '[]';
@@ -78,9 +79,12 @@ function initializeCache() {
     let filteredInstruments = Array.from(symbolMap.values());
     allInstruments = filteredInstruments;
     
-    // Pre-calculate lot sizes map for O(1) lookup — store ONLY non-1 lot sizes to save >80% RAM
+    // Pre-calculate lot sizes map and activeSymbolSet for O(1) lookup
     lotSizeMap = {};
+    activeSymbolSet = new Set();
     allInstruments.forEach(item => {
+        if (item.symbol) activeSymbolSet.add(item.symbol);
+        if (item.unique_symbol) activeSymbolSet.add(item.unique_symbol);
         if (item.lotsize && item.lotsize > 1) {
             lotSizeMap[item.symbol] = item.lotsize;
             if (item.unique_symbol !== item.symbol) {
@@ -412,6 +416,14 @@ function checkPositionConversionAllowed(symbol, targetProductTypeOrDate = 'DEL',
     return { allowed: true };
 }
 
+function hasActiveInstrument(symbol) {
+    if (!symbol || typeof symbol !== 'string') return false;
+    if (activeSymbolSet.size === 0) return true; // Not initialized yet, don't block
+    if (activeSymbolSet.has(symbol)) return true;
+    const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    return activeSymbolSet.has(`NSE:${clean}`) || activeSymbolSet.has(`BSE:${clean}`) || activeSymbolSet.has(`MCX:${clean}`);
+}
+
 module.exports = {
     initializeCache,
     getLotSizes,
@@ -427,5 +439,6 @@ module.exports = {
     isMCXWinterSession,
     checkPositionConversionAllowed,
     resolveSingleLotSize,
-    getDiskLotsizeMap
+    getDiskLotsizeMap,
+    hasActiveInstrument
 };

@@ -47,9 +47,17 @@ let isMasterNode = false;
 let dirtySymbols = new Set(); // Track symbols that changed in the last 300ms
 let clientViewerLastSeen = new Map(); // Track timestamp when an active client last pinged/viewed a symbol
 let symbolLastSeen = new Map(); // Global GC timestamp map for Fyers SDK keepalive
+let invalidFyersSymbols = new Set(); // Dynamic blacklist for symbols rejected by Fyers with "invalid token [...]"
 
 function isExpiredContract(symbol) {
     if (!symbol || typeof symbol !== 'string') return false;
+    if (invalidFyersSymbols.has(symbol)) return true;
+    try {
+        const { isDerivativeContract, hasActiveInstrument } = require('./instrumentsCache');
+        if (isDerivativeContract && hasActiveInstrument && isDerivativeContract(symbol) && !hasActiveInstrument(symbol)) {
+            return true;
+        }
+    } catch (e) {}
     try {
         const { parseExpiryDate } = require('./autoSquareOff');
         const expDate = parseExpiryDate(symbol);
@@ -60,6 +68,52 @@ function isExpiredContract(symbol) {
         }
     } catch (e) {}
     return false;
+}
+
+function extractAndPurgeInvalidSymbols(msg) {
+    if (!msg || typeof msg !== 'string') return [];
+    const found = [];
+    const bracketMatch = msg.match(/\[([^\]]+)\]/);
+    if (bracketMatch && bracketMatch[1]) {
+        const parts = bracketMatch[1].split(',');
+        for (const p of parts) {
+            const fSym = p.replace(/['"\s]/g, '');
+            if (fSym && fSym.includes(':')) {
+                if (!invalidFyersSymbols.has(fSym)) {
+                    invalidFyersSymbols.add(fSym);
+                    found.push(fSym);
+                }
+                const mappedSyms = globalFyersToRequested[fSym] || [];
+                mappedSyms.forEach(s => {
+                    invalidFyersSymbols.add(s);
+                    clientSubscriptions.delete(s);
+                    symbolLastSeen.delete(s);
+                    clientViewerLastSeen.delete(s);
+                });
+                clientSubscriptions.delete(fSym);
+                symbolLastSeen.delete(fSym);
+                clientViewerLastSeen.delete(fSym);
+                delete globalFyersToRequested[fSym];
+            }
+        }
+    }
+    if (found.length > 0) {
+        subQueue = subQueue.filter(sym => !invalidFyersSymbols.has(sym));
+        console.warn(`🧹 [Fyers] Blacklisted invalid symbol(s) ${found.join(', ')} and re-syncing valid WebSocket subscriptions.`);
+        // Re-queue remaining valid clientSubscriptions so any 25-symbol WS batch previously rejected due to the invalid symbol gets subscribed
+        clientSubscriptions.forEach(s => {
+            if (!isExpiredContract(s)) {
+                const fSym = toFyersSymbol(s);
+                if (fSym && !invalidFyersSymbols.has(fSym) && !subQueue.includes(fSym)) {
+                    subQueue.push(fSym);
+                }
+            }
+        });
+        if (wsInstance && isFyersConnected && subQueue.length > 0) {
+            processSubQueue();
+        }
+    }
+    return found;
 }
 
 function purgeExpiredSubscriptions() {
@@ -80,7 +134,7 @@ function purgeExpiredSubscriptions() {
                 }
             }
         });
-        console.log(`🧹 [Fyers] Purged ${toRemove.length} expired subscriptions from live stream.`);
+        console.log(`🧹 [Fyers] Purged ${toRemove.length} expired/invalid subscriptions from live stream.`);
     }
     return toRemove.length;
 }
@@ -398,7 +452,7 @@ async function initFyers(io, pc, isMaster = true) {
                     }
                 } catch(e) {}
             }
-        }, 1000); // 1000ms (1 update per sec) to drastically save Egress Bandwidth costs for 100k users
+        }, 250); // 250ms (4 updates/sec) for real-time tick streaming across clients and cluster workers
     }
 }
 
@@ -549,6 +603,13 @@ function startLiveWebSocket() {
     
     wsInstance.on('message', (message) => {
         lastTickTime = Date.now();
+        if (!isFyersConnected) {
+            isFyersConnected = true;
+            lastDataSocketError = null;
+            if (subQueue.length > 0) {
+                processSubQueue();
+            }
+        }
         const data = Array.isArray(message) ? message : [message];
         
         data.forEach(tick => {
@@ -640,10 +701,16 @@ function startLiveWebSocket() {
     
     wsInstance.on('error', (err) => {
         console.error("Fyers WS Error:", err);
-        const errMsg = (err && (err.message || err.toString())) || '';
-        if (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized')) {
+        const errMsg = (err && (err.message || JSON.stringify(err) || err.toString())) || '';
+        const purged = extractAndPurgeInvalidSymbols(errMsg);
+        if (purged.length === 0 && isTokenExpired(activeAccessToken) && (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized'))) {
             console.warn("🚨 Fyers token expired or unauthorized. Please re-authenticate Fyers via Admin Settings / API.");
         }
+    });
+    
+    wsInstance.on('general', (msg) => {
+        const msgStr = typeof msg === 'string' ? msg : JSON.stringify(msg || {});
+        extractAndPurgeInvalidSymbols(msgStr);
     });
     
     wsInstance.on('close', (reason) => {
@@ -688,9 +755,12 @@ async function processSubQueue() {
     try {
         while (subQueue.length > 0) {
             if (!wsInstance) break;
-            const chunk = subQueue.splice(0, 25);
-            wsInstance.subscribe(chunk);
-            await new Promise(r => setTimeout(r, 300)); // Limit rate while batching
+            const rawChunk = subQueue.splice(0, 25);
+            const chunk = rawChunk.filter(fSym => fSym && !invalidFyersSymbols.has(fSym) && !isExpiredContract(fSym));
+            if (chunk.length > 0) {
+                wsInstance.subscribe(chunk);
+                await new Promise(r => setTimeout(r, 300)); // Limit rate while batching
+            }
         }
     } catch (e) {
         console.error("Error processing Fyers sub queue:", e);
@@ -995,26 +1065,44 @@ async function fetchBatchLTPs(symbols) {
                 if (response && response.s === 'ok') {
                     processQuotesResponse(response);
                 } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
-                    if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
+                    const purged = extractAndPurgeInvalidSymbols(response.message || '');
+                    if (purged.length === 0 && (response.code === -15 || response.code === -17) && isTokenExpired(activeAccessToken)) {
                         lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
                         isFyersConnected = false;
                     }
-                    if (response.code !== -15 && response.code !== -17) {
-                        // Fast parallel retry with strict 1.5s timeout cap (eliminates the 28-second stall)
-                        const validChunk = chunk.filter(fSym => !isExpiredContract(fSym));
-                        const retryPromises = validChunk.map(fSym => 
-                            fyers.getQuotes([fSym]).then(indRes => {
-                                if (indRes && indRes.s === 'ok') processQuotesResponse(indRes);
-                            }).catch(() => {})
-                        );
-                        await Promise.race([
-                            Promise.allSettled(retryPromises),
-                            new Promise(resolve => setTimeout(resolve, 1500))
-                        ]);
+                    if (!isTokenExpired(activeAccessToken)) {
+                        const validChunk = chunk.filter(fSym => !invalidFyersSymbols.has(fSym) && !isExpiredContract(fSym));
+                        if (validChunk.length > 0) {
+                            let batchRecovered = false;
+                            if (purged.length > 0) {
+                                try {
+                                    const retryBatchRes = await fyers.getQuotes(validChunk);
+                                    if (retryBatchRes && retryBatchRes.s === 'ok') {
+                                        processQuotesResponse(retryBatchRes);
+                                        batchRecovered = true;
+                                    } else if (retryBatchRes && retryBatchRes.message) {
+                                        extractAndPurgeInvalidSymbols(retryBatchRes.message);
+                                    }
+                                } catch (_) {}
+                            }
+                            if (!batchRecovered) {
+                                const remainingChunk = validChunk.filter(fSym => !invalidFyersSymbols.has(fSym));
+                                const retryPromises = remainingChunk.map(fSym => 
+                                    fyers.getQuotes([fSym]).then(indRes => {
+                                        if (indRes && indRes.s === 'ok') processQuotesResponse(indRes);
+                                        else if (indRes && indRes.message) extractAndPurgeInvalidSymbols(indRes.message);
+                                    }).catch(() => {})
+                                );
+                                await Promise.race([
+                                    Promise.allSettled(retryPromises),
+                                    new Promise(resolve => setTimeout(resolve, 1500))
+                                ]);
+                            }
+                        }
                     }
                 }
             } catch(chunkErr) {
-                if (chunkErr && (chunkErr.code === -15 || chunkErr.code === -17 || (chunkErr.message && (chunkErr.message.toLowerCase().includes('token') || chunkErr.message.toLowerCase().includes('authenticate'))))) {
+                if (chunkErr && (chunkErr.code === -15 || chunkErr.code === -17) && isTokenExpired(activeAccessToken)) {
                     lastDataSocketError = `Token Expired: ${chunkErr.message || 'Invalid or expired token'}`;
                     isFyersConnected = false;
                 }
@@ -1023,7 +1111,7 @@ async function fetchBatchLTPs(symbols) {
         
         return { ...results, ...mfResults };
     } catch(e) {
-        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+        if (e && (e.code === -15 || e.code === -17) && isTokenExpired(activeAccessToken)) {
             lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
             isFyersConnected = false;
         }
@@ -1113,14 +1201,12 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
             }
             
             return formattedCandles;
-        } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
-            if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
-                lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
-                isFyersConnected = false;
-            }
+        } else if (response && (response.code === -15 || response.code === -17) && isTokenExpired(activeAccessToken)) {
+            lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+            isFyersConnected = false;
         }
     } catch (e) {
-        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+        if (e && (e.code === -15 || e.code === -17) && isTokenExpired(activeAccessToken)) {
             lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
             isFyersConnected = false;
         }
@@ -1163,26 +1249,25 @@ function getPriceFromCache() {
 
 function getFyersStatus() {
     const expiredByJwt = isTokenExpired(activeAccessToken);
-    const isTokenExpiredError = expiredByJwt || (lastDataSocketError && (
+    const recentTick = (Date.now() - lastTickTime) < 15000;
+    const isTokenExpiredError = expiredByJwt || (!recentTick && lastDataSocketError && (
         lastDataSocketError.toLowerCase().includes('expired') || 
-        lastDataSocketError.toLowerCase().includes('valid token') ||
         lastDataSocketError.toLowerCase().includes('authenticate') ||
         lastDataSocketError.toLowerCase().includes('failed to decode jwt')
     ));
     const hasValidToken = !!activeAccessToken && !isTokenExpiredError;
-    const recentTick = (Date.now() - lastTickTime) < 15000;
     const jwtPayload = decodeFyersJwt(activeAccessToken);
     const tokenExpiryDate = jwtPayload && jwtPayload.exp ? new Date(jwtPayload.exp * 1000).toISOString() : null;
 
     return {
         isMasterNode,
-        isFyersConnected: isMasterNode ? (isFyersConnected && hasValidToken) : (isFyersConnected || recentTick),
+        isFyersConnected: (isFyersConnected || recentTick) && hasValidToken,
         isPaused: !!isMarketFeedPaused,
         hasAccessToken: hasValidToken,
         tokenExpired: !!isTokenExpiredError,
         tokenExpiryDate,
         wsInstanceExists: !!wsInstance,
-        lastDataSocketError: lastDataSocketError,
+        lastDataSocketError: recentTick ? null : lastDataSocketError,
         subscriptions: Array.from(clientSubscriptions),
         lastTickTime: new Date(lastTickTime).toISOString(),
         secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,

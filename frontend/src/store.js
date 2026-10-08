@@ -99,10 +99,21 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         low: rawData[6],
         close: rawData[7],
         vol: rawData[8],
+        volume: rawData[8],
         totBuyQuan: rawData[9],
         totSellQuan: rawData[10],
         upper_circuit: rawData[11] || 0,
         lower_circuit: rawData[12] || 0
+      };
+    } else if (rawData && typeof rawData === 'object') {
+      data = {
+        ...rawData,
+        ch: rawData.ch ?? rawData.change ?? 0,
+        change: rawData.change ?? rawData.ch ?? 0,
+        chp: rawData.chp ?? rawData.pct ?? 0,
+        pct: rawData.pct ?? rawData.chp ?? 0,
+        vol: rawData.vol ?? rawData.volume ?? 0,
+        volume: rawData.volume ?? rawData.vol ?? 0,
       };
     }
 
@@ -1335,10 +1346,15 @@ export const useStore = create(persist((set, get) => ({
           watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
         });
         
+        if (shouldUpdateWatchlists) {
+          get().pingSubscriptions();
+        }
+        const activeWl = (get().watchlists || []).find(w => String(w.id) === String(get().activeWatchlistId)) || get().watchlists?.[0];
+        const wlSymbols = activeWl?.symbols || [];
         const posSymbols = get().positions.map(p => p.symbol);
         const holdSymbols = get().holdings.map(h => h.symbol);
         const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
-        const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols, ...alertSymbols])];
+        const allSymbolsToSubscribe = [...new Set([...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols])];
         if (allSymbolsToSubscribe.length > 0) {
           if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
           const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));

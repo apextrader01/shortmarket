@@ -29,6 +29,7 @@ export default function ChartWidget() {
   const macdSeriesRef     = useRef(null);
   const macdSignalSeriesRef = useRef(null);
   const macdHistSeriesRef = useRef(null);
+  const lastCandleRef     = useRef(null);
   const mountedRef        = useRef(true);
 
   const [hoveredCandle, setHoveredCandle] = useState(null);
@@ -196,8 +197,76 @@ export default function ChartWidget() {
       macdSeriesRef.current = null;
       macdSignalSeriesRef.current = null;
       macdHistSeriesRef.current = null;
+      lastCandleRef.current = null;
     };
   }, [selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD]);
+
+  const applyLiveTickToCandle = useCallback((currentPrice) => {
+    if (!mountedRef.current || !currentPrice || !Number.isFinite(Number(currentPrice.ltp))) return;
+    const ltp = Number(currentPrice.ltp);
+    const rawTs = currentPrice.timestamp ? Math.floor(new Date(currentPrice.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000);
+    const tickSec = (rawTs > 0 ? rawTs : Math.floor(Date.now() / 1000)) + 19800;
+
+    if (candleSeriesRef.current && lastCandleRef.current) {
+      const prev = lastCandleRef.current;
+      const intervalSecMap = {
+        ONE_MINUTE: 60,
+        THREE_MINUTE: 180,
+        FIVE_MINUTE: 300,
+        TEN_MINUTE: 600,
+        FIFTEEN_MINUTE: 900,
+        THIRTY_MINUTE: 1800,
+        ONE_HOUR: 3600,
+        ONE_DAY: 86400,
+      };
+      const intervalSec = intervalSecMap[chartInterval] || 300;
+      const elapsed = tickSec - prev.time;
+
+      let updatedBar;
+      if (elapsed >= intervalSec) {
+        const steps = Math.floor(elapsed / intervalSec);
+        const barTime = prev.time + steps * intervalSec;
+        if (chartInterval === 'ONE_DAY') {
+          const dayOpen = Number(currentPrice.open) > 0 ? Number(currentPrice.open) : ltp;
+          const dayHigh = Number(currentPrice.high) > 0 ? Math.max(Number(currentPrice.high), ltp, dayOpen) : Math.max(ltp, dayOpen);
+          const dayLow  = Number(currentPrice.low)  > 0 ? Math.min(Number(currentPrice.low),  ltp, dayOpen) : Math.min(ltp, dayOpen);
+          updatedBar = { time: barTime, open: dayOpen, high: dayHigh, low: dayLow, close: ltp, volume: Number(currentPrice.volume) || 0 };
+        } else {
+          updatedBar = { time: barTime, open: ltp, high: ltp, low: ltp, close: ltp, volume: 0 };
+        }
+      } else {
+        if (chartInterval === 'ONE_DAY') {
+          const dayOpen = Number(currentPrice.open) > 0 ? Number(currentPrice.open) : prev.open;
+          const dayHigh = Math.max(prev.high, Number(currentPrice.high) || ltp, ltp);
+          const dayLow  = Math.min(prev.low,  Number(currentPrice.low)  || ltp, ltp);
+          updatedBar = { ...prev, open: dayOpen, high: dayHigh, low: dayLow, close: ltp };
+        } else {
+          updatedBar = {
+            ...prev,
+            high: Math.max(prev.high, ltp),
+            low: Math.min(prev.low, ltp),
+            close: ltp,
+          };
+        }
+      }
+
+      lastCandleRef.current = updatedBar;
+      try {
+        candleSeriesRef.current.update({
+          time: updatedBar.time,
+          open: updatedBar.open,
+          high: updatedBar.high,
+          low: updatedBar.low,
+          close: updatedBar.close,
+        });
+      } catch (_) {}
+      if (liveLineRef.current) {
+        try {
+          liveLineRef.current.update({ time: updatedBar.time, value: ltp });
+        } catch (_) {}
+      }
+    }
+  }, [chartInterval]);
 
   // Push candle and indicator data into chart
   useEffect(() => {
@@ -292,21 +361,22 @@ export default function ChartWidget() {
         macdHistSeriesRef.current.setData(histLine);
       }
 
-      const last = candles[candles.length - 1];
-      if (last) liveLineRef.current?.setData([{ time: last.time, value: last.close }]);
+      const last = uniqueCandles[uniqueCandles.length - 1];
+      if (last) {
+        lastCandleRef.current = { ...last };
+        liveLineRef.current?.setData([{ time: last.time, value: last.close }]);
+        if (price) applyLiveTickToCandle(price);
+      }
 
       chartRef.current?.timeScale().fitContent();
     } catch (e) { console.error(e) }
-  }, [candles, showSMA, showEMA, showRSI, showMACD, theme]);
+  }, [candles, showSMA, showEMA, showRSI, showMACD, theme, applyLiveTickToCandle]);
 
   // Live tick update
   useEffect(() => {
-    if (!mountedRef.current || !price || !liveLineRef.current) return;
-    try {
-      const t = price.timestamp ? Math.floor(new Date(price.timestamp).getTime() / 1000) : 0;
-      if (t > 0) liveLineRef.current.update({ time: t + 19800, value: price.ltp });
-    } catch (_) {}
-  }, [price, selectedSymbol]);
+    if (!mountedRef.current || !price) return;
+    applyLiveTickToCandle(price);
+  }, [price, selectedSymbol, applyLiveTickToCandle]);
 
   const isUp   = (price?.pct ?? 0) >= 0;
   const pct    = price?.pct    != null ? Number(price.pct).toFixed(2)    : null;
@@ -380,7 +450,7 @@ export default function ChartWidget() {
           {[['O', hoveredCandle?.open ?? price?.open], 
             ['H', hoveredCandle?.high ?? price?.high], 
             ['L', hoveredCandle?.low ?? price?.low], 
-            ['C', hoveredCandle?.close ?? price?.close],
+            ['C', hoveredCandle?.close ?? price?.ltp ?? price?.close],
             ['Vol', hoveredCandle?.volume ?? price?.volume]]
             .map(([lbl, val]) =>
             val != null ? (

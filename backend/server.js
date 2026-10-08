@@ -623,13 +623,18 @@ if (isMaster) {
 }
 if (!isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
+  const { updateWorkerTickTime } = require('./services/fyers');
   
   const setupCacheSync = () => {
     cacheSubClient.subscribe('price_cache_batch_sync', (message) => {
       try {
         const batchUpdate = JSON.parse(message);
+        const keys = Object.keys(batchUpdate);
+        if (keys.length > 0 && updateWorkerTickTime) {
+          updateWorkerTickTime();
+        }
         // Workers only update their local priceCache — trigger evaluation ONLY runs on master
-        Object.keys(batchUpdate).forEach(symbol => {
+        keys.forEach(symbol => {
           const priceObj = batchUpdate[symbol];
           if (symbol && priceObj) {
             priceCache[symbol] = priceObj;
@@ -10560,53 +10565,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('subscribe', (data) => {
-    if (Array.isArray(data)) {
-        data.forEach(sym => {
-            let symbol = typeof sym === 'string' ? sym : sym.symbol;
-            if (symbol) socket.join(symbol);
-        });
-        if (isMaster) {
-            const { addSubscriptionBatch } = require('./services/fyers');
-            if (addSubscriptionBatch) addSubscriptionBatch(data);
-        } else {
-            try {
-                const { pubClient } = require('./services/redisClient');
-                pubClient.publish('fyers_subscribe', JSON.stringify(data)).catch(e=>{});
-            } catch (err) {}
-        }
-    } else {
-        let symbol = typeof data === 'string' ? data : data.symbol;
-        if (symbol) socket.join(symbol);
-        if (isMaster) {
-            const { addSubscription } = require('./services/fyers');
-            if (addSubscription) addSubscription(data, io, priceCache);
-        } else {
-            try {
-                const { pubClient } = require('./services/redisClient');
-                pubClient.publish('fyers_subscribe', JSON.stringify([symbol])).catch(e=>{});
-            } catch (err) {}
-        }
-    }
-  });
-
-  socket.on('ping_subscriptions', (symbolsArray) => {
-    if (!Array.isArray(symbolsArray)) return;
-    
-    // Join socket.io rooms for each symbol so targeted price_snapshot broadcasts reach this client.
-    symbolsArray.forEach(sym => {
+  const emitCachedPricesForNewRooms = (symbolsList) => {
+    const requestedCache = {};
+    symbolsList.forEach(sym => {
       if (sym && typeof sym === 'string') {
+        const isNewRoom = !socket.rooms.has(sym);
         socket.join(sym);
-      }
-    });
-
-    // ⚡ Send full price snapshot ONLY on initial connect/first ping for this socket.
-    // Routine 10s keepalive pings maintain room membership and Fyers GC without re-broadcasting 50+ symbols.
-    if (!socket._hasReceivedPriceInit) {
-      socket._hasReceivedPriceInit = true;
-      const requestedCache = {};
-      symbolsArray.forEach(sym => {
-        if (sym && typeof sym === 'string') {
+        if (isNewRoom) {
           const p = priceCache[sym] || (sym.includes(':') ? priceCache[sym.split(':')[1]] : null);
           if (p) {
             requestedCache[sym] = [
@@ -10626,12 +10591,46 @@ io.on('connection', (socket) => {
             ];
           }
         }
-      });
-
-      if (Object.keys(requestedCache).length > 0) {
-        socket.emit('price_init', requestedCache);
       }
+    });
+    if (Object.keys(requestedCache).length > 0) {
+      socket.emit('price_init', requestedCache);
     }
+  };
+
+  socket.on('subscribe', (data) => {
+    if (Array.isArray(data)) {
+        const syms = data.map(sym => typeof sym === 'string' ? sym : sym?.symbol).filter(Boolean);
+        emitCachedPricesForNewRooms(syms);
+        if (isMaster) {
+            const { addSubscriptionBatch } = require('./services/fyers');
+            if (addSubscriptionBatch) addSubscriptionBatch(data);
+        } else {
+            try {
+                const { pubClient } = require('./services/redisClient');
+                pubClient.publish('fyers_subscribe', JSON.stringify(data)).catch(e=>{});
+            } catch (err) {}
+        }
+    } else {
+        let symbol = typeof data === 'string' ? data : data?.symbol;
+        if (symbol) emitCachedPricesForNewRooms([symbol]);
+        if (isMaster) {
+            const { addSubscription } = require('./services/fyers');
+            if (addSubscription) addSubscription(data, io, priceCache);
+        } else {
+            try {
+                const { pubClient } = require('./services/redisClient');
+                pubClient.publish('fyers_subscribe', JSON.stringify([symbol])).catch(e=>{});
+            } catch (err) {}
+        }
+    }
+  });
+
+  socket.on('ping_subscriptions', (symbolsArray) => {
+    if (!Array.isArray(symbolsArray)) return;
+    
+    // Join socket.io rooms for each symbol and push price_init for any newly joined rooms
+    emitCachedPricesForNewRooms(symbolsArray);
 
     if (isMaster) {
       const { handlePingSubscriptions } = require('./services/fyers');
