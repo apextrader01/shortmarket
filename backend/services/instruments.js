@@ -155,6 +155,15 @@ async function loadInstrumentMaster(forceSync = false) {
         // FREE MEMORY (GC will clean these up now)
         tempStockMaster = null;
         dbRecords = null;
+        nseStocks = null;
+        nfoOptions = null;
+        nfoFutures = null;
+        globalNfoOptions = {};
+        globalNfoFutures = {};
+        globalBseSpots = {};
+        symbolToToken = {};
+        tokenToSymbol = {};
+        allTokens = [];
         SEARCH_INDEX = []; 
         STOCK_MASTER = {}; // Deprecated, left empty to avoid breaking legacy requires
         
