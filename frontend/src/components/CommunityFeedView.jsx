@@ -6,7 +6,8 @@ import {
   Users, Flame, Clock, UserCheck, Search, Plus, Image as ImageIcon,
   MessageSquare, Share2, Trash2, Pin, X, Check, ChevronRight,
   TrendingUp, ShieldCheck, Sparkles, Zap, Award, ExternalLink,
-  Send, ArrowLeft, Layers, RefreshCw, Infinity as InfinityIcon
+  Send, ArrowLeft, Layers, RefreshCw, Infinity as InfinityIcon,
+  Bookmark, Copy
 } from 'lucide-react';
 
 /**
@@ -141,16 +142,17 @@ function formatMembersCount(num) {
 }
 
 export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }) {
-  const { user, positions, setSelectedSymbol, showToast } = useStore(
+  const { user, positions, setSelectedSymbol, openOrderModal, showToast } = useStore(
     useShallow(state => ({
       user: state.user,
       positions: state.positions,
       setSelectedSymbol: state.setSelectedSymbol,
+      openOrderModal: state.openOrderModal,
       showToast: state.showToast
     }))
   );
 
-  // Navigation Tabs: 'clubs' | 'hot' | 'new' | 'following'
+  // Navigation Tabs: 'clubs' | 'hot' | 'new' | 'following' | 'saved'
   const [activeSubTab, setActiveSubTab] = useState('hot');
   const [clubs, setClubs] = useState([]);
   const [storagePolicy, setStoragePolicy] = useState({
@@ -161,6 +163,31 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
   const [selectedClub, setSelectedClub] = useState(null);
   const [selectedTag, setSelectedTag] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Bookmarked / Saved Posts (persisted in localStorage)
+  const [savedPostIds, setSavedPostIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('skandx_saved_community_posts');
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const toggleSavePost = (postId) => {
+    setSavedPostIds(prev => {
+      const exists = prev.includes(postId);
+      const next = exists ? prev.filter(id => id !== postId) : [...prev, postId];
+      try {
+        localStorage.setItem('skandx_saved_community_posts', JSON.stringify(next));
+      } catch (_) {}
+      if (showToast) {
+        showToast(exists ? 'Post removed from Saved' : '⭐ Post saved to Bookmarks!', 'info');
+      }
+      return next;
+    });
+  };
 
   // Feed State
   const [posts, setPosts] = useState([]);
@@ -226,6 +253,14 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
   // Load Feed Posts
   const fetchFeed = async (resetPage = 1, tabOverride = activeSubTab, clubOverride = selectedClub, tagOverride = selectedTag, searchOverride = searchQuery) => {
     if (tabOverride === 'clubs') return;
+    if (tabOverride === 'saved') {
+      if (!savedPostIds || savedPostIds.length === 0) {
+        setPosts([]);
+        setLoadingFeed(false);
+        setHasMore(false);
+        return;
+      }
+    }
     setLoadingFeed(resetPage === 1);
     try {
       const params = new URLSearchParams({
@@ -233,6 +268,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
         page: String(resetPage),
         limit: '15'
       });
+      if (tabOverride === 'saved' && savedPostIds.length > 0) {
+        params.set('post_ids', savedPostIds.join(','));
+      }
       if (clubOverride?.id) params.set('club_id', String(clubOverride.id));
       if (tagOverride) params.set('tag', tagOverride);
       if (searchOverride.trim()) params.set('search', searchOverride.trim());
@@ -416,8 +454,16 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
     }
   };
 
-  // Upvote Post
+  // Upvote Post with Optimistic Feedback
   const handleToggleVote = async (postId) => {
+    setPosts(prev =>
+      prev.map(p => {
+        if (p.id !== postId) return p;
+        const nextVoted = !p.has_voted;
+        const nextCount = nextVoted ? (p.upvotes_count || 0) + 1 : Math.max(0, (p.upvotes_count || 1) - 1);
+        return { ...p, has_voted: nextVoted, upvotes_count: nextCount };
+      })
+    );
     try {
       const res = await fetch(`/api/community/posts/${postId}/vote`, {
         method: 'POST',
@@ -480,34 +526,56 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
   };
 
   const handleSendComment = async (postId) => {
-    if (!commentInput.trim() || submittingComment) return;
+    const text = commentInput.trim();
+    if (!text || submittingComment) return;
     setSubmittingComment(true);
+    setCommentInput('');
+
+    // Optimistic comment insert
+    const tempComment = {
+      id: Date.now(),
+      post_id: postId,
+      user_id: user?.id,
+      content: text,
+      created_at: new Date().toISOString(),
+      username: user?.username || 'You',
+      profile_picture_url: user?.profile_picture_url || null,
+      subscription_tier: user?.subscription_tier || 'BASIC',
+      is_admin: Boolean(user?.is_admin)
+    };
+    setCommentsByPost(prev => ({
+      ...prev,
+      [postId]: [...(prev[postId] || []), tempComment]
+    }));
+    setPosts(prev =>
+      prev.map(p =>
+        p.id === postId ? { ...p, comments_count: Number(p.comments_count || 0) + 1 } : p
+      )
+    );
+
     try {
       const res = await fetch(`/api/community/posts/${postId}/comments`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ content: commentInput.trim() })
+        body: JSON.stringify({ content: text })
       });
       const data = await res.json();
       if (data.success && data.comment) {
         setCommentsByPost(prev => ({
           ...prev,
-          [postId]: [...(prev[postId] || []), data.comment]
+          [postId]: prev[postId].map(c => c.id === tempComment.id ? data.comment : c)
         }));
-        setPosts(prev =>
-          prev.map(p =>
-            p.id === postId ? { ...p, comments_count: Number(p.comments_count || 0) + 1 } : p
-          )
-        );
-        setCommentInput('');
       }
-    } catch (_) {} finally {
+    } catch (_) {
+      if (showToast) showToast('Failed to post comment', 'error');
+    } finally {
       setSubmittingComment(false);
     }
   };
 
   // Delete or Pin Post
   const handleDeletePost = async (postId) => {
+    if (!window.confirm('Delete this post permanently from the community?')) return;
     try {
       const res = await fetch(`/api/community/posts/${postId}`, {
         method: 'DELETE',
@@ -537,12 +605,33 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
     } catch (_) {}
   };
 
-  // Share to WhatsApp
-  const handleWhatsAppShare = (post) => {
-    const snippet = (post.content || '').slice(0, 180);
+  // Enhanced Native Mobile + Web Share
+  const handleSharePost = async (post) => {
+    const snippet = (post.content || '').slice(0, 160);
     const setupText = post.trade_setup ? `\n📊 Setup: ${post.trade_setup.symbol} (${post.trade_setup.strategy || ''})` : '';
-    const text = `🔥 *${post.username}* in *${post.club_name}* on SkandX Community:\n\n"${snippet}"${setupText}\n\n👉 Join live on https://skandx.in/community`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    const shareUrl = `${window.location.origin}/community?post=${post.id}`;
+    const shareTitle = `${post.username} on SkandX Community`;
+    const fullText = `🔥 ${post.username} in ${post.club_name} on SkandX:\n"${snippet}"${setupText}\n\n👉 View setup on ${shareUrl}`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: fullText,
+          url: shareUrl
+        });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      if (showToast) showToast('🔗 Post link copied to clipboard!', 'success');
+    } catch (_) {}
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer');
   };
 
   // Navigate to Symbol on SkandX Paper Trading Chart when clicking a #SYMBOL hashtag
@@ -659,6 +748,71 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
       position: 'relative',
       fontFamily: "'Inter', system-ui, sans-serif"
     }}>
+      {/* ─── Responsive Styles for Desktop & Mobile ─── */}
+      <style>{`
+        .spin-anim {
+          animation: comm-spin 0.8s linear infinite;
+        }
+        @keyframes comm-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .comm-tab-btn:hover {
+          color: #38bdf8 !important;
+        }
+        .comm-action-btn:hover {
+          filter: brightness(1.2);
+        }
+        @media (max-width: 768px) {
+          .comm-header-top {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .comm-header-title-row {
+            justify-content: space-between !important;
+            width: 100% !important;
+          }
+          .comm-header-subtext {
+            display: none !important;
+          }
+          .comm-header-actions {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            justify-content: space-between !important;
+          }
+          .comm-search-box {
+            max-width: 100% !important;
+            flex: 1 1 auto !important;
+          }
+          .comm-tabs-bar {
+            gap: 14px !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: none !important;
+          }
+          .comm-tabs-bar::-webkit-scrollbar {
+            display: none !important;
+          }
+          .comm-trade-payoff-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          .comm-floating-btn {
+            bottom: 76px !important;
+            right: 18px !important;
+            width: 50px !important;
+            height: 50px !important;
+          }
+          .comm-quick-compose-text {
+            font-size: 12px !important;
+          }
+          .comm-card {
+            padding: 12px !important;
+          }
+        }
+      `}</style>
+
       {/* ─── Top Sticky FrontPage-Style Community Header & Tabs ─── */}
       <div style={{
         position: 'sticky',
@@ -677,14 +831,14 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
           gap: '10px'
         }}>
           {/* Title Row + Search + Retention Vault Pill */}
-          <div style={{
+          <div className="comm-header-top" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: '10px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="comm-header-title-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
                 width: '34px',
                 height: '34px',
@@ -693,13 +847,14 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 14px rgba(56, 189, 248, 0.35)'
+                boxShadow: '0 0 14px rgba(56, 189, 248, 0.35)',
+                flexShrink: 0
               }}>
                 <Users size={18} color="#fff" />
               </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff', whiteSpace: 'nowrap' }}>
                     Traders Community
                   </span>
                   <span style={{
@@ -711,20 +866,21 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       ? 'rgba(16, 185, 129, 0.15)'
                       : 'rgba(56, 189, 248, 0.12)',
                     color: storagePolicy.is_permanent ? '#34d399' : '#38bdf8',
-                    border: `1px solid ${storagePolicy.is_permanent ? 'rgba(16, 185, 129, 0.35)' : 'rgba(56, 189, 248, 0.3)'}`
+                    border: `1px solid ${storagePolicy.is_permanent ? 'rgba(16, 185, 129, 0.35)' : 'rgba(56, 189, 248, 0.3)'}`,
+                    whiteSpace: 'nowrap'
                   }}>
                     {storagePolicy.label}
                   </span>
                 </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                <div className="comm-header-subtext" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                   Live NSE/BSE/MCX Charts, Option Strategies & Verified Setups • Ultra-Fast 40KB WebP Engine
                 </div>
               </div>
             </div>
 
             {/* Search Bar + Compose Trigger */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 260px', justifyContent: 'flex-end' }}>
-              <div style={{
+            <div className="comm-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 260px', justifyContent: 'flex-end' }}>
+              <div className="comm-search-box" style={{
                 position: 'relative',
                 flex: '1 1 200px',
                 maxWidth: '300px'
@@ -789,7 +945,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                   alignItems: 'center',
                   gap: '6px',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)'
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                  flexShrink: 0
                 }}
               >
                 <Plus size={15} />
@@ -798,18 +955,20 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
             </div>
           </div>
 
-          {/* FrontPage 4-Tab Bar: Clubs | Hot | New | Following */}
-          <div style={{
+          {/* FrontPage Tab Bar: Clubs | Hot | New | Following | Saved + Refresh Button */}
+          <div className="comm-tabs-bar" style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '24px',
-            marginTop: '2px'
+            gap: '20px',
+            marginTop: '2px',
+            borderBottom: '1px solid transparent'
           }}>
             {[
               { id: 'clubs', label: 'Clubs', icon: Users },
               { id: 'hot', label: 'Hot', icon: Flame },
               { id: 'new', label: 'New', icon: Clock },
-              { id: 'following', label: 'Following', icon: UserCheck }
+              { id: 'following', label: 'Following', icon: UserCheck },
+              { id: 'saved', label: savedPostIds.length > 0 ? `Saved (${savedPostIds.length})` : 'Saved', icon: Bookmark }
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeSubTab === tab.id;
@@ -817,6 +976,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id)}
+                  className="comm-tab-btn"
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -829,7 +989,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    transition: 'all 0.15s ease'
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
                   }}
                 >
                   <Icon size={15} />
@@ -837,6 +999,35 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 </button>
               );
             })}
+
+            {/* Quick Live Refresh Button */}
+            <button
+              onClick={async () => {
+                setIsRefreshing(true);
+                await fetchFeed(1, activeSubTab, selectedClub, selectedTag, searchQuery);
+                setIsRefreshing(false);
+                if (showToast) showToast('Feed updated', 'info');
+              }}
+              title="Refresh feed"
+              style={{
+                marginLeft: 'auto',
+                background: 'transparent',
+                border: 'none',
+                color: isRefreshing ? '#38bdf8' : '#64748b',
+                cursor: 'pointer',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                fontWeight: '600',
+                flexShrink: 0
+              }}
+            >
+              <RefreshCw size={13} className={isRefreshing ? 'spin-anim' : ''} />
+              <span style={{ display: 'none' }} className="comm-refresh-text">Refresh</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1245,35 +1436,68 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 Loading live trader feed...
               </div>
             ) : posts.length === 0 ? (
-              <div style={{
-                background: '#131b2e',
-                border: '1px solid rgba(255, 255, 255, 0.07)',
-                borderRadius: '12px',
-                padding: '36px 20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>
-                  No posts match this filter yet
+              activeSubTab === 'saved' ? (
+                <div style={{
+                  background: '#131b2e',
+                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  borderRadius: '12px',
+                  padding: '40px 20px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔖</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>
+                    No Saved Posts Yet
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#94a3b8', maxWidth: '380px', margin: '0 auto 16px', lineHeight: '1.5' }}>
+                    Bookmark any post, chart idea, or trade setup by clicking the bookmark icon to save it here for fast reference.
+                  </div>
+                  <button
+                    onClick={() => setActiveSubTab('hot')}
+                    style={{
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 18px',
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Explore Hot Feed
+                  </button>
                 </div>
-                <div style={{ fontSize: '12.5px', color: '#94a3b8', marginBottom: '16px' }}>
-                  Be the first trader to share your chart analysis or F&O strategy setup!
+              ) : (
+                <div style={{
+                  background: '#131b2e',
+                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  borderRadius: '12px',
+                  padding: '36px 20px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>
+                    No posts match this filter yet
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#94a3b8', marginBottom: '16px' }}>
+                    Be the first trader to share your chart analysis or F&O strategy setup!
+                  </div>
+                  <button
+                    onClick={() => setShowComposeModal(true)}
+                    style={{
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 16px',
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Create First Post
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowComposeModal(true)}
-                  style={{
-                    background: '#2563eb',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + Create First Post
-                </button>
-              </div>
+              )
             ) : (
               posts.map((post, idx) => (
                 <React.Fragment key={post.id}>
@@ -1475,25 +1699,63 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             )}
                           </div>
 
-                          <button
-                            onClick={() => handleSymbolClick(post.trade_setup.symbol)}
-                            style={{
-                              background: 'rgba(16, 185, 129, 0.15)',
-                              color: '#34d399',
-                              border: '1px solid rgba(16, 185, 129, 0.35)',
-                              borderRadius: '6px',
-                              padding: '3px 9px',
-                              fontSize: '11px',
-                              fontWeight: '800',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <span>Open Chart</span>
-                            <ExternalLink size={11} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => handleSymbolClick(post.trade_setup.symbol)}
+                              style={{
+                                background: 'rgba(16, 185, 129, 0.15)',
+                                color: '#34d399',
+                                border: '1px solid rgba(16, 185, 129, 0.35)',
+                                borderRadius: '6px',
+                                padding: '4px 9px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <span>Open Chart</span>
+                              <ExternalLink size={11} />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const cleanSym = post.trade_setup.symbol;
+                                const firstLeg = Array.isArray(post.trade_setup.legs) && post.trade_setup.legs[0];
+                                const side = firstLeg?.side ? String(firstLeg.side).toUpperCase() : 'BUY';
+                                const lotSize = parseInt(post.trade_setup.lotSize || firstLeg?.lots || '1', 10) || 1;
+                                if (typeof setSelectedSymbol === 'function') {
+                                  setSelectedSymbol(cleanSym);
+                                }
+                                if (typeof openOrderModal === 'function') {
+                                  openOrderModal(cleanSym, side, lotSize);
+                                }
+                                if (showToast) {
+                                  showToast(`⚡ Order ticket opened for ${cleanSym}`, 'success');
+                                }
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.4)'
+                              }}
+                              title="Trade or execute this setup directly in Paper Trading"
+                            >
+                              <Zap size={12} fill="#fff" />
+                              <span>Trade Setup</span>
+                            </button>
+                          </div>
                         </div>
 
                         {/* Option / Equity Legs List */}
@@ -1542,15 +1804,18 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                         )}
 
                         {/* 4-Column Payoff / Margin Strip */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(4, 1fr)',
-                          background: 'rgba(15, 23, 42, 0.9)',
-                          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                          padding: '8px 14px',
-                          gap: '8px',
-                          fontSize: '11px'
-                        }}>
+                        <div
+                          className="comm-trade-payoff-grid"
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            background: 'rgba(15, 23, 42, 0.9)',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                            padding: '8px 14px',
+                            gap: '8px',
+                            fontSize: '11px'
+                          }}
+                        >
                           <div>
                             <div style={{ color: '#64748b', fontWeight: '700' }}>MAX PROFIT</div>
                             <div style={{ color: '#34d399', fontWeight: '800', marginTop: '2px' }}>
@@ -1629,15 +1894,17 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       </div>
                     )}
 
-                    {/* ─── Post Action Footer: Vote | Comment | Share ─── */}
+                    {/* ─── Post Action Footer: Vote | Comment | Bookmark | Share ─── */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       paddingTop: '8px',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                      flexWrap: 'wrap',
+                      gap: '8px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button
                           onClick={() => handleToggleVote(post.id)}
                           style={{
@@ -1680,25 +1947,48 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                         </button>
                       </div>
 
-                      <button
-                        onClick={() => handleWhatsAppShare(post)}
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#34d399',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          borderRadius: '999px',
-                          padding: '5px 12px',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        <Share2 size={13} />
-                        <span>Share</span>
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => toggleSavePost(post.id)}
+                          title={savedPostIds.includes(post.id) ? 'Remove from Saved' : 'Save Setup to Bookmarks'}
+                          style={{
+                            background: savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                            color: savedPostIds.includes(post.id) ? '#fbbf24' : '#94a3b8',
+                            border: `1px solid ${savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                            borderRadius: '999px',
+                            padding: '5px 10px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Bookmark size={13} fill={savedPostIds.includes(post.id) ? '#fbbf24' : 'none'} />
+                          <span style={{ fontSize: '11px' }}>{savedPostIds.includes(post.id) ? 'Saved' : 'Save'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleSharePost(post)}
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#34d399',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            borderRadius: '999px',
+                            padding: '5px 12px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Share2 size={13} />
+                          <span>Share</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* ─── Expandable Comments Thread ─── */}
@@ -2175,75 +2465,92 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
                   {/* Legs */}
                   {tradeSetupForm.legs.map((leg, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '75px 80px 70px 1fr 90px 30px', gap: '6px', alignItems: 'center' }}>
-                      <select
-                        value={leg.side}
-                        onChange={(e) => {
-                          const next = [...tradeSetupForm.legs];
-                          next[idx] = { ...next[idx], side: e.target.value };
-                          setTradeSetupForm(prev => ({ ...prev, legs: next }));
-                        }}
-                        style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px', color: '#fff', fontSize: '11.5px' }}
-                      >
-                        <option value="BUY">BUY</option>
-                        <option value="SELL">SELL</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={leg.lots}
-                        onChange={(e) => {
-                          const next = [...tradeSetupForm.legs];
-                          next[idx] = { ...next[idx], lots: e.target.value };
-                          setTradeSetupForm(prev => ({ ...prev, legs: next }));
-                        }}
-                        placeholder="1 LOT"
-                        style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px', color: '#fff', fontSize: '11.5px' }}
-                      />
-                      <select
-                        value={leg.type}
-                        onChange={(e) => {
-                          const next = [...tradeSetupForm.legs];
-                          next[idx] = { ...next[idx], type: e.target.value };
-                          setTradeSetupForm(prev => ({ ...prev, legs: next }));
-                        }}
-                        style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px', color: '#fff', fontSize: '11.5px' }}
-                      >
-                        <option value="CE">CE</option>
-                        <option value="PE">PE</option>
-                        <option value="FUT">FUT</option>
-                        <option value="EQ">EQ</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={leg.strike}
-                        onChange={(e) => {
-                          const next = [...tradeSetupForm.legs];
-                          next[idx] = { ...next[idx], strike: e.target.value };
-                          setTradeSetupForm(prev => ({ ...prev, legs: next }));
-                        }}
-                        placeholder="Strike (25000)"
-                        style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px', color: '#fff', fontSize: '11.5px' }}
-                      />
-                      <input
-                        type="text"
-                        value={leg.price}
-                        onChange={(e) => {
-                          const next = [...tradeSetupForm.legs];
-                          next[idx] = { ...next[idx], price: e.target.value };
-                          setTradeSetupForm(prev => ({ ...prev, legs: next }));
-                        }}
-                        placeholder="@ Price"
-                        style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px', color: '#fff', fontSize: '11.5px' }}
-                      />
-                      {tradeSetupForm.legs.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setTradeSetupForm(prev => ({ ...prev, legs: prev.legs.filter((_, i) => i !== idx) }))}
-                          style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer' }}
+                    <div
+                      key={idx}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: '85px 85px 1fr 30px', gap: '6px', alignItems: 'center' }}>
+                        <select
+                          value={leg.side}
+                          onChange={(e) => {
+                            const next = [...tradeSetupForm.legs];
+                            next[idx] = { ...next[idx], side: e.target.value };
+                            setTradeSetupForm(prev => ({ ...prev, legs: next }));
+                          }}
+                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: '#fff', fontSize: '11.5px', fontWeight: '700' }}
                         >
-                          ✕
-                        </button>
-                      )}
+                          <option value="BUY">BUY</option>
+                          <option value="SELL">SELL</option>
+                        </select>
+                        <select
+                          value={leg.type}
+                          onChange={(e) => {
+                            const next = [...tradeSetupForm.legs];
+                            next[idx] = { ...next[idx], type: e.target.value };
+                            setTradeSetupForm(prev => ({ ...prev, legs: next }));
+                          }}
+                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: '#fff', fontSize: '11.5px', fontWeight: '700' }}
+                        >
+                          <option value="CE">CE</option>
+                          <option value="PE">PE</option>
+                          <option value="FUT">FUT</option>
+                          <option value="EQ">EQ</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={leg.strike}
+                          onChange={(e) => {
+                            const next = [...tradeSetupForm.legs];
+                            next[idx] = { ...next[idx], strike: e.target.value };
+                            setTradeSetupForm(prev => ({ ...prev, legs: next }));
+                          }}
+                          placeholder="Strike (e.g. 25000)"
+                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                        />
+                        {tradeSetupForm.legs.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => setTradeSetupForm(prev => ({ ...prev, legs: prev.legs.filter((_, i) => i !== idx) }))}
+                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#f87171', padding: '4px', cursor: 'pointer' }}
+                            title="Remove leg"
+                          >
+                            ✕
+                          </button>
+                        ) : <div />}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={leg.lots}
+                          onChange={(e) => {
+                            const next = [...tradeSetupForm.legs];
+                            next[idx] = { ...next[idx], lots: e.target.value };
+                            setTradeSetupForm(prev => ({ ...prev, legs: next }));
+                          }}
+                          placeholder="Lots (e.g. 1 LOT)"
+                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                        />
+                        <input
+                          type="text"
+                          value={leg.price}
+                          onChange={(e) => {
+                            const next = [...tradeSetupForm.legs];
+                            next[idx] = { ...next[idx], price: e.target.value };
+                            setTradeSetupForm(prev => ({ ...prev, legs: next }));
+                          }}
+                          placeholder="Price @ ₹"
+                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                        />
+                      </div>
                     </div>
                   ))}
 
@@ -2259,10 +2566,10 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       style={{
                         alignSelf: 'flex-start',
                         background: 'rgba(56, 189, 248, 0.12)',
-                        border: 'none',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
                         color: '#38bdf8',
                         borderRadius: '6px',
-                        padding: '3px 9px',
+                        padding: '4px 10px',
                         fontSize: '11px',
                         fontWeight: '700',
                         cursor: 'pointer'
@@ -2272,34 +2579,34 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     </button>
                   )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '4px' }}>
+                  <div className="comm-trade-payoff-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '4px' }}>
                     <input
                       type="text"
                       value={tradeSetupForm.maxProfit}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, maxProfit: e.target.value }))}
                       placeholder="Max Profit"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 8px', color: '#34d399', fontSize: '11.5px' }}
+                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#34d399', fontSize: '11.5px', fontWeight: '700' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.maxLoss}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, maxLoss: e.target.value }))}
                       placeholder="Max Loss"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 8px', color: '#f87171', fontSize: '11.5px' }}
+                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#f87171', fontSize: '11.5px', fontWeight: '700' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.lotSize}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, lotSize: e.target.value }))}
                       placeholder="Lot Size"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 8px', color: '#fff', fontSize: '11.5px' }}
+                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#fff', fontSize: '11.5px' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.margin}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, margin: e.target.value }))}
                       placeholder="Est. Margin"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 8px', color: '#38bdf8', fontSize: '11.5px' }}
+                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#38bdf8', fontSize: '11.5px' }}
                     />
                   </div>
                 </div>

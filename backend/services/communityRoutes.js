@@ -478,13 +478,22 @@ router.get('/feed', authenticateToken, async (req, res) => {
   try {
     await ensureCommunitySchema();
     const userId = req.user.id;
-    const tab = String(req.query.tab || 'hot').toLowerCase(); // 'hot' | 'new' | 'following'
+    const targetPostId = req.query.post_id ? parseInt(req.query.post_id, 10) : null;
+    const postIdsParam = req.query.post_ids
+      ? String(req.query.post_ids).split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id) && id > 0)
+      : null;
+    const tab = String(req.query.tab || 'hot').toLowerCase(); // 'hot' | 'new' | 'following' | 'saved'
     const clubId = req.query.club_id ? parseInt(req.query.club_id, 10) : null;
     const tagFilter = req.query.tag ? String(req.query.tag).replace(/^#/, '').toUpperCase().trim() : '';
     const search = req.query.search ? String(req.query.search).trim() : '';
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(30, Math.max(5, parseInt(req.query.limit, 10) || 15));
     const offset = (page - 1) * limit;
+
+    // Fast-path: If user requests 'saved' tab but has no saved IDs, return empty immediately
+    if (tab === 'saved' && (!postIdsParam || postIdsParam.length === 0)) {
+      return res.json({ success: true, posts: [], has_more: false, page: 1, total: 0 });
+    }
 
     let query = db('community_posts as p')
       .join('users as u', 'p.user_id', 'u.id')
@@ -517,6 +526,12 @@ router.get('/feed', authenticateToken, async (req, res) => {
         'c.accent_color as club_color'
       );
 
+    if (targetPostId) {
+      query = query.where('p.id', targetPostId);
+    } else if (postIdsParam && postIdsParam.length > 0) {
+      query = query.whereIn('p.id', postIdsParam);
+    }
+
     if (clubId) {
       query = query.where('p.club_id', clubId);
     }
@@ -529,7 +544,12 @@ router.get('/feed', authenticateToken, async (req, res) => {
     }
 
     if (tagFilter) {
-      query = query.whereRaw('p.content ILIKE ?', [`%#${tagFilter}%`]);
+      query = query.where(function() {
+        this.whereRaw('p.content ILIKE ?', [`%#${tagFilter}%`])
+          .orWhereRaw('p.content ILIKE ?', [`%${tagFilter}%`])
+          .orWhereRaw('CAST(p.tags AS TEXT) ILIKE ?', [`%${tagFilter}%`])
+          .orWhereRaw('CAST(p.trade_setup_json AS TEXT) ILIKE ?', [`%${tagFilter}%`]);
+      });
     }
 
     if (search) {
@@ -537,7 +557,9 @@ router.get('/feed', authenticateToken, async (req, res) => {
       query = query.where(function() {
         this.where('p.content', 'ilike', s)
           .orWhere('u.username', 'ilike', s)
-          .orWhere('c.name', 'ilike', s);
+          .orWhere('c.name', 'ilike', s)
+          .orWhereRaw('CAST(p.tags AS TEXT) ILIKE ?', [s])
+          .orWhereRaw('CAST(p.trade_setup_json AS TEXT) ILIKE ?', [s]);
       });
     }
 
@@ -646,11 +668,11 @@ router.post('/upload-image', authenticateToken, async (req, res) => {
     const base64Clean = image_base64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
     const buffer = Buffer.from(base64Clean, 'base64');
 
-    // Enforce strict 100 KB server-side ceiling (Browser adaptive compressor targets <= 42 KB WebP)
+    // Adaptive size ceiling (Browser adaptive compressor targets <= 42 KB WebP, allow up to 500 KB)
     const sizeKb = Math.round((buffer.length / 1024) * 100) / 100;
-    if (buffer.length > 105 * 1024) {
+    if (buffer.length > 500 * 1024) {
       return res.status(413).json({
-        error: `Image payload (${sizeKb} KB) exceeds the 100 KB ultra-fast WebP limit. Please let the browser compressor finish.`
+        error: `Image payload (${sizeKb} KB) exceeds the 500 KB upload limit. Please select or compress the image.`
       });
     }
 
