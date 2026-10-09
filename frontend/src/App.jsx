@@ -461,6 +461,56 @@ function App() {
   const [showMutualFundsModal, setShowMutualFundsModal] = useState(false);
   const [showAlgoBridgeModal, setShowAlgoBridgeModal] = useState(false);
 
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  const modalHistoryPushedRef = useRef(false);
+  const isClosingFromPopstateRef = useRef(false);
+  const lastBackPressTimeRef = useRef(0);
+
+  // Check if any modal, sheet, or drawer is currently active
+  const hasOpenModal = Boolean(
+    chartModalSymbol ||
+    orderModal?.isOpen ||
+    editOrderModal?.isOpen ||
+    mobileStockOverviewSymbol ||
+    alertModalSymbol ||
+    basketModalOpen ||
+    marketDepthModal?.isOpen ||
+    domLadderModal?.isOpen ||
+    showDepositModal ||
+    showMobileMenu ||
+    notificationDrawerOpen ||
+    broadcastModalOpen ||
+    showBrokerConnectModal ||
+    showWealthModal ||
+    showMutualFundsModal ||
+    showAlgoBridgeModal ||
+    showCalculatorsModal
+  );
+
+  // Synchronize modal state with browser history stack for hardware back button support
+  useEffect(() => {
+    if (hasOpenModal) {
+      if (!modalHistoryPushedRef.current) {
+        window.history.pushState({ isModal: true }, '');
+        modalHistoryPushedRef.current = true;
+      }
+    } else {
+      if (modalHistoryPushedRef.current && !isClosingFromPopstateRef.current) {
+        modalHistoryPushedRef.current = false;
+        try {
+          if (window.history.state?.isModal) {
+            window.history.back();
+          }
+        } catch (_) {}
+      }
+      isClosingFromPopstateRef.current = false;
+    }
+  }, [hasOpenModal]);
+
   // Apply persisted UI settings on load
   useEffect(() => {
     setFontSize(fontSize);
@@ -468,7 +518,6 @@ function App() {
     if (fetchAnnouncement) fetchAnnouncement();
     if (fetchBroadcastNotifications) fetchBroadcastNotifications();
   }, []);
-
 
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
@@ -533,7 +582,131 @@ function App() {
   }, [activeTab, calculatorsInitialType]);
 
   useEffect(() => {
-    const handlePopState = () => {
+    const handlePopState = (event) => {
+      const storeState = useStore.getState();
+
+      // 1. If any modal, sheet, or drawer is open, close the topmost modal and stay in the app
+      const anyModalOpen = Boolean(
+        storeState.chartModalSymbol ||
+        storeState.orderModal?.isOpen ||
+        storeState.editOrderModal?.isOpen ||
+        storeState.mobileStockOverviewSymbol ||
+        storeState.alertModalSymbol ||
+        storeState.basketModalOpen ||
+        storeState.marketDepthModal?.isOpen ||
+        storeState.domLadderModal?.isOpen ||
+        showDepositModal ||
+        showMobileMenu ||
+        notificationDrawerOpen ||
+        broadcastModalOpen ||
+        showBrokerConnectModal ||
+        showWealthModal ||
+        showMutualFundsModal ||
+        showAlgoBridgeModal ||
+        showCalculatorsModal
+      );
+
+      if (anyModalOpen) {
+        isClosingFromPopstateRef.current = true;
+        modalHistoryPushedRef.current = false;
+
+        if (storeState.chartModalSymbol) {
+          storeState.setChartModalSymbol(null);
+          return;
+        }
+        if (storeState.orderModal?.isOpen) {
+          storeState.closeOrderModal();
+          return;
+        }
+        if (storeState.editOrderModal?.isOpen) {
+          storeState.closeEditOrderModal();
+          return;
+        }
+        if (storeState.mobileStockOverviewSymbol) {
+          storeState.setMobileStockOverviewSymbol(null);
+          return;
+        }
+        if (storeState.alertModalSymbol) {
+          storeState.setAlertModalSymbol(null);
+          return;
+        }
+        if (storeState.basketModalOpen) {
+          storeState.setBasketModalOpen(false);
+          return;
+        }
+        if (storeState.marketDepthModal?.isOpen) {
+          storeState.closeMarketDepthModal();
+          return;
+        }
+        if (storeState.domLadderModal?.isOpen) {
+          storeState.closeDomLadderModal();
+          return;
+        }
+        if (showDepositModal) {
+          setShowDepositModal(false);
+          return;
+        }
+        if (showMobileMenu) {
+          setShowMobileMenu(false);
+          return;
+        }
+        if (notificationDrawerOpen) {
+          setNotificationDrawerOpen(false);
+          return;
+        }
+        if (broadcastModalOpen) {
+          setBroadcastModalOpen(false);
+          return;
+        }
+        if (showBrokerConnectModal) {
+          setShowBrokerConnectModal(false);
+          return;
+        }
+        if (showWealthModal) {
+          setShowWealthModal(false);
+          return;
+        }
+        if (showMutualFundsModal) {
+          setShowMutualFundsModal(false);
+          return;
+        }
+        if (showAlgoBridgeModal) {
+          setShowAlgoBridgeModal(false);
+          return;
+        }
+        if (showCalculatorsModal) {
+          setShowCalculatorsModal(false);
+          return;
+        }
+        return;
+      }
+
+      // 2. Mobile secondary tabs back button: Return to Watchlist/Markets
+      const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const currentTab = activeTabRef.current || 'Home';
+      const secondaryTradingTabs = ['Positions', 'Orders', 'Portfolio', 'ClientData'];
+
+      if (isMobileScreen && secondaryTradingTabs.includes(currentTab)) {
+        setActiveTab('Watchlist');
+        window.history.replaceState(null, '', '/markets');
+        return;
+      }
+
+      // 3. Android exit guard on root Watchlist / Home tab
+      if (isMobileScreen && (currentTab === 'Watchlist' || currentTab === 'Markets' || currentTab === 'Home')) {
+        const now = Date.now();
+        if (now - lastBackPressTimeRef.current > 2500) {
+          lastBackPressTimeRef.current = now;
+          if (typeof storeState.showToast === 'function') {
+            storeState.showToast('Press back again to exit', 'info');
+          }
+          // Push state so a second back tap within 2.5s will exit cleanly
+          window.history.pushState({ rootExitGuard: true }, '');
+          return;
+        }
+      }
+
+      // 4. Standard path parsing for deep-links and desktop navigation
       const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
       if (!rawPath || rawPath === 'home') {
         setActiveTab('Home');
@@ -554,13 +727,13 @@ function App() {
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
-        'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets',
+        'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Watchlist',
         'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
         'leaderboard': 'Leaderboard',
         'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
-        'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
+        'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'profile': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
         'aboutus': 'AboutUs', 'about': 'AboutUs'
       };
@@ -573,7 +746,17 @@ function App() {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('open-deposit-modal', handleOpenDeposit);
     };
-  }, []);
+  }, [
+    showDepositModal,
+    showMobileMenu,
+    notificationDrawerOpen,
+    broadcastModalOpen,
+    showBrokerConnectModal,
+    showWealthModal,
+    showMutualFundsModal,
+    showAlgoBridgeModal,
+    showCalculatorsModal
+  ]);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
 
