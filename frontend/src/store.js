@@ -678,6 +678,9 @@ export const useStore = create(persist((set, get) => ({
   basketModalOpen: false,
   setBasketModalOpen: (isOpen) => set({ basketModalOpen: isOpen }),
 
+  isAdModalOpen: false,
+  setIsAdModalOpen: (isOpen) => set({ isAdModalOpen: Boolean(isOpen) }),
+
   chartModalSymbol: null,
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
@@ -1936,7 +1939,33 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         playOrderExecutedSound();
-        // Sync user data non-blockingly in background for sub-100ms instant execution
+
+        // 1. Instantly inject the newly placed order into Zustand state for immediate display
+        if (data.orderId) {
+          const newOrderRecord = {
+            id: data.orderId,
+            symbol: normalizedPayload.symbol,
+            type: normalizedPayload.type || 'MARKET',
+            side: normalizedPayload.side || 'BUY',
+            quantity: Number(normalizedPayload.quantity),
+            price: Number(normalizedPayload.price || normalizedPayload.quoted_price || 0),
+            status: data.status || 'PENDING',
+            product_type: normalizedPayload.product_type || 'INT',
+            order_variety: normalizedPayload.order_variety || (normalizedPayload.is_amo ? 'AMO' : 'REGULAR'),
+            filled_quantity: (data.status === 'EXECUTED' || data.status === 'COMPLETED' || data.status === 'COMPLETE') ? Number(normalizedPayload.quantity) : 0,
+            pending_quantity: (data.status === 'EXECUTED' || data.status === 'COMPLETED' || data.status === 'COMPLETE') ? 0 : Number(normalizedPayload.quantity),
+            average_price: Number(normalizedPayload.price || normalizedPayload.quoted_price || 0),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          const curOrders = get().orders || [];
+          if (!curOrders.some(o => o.id === data.orderId)) {
+            set({ orders: [newOrderRecord, ...curOrders] });
+          }
+        }
+
+        // 2. Force fresh fetch of user data from backend (clear in-flight lock so this fetch is guaranteed)
+        window._activeFetchUserDataPromise = null;
         get().fetchUserData().catch(() => {});
 
         // Show Sponsored Ad right when Buy/New order is placed (Open, Pending, AMO, or Executed)

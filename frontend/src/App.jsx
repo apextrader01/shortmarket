@@ -295,7 +295,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, isAdModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, isAdModalOpen: state.isAdModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
 
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
@@ -505,7 +505,8 @@ function App() {
     showWealthModal ||
     showMutualFundsModal ||
     showAlgoBridgeModal ||
-    showCalculatorsModal
+    showCalculatorsModal ||
+    isAdModalOpen
   );
 
   // Synchronize modal state with browser history stack for hardware back button support
@@ -630,7 +631,8 @@ function App() {
         showWealthModal ||
         showMutualFundsModal ||
         showAlgoBridgeModal ||
-        showCalculatorsModal
+        showCalculatorsModal ||
+        storeState.isAdModalOpen
       );
 
       if (anyModalOpen) {
@@ -654,6 +656,10 @@ function App() {
         else if (showMutualFundsModal) { setShowMutualFundsModal(false); }
         else if (showAlgoBridgeModal) { setShowAlgoBridgeModal(false); }
         else if (showCalculatorsModal) { setShowCalculatorsModal(false); }
+        else if (storeState.isAdModalOpen) {
+          storeState.setIsAdModalOpen(false);
+          window.dispatchEvent(new CustomEvent('skandx-close-ad'));
+        }
 
         if (isMobileScreen) {
           try {

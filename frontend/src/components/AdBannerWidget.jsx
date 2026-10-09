@@ -255,6 +255,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
     if (!isOpen || secondsLeft > 0) return;
     if (!completionTrackedRef.current) {
       completionTrackedRef.current = true;
+      useStore.getState().fetchUserData?.();
       trackAdEvent('complete_30s').finally(() => {
         if (typeof onAdCompleted === 'function') {
           onAdCompleted();
@@ -871,7 +872,10 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                 <button
                   type="button"
                   disabled={secondsLeft > 0}
-                  onClick={onClose}
+                  onClick={() => {
+                    useStore.getState().fetchUserData?.();
+                    if (typeof onClose === 'function') onClose();
+                  }}
                   style={{
                     width: '100%',
                     padding: '14px',
@@ -958,9 +962,21 @@ export function GlobalAdInterstitial() {
       setActiveTrigger(detail);
     };
 
+    const handleCloseAd = () => {
+      setActiveTrigger(null);
+    };
+
     window.addEventListener('skandx-trigger-ad', handleTriggerAd);
-    return () => window.removeEventListener('skandx-trigger-ad', handleTriggerAd);
+    window.addEventListener('skandx-close-ad', handleCloseAd);
+    return () => {
+      window.removeEventListener('skandx-trigger-ad', handleTriggerAd);
+      window.removeEventListener('skandx-close-ad', handleCloseAd);
+    };
   }, []);
+
+  useEffect(() => {
+    useStore.getState().setIsAdModalOpen?.(Boolean(activeTrigger));
+  }, [activeTrigger]);
 
   useEffect(() => {
     if (!activeTrigger || !config) return;

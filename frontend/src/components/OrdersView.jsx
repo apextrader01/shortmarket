@@ -20,6 +20,12 @@ export default function OrdersView() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Always sync latest orders from backend when Orders screen is opened
+  React.useEffect(() => {
+    useStore.getState().fetchUserData?.();
+  }, []);
+
   const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast } = useStore(useShallow(state => ({
     orders: state.orders,
     pendingTriggers: state.pendingTriggers,
@@ -70,8 +76,6 @@ export default function OrdersView() {
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Alerts'];
 
-
-
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
     const isPendingOrOpen = order.status === 'PENDING' || order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED' || order.status === 'AMO_PENDING' || order.status === 'OPEN';
@@ -79,7 +83,7 @@ export default function OrdersView() {
     if (activeTab === 'Order History') {
       if (isPendingOrOpen || order.status === 'PENDING_TRIGGER') return false;
       if (searchQuery && searchQuery.trim()) return true; // Allow searching across full historical orders
-      return isToday(order.updated_at || order.created_at);
+      return !order.created_at || isToday(order.updated_at || order.created_at);
     }
     return false;
   });
