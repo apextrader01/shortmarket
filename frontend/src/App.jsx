@@ -1,5 +1,5 @@
 import { registerServiceWorker } from './services/pushManager';
-import React, { useEffect, useState, useMemo, Suspense, lazy } from 'react';
+import React, { useEffect, useState, useMemo, useRef, Suspense, lazy } from 'react';
 import MarketWatch from './components/MarketWatch';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
