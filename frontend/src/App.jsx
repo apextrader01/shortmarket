@@ -473,6 +473,7 @@ function App() {
 
   const modalHistoryPushedRef = useRef(false);
   const isClosingFromPopstateRef = useRef(false);
+  const isPoppingModalHistoryRef = useRef(false);
   const lastBackPressTimeRef = useRef(0);
 
   // On mobile devices, ensure there is an initial history buffer for hardware back interception
@@ -521,6 +522,7 @@ function App() {
         modalHistoryPushedRef.current = false;
         try {
           if (window.history.state?.isModal) {
+            isPoppingModalHistoryRef.current = true;
             window.history.back();
           }
         } catch (_) {}
@@ -606,6 +608,10 @@ function App() {
 
   useEffect(() => {
     const handlePopState = (event) => {
+      if (isPoppingModalHistoryRef.current) {
+        isPoppingModalHistoryRef.current = false;
+        return;
+      }
       const storeState = useStore.getState();
       const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
       const currentTab = activeTabRef.current || 'Home';
