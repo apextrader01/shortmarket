@@ -466,9 +466,26 @@ function App() {
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const modalHistoryPushedRef = useRef(false);
   const isClosingFromPopstateRef = useRef(false);
   const lastBackPressTimeRef = useRef(0);
+
+  // On mobile devices, ensure there is an initial history buffer for hardware back interception
+  useEffect(() => {
+    const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    if (isMobileScreen) {
+      try {
+        if (!window.history.state?.hasGuard) {
+          window.history.pushState({ hasGuard: true }, '', window.location.pathname);
+        }
+      } catch (_) {}
+    }
+  }, []);
 
   // Check if any modal, sheet, or drawer is currently active
   const hasOpenModal = Boolean(
@@ -575,7 +592,12 @@ function App() {
       const targetUrl = isAlreadyDeepCalc ? `/calculators/${calculatorsInitialType}` : newPath;
 
       if (currentPathname !== targetUrl) {
-        window.history.pushState(null, '', targetUrl);
+        const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+        if (isMobileScreen) {
+          window.history.replaceState({ appTab: activeTab, hasGuard: true }, '', targetUrl);
+        } else {
+          window.history.pushState(null, '', targetUrl);
+        }
       }
       applyDynamicSEO(window.location.pathname);
     }
@@ -584,8 +606,13 @@ function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       const storeState = useStore.getState();
+      const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      const currentTab = activeTabRef.current || 'Home';
+      const currentUser = userRef.current;
+      const rootTab = currentUser ? 'Watchlist' : 'Home';
+      const rootPath = currentUser ? '/markets' : '/';
 
-      // 1. If any modal, sheet, or drawer is open, close the topmost modal and stay in the app
+      // 1. If any modal, sheet, or drawer is open, close it and stay in the app
       const anyModalOpen = Boolean(
         storeState.chartModalSymbol ||
         storeState.orderModal?.isOpen ||
@@ -610,103 +637,73 @@ function App() {
         isClosingFromPopstateRef.current = true;
         modalHistoryPushedRef.current = false;
 
-        if (storeState.chartModalSymbol) {
-          storeState.setChartModalSymbol(null);
-          return;
-        }
-        if (storeState.orderModal?.isOpen) {
-          storeState.closeOrderModal();
-          return;
-        }
-        if (storeState.editOrderModal?.isOpen) {
-          storeState.closeEditOrderModal();
-          return;
-        }
-        if (storeState.mobileStockOverviewSymbol) {
-          storeState.setMobileStockOverviewSymbol(null);
-          return;
-        }
-        if (storeState.alertModalSymbol) {
-          storeState.setAlertModalSymbol(null);
-          return;
-        }
-        if (storeState.basketModalOpen) {
-          storeState.setBasketModalOpen(false);
-          return;
-        }
-        if (storeState.marketDepthModal?.isOpen) {
-          storeState.closeMarketDepthModal();
-          return;
-        }
-        if (storeState.domLadderModal?.isOpen) {
-          storeState.closeDomLadderModal();
-          return;
-        }
-        if (showDepositModal) {
-          setShowDepositModal(false);
-          return;
-        }
-        if (showMobileMenu) {
-          setShowMobileMenu(false);
-          return;
-        }
-        if (notificationDrawerOpen) {
-          setNotificationDrawerOpen(false);
-          return;
-        }
-        if (broadcastModalOpen) {
-          setBroadcastModalOpen(false);
-          return;
-        }
-        if (showBrokerConnectModal) {
-          setShowBrokerConnectModal(false);
-          return;
-        }
-        if (showWealthModal) {
-          setShowWealthModal(false);
-          return;
-        }
-        if (showMutualFundsModal) {
-          setShowMutualFundsModal(false);
-          return;
-        }
-        if (showAlgoBridgeModal) {
-          setShowAlgoBridgeModal(false);
-          return;
-        }
-        if (showCalculatorsModal) {
-          setShowCalculatorsModal(false);
-          return;
+        if (storeState.chartModalSymbol) { storeState.setChartModalSymbol(null); }
+        else if (storeState.orderModal?.isOpen) { storeState.closeOrderModal(); }
+        else if (storeState.editOrderModal?.isOpen) { storeState.closeEditOrderModal(); }
+        else if (storeState.mobileStockOverviewSymbol) { storeState.setMobileStockOverviewSymbol(null); }
+        else if (storeState.alertModalSymbol) { storeState.setAlertModalSymbol(null); }
+        else if (storeState.basketModalOpen) { storeState.setBasketModalOpen(false); }
+        else if (storeState.marketDepthModal?.isOpen) { storeState.closeMarketDepthModal(); }
+        else if (storeState.domLadderModal?.isOpen) { storeState.closeDomLadderModal(); }
+        else if (showDepositModal) { setShowDepositModal(false); }
+        else if (showMobileMenu) { setShowMobileMenu(false); }
+        else if (notificationDrawerOpen) { setNotificationDrawerOpen(false); }
+        else if (broadcastModalOpen) { setBroadcastModalOpen(false); }
+        else if (showBrokerConnectModal) { setShowBrokerConnectModal(false); }
+        else if (showWealthModal) { setShowWealthModal(false); }
+        else if (showMutualFundsModal) { setShowMutualFundsModal(false); }
+        else if (showAlgoBridgeModal) { setShowAlgoBridgeModal(false); }
+        else if (showCalculatorsModal) { setShowCalculatorsModal(false); }
+
+        if (isMobileScreen) {
+          try {
+            window.history.pushState({ hasGuard: true }, '', window.location.pathname);
+          } catch (_) {}
         }
         return;
       }
 
-      // 2. Mobile secondary tabs back button: Return to Watchlist/Markets
-      const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
-      const currentTab = activeTabRef.current || 'Home';
-      const secondaryTradingTabs = ['Positions', 'Orders', 'Portfolio', 'ClientData'];
+      // --- MOBILE-ONLY NATIVE NAVIGATION HANDLER ---
+      if (isMobileScreen) {
+        const isRoot = (currentTab === rootTab) || (currentUser && (currentTab === 'Markets' || currentTab === 'Watchlist'));
 
-      if (isMobileScreen && secondaryTradingTabs.includes(currentTab)) {
-        setActiveTab('Watchlist');
-        window.history.replaceState(null, '', '/markets');
-        return;
-      }
+        // 2. If on ANY secondary screen, return directly to the Root tab (Watchlist if logged in, Home if guest)
+        if (!isRoot) {
+          setActiveTab(rootTab);
+          try {
+            window.history.replaceState({ appTab: rootTab }, '', rootPath);
+            window.history.pushState({ hasGuard: true }, '', rootPath);
+          } catch (_) {}
+          return;
+        }
 
-      // 3. Android exit guard on root Watchlist / Home tab
-      if (isMobileScreen && (currentTab === 'Watchlist' || currentTab === 'Markets' || currentTab === 'Home')) {
+        // 3. Already on Root screen: Double-tap to exit guard
         const now = Date.now();
-        if (now - lastBackPressTimeRef.current > 2500) {
+        if (now - lastBackPressTimeRef.current > 2000) {
           lastBackPressTimeRef.current = now;
           if (typeof storeState.showToast === 'function') {
             storeState.showToast('Press back again to exit', 'info');
           }
-          // Push state so a second back tap within 2.5s will exit cleanly
-          window.history.pushState({ rootExitGuard: true }, '');
+          // Push guard so next back press triggers popstate again
+          try {
+            window.history.pushState({ hasGuard: true }, '', rootPath);
+          } catch (_) {}
+          return;
+        } else {
+          // Second back press within 2000ms: User explicitly confirmed EXIT
+          try {
+            if (window.navigator?.app?.exitApp) {
+              window.navigator.app.exitApp();
+              return;
+            }
+          } catch (_) {}
+          window.history.back();
           return;
         }
       }
 
-      // 4. Standard path parsing for deep-links and desktop navigation
+      // --- DESKTOP WEB BROWSER ONLY (Screen > 768px) ---
+      // 4. Standard path parsing for deep-links and desktop forward/backward buttons
       const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
       if (!rawPath || rawPath === 'home') {
         setActiveTab('Home');
@@ -1403,7 +1400,7 @@ function App() {
           <PrimaryMarketsView 
             initialTab={primaryMarketsInitialTab}
             onOpenPaperTrading={() => setActiveTab('Markets')} 
-            onBack={() => setActiveTab('Home')} 
+            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
@@ -1412,7 +1409,7 @@ function App() {
           <TradeDiaryView 
             initialTab={tradeDiaryInitialTab}
             onOpenPaperTrading={() => setActiveTab('Markets')} 
-            onBack={() => setActiveTab('Home')} 
+            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
             onOpenProfile={() => setActiveTab('ClientData')}
             onNavigate={(tab) => setActiveTab(tab)}
           />
@@ -1422,7 +1419,7 @@ function App() {
         <Suspense fallback={<TabLoader />}>
           <SkandxAlgoView 
             initialTab={algoInitialTab}
-            onBack={() => setActiveTab('Home')} 
+            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
@@ -1431,7 +1428,7 @@ function App() {
         <Suspense fallback={<TabLoader />}>
           <CalculatorsSuiteView 
             initialType={calculatorsInitialType}
-            onBack={() => setActiveTab('Home')} 
+            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
@@ -1441,7 +1438,7 @@ function App() {
           <WealthPersonalFinanceModal 
             isFullPage={true}
             initialTab={wealthInitialTab}
-            onBack={() => setActiveTab('Home')} 
+            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
             onOpenPaperTrading={() => setActiveTab('Markets')}
             onOpenCalculators={(t) => {
               setCalculatorsInitialType(t || 'all');
@@ -1457,7 +1454,7 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '4px' }}>
                   <div 
-                    onClick={() => setActiveTab('Home')}
+                    onClick={() => setActiveTab(user ? 'Watchlist' : 'Home')}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}
                     title="SkandX Trading Platform"
                   >
