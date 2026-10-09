@@ -23,7 +23,9 @@ export default function OrdersView() {
 
   // Always sync latest orders from backend when Orders screen is opened
   React.useEffect(() => {
+    window._activeFetchUserDataPromise = null;
     useStore.getState().fetchUserData?.();
+    useStore.getState().fetchOrders?.(true);
   }, []);
 
   const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast } = useStore(useShallow(state => ({
@@ -38,6 +40,7 @@ export default function OrdersView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [timeframeFilter, setTimeframeFilter] = useState('ALL');
   const [tagModalOrder, setTagModalOrder] = useState(null);
   const [activeTag, setActiveTag] = useState('');
   const [tradeNotes, setTradeNotes] = useState('');
@@ -83,7 +86,18 @@ export default function OrdersView() {
     if (activeTab === 'Order History') {
       if (isPendingOrOpen || order.status === 'PENDING_TRIGGER') return false;
       if (searchQuery && searchQuery.trim()) return true; // Allow searching across full historical orders
-      return !order.created_at || isToday(order.updated_at || order.created_at);
+      if (timeframeFilter === 'TODAY') {
+        return !order.created_at || isToday(order.updated_at || order.created_at);
+      }
+      if (timeframeFilter === '7D') {
+        const d = new Date(order.updated_at || order.created_at || 0);
+        return (Date.now() - d.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+      }
+      if (timeframeFilter === '30D') {
+        const d = new Date(order.updated_at || order.created_at || 0);
+        return (Date.now() - d.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+      }
+      return true; // 'ALL'
     }
     return false;
   });
@@ -115,7 +129,10 @@ export default function OrdersView() {
     });
 
   let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
-  
+
+  const openOrdersCount = orders.filter(o => o.status === 'PENDING' || o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED' || o.status === 'AMO_PENDING' || o.status === 'OPEN').length;
+  const pendingTriggersCount = displayTriggers.length;
+  const historyOrdersCount = orders.filter(o => o.status !== 'PENDING' && o.status !== 'PARTIAL_FILLED' && o.status !== 'PARTIALLY_FILLED' && o.status !== 'AMO_PENDING' && o.status !== 'OPEN' && o.status !== 'PENDING_TRIGGER').length;
 
 
   if (statusFilter !== 'ALL') {
@@ -168,42 +185,80 @@ export default function OrdersView() {
         }}
       >
         <div style={{ display: 'flex', gap: '18px', flexShrink: 0 }}>
-          {tabs.map(tab => (
-            <div
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '14px 4px',
-                fontSize: '13px',
-                fontWeight: activeTab === tab ? '600' : '500',
-                color: activeTab === tab ? '#2563eb' : 'var(--text-secondary)',
-                borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {tab}
-            </div>
-          ))}
+          {tabs.map(tab => {
+            const count = tab === 'Open Orders' ? openOrdersCount
+              : tab === 'Pending Triggers' ? pendingTriggersCount
+              : tab === 'Order History' ? historyOrdersCount
+              : null;
+            return (
+              <div
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '14px 4px',
+                  fontSize: '13px',
+                  fontWeight: activeTab === tab ? '600' : '500',
+                  color: activeTab === tab ? '#2563eb' : 'var(--text-secondary)',
+                  borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span>{tab}</span>
+                {typeof count === 'number' && count > 0 && (
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    background: activeTab === tab ? 'rgba(37, 99, 235, 0.15)' : 'var(--bg-card)',
+                    color: activeTab === tab ? '#2563eb' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                    fontWeight: '600'
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
           {activeTab === 'Order History' && (
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
-                padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
-                outline: 'none', cursor: 'pointer', flexShrink: 0
-              }}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="EXECUTED">Executed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <>
+              <select 
+                value={timeframeFilter}
+                onChange={(e) => setTimeframeFilter(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
+                  padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                  outline: 'none', cursor: 'pointer', flexShrink: 0
+                }}
+              >
+                <option value="ALL">All Time</option>
+                <option value="TODAY">Today</option>
+                <option value="7D">Past 7 Days</option>
+                <option value="30D">Past 30 Days</option>
+              </select>
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
+                  padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                  outline: 'none', cursor: 'pointer', flexShrink: 0
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="EXECUTED">Executed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </>
           )}
           <button
             type="button"
@@ -264,7 +319,7 @@ export default function OrdersView() {
             subtitle={
               activeTab === 'Open Orders' ? 'Limit and Stop orders waiting to be executed will appear here.' :
               activeTab === 'Pending Triggers' ? 'Bracket (BO) and Cover (CO) orders waiting for a price trigger will be listed here.' :
-              activeTab === 'Order History' ? 'Your executed, cancelled, and rejected orders for today will appear here.' :
+              activeTab === 'Order History' ? (timeframeFilter === 'TODAY' ? 'Your executed, cancelled, and rejected orders for today will appear here. Switch timeframe to "All Time" to view full history.' : 'Your executed, cancelled, and rejected orders will appear here.') :
               'Create and execute multiple orders simultaneously.'
             }
           />

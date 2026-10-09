@@ -8090,7 +8090,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       const isMarket = type === 'MARKET' && !hasTrigger;
       const isTriggerOrder = hasTrigger;
       const status = isTriggerOrder ? 'PENDING_TRIGGER' : 'PENDING';
-      let execPrice = parseFloat(price) || getLtpFromPriceCache(symbol); // Fetch live LTP here for market orders
+      let execPrice = parseFloat(price) || getLtpFromPriceCache(symbol) || parseFloat(req.body.quoted_price) || parseFloat(req.body.current_price) || 0; // Fetch live LTP here for market orders
       if (req.body.post_market_price) {
         execPrice = Number(req.body.post_market_price);
       }
@@ -8379,7 +8379,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           console.error('Mutual fund direct execution error:', err);
         }
       } else {
-        let baseLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+        let baseLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || parseFloat(req.body.quoted_price) || parseFloat(req.body.current_price) || 0;
         if (baseLtp <= 0) {
           try {
             const { fetchBatchLTPs } = require('./services/fyers');
