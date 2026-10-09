@@ -22,50 +22,82 @@ function test(name, fn) {
   }
 }
 
-// 1. Verify isIndexContract identification logic
+// 1. Verify isIndexContract identification logic (Spot Index only, excludes derivatives)
 function isIndexContract(sym) {
   if (!sym || typeof sym !== 'string') return false;
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim().toUpperCase();
-  if (clean.includes('INDEX')) return true;
-  const INDEX_PREFIXES = [
+  const upper = sym.trim().toUpperCase();
+  const clean = upper.replace(/^(NSE:|BSE:|NFO:|BFO:|MCX:|CDS:)/i, '').trim();
+
+  // 1. Exclude ALL derivatives (Options, Futures, NFO/BFO contracts)
+  // Spot index is never an option (CE/PE) or a future (FUT)
+  if (upper.startsWith('NFO:') || upper.startsWith('BFO:') || upper.startsWith('MCX:') || upper.startsWith('CDS:')) {
+    return false;
+  }
+  if (clean.endsWith('CE') || clean.endsWith('PE') || clean.endsWith('FUT') || clean.endsWith('-FUT')) {
+    return false;
+  }
+  if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean)) {
+    return false;
+  }
+  if (/\d+.*?(CE|PE)$/i.test(clean)) {
+    return false;
+  }
+
+  // 2. Identify pure benchmark/spot indices (e.g. NSE:NIFTY50-INDEX, NIFTY, BANKNIFTY, SENSEX)
+  if (clean.includes('INDEX') || clean.endsWith('-INDEX')) {
+    return true;
+  }
+
+  const SPOT_INDICES = [
     'NIFTY',
+    'NIFTY50',
+    'NIFTY 50',
     'BANKNIFTY',
+    'NIFTYBANK',
     'FINNIFTY',
     'MIDCPNIFTY',
     'MIDCAPNIFTY',
     'NIFTYNXT50',
+    'NIFTY NEXT 50',
     'NIFTYFPI',
     'SENSEX',
     'BANKEX'
   ];
-  return INDEX_PREFIXES.some(prefix => clean.startsWith(prefix));
+
+  const normalizedClean = clean.replace(/[^A-Z0-9]/g, '');
+  return SPOT_INDICES.some(idx => normalizedClean === idx.replace(/[^A-Z0-9]/g, ''));
 }
 
-test('isIndexContract accurately identifies all index spot, options, and futures', () => {
-  // Indices Spot
+test('isIndexContract accurately identifies pure spot indices and NEVER matches options/futures', () => {
+  // Pure Spot Indices (MUST return TRUE)
   assert.strictEqual(isIndexContract('NSE:NIFTY50-INDEX'), true);
   assert.strictEqual(isIndexContract('NSE:NIFTYBANK-INDEX'), true);
   assert.strictEqual(isIndexContract('BSE:SENSEX-INDEX'), true);
+  assert.strictEqual(isIndexContract('NSE:FINNIFTY-INDEX'), true);
+  assert.strictEqual(isIndexContract('NSE:MIDCPNIFTY-INDEX'), true);
+  assert.strictEqual(isIndexContract('BSE:BANKEX-INDEX'), true);
   assert.strictEqual(isIndexContract('NIFTY'), true);
+  assert.strictEqual(isIndexContract('NIFTY 50'), true);
   assert.strictEqual(isIndexContract('BANKNIFTY'), true);
   assert.strictEqual(isIndexContract('FINNIFTY'), true);
   assert.strictEqual(isIndexContract('MIDCPNIFTY'), true);
   assert.strictEqual(isIndexContract('SENSEX'), true);
   assert.strictEqual(isIndexContract('BANKEX'), true);
 
-  // Index Options
-  assert.strictEqual(isIndexContract('NSE:NIFTY24OCT25000CE'), true);
-  assert.strictEqual(isIndexContract('NSE:NIFTY24OCT25000PE'), true);
-  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCT52000CE'), true);
-  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCT52000PE'), true);
-  assert.strictEqual(isIndexContract('NSE:FINNIFTY24OCT24000CE'), true);
-  assert.strictEqual(isIndexContract('NSE:MIDCPNIFTY24OCT13000PE'), true);
-  assert.strictEqual(isIndexContract('BSE:SENSEX24OCT82000CE'), true);
-  assert.strictEqual(isIndexContract('BSE:BANKEX24OCT58000PE'), true);
+  // Index Options (MUST return FALSE - derivatives are tradeable without spot index restriction)
+  assert.strictEqual(isIndexContract('NIFTY26O1322500CE'), false);
+  assert.strictEqual(isIndexContract('NSE:NIFTY24OCT25000CE'), false);
+  assert.strictEqual(isIndexContract('NSE:NIFTY24OCT25000PE'), false);
+  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCT52000CE'), false);
+  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCT52000PE'), false);
+  assert.strictEqual(isIndexContract('NSE:FINNIFTY24OCT24000CE'), false);
+  assert.strictEqual(isIndexContract('NSE:MIDCPNIFTY24OCT13000PE'), false);
+  assert.strictEqual(isIndexContract('BSE:SENSEX24OCT82000CE'), false);
+  assert.strictEqual(isIndexContract('BSE:BANKEX24OCT58000PE'), false);
 
-  // Index Futures
-  assert.strictEqual(isIndexContract('NSE:NIFTY24OCTFUT'), true);
-  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCTFUT'), true);
+  // Index Futures (MUST return FALSE - derivatives are tradeable without spot index restriction)
+  assert.strictEqual(isIndexContract('NSE:NIFTY24OCTFUT'), false);
+  assert.strictEqual(isIndexContract('NSE:BANKNIFTY24OCTFUT'), false);
 
   // Non-Index Equities & Stock Derivatives (must return FALSE)
   assert.strictEqual(isIndexContract('NSE:RELIANCE'), false);
@@ -106,37 +138,45 @@ function simulateOrderValidation({ user, order, positions = [], pendingOrders = 
           requires_subscription: true
         };
       }
-      // Note: Traders can now buy multiple index contracts simultaneously across NSE & BSE!
     }
   }
 
   return { status: 200, success: true };
 }
 
-test('Non-subscribed (BASIC) user buying index is rejected with 403 requires_subscription', () => {
+test('Non-subscribed (BASIC) user CAN buy options (NIFTY26O1322500CE, etc.) freely without restriction', () => {
   const result = simulateOrderValidation({
     user: { id: 101, subscription_tier: 'BASIC', is_admin: false },
-    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
+    order: { symbol: 'NIFTY26O1322500CE', side: 'BUY' }
+  });
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.success, true);
+});
+
+test('Non-subscribed (BASIC) user buying spot index (NSE:NIFTY50-INDEX) is rejected with 403 requires_subscription', () => {
+  const result = simulateOrderValidation({
+    user: { id: 101, subscription_tier: 'BASIC', is_admin: false },
+    order: { symbol: 'NSE:NIFTY50-INDEX', side: 'BUY' }
   });
   assert.strictEqual(result.status, 403);
   assert.strictEqual(result.requires_subscription, true);
   assert.ok(result.error.includes('exclusive to Pro subscribers'));
 });
 
-test('Masterclass (pure coaching) user buying index is rejected with 403 requires_subscription', () => {
+test('Masterclass (pure coaching) user buying spot index is rejected with 403 requires_subscription', () => {
   const result = simulateOrderValidation({
     user: { id: 103, subscription_tier: 'MASTERCLASS', is_admin: false },
-    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
+    order: { symbol: 'NSE:NIFTYBANK-INDEX', side: 'BUY' }
   });
   assert.strictEqual(result.status, 403);
   assert.strictEqual(result.requires_subscription, true);
   assert.ok(result.error.includes('exclusive to Pro subscribers'));
 });
 
-test('Lifetime Elite user (includes Yearly plan features for life) can buy index', () => {
+test('Lifetime Elite user (includes Yearly plan features for life) can buy spot index', () => {
   const result = simulateOrderValidation({
     user: { id: 104, subscription_tier: 'LIFETIME', is_admin: false },
-    order: { symbol: 'NSE:NIFTY24OCT25000CE', side: 'BUY' }
+    order: { symbol: 'NSE:NIFTY50-INDEX', side: 'BUY' }
   });
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.success, true);

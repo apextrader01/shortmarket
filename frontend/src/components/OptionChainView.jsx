@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore, API, isIndexContract } from '../store';
+import { useStore, API } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
@@ -376,21 +376,6 @@ const OptionChainViewInternal = () => {
         price: ''
       });
     } else if (oneClickMode) {
-      // Index Buy Restriction (Subscription Required & Single Active Index Trade Limit)
-      if (type === 'BUY' && isIndexContract(optKey)) {
-        const user = useStore.getState().user;
-        const isAdmin = Boolean(user?.is_admin);
-        const tier = (user?.subscription_tier || 'BASIC').toUpperCase();
-        const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
-        const activeTier = isExpired ? 'BASIC' : tier;
-        const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeTier);
-
-        if (!isPaidTier) {
-          useStore.getState().showToast('🔒 Index Buying is exclusive to Pro subscribers. Upgrade to trade Nifty & BankNifty options.', 'error', 'Subscription Required');
-          return;
-        }
-      }
-
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
       const finalQuantity = lotsize * (oneClickMultiplier || 1);
