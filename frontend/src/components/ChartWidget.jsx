@@ -17,7 +17,13 @@ const TIMEFRAMES = [
   { label: '1D',  value: 'ONE_DAY' },
 ];
 
-export default function ChartWidget() {
+export default function ChartWidget({
+  isModal = false,
+  isMobile: propIsMobile,
+  isLandscape = false,
+  activeView = 'chart',
+  onClose
+}) {
   const chartContainerRef = useRef(null);
   const chartRef          = useRef(null);
   const candleSeriesRef   = useRef(null);
@@ -31,6 +37,16 @@ export default function ChartWidget() {
   const macdHistSeriesRef = useRef(null);
   const lastCandleRef     = useRef(null);
   const mountedRef        = useRef(true);
+
+  const [internalIsMobile, setInternalIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    if (propIsMobile !== undefined) return;
+    const check = () => setInternalIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [propIsMobile]);
+
+  const isMobile = propIsMobile !== undefined ? propIsMobile : internalIsMobile;
 
   const [hoveredCandle, setHoveredCandle] = useState(null);
   
@@ -383,38 +399,111 @@ export default function ChartWidget() {
   const change = price?.change != null ? Number(price.change).toFixed(2) : null;
   const tfLabel = TIMEFRAMES.find(t => t.value === chartInterval)?.label ?? chartInterval;
 
+  // If in modal and user selected details view, render StockDetails directly
+  if (isModal && activeView === 'details') {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '10px 8px' : '16px 20px', background: isLight ? '#f8fafc' : '#0b1120' }}>
+        {selectedSymbol && price ? (
+          <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
+        ) : (
+          <div style={{ color: '#94a3b8', padding: '30px', textAlign: 'center' }}>Loading details for {selectedSymbol}...</div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      {/* ── Header Row ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
-        <div style={{ minWidth: 0 }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px', color: 'var(--text-primary)' }}>
-            {selectedSymbol.replace('-', ' (')} {selectedSymbol.includes('-') ? ')' : ''}
-          </h3>
-          {price ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '21px', fontWeight: '700', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                ₹{price.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-              {pct !== null && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                  background: isUp ? 'rgba(22, 163, 74, 0.12)' : 'rgba(220, 38, 38, 0.12)',
-                  color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)',
-                  padding: '2px 7px', borderRadius: '5px', fontSize: '12px', fontWeight: '600'
-                }}>
-                  {isUp ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-                  {change > 0 ? '+' : ''}{change} ({pct > 0 ? '+' : ''}{pct}%)
+    <div
+      className={isModal ? "" : "glass-panel"}
+      style={{
+        padding: isMobile ? (isModal ? '4px 6px 0 6px' : '8px 10px') : (isModal ? '8px 16px' : '16px 20px'),
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
+        height: '100%',
+        overflowY: isModal ? 'hidden' : 'auto',
+        background: isModal ? (isLight ? '#f8fafc' : '#0b1120') : undefined,
+        border: isModal ? 'none' : undefined
+      }}
+    >
+      {/* ── Non-modal Header Row (when rendered in main dashboard / tab) ── */}
+      {!isModal && (
+        <div style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          marginBottom: '8px',
+          gap: '8px'
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px', color: 'var(--text-primary)' }}>
+              {selectedSymbol.replace('-', ' (')} {selectedSymbol.includes('-') ? ')' : ''}
+            </h3>
+            {price ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '20px', fontWeight: '700', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                  ₹{price.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
-              )}
+                {pct !== null && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    background: isUp ? 'rgba(22, 163, 74, 0.12)' : 'rgba(220, 38, 38, 0.12)',
+                    color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)',
+                    padding: '2px 7px', borderRadius: '5px', fontSize: '12px', fontWeight: '600'
+                  }}>
+                    {isUp ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
+                    {change > 0 ? '+' : ''}{change} ({pct > 0 ? '+' : ''}{pct}%)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>No live price</div>
+            )}
+          </div>
+
+          {/* Timeframes for desktop main tab */}
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-hover)', padding: '3px', borderRadius: '8px', flexShrink: 0, border: '1px solid var(--border-color)' }}>
+              {TIMEFRAMES.map(tf => {
+                const active = chartInterval === tf.value;
+                return (
+                  <button
+                    key={tf.value}
+                    onClick={() => setChartInterval(tf.value)}
+                    disabled={isLoadingCandles}
+                    style={{
+                      background: active ? 'var(--color-blue)' : 'transparent',
+                      color:      active ? '#ffffff' : 'var(--text-secondary)',
+                      border:     'none',
+                      borderRadius: '5px', padding: '4px 8px',
+                      fontSize: '11px', fontWeight: '700', cursor: isLoadingCandles ? 'default' : 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >{tf.label}</button>
+                );
+              })}
             </div>
-          ) : (
-            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>No live price</div>
           )}
         </div>
+      )}
 
-        {/* Timeframes */}
-        <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-hover)', padding: '3px', borderRadius: '8px', flexShrink: 0, border: '1px solid var(--border-color)' }}>
+      {/* ── Timeframe Selector Bar (Dedicated Row on Mobile or inside Modal) ── */}
+      {(isMobile || isModal) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+          padding: '2px 0 4px 0',
+          marginBottom: '4px',
+          flexShrink: 0
+        }}>
           {TIMEFRAMES.map(tf => {
             const active = chartInterval === tf.value;
             return (
@@ -423,21 +512,38 @@ export default function ChartWidget() {
                 onClick={() => setChartInterval(tf.value)}
                 disabled={isLoadingCandles}
                 style={{
-                  background: active ? 'var(--color-blue)' : 'transparent',
-                  color:      active ? '#ffffff' : 'var(--text-secondary)',
-                  border:     'none',
-                  borderRadius: '5px', padding: '4px 8px',
-                  fontSize: '11px', fontWeight: '700', cursor: isLoadingCandles ? 'default' : 'pointer',
-                  transition: 'all 0.15s',
+                  background: active ? 'var(--color-blue, #2563eb)' : (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255, 255, 255, 0.05)'),
+                  color: active ? '#ffffff' : 'var(--text-secondary, #94a3b8)',
+                  border: active ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '6px',
+                  padding: '4px 9px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: isLoadingCandles ? 'default' : 'pointer',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
                 }}
-              >{tf.label}</button>
+              >
+                {tf.label}
+              </button>
             );
           })}
         </div>
-      </div>
+      )}
 
-      {/* ── Indicators Bar ── */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+      {/* ── Indicators Bar (Horizontally scrollable on mobile) ── */}
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        WebkitOverflowScrolling: 'touch',
+        padding: '2px 0',
+        marginBottom: '5px',
+        flexShrink: 0
+      }}>
         <IndicatorButton label="SMA (20)" active={showSMA} onClick={() => setShowSMA(!showSMA)} color="#F59E0B" />
         <IndicatorButton label="EMA (20)" active={showEMA} onClick={() => setShowEMA(!showEMA)} color="#8B5CF6" />
         <IndicatorButton label="RSI (14)" active={showRSI} onClick={() => setShowRSI(!showRSI)} color="#EAB308" />
@@ -446,7 +552,17 @@ export default function ChartWidget() {
 
       {/* ── OHLC Overlay ── */}
       {(hoveredCandle || price) && (
-        <div style={{ display: 'flex', gap: '16px', fontSize: '11px', marginBottom: '8px' }}>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
+          scrollbarWidth: 'none',
+          fontSize: '10.5px',
+          marginBottom: '5px',
+          padding: '1px 0',
+          flexShrink: 0
+        }}>
           {[['O', hoveredCandle?.open ?? price?.open], 
             ['H', hoveredCandle?.high ?? price?.high], 
             ['L', hoveredCandle?.low ?? price?.low], 
@@ -454,9 +570,9 @@ export default function ChartWidget() {
             ['Vol', hoveredCandle?.volume ?? price?.volume]]
             .map(([lbl, val]) =>
             val != null ? (
-              <span key={lbl}>
-                <span style={{ color: '#475569' }}>{lbl} </span>
-                <span style={{ color: '#CBD5E1', fontWeight: '600' }}>
+              <span key={lbl} style={{ flexShrink: 0 }}>
+                <span style={{ color: '#64748b' }}>{lbl} </span>
+                <span style={{ color: '#cbd5e1', fontWeight: '600' }}>
                   {lbl === 'Vol' ? new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2, notation: "compact" }).format(val) : `₹${Number(val).toFixed(2)}`}
                 </span>
               </span>
@@ -466,14 +582,20 @@ export default function ChartWidget() {
       )}
 
       {/* ── Chart area ── */}
-      <div style={{ position: 'relative', width: '100%', flex: '0 0 60vh', minHeight: '400px' }}>
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        flex: 1,
+        minHeight: isMobile ? (isLandscape ? 'calc(100vw - 110px)' : (isModal ? 'calc(100dvh - 215px)' : '340px')) : '420px',
+        overflow: 'hidden'
+      }}>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
 
-        {/* Quick Order Buttons Overlay */}
-        {price && !isLoadingCandles && (
+        {/* Quick Order Buttons Overlay (Desktop Only - Avoid blocking candles on mobile) */}
+        {!isMobile && price && !isLoadingCandles && (
           <div style={{ position: 'absolute', top: '12px', left: '0px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'SELL', price?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'SELL', price?.lotsize || 1, 'INT', false, 0, price?.ltp)}
               style={{
                 background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -489,7 +611,7 @@ export default function ChartWidget() {
             </button>
             <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'BUY', price?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'BUY', price?.lotsize || 1, 'INT', false, 0, price?.ltp)}
               style={{
                 background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -549,7 +671,69 @@ export default function ChartWidget() {
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       
-      {selectedSymbol && price && (
+      {/* Mobile Sticky Bottom Trading Action Bar */}
+      {isMobile && price && (
+        <div style={{
+          position: isModal ? 'sticky' : 'relative',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 25,
+          background: isLight ? '#ffffff' : '#0f172a',
+          borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)',
+          padding: '8px 12px',
+          display: 'flex',
+          gap: '10px',
+          flexShrink: 0,
+          boxShadow: '0 -4px 16px rgba(0,0,0,0.25)'
+        }}>
+          <button
+            onClick={() => openOrderModal(selectedSymbol, 'BUY', price?.lotsize || 1, 'INT', false, 0, price?.ltp)}
+            style={{
+              flex: 1,
+              background: '#0FB384',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '11px 16px',
+              fontSize: '13.5px',
+              fontWeight: '800',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 3px 10px rgba(15, 179, 132, 0.35)',
+            }}
+          >
+            ⚡ BUY {price?.ltp ? `₹${Number(price.ltp).toFixed(2)}` : ''}
+          </button>
+          <button
+            onClick={() => openOrderModal(selectedSymbol, 'SELL', price?.lotsize || 1, 'INT', false, 0, price?.ltp)}
+            style={{
+              flex: 1,
+              background: '#F0533C',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '11px 16px',
+              fontSize: '13.5px',
+              fontWeight: '800',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 3px 10px rgba(240, 83, 60, 0.35)',
+            }}
+          >
+            ⚡ SELL {price?.ltp ? `₹${Number(price.ltp).toFixed(2)}` : ''}
+          </button>
+        </div>
+      )}
+
+      {/* StockDetails for Non-Modal Desktop view */}
+      {!isModal && selectedSymbol && price && (
         <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
       )}
     </div>
