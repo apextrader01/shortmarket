@@ -24,6 +24,24 @@ export default function OrdersView() {
   // Always sync latest orders from backend when Orders screen is opened
   React.useEffect(() => {
     useStore.getState().fetchUserData?.();
+    const token = localStorage.getItem('token');
+    fetch(`${API}/api/orders?all=true`, {
+      credentials: 'include',
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          useStore.setState(prev => {
+            const map = new Map();
+            (prev.orders || []).forEach(o => map.set(o.id, o));
+            data.forEach(o => map.set(o.id, o));
+            const merged = Array.from(map.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+            return { orders: merged };
+          });
+        }
+      })
+      .catch(err => console.error('Failed to sync full order history:', err));
   }, []);
 
   const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast } = useStore(useShallow(state => ({
@@ -38,6 +56,7 @@ export default function OrdersView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [timeFilter, setTimeFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'WEEK' | 'MONTH'
   const [tagModalOrder, setTagModalOrder] = useState(null);
   const [activeTag, setActiveTag] = useState('');
   const [tradeNotes, setTradeNotes] = useState('');
@@ -82,11 +101,29 @@ export default function OrdersView() {
     if (activeTab === 'Open Orders') return isPendingOrOpen;
     if (activeTab === 'Order History') {
       if (isPendingOrOpen || order.status === 'PENDING_TRIGGER') return false;
-      if (searchQuery && searchQuery.trim()) return true; // Allow searching across full historical orders
-      return !order.created_at || isToday(order.updated_at || order.created_at);
+      
+      // If user typed a search query, allow matching across all history
+      if (searchQuery && searchQuery.trim()) return true;
+
+      // Timeframe filtering (defaults to 'ALL' so orders are never hidden!)
+      if (timeFilter === 'TODAY') {
+        return !order.created_at || isToday(order.updated_at || order.created_at);
+      }
+      if (timeFilter === 'WEEK') {
+        const orderDate = new Date(order.updated_at || order.created_at || 0).getTime();
+        return Date.now() - orderDate <= 7 * 24 * 60 * 60 * 1000;
+      }
+      if (timeFilter === 'MONTH') {
+        const orderDate = new Date(order.updated_at || order.created_at || 0).getTime();
+        return Date.now() - orderDate <= 30 * 24 * 60 * 60 * 1000;
+      }
+      return true; // 'ALL' shows all historical orders!
     }
     return false;
   });
+
+  // Always ensure newest orders appear first
+  displayOrders.sort((a, b) => new Date(b.created_at || b.updated_at || 0) - new Date(a.created_at || a.updated_at || 0));
   
   const boLegTriggers = orders
     .filter(order => order.status === 'PENDING_TRIGGER')
@@ -115,19 +152,27 @@ export default function OrdersView() {
     });
 
   let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
-  
-
+  displayTriggers.sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
 
   if (statusFilter !== 'ALL') {
     displayOrders = displayOrders.filter(order => {
       if (statusFilter === 'EXECUTED') {
         return order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE';
       }
+      if (statusFilter === 'CANCELLED') {
+        return order.status === 'CANCELLED' || order.status === 'AMO_CANCELLED';
+      }
+      if (statusFilter === 'REJECTED') {
+        return order.status === 'REJECTED' || order.status === 'AMO_REJECTED' || order.status === 'TRIGGER_REJECTED' || order.status === 'FAILED';
+      }
       return order.status === statusFilter;
     });
     displayTriggers = displayTriggers.filter(trigger => {
       if (statusFilter === 'EXECUTED') {
         return trigger.status === 'EXECUTED' || trigger.status === 'COMPLETED' || trigger.status === 'COMPLETE';
+      }
+      if (statusFilter === 'CANCELLED') {
+        return trigger.status === 'CANCELLED';
       }
       return trigger.status === statusFilter;
     });
@@ -188,22 +233,43 @@ export default function OrdersView() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
           {activeTab === 'Order History' && (
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
-                padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
-                outline: 'none', cursor: 'pointer', flexShrink: 0
-              }}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="EXECUTED">Executed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <>
+              {/* Timeframe Selector */}
+              <select 
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
+                  padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                  outline: 'none', cursor: 'pointer', flexShrink: 0
+                }}
+                title="Filter by Timeframe"
+              >
+                <option value="ALL">All Time</option>
+                <option value="TODAY">Today</option>
+                <option value="WEEK">Past 7 Days</option>
+                <option value="MONTH">Past 30 Days</option>
+              </select>
+
+              {/* Status Filter */}
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
+                  padding: '6px 10px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                  outline: 'none', cursor: 'pointer', flexShrink: 0
+                }}
+                title="Filter by Order Status"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="EXECUTED">Executed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </>
           )}
           <button
             type="button"
@@ -231,7 +297,6 @@ export default function OrdersView() {
           </button>
           <input
             type="text"
-            className="hide-on-mobile"
             placeholder="Filter orders..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -264,7 +329,7 @@ export default function OrdersView() {
             subtitle={
               activeTab === 'Open Orders' ? 'Limit and Stop orders waiting to be executed will appear here.' :
               activeTab === 'Pending Triggers' ? 'Bracket (BO) and Cover (CO) orders waiting for a price trigger will be listed here.' :
-              activeTab === 'Order History' ? 'Your executed, cancelled, and rejected orders for today will appear here.' :
+              activeTab === 'Order History' ? 'Your executed, cancelled, and rejected orders will appear here.' :
               'Create and execute multiple orders simultaneously.'
             }
           />
@@ -341,7 +406,12 @@ export default function OrdersView() {
                 {activeTab === 'Pending Triggers' ? (
                   displayTriggers.map(trigger => {
                     const isBuy = trigger.side === 'BUY';
-                    const timeStr = trigger.createdAt ? new Date(trigger.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                    const timeStr = (() => {
+                      if (!trigger.createdAt) return '';
+                      const d = new Date(trigger.createdAt);
+                      if (isNaN(d.getTime())) return '';
+                      return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
+                    })();
                     return (
                       <div
                         key={trigger.id}
@@ -406,7 +476,13 @@ export default function OrdersView() {
                     const isExecuted = order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE';
                     const isPending = order.status === 'PENDING';
                     const statusColor = isExecuted ? 'var(--color-green-light)' : (isPending ? 'var(--color-yellow)' : 'var(--color-red-light)');
-                    const timeStr = order.created_at ? new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                    const timeStr = (() => {
+                      const dStr = order.created_at || order.updated_at;
+                      if (!dStr) return '';
+                      const d = new Date(dStr);
+                      if (isNaN(d.getTime())) return '';
+                      return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
+                    })();
                     const pnlVal = order.realized_pnl ? parseFloat(order.realized_pnl) : 0;
                     const priceVal = parseFloat(order.average_price || order.price || 0);
 
