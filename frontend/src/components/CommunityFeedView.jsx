@@ -1359,7 +1359,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 ? { label: 'Markets & Exploring Traders', icon: '📊', color: '#38bdf8' }
                 : categoryName === 'INVESTORS'
                 ? { label: 'Investing & Wealth Building', icon: '🌱', color: '#10b981' }
-                : { label: 'Regional Languages & 7 Sisters Hub', icon: '🌐', color: '#f59e0b' };
+                : { label: 'Pan-India & Regional Languages Hub', icon: '🇮🇳', color: '#f59e0b' };
 
               return (
                 <div

@@ -142,23 +142,32 @@ const DEFAULT_CLUBS = [
     members_count: 2
   },
 
-  // ─── LANGUAGES ───
+  // ─── LANGUAGES & ALL-INDIA HUBS ───
+  {
+    slug: 'all-india-traders-club',
+    name: 'All India Traders Club',
+    category: 'LANGUAGES',
+    description: '🇮🇳 अखिल भारतीय ट्रेडर्स क्लब — Pan-India community for all Indian traders & investors across states. Macro news, budget, earnings & market discussions in English & Hinglish.',
+    icon: '🇮🇳',
+    accent_color: '#f97316',
+    members_count: 5
+  },
   {
     slug: 'hindi-traders-club',
     name: 'Hindi Traders Club',
     category: 'LANGUAGES',
     description: 'हिंदी में निफ्टी, बैंकनिफ्टी, ऑप्शन ट्रेडिंग और शेयर बाजार की लाइव चर्चा और चार्ट विश्लेषण।',
     icon: '🇮🇳',
-    accent_color: '#f97316',
+    accent_color: '#ea580c',
     members_count: 2
   },
   {
-    slug: 'tamil-traders-club',
-    name: 'Tamil Traders Club',
+    slug: 'marathi-traders-club',
+    name: 'Marathi Traders Club',
     category: 'LANGUAGES',
-    description: 'தமிழ் வர்த்தகர்கள் மற்றும் முதலீட்டாளர்கள் மன்றம் — நிஃப்டி, பேங்க் நிஃப்டி மற்றும் பங்குச்சந்தை விவாதம்.',
-    icon: '🔥',
-    accent_color: '#ec4899',
+    description: 'मराठीत निफ्टी, बँकनिफ्टी, ऑप्शन ट्रेडिंग आणि शेअर बाजाराची थेट चर्चा व चार्ट विश्लेषण — महाराष्ट्र व मुंबई मार्केट क्लब.',
+    icon: '🚩',
+    accent_color: '#f59e0b',
     members_count: 2
   },
   {
@@ -168,7 +177,25 @@ const DEFAULT_CLUBS = [
     description: 'ગુજરાતી ટ્રેડર્સ અને રોકાણકારો માટે ખાસ ક્લબ — નિફ્ટી, બેંકનિફ્ટી, IPO અને સ્ટોક માર્કેટ ચર્ચા.',
     icon: '💎',
     accent_color: '#eab308',
-    members_count: 1
+    members_count: 2
+  },
+  {
+    slug: 'bengali-traders-club',
+    name: 'Bengali Traders Club',
+    category: 'LANGUAGES',
+    description: 'বাংলায় নিফটি, ব্যাংকনিফটি, অপশন ট্রেডিং এবং শেয়ার বাজারের লাইভ আলোচনা ও বিশ্লেষণ — পশ্চিমবঙ্গ ও কলকাতা ট্রেডার্স.',
+    icon: '🌸',
+    accent_color: '#ec4899',
+    members_count: 2
+  },
+  {
+    slug: 'tamil-traders-club',
+    name: 'Tamil Traders Club',
+    category: 'LANGUAGES',
+    description: 'தமிழ் வர்த்தகர்கள் மற்றும் முதலீட்டாளர்கள் மன்றம் — நிஃப்டி, பேங்க் நிஃப்டி மற்றும் பங்குச்சந்தை விவாதம்.',
+    icon: '🔥',
+    accent_color: '#ef4444',
+    members_count: 2
   },
   {
     slug: 'telugu-traders-club',
@@ -177,7 +204,7 @@ const DEFAULT_CLUBS = [
     description: 'తెలుగు ట్రేడర్స్ మరియు ఇన్వెస్టర్స్ కమ్యూనిటీ — నిఫ్టీ, బ్యాంక్ నిఫ్టీ & ఆప్షన్స్ ట్రేడింగ్ విశ్లేషణ.',
     icon: '🌟',
     accent_color: '#06b6d4',
-    members_count: 1
+    members_count: 2
   },
   {
     slug: 'kannada-traders-club',
@@ -195,6 +222,42 @@ const DEFAULT_CLUBS = [
     description: 'മലയാളി ട്രേഡേഴ്സ് ക്ലബ് — കേരള ഓഹരി വിപണി, നിഫ്റ്റി & ഓപ്ഷൻസ് തത്സമയ ചർച്ച.',
     icon: '🌴',
     accent_color: '#10b981',
+    members_count: 1
+  },
+  {
+    slug: 'punjabi-traders-club',
+    name: 'Punjabi Traders Club',
+    category: 'LANGUAGES',
+    description: 'ਪੰਜਾਬੀ ਵਿੱਚ ਨਿਫਟੀ, ਬੈਂਕ ਨਿਫਟੀ, ਕਮੋਡਿਟੀ ਅਤੇ ਸ਼ੇਅਰ ਮਾਰਕੀਟ ਦੀ ਲਾਈਵ ਚਰਚਾ — ਪੰਜਾਬ, ਹਰਿਆਣਾ ਅਤੇ ਦਿੱਲੀ NCR.',
+    icon: '🌾',
+    accent_color: '#84cc16',
+    members_count: 1
+  },
+  {
+    slug: 'odia-traders-club',
+    name: 'Odia Traders Club',
+    category: 'LANGUAGES',
+    description: 'ଓଡ଼ିଆରେ ନିଫ୍ଟି, ବ୍ୟାଙ୍କ ନିଫ୍ଟି ଏବଂ ଷ୍ଟକ୍ ମାର୍କେଟ୍ ଲାଇଭ୍ ଆଲୋଚନା — ଓଡ଼ିଶା ଟ୍ରେଡର୍ସ କମ୍ୟୁନିଟି.',
+    icon: '🏛️',
+    accent_color: '#3b82f6',
+    members_count: 1
+  },
+  {
+    slug: 'rajasthani-marwari-traders-club',
+    name: 'Rajasthani & Marwari Club',
+    category: 'LANGUAGES',
+    description: 'राजस्थानी व मारवाड़ी ट्रेडर्स क्लब — शेयर बाजार, लंबी अवधि के निवेश, स्विंग ट्रेडिंग और कारोबारी चर्चा.',
+    icon: '🏰',
+    accent_color: '#d97706',
+    members_count: 1
+  },
+  {
+    slug: 'urdu-jk-traders-club',
+    name: 'Urdu & J&K Traders Club',
+    category: 'LANGUAGES',
+    description: 'اردو میں اسٹاک مارکیٹ، نفٹی اور بینکنفٹی ٹریڈنگ کے تجزیے — جموں و کشمیر اور اردو ٹریڈرز کمیونٹی.',
+    icon: '🏔️',
+    accent_color: '#0d9488',
     members_count: 1
   },
   {
