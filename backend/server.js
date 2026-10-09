@@ -13423,12 +13423,23 @@ let bridgeConfig = {
   allowConnectAccount: true,
   allowPurchaseIp: true,
   connectionToken: 'skandx_broker_demat_9433',
-  availableCredit: 2500.00,
+  availableCredit: 3500.00,
   totalDemat: 3,
   disconnectedDemat: 0,
   expiredDemat: 2,
-  totalStaticIp: 3,
-  availableStaticIp: 1
+  totalStaticIp: 4,
+  availableStaticIp: 2,
+  totalLinkSlots: 5,
+  usedLinkSlots: 3,
+  staticIpMonthlyRate: 350,
+  linkUserMonthlyRate: 250,
+  currentPlan: 'PRO_ALGO',
+  serverHealth: {
+    bkcLatency: '1.8ms',
+    uptime: '99.98%',
+    redisQueue: '0 msgs (Healthy)',
+    activeTickStream: '68,400 ticks/sec'
+  }
 };
 
 let dematAccountsStore = [
@@ -13546,11 +13557,106 @@ let linkedUsersStore = [
 ];
 
 let watchlistStore = [
-  { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend', algoActive: true },
-  { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3', algoActive: true },
-  { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Reversion', algoActive: false },
-  { id: 'WL-04', symbol: 'NSE:HDFCBANK', ltp: 1682.10, change: '+14.60 (+0.88%)', isUp: true, high: 1690.00, low: 1665.00, algoStrategy: 'Breakout 15M', algoActive: true },
-  { id: 'WL-05', symbol: 'MCX:GOLD26OCTFUT', ltp: 76450.00, change: '+180.00 (+0.24%)', isUp: true, high: 76600.00, low: 76220.00, algoStrategy: 'ATR Volatility', algoActive: false }
+  { 
+    id: 'WL-01', 
+    symbol: 'NSE:NIFTY24OCTFUT', 
+    ltp: 25014.60, 
+    change: '+104.20 (+0.42%)', 
+    isUp: true, 
+    high: 25080.00, 
+    low: 24920.00, 
+    algoStrategy: 'EMA 9/21 Trend Scalper', 
+    algoActive: true,
+    mode: 'LIVE',
+    status: 'IN_POSITION_LONG',
+    lots: 1,
+    qty: 75,
+    targetPts: 60,
+    slPts: 25,
+    trailingSl: true,
+    autoSquareOff: '15:15',
+    realizedPnl: 2850
+  },
+  { 
+    id: 'WL-02', 
+    symbol: 'NSE:BANKNIFTY51500CE', 
+    ltp: 342.50, 
+    change: '+48.20 (+16.38%)', 
+    isUp: true, 
+    high: 380.00, 
+    low: 260.00, 
+    algoStrategy: '9:20 AM Short Straddle', 
+    algoActive: true,
+    mode: 'LIVE',
+    status: 'IN_POSITION_SHORT',
+    lots: 2,
+    qty: 30,
+    targetPts: 110,
+    slPts: 55,
+    trailingSl: true,
+    autoSquareOff: '15:15',
+    realizedPnl: 1420
+  },
+  { 
+    id: 'WL-03', 
+    symbol: 'NSE:RELIANCE', 
+    ltp: 2985.40, 
+    change: '-12.80 (-0.43%)', 
+    isUp: false, 
+    high: 3012.00, 
+    low: 2975.00, 
+    algoStrategy: 'VWAP Mean Reversion', 
+    algoActive: false,
+    mode: 'PAPER',
+    status: 'WAITING_TRIGGER',
+    lots: 1,
+    qty: 50,
+    targetPts: 20,
+    slPts: 10,
+    trailingSl: false,
+    autoSquareOff: '15:15',
+    realizedPnl: 0
+  },
+  { 
+    id: 'WL-04', 
+    symbol: 'NSE:FINNIFTY23800PE', 
+    ltp: 112.80, 
+    change: '-18.40 (-14.02%)', 
+    isUp: false, 
+    high: 145.00, 
+    low: 105.00, 
+    algoStrategy: 'Supertrend 7/3 Breakout', 
+    algoActive: true,
+    mode: 'PAPER',
+    status: 'WAITING_TRIGGER',
+    lots: 1,
+    qty: 65,
+    targetPts: 35,
+    slPts: 18,
+    trailingSl: true,
+    autoSquareOff: '15:15',
+    realizedPnl: 580
+  },
+  { 
+    id: 'WL-05', 
+    symbol: 'MCX:GOLD26OCTFUT', 
+    ltp: 76450.00, 
+    change: '+180.00 (+0.24%)', 
+    isUp: true, 
+    high: 76600.00, 
+    low: 76220.00, 
+    algoStrategy: 'ATR Volatility Breakout', 
+    algoActive: false,
+    mode: 'LIVE',
+    status: 'PAUSED',
+    lots: 1,
+    qty: 1,
+    targetPts: 400,
+    slPts: 200,
+    trailingSl: true,
+    autoSquareOff: '23:15',
+    realizedPnl: 0
+  }
 ];
 
 let copyGroupsStore = {
@@ -13789,6 +13895,193 @@ app.post('/api/v1/bridge/webhook', (req, res) => {
   } catch (err) {
     res.status(400).json({ success: false, error: 'Invalid webhook payload' });
   }
+});
+
+// 8. Purchase Link User Slot (₹250/month)
+app.post('/api/v1/bridge/link-users/purchase', (req, res) => {
+  bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
+  res.json({
+    success: true,
+    message: 'Added 1 Linked Client Demat Slot (₹250/mo)',
+    totalLinkSlots: bridgeConfig.totalLinkSlots,
+    usedLinkSlots: linkedUsersStore.length
+  });
+});
+
+// 9. Payment Gateway Checkout (Handles Static IP ₹350, Link User ₹250, Plans, & Wallet)
+app.post('/api/v1/bridge/checkout', (req, res) => {
+  try {
+    const { itemType, itemId, amount, paymentMethod, transactionRef } = req.body || {};
+    const cost = Number(amount) || 0;
+    const txId = transactionRef || ('TXN_UPI_' + Math.floor(10000000 + Math.random() * 90000000));
+
+    if (itemType === 'STATIC_IP') {
+      const octet = Math.floor(50 + Math.random() * 150);
+      const newIp = {
+        id: 'IP-0' + (staticIpsStore.length + 1),
+        ip: `103.212.120.${octet}`,
+        datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+        status: 'WHITELISTED',
+        latency: (1.5 + Math.random()).toFixed(1) + ' ms',
+        assignedTo: 'Unassigned (Ready for Demat)',
+        port: '8080 (SOCKS5/HTTP)',
+        expiresAt: '30 Days Remaining'
+      };
+      staticIpsStore.push(newIp);
+      bridgeConfig.totalStaticIp = staticIpsStore.length;
+      bridgeConfig.availableStaticIp = staticIpsStore.filter(i => i.status === 'AVAILABLE' || i.status === 'WHITELISTED').length;
+      
+      return res.json({
+        success: true,
+        transactionId: txId,
+        message: `Successfully provisioned Dedicated Mumbai BKC Static IP: ${newIp.ip} (₹350/mo)`,
+        item: newIp,
+        ips: staticIpsStore
+      });
+    }
+
+    if (itemType === 'LINK_USER') {
+      bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
+      return res.json({
+        success: true,
+        transactionId: txId,
+        message: 'Successfully activated 1 Link User Client Slot (₹250/mo)',
+        totalLinkSlots: bridgeConfig.totalLinkSlots,
+        usedLinkSlots: linkedUsersStore.length
+      });
+    }
+
+    if (itemType === 'WALLET_RECHARGE') {
+      bridgeConfig.availableCredit += cost;
+      return res.json({
+        success: true,
+        transactionId: txId,
+        message: `₹${cost.toLocaleString('en-IN')} added to SkandX Algo Wallet`,
+        credit: bridgeConfig.availableCredit
+      });
+    }
+
+    if (itemType === 'PLAN_UPGRADE') {
+      bridgeConfig.currentPlan = String(itemId || 'ENTERPRISE').toUpperCase();
+      return res.json({
+        success: true,
+        transactionId: txId,
+        message: `Successfully upgraded to ${bridgeConfig.currentPlan} Plan!`,
+        plan: bridgeConfig.currentPlan
+      });
+    }
+
+    res.json({ success: true, transactionId: txId, message: 'Payment processed successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Checkout processing failed' });
+  }
+});
+
+// 10. Watchlist Strategy Controls & Actions
+app.post('/api/v1/bridge/watchlist/:id/toggle', (req, res) => {
+  const item = watchlistStore.find(w => w.id === req.params.id);
+  if (item) {
+    item.algoActive = !item.algoActive;
+    item.status = item.algoActive ? (item.status === 'PAUSED' ? 'WAITING_TRIGGER' : item.status) : 'PAUSED';
+    return res.json({ success: true, item, watchlist: watchlistStore });
+  }
+  res.status(404).json({ error: 'Watchlist item not found' });
+});
+
+app.post('/api/v1/bridge/watchlist/:id/square-off', (req, res) => {
+  const item = watchlistStore.find(w => w.id === req.params.id);
+  if (item) {
+    item.status = 'WAITING_TRIGGER';
+    const exitOrder = {
+      id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      broker: 'Zerodha Kite',
+      account: 'ZER-6641',
+      symbol: item.symbol,
+      side: 'SQUARE_OFF',
+      qty: item.qty || 50,
+      price: item.ltp || 0,
+      status: 'COMPLETED',
+      source: '1-Click Algo Position Exit'
+    };
+    bridgeOrdersStore.unshift(exitOrder);
+    if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
+    return res.json({ success: true, message: `Squared off position for ${item.symbol}`, item, order: exitOrder });
+  }
+  res.status(404).json({ error: 'Watchlist item not found' });
+});
+
+app.put('/api/v1/bridge/watchlist/:id', (req, res) => {
+  const idx = watchlistStore.findIndex(w => w.id === req.params.id);
+  if (idx !== -1) {
+    watchlistStore[idx] = { ...watchlistStore[idx], ...req.body };
+    return res.json({ success: true, item: watchlistStore[idx], watchlist: watchlistStore });
+  }
+  res.status(404).json({ error: 'Watchlist item not found' });
+});
+
+// 11. Institutional Algo Admin Suite Endpoints
+app.get('/api/v1/bridge/admin/system-stats', (req, res) => {
+  res.json({
+    success: true,
+    infrastructure: {
+      bkcGatewayStatus: 'ONLINE_ACTIVE',
+      bkcLatencyMs: 1.8,
+      serverUptimePct: 99.98,
+      redisQueueBacklog: 0,
+      activeTicksPerSec: 68400,
+      packetLossPct: 0.00
+    },
+    gateways: [
+      { broker: 'Zerodha Kite Connect', status: 'ACTIVE', latency: '12ms', rateLimit: '3/s', throttled: 0 },
+      { broker: 'Angel One SmartAPI', status: 'ACTIVE', latency: '18ms', rateLimit: '10/s', throttled: 0 },
+      { broker: 'Upstox Pro API v2', status: 'ACTIVE', latency: '14ms', rateLimit: '5/s', throttled: 0 },
+      { broker: 'Fyers API v3', status: 'ACTIVE', latency: '16ms', rateLimit: '10/s', throttled: 0 },
+      { broker: 'Finvasia Shoonya', status: 'ACTIVE', latency: '21ms', rateLimit: '10/s', throttled: 0 },
+      { broker: 'Dhan Open API', status: 'ACTIVE', latency: '15ms', rateLimit: '10/s', throttled: 0 }
+    ],
+    staticIps: staticIpsStore,
+    linkedUsers: linkedUsersStore,
+    demats: dematAccountsStore,
+    totalOrdersToday: bridgeOrdersStore.length + 382,
+    activeSubscribers: 142,
+    monthlyRecurringRevenue: '₹1,24,500'
+  });
+});
+
+app.post('/api/v1/bridge/admin/ip/add', (req, res) => {
+  const octet = Math.floor(100 + Math.random() * 120);
+  const ip = {
+    id: 'IP-' + (staticIpsStore.length + 1),
+    ip: `103.212.120.${octet}`,
+    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+    status: 'AVAILABLE',
+    latency: '1.7 ms',
+    assignedTo: 'Admin Pool Standby',
+    port: '8080 (SOCKS5/HTTP)',
+    expiresAt: 'Permanent Admin Block'
+  };
+  staticIpsStore.push(ip);
+  bridgeConfig.totalStaticIp = staticIpsStore.length;
+  res.json({ success: true, ip, ips: staticIpsStore });
+});
+
+app.post('/api/v1/bridge/admin/grant-slot', (req, res) => {
+  const { slotType } = req.body || {};
+  if (slotType === 'IP') {
+    bridgeConfig.totalStaticIp += 1;
+    bridgeConfig.availableStaticIp += 1;
+  } else {
+    bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
+  }
+  res.json({ success: true, config: bridgeConfig });
+});
+
+app.post('/api/v1/bridge/admin/global-freeze', (req, res) => {
+  copyGroupsStore.status = 'PAUSED';
+  dematAccountsStore.forEach(a => { a.tradingActive = false; });
+  watchlistStore.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+  res.json({ success: true, message: 'GLOBAL EMERGENCY FREEZE ACTIVATED: All user algos and copy executions halted.' });
 });
 
 // ─── In-Memory HTML Template & Server-Side SEO Engine (0 Disk I/O at 1 Lakh Concurrent Users) ───

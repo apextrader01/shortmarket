@@ -66,6 +66,7 @@ function getStoragePolicyForUser(user) {
 
 // Default FrontPage-style Clubs
 const DEFAULT_CLUBS = [
+  // ─── EXPLORING TRADERS ───
   {
     slug: 'all-about-indices',
     name: 'All About Indices',
@@ -73,16 +74,16 @@ const DEFAULT_CLUBS = [
     description: 'Live NIFTY 50, BANKNIFTY, FINNIFTY, MIDCPNIFTY & SENSEX intraday setups, option chain PCR shifts, and key support/resistance levels.',
     icon: '📊',
     accent_color: '#f59e0b',
-    members_count: 118900
+    members_count: 3
   },
   {
     slug: 'option-strategies-selling',
-    name: 'Option Strategies and Selling',
+    name: 'Option Strategies & Selling',
     category: 'EXPLORING TRADERS',
     description: 'Bull Put Spreads, Iron Condors, Straddles, Theta decay setups, multi-leg payoff structures, and live Greek adjustments.',
     icon: '🎯',
     accent_color: '#ef4444',
-    members_count: 89900
+    members_count: 2
   },
   {
     slug: 'intraday-stockbusters',
@@ -91,7 +92,7 @@ const DEFAULT_CLUBS = [
     description: 'High-momentum NSE cash & F&O stock breakouts, VWAP pullbacks, ORB setups, and volume surge alerts.',
     icon: '⚡',
     accent_color: '#38bdf8',
-    members_count: 85900
+    members_count: 2
   },
   {
     slug: 'commodity-central',
@@ -100,8 +101,19 @@ const DEFAULT_CLUBS = [
     description: 'MCX Crude Oil, Gold, Silver & Natural Gas evening session price action, inventory data plays, and global macro levels.',
     icon: '🛢️',
     accent_color: '#10b981',
-    members_count: 27400
+    members_count: 1
   },
+  {
+    slug: 'smart-investing-wealth',
+    name: 'Smart Investing & Wealth Building',
+    category: 'EXPLORING TRADERS',
+    description: 'Long-term compounding, bluechip & midcap accumulation, portfolio rebalancing, dividend yield, and value investing frameworks.',
+    icon: '📈',
+    accent_color: '#06b6d4',
+    members_count: 2
+  },
+
+  // ─── INVESTORS ───
   {
     slug: 'mutual-fund-investing',
     name: 'Mutual Fund Investing',
@@ -109,7 +121,7 @@ const DEFAULT_CLUBS = [
     description: 'Direct vs Regular mutual funds, Step-Up SIP compounding, Flexi-Cap, Mid-Cap & Small-Cap long-term portfolio reviews.',
     icon: '🌱',
     accent_color: '#34d399',
-    members_count: 74900
+    members_count: 2
   },
   {
     slug: 'fundamental-value-picks',
@@ -118,7 +130,7 @@ const DEFAULT_CLUBS = [
     description: 'Quarterly earnings breakdowns, >60% Bhavcopy delivery accumulation, ROCE/ROE value picks, and multibagger thesis.',
     icon: '🏛️',
     accent_color: '#818cf8',
-    members_count: 62400
+    members_count: 1
   },
   {
     slug: 'ipo-primary-markets',
@@ -127,8 +139,10 @@ const DEFAULT_CLUBS = [
     description: 'Mainboard & SME IPO Grey Market Premium (GMP), QIB/HNI/Retail subscription trends, allotment status & listing day strategies.',
     icon: '🚀',
     accent_color: '#a855f7',
-    members_count: 51200
+    members_count: 2
   },
+
+  // ─── LANGUAGES ───
   {
     slug: 'hindi-traders-club',
     name: 'Hindi Traders Club',
@@ -136,25 +150,7 @@ const DEFAULT_CLUBS = [
     description: 'हिंदी में निफ्टी, बैंकनिफ्टी, ऑप्शन ट्रेडिंग और शेयर बाजार की लाइव चर्चा और चार्ट विश्लेषण।',
     icon: '🇮🇳',
     accent_color: '#f97316',
-    members_count: 94200
-  },
-  {
-    slug: 'gujarati-traders-club',
-    name: 'Gujarati Traders Club',
-    category: 'LANGUAGES',
-    description: 'ગુજરાતી ટ્રેડર્સ અને રોકાણકારો માટે ખાસ ક્લબ — નિફ્ટી, બેંકનિફ્ટી, IPO અને સ્ટોક માર્કેટ ચર્ચા.',
-    icon: '💎',
-    accent_color: '#eab308',
-    members_count: 41800
-  },
-  {
-    slug: 'telugu-traders-club',
-    name: 'Telugu Traders Club',
-    category: 'LANGUAGES',
-    description: 'తెలుగు ట్రేడర్స్ మరియు ఇన్వెస్టర్స్ కమ్యూనిటీ — నిఫ్టీ, బ్యాంక్ నిఫ్టీ & ఆప్షన్స్ ట్రేడింగ్ విశ్లేషణ.',
-    icon: '🌟',
-    accent_color: '#06b6d4',
-    members_count: 36500
+    members_count: 2
   },
   {
     slug: 'tamil-traders-club',
@@ -163,7 +159,52 @@ const DEFAULT_CLUBS = [
     description: 'தமிழ் வர்த்தகர்கள் மற்றும் முதலீட்டாளர்கள் மன்றம் — நிஃப்டி, பேங்க் நிஃப்டி மற்றும் பங்குச்சந்தை விவாதம்.',
     icon: '🔥',
     accent_color: '#ec4899',
-    members_count: 33100
+    members_count: 2
+  },
+  {
+    slug: 'gujarati-traders-club',
+    name: 'Gujarati Traders Club',
+    category: 'LANGUAGES',
+    description: 'ગુજરાતી ટ્રેડર્સ અને રોકાણકારો માટે ખાસ ક્લબ — નિફ્ટી, બેંકનિફ્ટી, IPO અને સ્ટોક માર્કેટ ચર્ચા.',
+    icon: '💎',
+    accent_color: '#eab308',
+    members_count: 1
+  },
+  {
+    slug: 'telugu-traders-club',
+    name: 'Telugu Traders Club',
+    category: 'LANGUAGES',
+    description: 'తెలుగు ట్రేడర్స్ మరియు ఇన్వెస్టర్స్ కమ్యూనిటీ — నిఫ్టీ, బ్యాంక్ నిఫ్టీ & ఆప్షన్స్ ట్రేడింగ్ విశ్లేషణ.',
+    icon: '🌟',
+    accent_color: '#06b6d4',
+    members_count: 1
+  },
+  {
+    slug: 'kannada-traders-club',
+    name: 'Kannada Traders Club',
+    category: 'LANGUAGES',
+    description: 'ಕನ್ನಡ ಟ್ರೇಡರ್ಸ್ ಕ್ಲಬ್ — ಕರ್ನಾಟಕದ ಷೇರು ಮಾರುಕಟ್ಟೆ, ನಿಫ್ಟಿ, ಬ್ಯಾಂಕ್ ನಿಫ್ಟಿ ಮತ್ತು ಇಂಟ್ರಾಡೇ ವಿಶ್ಲೇಷಣೆ.',
+    icon: '⚡',
+    accent_color: '#f59e0b',
+    members_count: 1
+  },
+  {
+    slug: 'malayalam-traders-club',
+    name: 'Malayali Traders Club',
+    category: 'LANGUAGES',
+    description: 'മലയാളി ട്രേഡേഴ്സ് ക്ലബ് — കേരള ഓഹരി വിപണി, നിഫ്റ്റി & ഓപ്ഷൻസ് തത്സമയ ചർച്ച.',
+    icon: '🌴',
+    accent_color: '#10b981',
+    members_count: 1
+  },
+  {
+    slug: 'seven-sisters-northeast-club',
+    name: '7 Sisters North East Club',
+    category: 'LANGUAGES',
+    description: '7 Sisters North East Traders — Assam, Meghalaya, Manipur, Mizoram, Nagaland, Tripura & Arunachal market community.',
+    icon: '🌄',
+    accent_color: '#8b5cf6',
+    members_count: 1
   }
 ];
 
@@ -260,23 +301,52 @@ async function ensureCommunitySchema() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_comm_comments_post ON community_comments(post_id, created_at ASC)').catch(() => {});
 
-    // Seed Default Clubs if missing
+    // Seed / Sync Default Clubs
     for (const club of DEFAULT_CLUBS) {
-      await db('community_clubs')
-        .insert({
-          slug: club.slug,
+      const existing = await db('community_clubs').where({ slug: club.slug }).first().catch(() => null);
+      if (!existing) {
+        await db('community_clubs')
+          .insert({
+            slug: club.slug,
+            name: club.name,
+            category: club.category,
+            description: club.description,
+            icon: club.icon,
+            accent_color: club.accent_color,
+            members_count: club.members_count || 1,
+            last_posted_at: new Date()
+          })
+          .catch(() => {});
+      } else {
+        await db('community_clubs').where({ slug: club.slug }).update({
           name: club.name,
           category: club.category,
           description: club.description,
           icon: club.icon,
-          accent_color: club.accent_color,
-          members_count: club.members_count,
-          last_posted_at: new Date()
-        })
-        .onConflict('slug')
-        .ignore()
-        .catch(() => {});
+          accent_color: club.accent_color
+        }).catch(() => {});
+      }
     }
+
+    // Reset inflated fake member counts to actual real member counts from community_club_members
+    try {
+      const memberCountRows = await db('community_club_members')
+        .groupBy('club_id')
+        .select('club_id')
+        .count('id as cnt')
+        .catch(() => []);
+      const countMap = {};
+      (memberCountRows || []).forEach(r => {
+        countMap[Number(r.club_id)] = parseInt(r.cnt || 0, 10);
+      });
+      const allClubs = await db('community_clubs').select('id', 'members_count').catch(() => []);
+      for (const c of (allClubs || [])) {
+        const realCount = Math.max(1, countMap[Number(c.id)] || 1);
+        if (Number(c.members_count) > 100 || countMap[Number(c.id)] !== undefined) {
+          await db('community_clubs').where({ id: c.id }).update({ members_count: realCount }).catch(() => {});
+        }
+      }
+    } catch (_) {}
 
     // Seed initial high-signal community posts if table is empty
     const postCountRow = await db('community_posts').count('id as cnt').first().catch(() => null);
@@ -396,11 +466,17 @@ router.get('/clubs', authenticateToken, async (req, res) => {
     await ensureCommunitySchema();
     const userId = req.user.id;
 
-    const [clubs, memberships, userRow] = await Promise.all([
-      db('community_clubs').orderBy('members_count', 'desc'),
+    const [clubs, memberships, userRow, memberCounts] = await Promise.all([
+      db('community_clubs').orderBy('id', 'asc'),
       db('community_club_members').where({ user_id: userId }).select('club_id'),
-      db('users').where({ id: userId }).select('id', 'subscription_tier', 'is_admin').first()
+      db('users').where({ id: userId }).select('id', 'subscription_tier', 'is_admin').first(),
+      db('community_club_members').groupBy('club_id').select('club_id').count('id as cnt').catch(() => [])
     ]);
+
+    const countMap = {};
+    (memberCounts || []).forEach(r => {
+      countMap[Number(r.club_id)] = parseInt(r.cnt || 0, 10);
+    });
 
     let joinedIds = new Set(memberships.map(m => Number(m.club_id)));
 
@@ -414,15 +490,22 @@ router.get('/clubs', authenticateToken, async (req, res) => {
           .ignore()
           .catch(() => {});
         joinedIds.add(Number(c.id));
+        countMap[Number(c.id)] = (countMap[Number(c.id)] || 0) + 1;
       }
     }
 
-    const formatted = clubs.map(c => ({
-      ...c,
-      members_count: Number(c.members_count || 0),
-      posts_count: Number(c.posts_count || 0),
-      is_joined: joinedIds.has(Number(c.id))
-    }));
+    const formatted = clubs.map(c => {
+      const isJoined = joinedIds.has(Number(c.id));
+      const realCount = countMap[Number(c.id)] !== undefined 
+        ? countMap[Number(c.id)] 
+        : (isJoined ? 1 : Math.max(0, Number(c.members_count || 0)));
+      return {
+        ...c,
+        members_count: Math.min(realCount, 50), // Real organic member count
+        posts_count: Number(c.posts_count || 0),
+        is_joined: isJoined
+      };
+    });
 
     const storagePolicy = getStoragePolicyForUser(userRow || req.user);
 

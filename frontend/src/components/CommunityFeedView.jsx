@@ -137,6 +137,8 @@ function formatRelativeTime(dateInput) {
 
 function formatMembersCount(num) {
   const n = Number(num || 0);
+  if (n <= 0) return '0 members';
+  if (n === 1) return '1 member';
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K members`;
   return `${n} members`;
 }
@@ -1352,98 +1354,120 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
             </div>
 
             {/* Discover Clubs by Category */}
-            {Object.entries(clubsByCategory).map(([categoryName, categoryClubs]) => (
-              <div
-                key={categoryName}
-                style={{
-                  background: '#131b2e',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
-                  borderRadius: '12px',
-                  padding: '16px'
-                }}
-              >
-                <div style={{
-                  fontSize: '11.5px',
-                  fontWeight: '800',
-                  letterSpacing: '0.8px',
-                  color: '#94a3b8',
-                  textTransform: 'uppercase',
-                  marginBottom: '12px'
-                }}>
-                  Discover Clubs — {categoryName}
-                </div>
+            {Object.entries(clubsByCategory).map(([categoryName, categoryClubs]) => {
+              const meta = categoryName === 'EXPLORING TRADERS'
+                ? { label: 'Markets & Exploring Traders', icon: '📊', color: '#38bdf8' }
+                : categoryName === 'INVESTORS'
+                ? { label: 'Investing & Wealth Building', icon: '🌱', color: '#10b981' }
+                : { label: 'Regional Languages & 7 Sisters Hub', icon: '🌐', color: '#f59e0b' };
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {categoryClubs.map(club => (
-                    <div
-                      key={club.id}
-                      onClick={() => {
-                        setSelectedClub(club);
-                        setActiveSubTab('hot');
-                      }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
-                        borderRadius: '10px',
-                        padding: '12px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
+              return (
+                <div
+                  key={categoryName}
+                  style={{
+                    background: '#131b2e',
+                    border: '1px solid rgba(255, 255, 255, 0.07)',
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}
+                >
+                  <div style={{
+                    fontSize: '12.5px',
+                    fontWeight: '800',
+                    letterSpacing: '0.5px',
+                    color: meta.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '14px',
+                    paddingBottom: '8px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <span style={{ fontSize: '15px' }}>{meta.icon}</span>
+                    <span>{meta.label} ({categoryClubs.length})</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {categoryClubs.map(club => (
+                      <div
+                        key={club.id}
+                        onClick={() => {
+                          setSelectedClub(club);
+                          setActiveSubTab('hot');
+                        }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
                           borderRadius: '10px',
-                          background: `${club.accent_color || '#38bdf8'}20`,
-                          border: `1px solid ${club.accent_color || '#38bdf8'}45`,
+                          padding: '12px 14px',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '20px',
-                          flexShrink: 0
-                        }}>
-                          {club.icon}
-                        </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
-                              {club.name}
-                            </span>
-                            <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '600' }}>
-                              • {formatMembersCount(club.members_count)}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px', lineHeight: '1.4' }}>
-                            {club.description}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={(e) => handleToggleJoinClub(club, e)}
-                        style={{
-                          background: club.is_joined ? 'rgba(59, 130, 246, 0.12)' : '#2563eb',
-                          color: club.is_joined ? '#60a5fa' : '#ffffff',
-                          border: club.is_joined ? '1px solid rgba(59, 130, 246, 0.35)' : 'none',
-                          borderRadius: '8px',
-                          padding: '6px 14px',
-                          fontSize: '12px',
-                          fontWeight: '700',
+                          justifyContent: 'space-between',
+                          gap: '12px',
                           cursor: 'pointer',
-                          flexShrink: 0
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        {club.is_joined ? 'Joined ✓' : '+ Join'}
-                      </button>
-                    </div>
-                  ))}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '10px',
+                            background: `${club.accent_color || '#38bdf8'}20`,
+                            border: `1px solid ${club.accent_color || '#38bdf8'}45`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '20px',
+                            flexShrink: 0
+                          }}>
+                            {club.icon}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
+                                {club.name}
+                              </span>
+                              <span style={{
+                                fontSize: '11px',
+                                color: '#94a3b8',
+                                background: 'rgba(255, 255, 255, 0.06)',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontWeight: '600'
+                              }}>
+                                {formatMembersCount(club.members_count)}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px', lineHeight: '1.4' }}>
+                              {club.description}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => handleToggleJoinClub(club, e)}
+                          style={{
+                            background: club.is_joined ? 'rgba(34, 197, 94, 0.12)' : 'linear-gradient(135deg, #0284c7, #2563eb)',
+                            color: club.is_joined ? '#4ade80' : '#ffffff',
+                            border: club.is_joined ? '1px solid rgba(34, 197, 94, 0.4)' : 'none',
+                            borderRadius: '8px',
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {club.is_joined ? 'Joined ✓' : '+ Join'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           /* ═══════════════════════════════════════════════════════════════════════
