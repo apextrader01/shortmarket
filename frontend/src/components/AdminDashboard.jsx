@@ -50,7 +50,8 @@ function DateRangeExportBar({
   setCustomEnd,
   onExportExcel,
   onExportPDF,
-  exporting
+  exporting,
+  label = 'Date Range:'
 }) {
   const presets = [
     { id: 'week', label: 'Week' },
@@ -77,7 +78,7 @@ function DateRangeExportBar({
       {/* Date Presets */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600', marginRight: '2px' }}>
-          Date Range:
+          {label}
         </span>
         {presets.map(p => {
           const isActive = datePreset === p.id;
@@ -1969,8 +1970,8 @@ export default function AdminDashboard() {
 
   // Client Management Filters & Sorting
   const [clientSearch, setClientSearch] = useState('');
-  const [clientFilter, setClientFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'BANNED' | 'PRO' | 'KYC_VERIFIED' | 'KYC_MISSING' | 'SHARED_IP'
-  const [clientSort, setClientSort] = useState('balance_desc'); // 'balance_desc' | 'balance_asc' | 'name_asc' | 'newest'
+  const [clientFilter, setClientFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'BANNED' | 'PRO' | 'KYC_VERIFIED' | 'KYC_MISSING' | 'SHARED_IP' | 'CREATED_TODAY' | 'CREATED_WEEK' | 'CREATED_MONTH'
+  const [clientSort, setClientSort] = useState('created_desc'); // 'created_desc' | 'created_asc' | 'balance_desc' | 'balance_asc' | 'name_asc' | 'newest'
 
   const filteredClients = useMemo(() => {
     let list = users || [];
@@ -1985,6 +1986,20 @@ export default function AdminDashboard() {
         String(u.id).includes(q)
       );
     }
+
+    // Filter by Date Preset / Custom Range if set
+    if (usersDatePreset && usersDatePreset !== 'all') {
+      const { startDate, endDate } = calculateDateBounds(usersDatePreset, usersCustomStart, usersCustomEnd);
+      if (startDate) {
+        const sTime = new Date(startDate).getTime();
+        list = list.filter(u => u.created_at && new Date(u.created_at).getTime() >= sTime);
+      }
+      if (endDate) {
+        const eTime = new Date(endDate).getTime();
+        list = list.filter(u => u.created_at && new Date(u.created_at).getTime() <= eTime);
+      }
+    }
+
     if (clientFilter === 'ACTIVE') {
       list = list.filter(u => !u.is_banned);
     } else if (clientFilter === 'BANNED') {
@@ -1997,15 +2012,35 @@ export default function AdminDashboard() {
       list = list.filter(u => !u.kyc_pan_url || !u.kyc_aadhar_url);
     } else if (clientFilter === 'SHARED_IP') {
       list = list.filter(u => (u.shared_ip_count || 0) > 1);
+    } else if (clientFilter === 'CREATED_TODAY') {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      list = list.filter(u => u.created_at && new Date(u.created_at).getTime() >= startOfDay.getTime());
+    } else if (clientFilter === 'CREATED_WEEK') {
+      const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      list = list.filter(u => u.created_at && new Date(u.created_at).getTime() >= oneWeekAgo);
+    } else if (clientFilter === 'CREATED_MONTH') {
+      const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      list = list.filter(u => u.created_at && new Date(u.created_at).getTime() >= oneMonthAgo);
     }
+
     return [...list].sort((a, b) => {
+      if (clientSort === 'created_desc' || clientSort === 'newest') {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.id || 0);
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.id || 0);
+        return timeB - timeA;
+      }
+      if (clientSort === 'created_asc') {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.id || 0);
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.id || 0);
+        return timeA - timeB;
+      }
       if (clientSort === 'balance_desc') return (Number(b.balance) || 0) - (Number(a.balance) || 0);
       if (clientSort === 'balance_asc') return (Number(a.balance) || 0) - (Number(b.balance) || 0);
       if (clientSort === 'name_asc') return (a.username || '').localeCompare(b.username || '');
-      if (clientSort === 'newest') return (b.id || 0) - (a.id || 0);
       return 0;
     });
-  }, [users, clientSearch, clientFilter, clientSort]);
+  }, [users, clientSearch, clientFilter, clientSort, usersDatePreset, usersCustomStart, usersCustomEnd]);
 
   // Withdrawal Requests Filters & Sorting
   const [withdrawalSearch, setWithdrawalSearch] = useState('');
@@ -6113,16 +6148,18 @@ export default function AdminDashboard() {
                       cursor: 'pointer'
                     }}
                   >
+                    <option value="created_desc">Created (Newest First)</option>
+                    <option value="created_asc">Created (Oldest First)</option>
                     <option value="balance_desc">Balance (High → Low)</option>
                     <option value="balance_asc">Balance (Low → High)</option>
                     <option value="name_asc">Name (A → Z)</option>
-                    <option value="newest">Newest First</option>
                   </select>
                 </div>
               </div>
 
               {/* Date Filter Pills & Export Bar */}
               <DateRangeExportBar
+                label="Account Creation Date:"
                 datePreset={usersDatePreset}
                 setDatePreset={p => { setUsersDatePreset(p); setPage(1); }}
                 customStart={usersCustomStart}
@@ -6166,6 +6203,9 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                   {[
                     { label: 'All', val: 'ALL' },
+                    { label: '🆕 Created Today', val: 'CREATED_TODAY' },
+                    { label: '📅 Created This Week', val: 'CREATED_WEEK' },
+                    { label: '🗓️ Created This Month', val: 'CREATED_MONTH' },
                     { label: '🟢 Active', val: 'ACTIVE' },
                     { label: '🚫 Banned', val: 'BANNED' },
                     { label: '⭐ PRO Tier', val: 'PRO' },
@@ -6201,6 +6241,7 @@ export default function AdminDashboard() {
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                   <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
                   <th style={{ padding: '6px 12px', fontWeight: '600' }}>Contact</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Created On</th>
                   <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Margin Balance</th>
                   <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>KYC Status</th>
                   <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
@@ -6209,8 +6250,8 @@ export default function AdminDashboard() {
               <tbody>
                 {filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      {clientSearch || clientFilter !== 'ALL' ? 'No clients match your filter criteria' : 'No users found'}
+                    <td colSpan={6} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {clientSearch || clientFilter !== 'ALL' || (usersDatePreset && usersDatePreset !== 'all') ? 'No clients match your filter criteria' : 'No users found'}
                     </td>
                   </tr>
                 ) : (
@@ -6262,6 +6303,15 @@ export default function AdminDashboard() {
                         <td style={{ padding: '6px 12px', color: 'var(--text-secondary)' }}>
                           <div>{u.email}</div>
                           <div style={{ fontSize: '10px' }}>{u.phone || 'No phone'}</div>
+                        </td>
+                        <td style={{ padding: '6px 12px', whiteSpace: 'nowrap' }}>
+                          <div style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={11} style={{ color: 'var(--color-blue)', flexShrink: 0 }} />
+                            {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          </div>
+                          <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginLeft: '15px' }}>
+                            {u.created_at ? new Date(u.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
+                          </div>
                         </td>
                         <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
                           ₹{Number(u.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
