@@ -255,9 +255,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
     if (!isOpen || secondsLeft > 0) return;
     if (!completionTrackedRef.current) {
       completionTrackedRef.current = true;
-      window._activeFetchUserDataPromise = null;
       useStore.getState().fetchUserData?.();
-      useStore.getState().fetchOrders?.(true);
       trackAdEvent('complete_30s').finally(() => {
         if (typeof onAdCompleted === 'function') {
           onAdCompleted();
@@ -875,9 +873,7 @@ export function RewardedAdModal({ isOpen, onClose, onRewardClaimed, onAdComplete
                   type="button"
                   disabled={secondsLeft > 0}
                   onClick={() => {
-                    window._activeFetchUserDataPromise = null;
                     useStore.getState().fetchUserData?.();
-                    useStore.getState().fetchOrders?.(true);
                     if (typeof onClose === 'function') onClose();
                   }}
                   style={{

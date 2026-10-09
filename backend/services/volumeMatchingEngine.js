@@ -90,17 +90,6 @@ class VolumeMatchingEngine {
       for (const ord of pending) {
         this.enqueueOrder(ord);
         if (ord.symbol) symbolsToSubscribe.add(ord.symbol);
-
-        // Immediate resolution for resting market orders if live price is already available
-        if (ord.type === 'MARKET') {
-          const cached = getCachedPrice(this.priceCache, ord.symbol);
-          const currentLtp = Number(cached?.ltp || ord.price || 0);
-          if (currentLtp > 0) {
-            this.submitOrder(ord, currentLtp).catch(err => {
-              console.error(`Error resolving resting market order ${ord.id}:`, err.message);
-            });
-          }
-        }
       }
 
       // Ensure Fyers WebSocket actively subscribes to all resting volume order symbols
@@ -286,23 +275,10 @@ class VolumeMatchingEngine {
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
     }
 
-    // Immediate execution fallback for Market orders and Marketable Limit orders:
-    // If Level-2 depth book is empty (e.g. options contracts or illiquid strikes) or only
-    // partially filled the order, and a valid live price (baseLtp) exists, execute the remaining
-    // pending quantity immediately at baseLtp so market orders fill instantaneously.
-    if (ordObj.pending_quantity > 0 && baseLtp > 0) {
-      const isMarket = Boolean(ordObj.isMarket || ordObj.type === 'MARKET');
-      let isMarketable = isMarket;
-      if (!isMarket && ordObj.type === 'LIMIT' && ordObj.price) {
-        const limitPrice = Number(ordObj.price);
-        isMarketable = (ordObj.side === 'BUY' && baseLtp <= limitPrice) || (ordObj.side === 'SELL' && baseLtp >= limitPrice);
-      }
-
-      if (isMarketable) {
-        const remainingQty = ordObj.pending_quantity;
-        await this.processSliceFill(ordObj, remainingQty, baseLtp);
-      }
-    }
+    // Notice: Any remaining ordObj.pending_quantity stays queued in this.symbolQueues.
+    // We NEVER fill remaining quantity out of thin air! It strictly waits for real exchange
+    // trade volume ticks in onTick to ensure realistic volume matching across all segments.
+    // (Checked: ordObj.type === 'MARKET' || ordObj.isMarket)
 
     // Automatically dequeue order if completely executed
     if (ordObj.pending_quantity <= 0) {
@@ -390,23 +366,9 @@ class VolumeMatchingEngine {
 
       const now = Date.now();
 
-      // Ensure any resting market orders in queue execute immediately at live ltp
-      const snapshotQueue = [...queue];
-      for (const order of snapshotQueue) {
-        if (!order || !this.activeOrders.has(order.id.toString()) || order.pending_quantity <= 0) continue;
-        const isMarket = Boolean(order.type === 'MARKET' || order.isMarket);
-        let isMarketable = isMarket;
-        if (!isMarket && order.type === 'LIMIT' && order.price) {
-          const limitPrice = Number(order.price);
-          isMarketable = (order.side === 'BUY' && ltp <= limitPrice) || (order.side === 'SELL' && ltp >= limitPrice);
-        }
-        if (isMarketable) {
-          await this.processSliceFill(order, order.pending_quantity, ltp);
-        }
-      }
-
-      // Remaining limit orders strictly wait for real exchange volume
-      if (deltaVol <= 0) return;
+      // ALL instruments (cash equities, derivatives, commodities) must wait for real exchange volume.
+      // Never fabricate fake volume — if deltaVol is 0, the order stays pending until real trades happen.
+      if (deltaVol <= 0) return; // Strictly wait for real exchange volume for ALL instruments
 
       // Distribute available tick volume to active orders in FIFO order per side.
       // Every trade on the exchange has BOTH a buyer and a seller:
@@ -415,6 +377,7 @@ class VolumeMatchingEngine {
       // and SELL orders match against exchange buy liquidity (availableSellVol).
       let availableBuyVol = deltaVol;
       let availableSellVol = deltaVol;
+      const snapshotQueue = [...queue];
 
       for (let i = 0; i < snapshotQueue.length; i++) {
         const order = snapshotQueue[i];
@@ -1403,20 +1366,6 @@ class VolumeMatchingEngine {
           const cached = getCachedPrice(this.priceCache, normSym) || {};
           const ltp = Number(cached.ltp || 0);
           if (ltp <= 0) continue;
-
-          // Immediately process any resting market orders at live LTP
-          for (const order of [...queue]) {
-            if (!order || !this.activeOrders.has(order.id.toString()) || order.pending_quantity <= 0) continue;
-            const isMarket = Boolean(order.type === 'MARKET' || order.isMarket);
-            let isMarketable = isMarket;
-            if (!isMarket && order.type === 'LIMIT' && order.price) {
-              const limitPrice = Number(order.price);
-              isMarketable = (order.side === 'BUY' && ltp <= limitPrice) || (order.side === 'SELL' && ltp >= limitPrice);
-            }
-            if (isMarketable) {
-              await this.processSliceFill(order, order.pending_quantity, ltp);
-            }
-          }
 
           // ── VOLUME GATE: Use SHARED volume tracker (same as onTick) to prevent double-counting ──
           const currentVol = Number(cached.volume || 0);

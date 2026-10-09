@@ -1992,10 +1992,9 @@ export const useStore = create(persist((set, get) => ({
           }
         }
 
-        // 2. Force fresh fetch of user data and orders from backend (clear in-flight lock so this fetch is guaranteed)
+        // 2. Force fresh fetch of user data from backend (clear in-flight lock so this fetch is guaranteed)
         window._activeFetchUserDataPromise = null;
         get().fetchUserData().catch(() => {});
-        get().fetchOrders?.(true).catch?.(() => {});
 
         // Show Sponsored Ad right when Buy/New order is placed (Open, Pending, AMO, or Executed)
         if (typeof window !== 'undefined' && data.status !== 'REJECTED') {
@@ -2169,24 +2168,6 @@ export const useStore = create(persist((set, get) => ({
       console.error('[cancelSip ERROR]', err);
       return null;
     }
-  },
-
-  fetchOrders: async (all = false) => {
-    try {
-      const token = localStorage.getItem('token') || get().token;
-      const headers = { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
-      const res = await fetch(`${API}/api/orders${all ? '?all=true' : ''}`, { credentials: 'include', headers });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          set({ orders: data });
-          return data;
-        }
-      }
-    } catch (e) {
-      console.error('fetchOrders error:', e);
-    }
-    return get().orders;
   },
 
   cancelOrder: async (orderId) => {
