@@ -1798,6 +1798,11 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
         if (auth) {
           const fbUser = await auth.getUserByEmail(user.email.toLowerCase().trim()).catch(() => null);
           if (fbUser && fbUser.emailVerified === false) {
+            const { sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
+            if (typeof sendFirebaseVerificationEmail === 'function') {
+              sendFirebaseVerificationEmail(user.email).catch(e => console.warn('[PRE-LOGIN] Auto-dispatch verification email note:', e.message));
+            }
+
             return res.status(403).json({
               error: `Please verify your email address to log in. An activation link was sent to ${user.email}. Check your inbox and spam folder.`,
               needs_email_verification: true,

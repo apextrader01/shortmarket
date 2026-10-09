@@ -9,7 +9,15 @@ try {
 
 let admin = null;
 let authInstance = null;
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || '';
+function getFirebaseApiKey() {
+  return process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || 'AIzaSyBc_mR872wmE9jhFjobSHODqA5OlTHrK1I';
+}
+
+const GOOGLE_API_HEADERS = {
+  'Content-Type': 'application/json',
+  'Referer': 'https://skandx.in/',
+  'Origin': 'https://skandx.in'
+};
 
 try {
   admin = require('firebase-admin');
@@ -135,9 +143,10 @@ async function sendFirebasePasswordReset(email) {
 
   // 2. Dispatch email via Firebase Identity Toolkit REST API
   // This triggers Google/Firebase's high-deliverability mail servers to send the reset email
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`, {
+  const apiKey = getFirebaseApiKey();
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: GOOGLE_API_HEADERS,
     body: JSON.stringify({
       requestType: 'PASSWORD_RESET',
       email: cleanEmail,
@@ -171,11 +180,13 @@ async function sendFirebaseVerificationEmail(email) {
   const auth = getFirebaseAdminAuth();
   if (!auth) throw new Error('Firebase Admin Auth instance not initialized');
 
+  const apiKey = getFirebaseApiKey();
+
   // 2. Mint custom token and exchange for idToken to trigger official verify email
   const customToken = await auth.createCustomToken(user.uid);
-  const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_WEB_API_KEY}`, {
+  const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: GOOGLE_API_HEADERS,
     body: JSON.stringify({ token: customToken, returnSecureToken: true })
   });
   const signInData = await signInRes.json();
@@ -184,9 +195,9 @@ async function sendFirebaseVerificationEmail(email) {
   }
 
   // 3. Dispatch official Firebase verification email via Google Identity Toolkit REST API
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`, {
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: GOOGLE_API_HEADERS,
     body: JSON.stringify({
       requestType: 'VERIFY_EMAIL',
       idToken: signInData.idToken,
@@ -235,8 +246,21 @@ try {
  * Send branded HTML verification email via Gmail SMTP
  */
 async function sendEmailOtpViaService(email, code) {
-  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  let gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  let gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  if (!gmailUser || !gmailPass) {
+    try {
+      const db = require('../database/db');
+      if (typeof db === 'function') {
+        const rows = await db('system_settings').whereIn('key', ['gmail_user', 'gmail_app_password']);
+        for (const r of rows) {
+          if (r.key === 'gmail_user') gmailUser = r.value;
+          if (r.key === 'gmail_app_password') gmailPass = r.value;
+        }
+      }
+    } catch (_) {}
+  }
 
   // 1. Primary: Direct Google / Gmail SMTP (₹0, 500/day free, 100% white-labeled)
   if (nodemailer && gmailUser && gmailPass) {
@@ -376,9 +400,10 @@ async function verifyFirebasePhoneToken(idToken, submittedPhone = null, submitte
 async function verifyFirebasePasswordResetOobCode(oobCode, newPassword) {
   if (!oobCode || !newPassword) throw new Error('Missing reset code or new password');
 
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=${FIREBASE_WEB_API_KEY}`, {
+  const apiKey = getFirebaseApiKey();
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=${apiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: GOOGLE_API_HEADERS,
     body: JSON.stringify({
       oobCode: String(oobCode).trim(),
       newPassword: String(newPassword)
@@ -400,9 +425,10 @@ async function verifyFirebasePassword(email, password) {
   if (!email || !password) return { success: false };
   try {
     const cleanEmail = String(email).trim().toLowerCase();
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`, {
+    const apiKey = getFirebaseApiKey();
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: GOOGLE_API_HEADERS,
       body: JSON.stringify({
         email: cleanEmail,
         password: String(password),
