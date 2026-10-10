@@ -404,7 +404,14 @@ export default function PortfolioView() {
   // Filter & Sort Holdings
   const processedHoldings = useMemo(() => {
     let list = deliveryPositions.map(pos => {
-      const priceData = portfolioPrices[pos.symbol] || {};
+      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const priceData = portfolioPrices[pos.symbol] 
+        || portfolioPrices[cleanSym] 
+        || portfolioPrices[`NSE:${cleanSym}`] 
+        || portfolioPrices[`BSE:${cleanSym}`] 
+        || portfolioPrices[`MCX:${cleanSym}`] 
+        || portfolioPrices[`NSE:${cleanSym}-EQ`] 
+        || {};
       const avg = Math.abs(parseFloat(pos.average_price) || 0);
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
       const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
@@ -1332,7 +1339,6 @@ export default function PortfolioView() {
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '80px' }}>Qty / Units</th>
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Avg Price</th>
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '95px' }}>Live LTP / NAV</th>
-                      <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '105px' }}>Day Change</th>
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Invested</th>
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Current</th>
                       <th style={{ padding: '11px 12px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '115px' }}>Total Return (P&L)</th>
@@ -1342,7 +1348,7 @@ export default function PortfolioView() {
                   <tbody>
                     {processedHoldings.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <td colSpan={8} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <Layers size={36} style={{ opacity: 0.3 }} />
                             <div style={{ fontSize: '14px', fontWeight: '600' }}>No Delivery Holdings Found</div>
@@ -1414,22 +1420,6 @@ export default function PortfolioView() {
                             </td>
                             <td style={{ padding: '11px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '90px' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
                             <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: '#2563eb', fontVariantNumeric: 'tabular-nums', width: '95px' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '11px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '105px' }}>
-                              {pos.isMf ? (
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '10.5px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '500' }}>
-                                  Daily NAV
-                                </span>
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                  <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600', fontSize: '12px' }}>
-                                    {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
-                                  </div>
-                                  <div style={{ fontSize: '10.5px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.9, fontWeight: '600' }}>
-                                    {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
-                                  </div>
-                                </div>
-                              )}
-                            </td>
                             <td style={{ padding: '11px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '100px' }}>{formatCurrency(pos.invested)}</td>
                             <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '100px' }}>{formatCurrency(pos.current)}</td>
                             <td style={{ padding: '11px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '115px' }}>
