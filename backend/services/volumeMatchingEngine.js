@@ -54,6 +54,7 @@ class VolumeMatchingEngine {
   constructor() {
     this.priceCache = {};
     this.io = null;
+    this.isMarketOpenFn = null;
     // symbol -> Array of active order objects (FIFO queue)
     this.symbolQueues = new Map();
     // orderId -> active order object
@@ -63,6 +64,10 @@ class VolumeMatchingEngine {
     // Prevent overlapping tick processing for same symbol
     this.processingSymbols = new Set();
     console.log('📊 Volume & Market Depth Matching Engine initialized.');
+  }
+
+  setMarketOpenChecker(fn) {
+    this.isMarketOpenFn = typeof fn === 'function' ? fn : null;
   }
 
   init(priceCacheRef, ioInstance) {
@@ -88,6 +93,11 @@ class VolumeMatchingEngine {
 
       const symbolsToSubscribe = new Set();
       for (const ord of pending) {
+        if (ord.status === 'AMO_PENDING') continue;
+        if (typeof this.isMarketOpenFn === 'function' && ord.order_variety === 'AMO' && Number(ord.filled_quantity || 0) <= 0) {
+          const isOpen = this.isMarketOpenFn(ord.symbol, ord.product_type, Boolean(ord.is_exit));
+          if (!isOpen) continue;
+        }
         this.enqueueOrder(ord);
         if (ord.symbol) symbolsToSubscribe.add(ord.symbol);
       }
@@ -196,6 +206,14 @@ class VolumeMatchingEngine {
    * Step 2: If quantity remains, put the rest in the tick-by-tick volume queue.
    */
   async submitOrder(order, baseLtp) {
+    if (!order || order.status === 'AMO_PENDING') return;
+    if (typeof this.isMarketOpenFn === 'function') {
+      const isExit = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+      if (!this.isMarketOpenFn(order.symbol, order.product_type, isExit)) {
+        console.warn(`⏸️ [VolumeMatchingEngine] Blocked submitOrder for #${order.id} (${order.symbol}) because market is closed/holiday.`);
+        return;
+      }
+    }
     this.enqueueOrder(order);
     const ordObj = this.activeOrders.get(order.id.toString());
     if (!ordObj) return;
@@ -329,6 +347,9 @@ class VolumeMatchingEngine {
    */
   async onTick(symbol, tick) {
     if (!symbol || !tick) return;
+    if (typeof this.isMarketOpenFn === 'function' && !this.isMarketOpenFn(symbol)) {
+      return;
+    }
     const normSym = normalizeSymbol(symbol);
     const queue = this.symbolQueues.get(normSym);
     if (!queue || queue.length === 0) {
@@ -1434,6 +1455,7 @@ class VolumeMatchingEngine {
           for (const order of [...queue]) {
             if (volDelta <= 0) break;
             if (!order || order.pending_quantity <= 0) continue;
+            if (typeof this.isMarketOpenFn === 'function' && !this.isMarketOpenFn(order.symbol, order.product_type, order.is_exit)) continue;
 
             // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume via onTick
             const isDerivOrCommodity = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);

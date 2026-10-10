@@ -388,7 +388,15 @@ function loadTokenFromDisk() {
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 
-function isAnyTradingSessionOpen() {
+let customMarketOpenChecker = null;
+function setMarketOpenChecker(fn) {
+    customMarketOpenChecker = typeof fn === 'function' ? fn : null;
+}
+
+function isAnyTradingSessionOpen(symbol = null) {
+    if (symbol && typeof customMarketOpenChecker === 'function') {
+        try { return Boolean(customMarketOpenChecker(symbol)); } catch (e) {}
+    }
     const istTimeParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(new Date());
     const istH = parseInt(istTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
     const istM = parseInt(istTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
@@ -802,14 +810,18 @@ function startLiveWebSocket() {
                     }
                     dirtySymbols.add(uniqueSymbol); // Broadcast canonical uniqueSymbol (cuts duplicate emissions)
                     
-                    // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
-                    if (triggerEngine) {
-                        triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
-                    }
+                    // Only evaluate triggers and volume matching when the symbol's market session is actually open
+                    // (Prevents Fyers initial subscription closing snapshots on weekends/holidays/nights from filling resting orders)
+                    if (isAnyTradingSessionOpen(uniqueSymbol)) {
+                        // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
+                        if (triggerEngine) {
+                            triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
+                        }
 
-                    // Feed tick into realistic volume and market depth matching engine
-                    if (volumeMatchingEngine) {
-                        volumeMatchingEngine.onTick(uniqueSymbol, priceObj).catch(() => {});
+                        // Feed tick into realistic volume and market depth matching engine
+                        if (volumeMatchingEngine) {
+                            volumeMatchingEngine.onTick(uniqueSymbol, priceObj).catch(() => {});
+                        }
                     }
                 });
             }
@@ -1418,6 +1430,7 @@ module.exports = {
     resumeLiveFeed,
     isLiveFeedPaused,
     isAnyTradingSessionOpen,
+    setMarketOpenChecker,
     toFyersSymbol,
     fromFyersSymbol,
     purgeExpiredSubscriptions,

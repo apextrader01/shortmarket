@@ -320,14 +320,36 @@ async function loadMarketCalendarFromDb() {
 }
 loadMarketCalendarFromDb();
 
+function isTradingDayOpen(isCommodity = false) {
+  const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
+  if (globalStatus === 'CLOSED') return false;
+  if (globalStatus === 'OPEN') return true;
+
+  const now = new Date();
+  const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  const year = istTime.getUTCFullYear();
+  const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+  const dateNum = String(istTime.getUTCDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${dateNum}`;
+  const day = istTime.getUTCDay(); // 0 = Sun, 6 = Sat
+
+  const calRule = marketCalendarCache.get(todayStr);
+  if (calRule) {
+    const segmentStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
+    if (segmentStatus === 'CLOSED') return false;
+    if (segmentStatus === 'OPEN') return true;
+  }
+
+  if (day === 0 || day === 6) return false;
+  return true;
+}
+
 function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, isClosingOrder = false) {
   const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
   if (globalStatus === 'CLOSED') {
     return { open: false, isTotalBlock: true, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
   }
-
-  // Position exits/closing orders are always permitted
-  if (isClosingOrder) {
+  if (globalStatus === 'OPEN') {
     return { open: true, session: 'OPEN' };
   }
   
@@ -10514,6 +10536,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         let ltpForMarket = 0;
         let updatedOrder = null;
         let updatedChildOrders = [];
+        let modMarketOpen = true;
         
         await db.transaction(async (trx) => {
           await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
@@ -10531,9 +10554,23 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           }
           const newPendingQty = Math.max(0, newQty - filledQty);
 
-          // Validate Exchange Freeze Limit on order modification
+          // Validate Exchange Freeze Limit & Market Session / Holiday Status on order modification
           const isMF = String(order.symbol).endsWith('-MF') || String(order.symbol).includes('MUTUALFUND');
           if (!isMF) {
+            const isCommodity = isCommodityContract(order.symbol);
+            const marketCheck = isSegmentMarketOpen(isCommodity, order.symbol, order.product_type, Boolean(order.is_exit));
+            modMarketOpen = Boolean(marketCheck.open);
+
+            if (!marketCheck.open) {
+              if (marketCheck.isTotalBlock) {
+                throw Object.assign(new Error(marketCheck.reason), { statusCode: 400 });
+              }
+              const isAmoOrder = (order.status === 'AMO_PENDING' || order.order_variety === 'AMO' || order.order_variety === 'CAS');
+              if (!isAmoOrder && isMarket) {
+                throw Object.assign(new Error(marketCheck.reason || 'Market is currently closed. Cannot execute at Market price outside trading hours.'), { statusCode: 400 });
+              }
+            }
+
             const { getFreezeLimit, getInstantLotsize } = require('./services/taxCalculator');
             const freezeLimit = getFreezeLimit(order.symbol);
             if (freezeLimit && newQty > freezeLimit) {
@@ -10546,8 +10583,11 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
             }
           }
 
-          // Handle Market Execution override for Pending Triggers
+          // Handle Market Execution override for Pending Triggers (only when market session is actually open)
           if (isMarket && order.status === 'PENDING_TRIGGER') {
+             if (!modMarketOpen) {
+               throw Object.assign(new Error('Market is currently closed. Trigger orders cannot be executed at Market price outside trading hours.'), { statusCode: 400 });
+             }
              ltpForMarket = getLtpFromPriceCache(order.symbol) || Number(order.trigger_price) || Number(order.price) || 0;
              if (ltpForMarket <= 0) throw Object.assign(new Error('Live price unavailable for market execution'), { statusCode: 400 });
              
@@ -10779,8 +10819,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           }
         });
 
-        // Outside Transaction: update Redis triggers
-        if (marketOrderToExecute) {
+        // Outside Transaction: update Redis triggers (only execute when market is open)
+        if (marketOrderToExecute && modMarketOpen) {
             const triggerEngine = require('./services/triggerEngine');
             triggerEngine.removeOrderFromMemory(marketOrderToExecute.id, marketOrderToExecute.symbol);
             await triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
@@ -10790,31 +10830,37 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         const triggerEngine = require('./services/triggerEngine');
         if (updatedOrder) {
             await triggerEngine.removeOrderFromMemory(updatedOrder.id, updatedOrder.symbol);
-            if (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PENDING_TRIGGER') {
+            if (modMarketOpen && (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PENDING_TRIGGER')) {
                 await triggerEngine.addOrderToMemory(updatedOrder);
             }
             try {
                 const volumeMatchingEngine = require('./services/volumeMatchingEngine');
-                volumeMatchingEngine.updateOrder(updatedOrder.id, {
-                    type: updatedOrder.type,
-                    quantity: updatedOrder.quantity,
-                    pending_quantity: updatedOrder.pending_quantity,
-                    price: updatedOrder.price,
-                    margin: updatedOrder.margin,
-                    status: updatedOrder.status
-                });
+                if (!modMarketOpen || updatedOrder.status === 'AMO_PENDING') {
+                    volumeMatchingEngine.dequeueOrder(updatedOrder.id, updatedOrder.symbol);
+                } else {
+                    volumeMatchingEngine.updateOrder(updatedOrder.id, {
+                        type: updatedOrder.type,
+                        quantity: updatedOrder.quantity,
+                        pending_quantity: updatedOrder.pending_quantity,
+                        price: updatedOrder.price,
+                        margin: updatedOrder.margin,
+                        status: updatedOrder.status
+                    });
 
-                if (updatedOrder.type === 'MARKET' && (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PARTIAL_FILLED')) {
-                    const baseLtp = getLtpFromPriceCache(updatedOrder.symbol) || parseFloat(updatedOrder.price) || 0;
-                    if (baseLtp > 0) {
-                        await volumeMatchingEngine.submitOrder(updatedOrder, baseLtp).catch(e => console.error('Volume matching submission error:', e));
+                    if (updatedOrder.type === 'MARKET' && (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PARTIAL_FILLED')) {
+                        const baseLtp = getLtpFromPriceCache(updatedOrder.symbol) || parseFloat(updatedOrder.price) || 0;
+                        if (baseLtp > 0) {
+                            await volumeMatchingEngine.submitOrder(updatedOrder, baseLtp).catch(e => console.error('Volume matching submission error:', e));
+                        }
                     }
                 }
             } catch(e) {}
         }
         for (const child of updatedChildOrders) {
             await triggerEngine.removeOrderFromMemory(child.id, child.symbol);
-            await triggerEngine.addOrderToMemory(child);
+            if (modMarketOpen) {
+                await triggerEngine.addOrderToMemory(child);
+            }
         }
 
         try {
@@ -15059,6 +15105,17 @@ server.listen(PORT, async () => {
     setTimeout(cleanStaleOptionCache, 60000); // Also prune 60s after server boot
 
 
+    // Wire live market-open & holiday checker into Fyers WebSocket tick pipeline
+    try {
+      const { setMarketOpenChecker: setFyersMarketOpenChecker } = require('./services/fyers');
+      if (typeof setFyersMarketOpenChecker === 'function') {
+        setFyersMarketOpenChecker((sym) => {
+          const isCom = isCommodityContract(sym);
+          return Boolean(isSegmentMarketOpen(isCom, sym).open);
+        });
+      }
+    } catch (e) {}
+
     // Initialize TriggerEngine
     triggerEngine.setPriceCache(priceCache);
     triggerEngine.setSocketIo(io);
@@ -15067,6 +15124,12 @@ server.listen(PORT, async () => {
 
     // Initialize Volume & Market Depth Matching Engine
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+    if (typeof volumeMatchingEngine.setMarketOpenChecker === 'function') {
+      volumeMatchingEngine.setMarketOpenChecker((sym, productType, isExit) => {
+        const isCom = isCommodityContract(sym);
+        return Boolean(isSegmentMarketOpen(isCom, sym, productType, isExit).open);
+      });
+    }
     volumeMatchingEngine.init(priceCache, io);
     volumeMatchingEngine.startPacingHeartbeat();
     console.log('📊 VolumeMatchingEngine active on Master (Depth + POV tick-by-tick matching + Pacing Heartbeat)');
@@ -15082,10 +15145,10 @@ server.listen(PORT, async () => {
     }).start();
     console.log('🛡️  MTM Risk Manager active (95% auto-liquidation, synced with Admin Market Status)');
 
-    initCronJobs(priceCache, triggerEngine);
+    initCronJobs(priceCache, triggerEngine, isTradingDayOpen, isSegmentMarketOpen);
     startSquareOffJobs();
     initRiskyStocksSync();
-    initOrderExecutor(priceCache);
+    initOrderExecutor(priceCache, isSegmentMarketOpen);
     SIPEngine.init(priceCache);
 
     // Auto-heal user email casing, standardize sequential SE00000... Client IDs, and link orphaned referrals
@@ -15128,6 +15191,12 @@ server.listen(PORT, async () => {
   } else {
     // Worker instances also initialize volumeMatchingEngine with local priceCache & io
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+    if (typeof volumeMatchingEngine.setMarketOpenChecker === 'function') {
+      volumeMatchingEngine.setMarketOpenChecker((sym, productType, isExit) => {
+        const isCom = isCommodityContract(sym);
+        return Boolean(isSegmentMarketOpen(isCom, sym, productType, isExit).open);
+      });
+    }
     volumeMatchingEngine.init(priceCache, io);
     console.log(`👷 Worker Instance: Listening for API requests and WS connections (volumeMatchingEngine initialized)...`);
   }
@@ -15161,4 +15230,4 @@ if (typeof global.gc === 'function') {
 process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
-module.exports = { io, priceCache };
+module.exports = { io, priceCache, isSegmentMarketOpen, isTradingDayOpen };

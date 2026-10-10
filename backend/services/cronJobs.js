@@ -84,7 +84,103 @@ function isIntradayBlocked(symbol) {
     return isNonFnoEquityIntradayBlocked || isEquityIntradayBlocked || (timeVal >= 1515) || (timeVal < 915);
 }
 
+let customTradingDayChecker = null;
+let customSegmentMarketChecker = null;
+
+async function isTradingDayForSegment(isCommodity = false) {
+    try {
+        if (typeof customTradingDayChecker === 'function') {
+            return Boolean(await customTradingDayChecker(Boolean(isCommodity)));
+        }
+        const settingKey = isCommodity ? 'commodity_market_status' : 'equity_market_status';
+        const settingRow = await db('system_settings').where({ key: settingKey }).first().catch(() => null);
+        const globalStatus = settingRow?.value ? String(settingRow.value).toUpperCase() : 'AUTO';
+        if (globalStatus === 'OPEN') return true;
+        if (globalStatus === 'CLOSED') return false;
+
+        const now = new Date();
+        const istStr = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+        const istTime = new Date(istStr);
+        const day = istTime.getDay(); // 0 = Sun, 6 = Sat
+        const yyyy = istTime.getFullYear();
+        const mm = String(istTime.getMonth() + 1).padStart(2, '0');
+        const dd = String(istTime.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        const targetSeg = isCommodity ? 'COMMODITY' : 'EQUITY';
+
+        const calRules = await db('market_calendar')
+            .where({ date: todayStr })
+            .whereIn('segment', ['ALL', targetSeg])
+            .catch(() => []);
+        const rule = calRules.find(r => r.segment === targetSeg) || calRules.find(r => r.segment === 'ALL');
+        if (rule) {
+            if (rule.status === 'CLOSED') return false;
+            if (rule.status === 'OPEN') return true;
+        }
+
+        if (day === 0 || day === 6) return false;
+        return true;
+    } catch (e) {
+        const istTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const day = istTime.getDay();
+        return day !== 0 && day !== 6;
+    }
+}
+
+async function revertStrandedWeekendOrHolidayAmos(triggerEngine = null) {
+    try {
+        const eqOpen = await isTradingDayForSegment(false);
+        const comOpen = await isTradingDayForSegment(true);
+        if (eqOpen && comOpen) return;
+
+        const strandedAmos = await db('orders')
+            .where({ order_variety: 'AMO' })
+            .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+            .andWhere(function() {
+                this.whereNull('filled_quantity').orWhere('filled_quantity', '<=', 0);
+            });
+
+        if (!strandedAmos || strandedAmos.length === 0) return;
+
+        const volumeMatchingEngine = require('./volumeMatchingEngine');
+        let revertedCount = 0;
+        for (const ord of strandedAmos) {
+            const isCom = isCommoditySymbol(ord.symbol);
+            if (isCom && comOpen) continue;
+            if (!isCom && eqOpen) continue;
+
+            await db('orders').where({ id: ord.id }).update({ status: 'AMO_PENDING', updated_at: new Date() });
+            if (triggerEngine) {
+                try { triggerEngine.removeOrderFromMemory(ord.id, ord.symbol); } catch (e) {}
+            }
+            try { volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol); } catch (e) {}
+            revertedCount++;
+        }
+        if (revertedCount > 0) {
+            console.log(`🛡️ [AMO HOLIDAY GUARD] Reverted ${revertedCount} premature PENDING AMO order(s) back to AMO_PENDING because market is closed today.`);
+        }
+    } catch (e) {
+        console.warn('[AMO HOLIDAY GUARD] Error checking stranded AMO orders:', e.message);
+    }
+}
+
 async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine = null) {
+    const eqOpen = segment !== 'COMMODITY' ? await isTradingDayForSegment(false) : false;
+    const comOpen = segment !== 'EQUITY' ? await isTradingDayForSegment(true) : false;
+
+    if (segment === 'EQUITY' && !eqOpen) {
+        console.log(`⏸️ [CRON] Equity market is closed today (Weekend/Holiday) — keeping Equity AMO orders as AMO_PENDING.`);
+        return;
+    }
+    if (segment === 'COMMODITY' && !comOpen) {
+        console.log(`⏸️ [CRON] Commodity market is closed today (Weekend/Holiday) — keeping Commodity AMO orders as AMO_PENDING.`);
+        return;
+    }
+    if (segment === 'ALL' && !eqOpen && !comOpen) {
+        console.log(`⏸️ [CRON] All markets are closed today (Weekend/Holiday) — keeping AMO orders as AMO_PENDING.`);
+        return;
+    }
+
     const volumeMatchingEngine = require('./volumeMatchingEngine');
     console.log(`⏰ [CRON] Sweeping AMO orders for segment: ${segment}...`);
     try {
@@ -100,6 +196,8 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine 
             const isCom = isCommoditySymbol(ord.symbol);
             if (segment === 'COMMODITY' && !isCom) continue;
             if (segment === 'EQUITY' && isCom) continue;
+            if (isCom && !comOpen) continue;
+            if (!isCom && !eqOpen) continue;
 
             const clean = ord.symbol ? ord.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '') : '';
             const ltp = priceCache[ord.symbol]?.ltp || (clean ? (priceCache[clean]?.ltp || priceCache[`NSE:${clean}`]?.ltp || priceCache[`NSE:${clean}-EQ`]?.ltp || priceCache[`BSE:${clean}`]?.ltp || priceCache[`BSE:${clean}-A`]?.ltp || priceCache[`MCX:${clean}`]?.ltp) : null) || Number(ord.price || 0);
@@ -145,6 +243,10 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine 
 }
 
 async function executeCasOpeningMatch(priceCache = {}, triggerEngine = null) {
+    if (!(await isTradingDayForSegment(false))) {
+        console.log(`⏸️ [CRON 09:08 AM] Equity market is closed today (Weekend/Holiday) — skipping Pre-Market CAS match.`);
+        return;
+    }
     const volumeMatchingEngine = require('./volumeMatchingEngine');
     console.log(`⏰ [CRON 09:08 AM] Matching Pre-Market CAS orders at opening equilibrium price...`);
     try {
@@ -191,6 +293,10 @@ async function executeCasOpeningMatch(priceCache = {}, triggerEngine = null) {
 }
 
 async function executeClosingAuctionMatch(priceCache = {}, triggerEngine = null) {
+    if (!(await isTradingDayForSegment(false))) {
+        console.log(`⏸️ [CRON 03:35 PM] Equity market is closed today (Weekend/Holiday) — skipping Closing Auction Session (CAS) match.`);
+        return;
+    }
     const volumeMatchingEngine = require('./volumeMatchingEngine');
     console.log(`⏰ [CRON 03:35 PM] Matching Closing Auction Session (CAS) orders for F&O Cash stocks...`);
     try {
@@ -255,8 +361,15 @@ async function updateWeeklyCasStocksList(priceCache = {}) {
     }
 }
 
-function initCronJobs(priceCache, triggerEngine) {
+function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSegmentMarketOpenFn = null) {
     console.log('Initializing Cron Jobs...');
+    if (typeof isTradingDayOpenFn === 'function') customTradingDayChecker = isTradingDayOpenFn;
+    if (typeof isSegmentMarketOpenFn === 'function') customSegmentMarketChecker = isSegmentMarketOpenFn;
+
+    // Self-heal any AMO orders that may have been moved to PENDING on a weekend/holiday
+    setTimeout(() => {
+        revertStrandedWeekendOrHolidayAmos(triggerEngine);
+    }, 3000);
 
     // ─── 09:00 AM IST: MCX Commodity AMO Sweep ──────────────────────────────────
     cron.schedule('0 9 * * *', () => {
@@ -344,6 +457,11 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
+        const isComAsset = (assetType === 'COM');
+        if (!(await isTradingDayForSegment(isComAsset))) {
+            console.log(`⏸️ [CRON] Market closed today (Weekend/Holiday) — skipping Phase 2 Sweep (${assetType}).`);
+            return;
+        }
         let connection = null;
         let isLocked = false;
         const lockKey = `cron_phase2_${assetType}`;
@@ -500,6 +618,11 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 3: Auto Square-Off ─────────────────────────────────────────────
     const phase3SquareOff = async (assetType) => {
+        const isComAsset = (assetType === 'COM');
+        if (!(await isTradingDayForSegment(isComAsset))) {
+            console.log(`⏸️ [CRON] Market closed today (Weekend/Holiday) — skipping Phase 3 Auto Square-Off (${assetType}).`);
+            return;
+        }
         let connection = null;
         let isLocked = false;
         const lockKey = `cron_phase3_${assetType}`;
@@ -711,6 +834,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // 03:31 PM: The 3:30 PM EOD Handler - Auto-Convert Unclosed Longs to CNC (with debit balance) & Settle Shorts via Auction
     cron.schedule('31 15 * * *', async () => {
+        if (!(await isTradingDayForSegment(false))) return;
         console.log('\n🏛️ [CRON 03:31 PM] Running EOD Reconciliation for any remaining open Cash Equity intraday positions...');
         const lockKey = 'cron_eod_equity_reconciliation_331';
         let connection = null;
@@ -780,6 +904,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // 03:40 PM: Expiry Day Settlement for Equities & Derivatives (F&O, Index Options/Futures, CNC Holdings)
     cron.schedule('40 15 * * *', async () => {
+        if (!(await isTradingDayForSegment(false))) return;
         console.log('\n⏰ [CRON 03:40 PM] Expiry Day Settlement triggered for Equities & Derivatives...');
         const positionsEngine = require('./positionsEngine');
         await positionsEngine.settleExpiries(false, false).catch(e => console.error('03:40 PM Expiry settlement error:', e));
@@ -787,6 +912,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // 04:00 PM: Final EOD Safety Net Expiry Settlement for Equities & Derivatives
     cron.schedule('0 16 * * *', async () => {
+        if (!(await isTradingDayForSegment(false))) return;
         console.log('\n⏰ [CRON 04:00 PM] Final 04:00 PM Expiry Settlement Safety Net...');
         const positionsEngine = require('./positionsEngine');
         await positionsEngine.sweepPendingOrders('EQUITY').catch(e => console.error('04:00 PM sweep error:', e));
@@ -802,6 +928,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // 11:35 PM IST: MCX Market Close / Expiry Auto Square-Off (ensures zero open intraday positions after 11:30 PM close)
     cron.schedule('35 23 * * *', async () => {
+        if (!(await isTradingDayForSegment(true))) return;
         phase3SquareOff('COM');
         const positionsEngine = require('./positionsEngine');
         await positionsEngine.settleExpiries(true, false).catch(e => console.error('11:35 PM MCX Expiry settlement error:', e));
@@ -820,6 +947,12 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── 11:56 PM IST: Step 1 - Cancel ALL Pending & Open Orders in Order Tab ─
     cron.schedule('56 23 * * *', async () => {
+        const eqTradingDay = await isTradingDayForSegment(false);
+        const comTradingDay = await isTradingDayForSegment(true);
+        if (!eqTradingDay && !comTradingDay) {
+            console.log('⏸️ [CRON 11:56 PM] Markets closed today (Weekend/Holiday) — skipping nightly order sweep.');
+            return;
+        }
         console.log('\n🌙 [CRON 11:56 PM] Nightly EOD Sweep Step 1: Cancelling all remaining pending and trigger orders...');
         const lockKey = 'cron_nightly_cancel_orders';
         let connection = null;
@@ -836,8 +969,12 @@ function initCronJobs(priceCache, triggerEngine) {
             }
 
             const positionsEngine = require('./positionsEngine');
-            await positionsEngine.sweepPendingOrders('EQUITY').catch(e => console.error('Nightly sweep equity orders error:', e));
-            await positionsEngine.sweepPendingOrders('COMMODITY').catch(e => console.error('Nightly sweep commodity orders error:', e));
+            if (eqTradingDay) {
+                await positionsEngine.sweepPendingOrders('EQUITY').catch(e => console.error('Nightly sweep equity orders error:', e));
+            }
+            if (comTradingDay) {
+                await positionsEngine.sweepPendingOrders('COMMODITY').catch(e => console.error('Nightly sweep commodity orders error:', e));
+            }
 
             await db.transaction(async (trx) => {
                 const staleOrders = await trx('orders')
@@ -850,6 +987,10 @@ function initCronJobs(priceCache, triggerEngine) {
 
                 const affectedUserIds = new Set();
                 for (const ord of staleOrders) {
+                    const isCom = isCommoditySymbol(ord.symbol);
+                    if (isCom && !comTradingDay) continue;
+                    if (!isCom && !eqTradingDay) continue;
+
                     await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
                     const totalQ = Number(ord.quantity) || 1;
                     const filledQ = Number(ord.filled_quantity) || 0;
@@ -907,6 +1048,12 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── 11:57 PM IST: Step 2 - Force Square-Off ALL Open/Skipped Intraday Positions across NSE, NFO, BFO, BSE, MCX
     cron.schedule('57 23 * * *', async () => {
+        const eqTradingDay = await isTradingDayForSegment(false);
+        const comTradingDay = await isTradingDayForSegment(true);
+        if (!eqTradingDay && !comTradingDay) {
+            console.log('⏸️ [CRON 11:57 PM] Markets closed today (Weekend/Holiday) — skipping nightly intraday square-off.');
+            return;
+        }
         console.log('\n🌙 [CRON 11:57 PM] Nightly EOD Sweep Step 2: Forcing square-off for all remaining open/skipped intraday positions across NSE, NFO, BFO, BSE, MCX...');
         const lockKey = 'cron_nightly_squareoff_intraday';
         let connection = null;
@@ -923,8 +1070,12 @@ function initCronJobs(priceCache, triggerEngine) {
             }
 
             const positionsEngine = require('./positionsEngine');
-            await positionsEngine.forceSquareOff('EQUITY').catch(e => console.error('Nightly equity square-off error:', e));
-            await positionsEngine.forceSquareOff('COMMODITY').catch(e => console.error('Nightly commodity square-off error:', e));
+            if (eqTradingDay) {
+                await positionsEngine.forceSquareOff('EQUITY').catch(e => console.error('Nightly equity square-off error:', e));
+            }
+            if (comTradingDay) {
+                await positionsEngine.forceSquareOff('COMMODITY').catch(e => console.error('Nightly commodity square-off error:', e));
+            }
 
             // Comprehensive fallback: scan for any remaining open INT, MIS, BO, CO positions in database
             await db.transaction(async (trx) => {
@@ -942,6 +1093,10 @@ function initCronJobs(priceCache, triggerEngine) {
                 const affectedUserIds = new Set();
 
                 for (const pos of openIntraday) {
+                    const isCom = isCommoditySymbol(pos.symbol);
+                    if (isCom && !comTradingDay) continue;
+                    if (!isCom && !eqTradingDay) continue;
+
                     let ltp = priceCache[pos.symbol]?.ltp;
                     if (!ltp || ltp <= 0) {
                         const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
@@ -989,6 +1144,9 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── 11:58 PM IST: Step 3 - Force Settle & Square-Off ALL Contracts Expiring Today (CNC & Intraday across NFO, BFO, Index, MCX)
     cron.schedule('58 23 * * *', async () => {
+        const eqTradingDay = await isTradingDayForSegment(false);
+        const comTradingDay = await isTradingDayForSegment(true);
+        if (!eqTradingDay && !comTradingDay) return;
         console.log('\n🌙 [CRON 11:58 PM] Nightly EOD Sweep Step 3: Forcing settlement for ALL contracts expiring today (NSE, NFO, BFO, BSE SENSEX/BANKEX, MCX) whether CNC or Intraday...');
         const lockKey = 'cron_nightly_expiry_settlement';
         let connection = null;
@@ -1005,10 +1163,14 @@ function initCronJobs(priceCache, triggerEngine) {
             }
 
             const positionsEngine = require('./positionsEngine');
-            // Settle Equities, NFO, BFO & Index Options (SENSEX, BANKEX, NIFTY) - settles BOTH positions and CNC holdings
-            await positionsEngine.settleExpiries(false, false).catch(e => console.error('Nightly equity expiry settlement error:', e));
-            // Settle MCX Commodities - settles BOTH positions and CNC holdings
-            await positionsEngine.settleExpiries(true, true).catch(e => console.error('Nightly commodity expiry settlement error:', e));
+            if (eqTradingDay) {
+                // Settle Equities, NFO, BFO & Index Options (SENSEX, BANKEX, NIFTY) - settles BOTH positions and CNC holdings
+                await positionsEngine.settleExpiries(false, false).catch(e => console.error('Nightly equity expiry settlement error:', e));
+            }
+            if (comTradingDay) {
+                // Settle MCX Commodities - settles BOTH positions and CNC holdings
+                await positionsEngine.settleExpiries(true, true).catch(e => console.error('Nightly commodity expiry settlement error:', e));
+            }
             console.log('✅ [CRON 11:58 PM] Nightly EOD Step 3 Complete: All today\'s expiring contracts settled.');
         } catch (err) {
             console.error('❌ [CRON 11:58 PM] Nightly expiry settlement error:', err.message);
@@ -1522,6 +1684,9 @@ async function runPositionsLifecycleArchive(cutoffDays = 30) {
 module.exports = {
     initCronJobs,
     isIntradayBlocked,
+    isTradingDayForSegment,
+    revertStrandedWeekendOrHolidayAmos,
+    setTradingDayChecker: (fn) => { customTradingDayChecker = fn; },
     isEquityIntradayBlocked: () => isEquityIntradayBlocked,
     isCommodityIntradayBlocked: () => isCommodityIntradayBlocked,
     executeAmoOrders,

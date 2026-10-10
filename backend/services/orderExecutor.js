@@ -1,6 +1,6 @@
 const db = require('../database/db');
 
-function initOrderExecutor(priceCache) {
+function initOrderExecutor(priceCache, isSegmentMarketOpen = null) {
   console.log('Starting Order Execution Engine...');
 
   let isExecuting = false;
@@ -30,7 +30,14 @@ function initOrderExecutor(priceCache) {
         return;
       }
 
+      const { isCommodityContract } = require('./instrumentsCache');
       for (const order of pendingOrders) {
+        if (typeof isSegmentMarketOpen === 'function') {
+          const isCom = isCommodityContract(order.symbol);
+          const isExit = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+          const mStatus = isSegmentMarketOpen(isCom, order.symbol, order.product_type, isExit);
+          if (!mStatus || !mStatus.open) continue;
+        }
         const ltp = priceCache[order.symbol]?.ltp;
         if (!ltp) continue; // No live price available yet
         await executeOrder(order, ltp);
