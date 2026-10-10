@@ -450,7 +450,12 @@ export const useStore = create(persist((set, get) => ({
         return { success: true };
       } else {
         set({ authError: data.error });
-        return { success: false, error: data.error };
+        return {
+          success: false,
+          error: data.error,
+          needs_email_verification: Boolean(data.needs_email_verification),
+          email: data.email
+        };
       }
     } catch (err) {
       set({ authError: err.message });
@@ -504,7 +509,9 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         if (data.needs_verification) {
-          // Keep user in unauthenticated state until email link is verified
+          // Keep user in strictly unauthenticated state until email link is verified
+          localStorage.removeItem('token');
+          set({ token: null, user: null });
           return { success: true, message: data.message, needs_verification: true, email: data.email };
         }
         if (data.token) localStorage.setItem('token', data.token);

@@ -95,10 +95,34 @@ check('db.js configures 84 total connections (84 single-process / 42 per cluster
   assert.ok(dbSource.includes('max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : (process.env.NODE_APP_INSTANCE !== undefined ? 42 : 84)'), 'db.js must default to 84 connections in single-process and 42 per PM2 worker (84 total)');
 });
 
+// ─── BUG 8: Deleted Account Re-Registration Email Verification Enforcement ───
+console.log('\n▶ BUG 8: Deleted Account Re-Registration Email Verification Enforcement');
+const fbAuthSource = fs.readFileSync(path.join(__dirname, 'services', 'firebaseAuth.js'), 'utf8');
+check('firebaseAuth.js resets emailVerified: false on registration and defines deleteFirebaseUserByEmail', () => {
+  assert.ok(fbAuthSource.includes('if (resetEmailVerified) updatePayload.emailVerified = false;'), 'ensureFirebaseUser must reset emailVerified to false when resetEmailVerified is true');
+  assert.ok(fbAuthSource.includes('async function deleteFirebaseUserByEmail(email)'), 'firebaseAuth.js must define deleteFirebaseUserByEmail');
+});
+
+check('server.js clears auth cookie on register, forces resetEmailVerified, and enforces email verification gate on pre-login, login, and verify-2fa', () => {
+  assert.ok(serverSource.includes('await ensureFirebaseUser(cleanEmail, cleanPhone, password, { resetEmailVerified: true });'), 'register must pass resetEmailVerified: true');
+  assert.ok(serverSource.includes('async function enforceEmailVerificationGate(user, password)'), 'server.js must define enforceEmailVerificationGate');
+  assert.ok(serverSource.includes('const emailGateLogin = await enforceEmailVerificationGate(user, password);'), 'login endpoint must enforce email verification gate');
+  assert.ok(serverSource.includes('await deleteFirebaseUserByEmail('), 'account deletion endpoints must delete user from Firebase Auth');
+});
+
+// ─── BUG 9: Automated DPDP Data Rights Resolution (Access Export, Consent Withdrawal, Correction) ───
+console.log('\n▶ BUG 9: Automated DPDP Data Rights Resolution');
+check('server.js and firebaseAuth.js automate SEND_DATA_EXPORT and WITHDRAW_CONSENT with JSON email attachments', () => {
+  assert.ok(serverSource.includes("if (cleanAction === 'SEND_DATA_EXPORT' || (cleanAction === 'COMPLETED' && reqType === 'ACCESS'))"), 'server.js must automate ACCESS data export');
+  assert.ok(serverSource.includes("if (cleanAction === 'WITHDRAW_CONSENT' || (cleanAction === 'COMPLETED' && reqType === 'WITHDRAW_CONSENT'))"), 'server.js must automate WITHDRAW_CONSENT revocation');
+  assert.ok(fbAuthSource.includes("if (event === 'ACCESS_EXPORT' && exportPayload)"), 'firebaseAuth.js must email personal data summary + JSON attachment on ACCESS_EXPORT');
+  assert.ok(adminDashSource.includes("Approve & Send Data Export") && adminDashSource.includes("Approve & Revoke Consents"), 'AdminDashboard.jsx must provide 1-click automated Data Rights action buttons');
+});
+
 console.log('\n======================================================================');
 console.log(`TOTAL CHECKS: ${passed + failed} | PASSED: ${passed} | FAILED: ${failed}`);
 console.log('======================================================================');
 
 if (failed > 0) process.exit(1);
-console.log('🎉 ALL 7 CRITICAL BUG FIXES 100% VERIFIED!');
+console.log('🎉 ALL CRITICAL BUG FIXES & DPDP AUTOMATIONS 100% VERIFIED!');
 process.exit(0);

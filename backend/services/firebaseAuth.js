@@ -87,23 +87,29 @@ function getFirebaseAdminAuth() {
 /**
  * Ensure user exists in Firebase Auth.
  * If user does not exist, creates the user account in Firebase.
+ * When options.resetEmailVerified === true (e.g., on fresh registration), forces emailVerified: false.
  */
-async function ensureFirebaseUser(email, phone = null, password = null) {
+async function ensureFirebaseUser(email, phone = null, password = null, options = {}) {
   if (!email) return null;
   const cleanEmail = String(email).trim().toLowerCase();
   const auth = getFirebaseAdminAuth();
   if (!auth) return null;
+  const resetEmailVerified = Boolean(options && options.resetEmailVerified);
 
   try {
     const existing = await auth.getUserByEmail(cleanEmail);
-    if (password) {
-      await auth.updateUser(existing.uid, { password }).catch(() => {});
+    const updatePayload = {};
+    if (password) updatePayload.password = password;
+    if (resetEmailVerified) updatePayload.emailVerified = false;
+    if (Object.keys(updatePayload).length > 0) {
+      const updated = await auth.updateUser(existing.uid, updatePayload).catch(() => null);
+      if (updated) return updated;
     }
     return existing;
   } catch (err) {
     if (err.code === 'auth/user-not-found') {
       try {
-        const createPayload = { email: cleanEmail };
+        const createPayload = { email: cleanEmail, emailVerified: false };
         if (password) createPayload.password = password;
         if (phone) {
           const cleanPhone = String(phone).replace(/\D/g, '');
@@ -117,7 +123,7 @@ async function ensureFirebaseUser(email, phone = null, password = null) {
       } catch (createErr) {
         // If phone already exists on another account, create without phone
         if (createErr.code === 'auth/phone-number-already-exists') {
-          const createPayload = { email: cleanEmail };
+          const createPayload = { email: cleanEmail, emailVerified: false };
           if (password) createPayload.password = password;
           const created = await auth.createUser(createPayload);
           return created;
@@ -129,6 +135,30 @@ async function ensureFirebaseUser(email, phone = null, password = null) {
     console.warn(`[FIREBASE AUTH] Error finding Firebase user ${cleanEmail}:`, err.message);
     return null;
   }
+}
+
+/**
+ * Permanently delete a user from Firebase Auth when their SkandX account is deleted.
+ * Prevents stale emailVerified: true state if the user re-registers later.
+ */
+async function deleteFirebaseUserByEmail(email) {
+  if (!email) return false;
+  const cleanEmail = String(email).trim().toLowerCase();
+  const auth = getFirebaseAdminAuth();
+  if (!auth) return false;
+  try {
+    const existing = await auth.getUserByEmail(cleanEmail);
+    if (existing && existing.uid) {
+      await auth.deleteUser(existing.uid);
+      console.log(`[FIREBASE AUTH] Deleted Firebase Auth user for ${cleanEmail} (${existing.uid})`);
+      return true;
+    }
+  } catch (err) {
+    if (err.code !== 'auth/user-not-found') {
+      console.warn(`[FIREBASE AUTH] Error deleting Firebase user ${cleanEmail}:`, err.message);
+    }
+  }
+  return false;
 }
 
 /**
@@ -457,7 +487,8 @@ async function sendDataRightsNotificationEmail({
   userId,
   username,
   clientIp,
-  adminNotes
+  adminNotes,
+  exportPayload
 }) {
   let gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   let gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
@@ -599,7 +630,83 @@ async function sendDataRightsNotificationEmail({
       return true;
     }
 
-    if (event === 'COMPLETED' || event === 'DELETED') {
+    if (event === 'ACCESS_EXPORT' && exportPayload) {
+      const u = exportPayload.user_profile || {};
+      const positionsCount = Array.isArray(exportPayload.positions) ? exportPayload.positions.length : 0;
+      const holdingsCount = Array.isArray(exportPayload.holdings) ? exportPayload.holdings.length : 0;
+      const ordersCount = Array.isArray(exportPayload.orders_sample) ? exportPayload.orders_sample.length : 0;
+      const consentsCount = Array.isArray(exportPayload.consent_registry) ? exportPayload.consent_registry.length : 0;
+
+      const accessHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #121721; border-radius: 12px; border: 1px solid #38bdf8; overflow: hidden;">
+            <tr>
+              <td style="padding: 24px 28px; background: rgba(56, 189, 248, 0.12); border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                <div style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1.5px;">DPDP Act 2023 • Section 11 Personal Data Summary</div>
+                <h2 style="margin: 6px 0 0; font-size: 20px; font-weight: 800; color: #ffffff;">📄 Your Personal Data Report & Export</h2>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px;">
+                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
+                  In accordance with your Right to Access request (Reference: <strong>${requestId}</strong>), please find below your personal data summary held by <strong>SkandX</strong>, along with your complete machine-readable JSON export attached to this email.
+                </p>
+                <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; font-size: 13px; color: #e5e7eb; margin-bottom: 18px;">
+                  <tr><td style="color: #9ca3af; width: 160px;"><strong>Client ID:</strong></td><td style="font-family: monospace; color: #38bdf8; font-weight: 700;">${u.client_id || 'N/A'}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Full Name:</strong></td><td>${u.username || 'N/A'}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Registered Email:</strong></td><td>${u.email || email}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Mobile Phone:</strong></td><td>${u.phone || 'N/A'}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Subscription Tier:</strong></td><td>${u.subscription_tier || 'BASIC'}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Virtual Margin Balance:</strong></td><td>₹${Number(u.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Recorded Positions:</strong></td><td>${positionsCount} records</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Recorded Holdings:</strong></td><td>${holdingsCount} records</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Order History Sample:</strong></td><td>${ordersCount} orders</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Consent Audit Logs:</strong></td><td>${consentsCount} entries</td></tr>
+                </table>
+                ${adminNotes ? `<div style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9ca3af; margin-bottom: 16px;"><strong>Compliance Note:</strong> ${String(adminNotes).replace(/</g, '&lt;')}</div>` : ''}
+                <p style="margin: 0; font-size: 12.5px; color: #6b7280;">
+                  The full JSON archive (<code>skandx_personal_data_${requestId}.json</code>) is attached to this email. For further assistance, contact <a href="mailto:skandx.in@gmail.com" style="color: #38bdf8;">skandx.in@gmail.com</a>.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        to: email,
+        replyTo: 'skandx.in@gmail.com',
+        subject: `SkandX: Your Personal Data Summary & Export (${requestId})`,
+        text: `Your DPDP Section 11 Personal Data Summary & JSON Export for ${email} (Reference ID: ${requestId}) is attached.`,
+        html: accessHtml,
+        attachments: [
+          {
+            filename: `skandx_personal_data_${requestId}.json`,
+            content: JSON.stringify(exportPayload, null, 2),
+            contentType: 'application/json'
+          }
+        ]
+      });
+      return true;
+    }
+
+    if (event === 'COMPLETED' || event === 'DELETED' || event === 'CONSENT_WITHDRAWN') {
+      const titleText = event === 'DELETED'
+        ? 'Account Permanently Deleted'
+        : event === 'CONSENT_WITHDRAWN'
+          ? 'Consent Withdrawal Processed'
+          : 'Data Rights Request Completed';
+      const bodyText = event === 'DELETED'
+        ? `In accordance with your erasure request (Reference: <strong>${requestId}</strong>), your SkandX account (<strong>${email}</strong>), profile credentials, and associated personal data have been permanently erased from our active systems.`
+        : event === 'CONSENT_WITHDRAWN'
+          ? `In accordance with your consent withdrawal request (Reference: <strong>${requestId}</strong>), your optional and marketing data processing consents for <strong>${email}</strong> have been officially revoked in our compliance registry.`
+          : `Your data rights request (Reference: <strong>${requestId}</strong>) for <strong>${email}</strong> has been resolved by our compliance team.`;
+
       const doneHtml = `
         <!DOCTYPE html>
         <html>
@@ -614,11 +721,9 @@ async function sendDataRightsNotificationEmail({
             </tr>
             <tr>
               <td style="padding: 28px;">
-                <h2 style="margin: 0 0 12px; font-size: 18px; color: #10b981;">${event === 'DELETED' ? 'Account Permanently Deleted' : 'Data Rights Request Completed'}</h2>
+                <h2 style="margin: 0 0 12px; font-size: 18px; color: #10b981;">${titleText}</h2>
                 <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
-                  ${event === 'DELETED'
-                    ? `In accordance with your erasure request (Reference: <strong>${requestId}</strong>), your SkandX account (<strong>${email}</strong>), profile credentials, and associated personal data have been permanently erased from our active systems.`
-                    : `Your data rights request (Reference: <strong>${requestId}</strong>) for <strong>${email}</strong> has been resolved by our compliance team.`}
+                  ${bodyText}
                 </p>
                 ${adminNotes ? `<div style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9ca3af; margin-bottom: 16px;"><strong>Compliance Note:</strong> ${String(adminNotes).replace(/</g, '&lt;')}</div>` : ''}
                 <p style="margin: 0; font-size: 12.5px; color: #6b7280;">
@@ -635,8 +740,8 @@ async function sendDataRightsNotificationEmail({
         from: `"SkandX Privacy Desk" <${gmailUser}>`,
         to: email,
         replyTo: 'skandx.in@gmail.com',
-        subject: `SkandX: ${event === 'DELETED' ? 'Account Deletion Completed' : 'Data Rights Request Resolved'} (${requestId})`,
-        text: `${event === 'DELETED' ? 'Your SkandX account and personal data have been permanently deleted.' : 'Your SkandX data rights request has been completed.'} Reference ID: ${requestId}.`,
+        subject: `SkandX: ${titleText} (${requestId})`,
+        text: `${titleText} for ${email}. Reference ID: ${requestId}.`,
         html: doneHtml
       });
       return true;
@@ -650,6 +755,7 @@ async function sendDataRightsNotificationEmail({
 module.exports = {
   getFirebaseAdminAuth,
   ensureFirebaseUser,
+  deleteFirebaseUserByEmail,
   sendFirebasePasswordReset,
   sendFirebaseVerificationEmail,
   syncFirebaseUserPassword,

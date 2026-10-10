@@ -1633,34 +1633,16 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
 
-    const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '60d' });
-    const tokenHash = hashToken(token);
-    if (tokenHash) {
-      await db('user_sessions').insert({
-        user_id: userId,
-        token_hash: tokenHash,
-        device_model: deviceModel,
-        browser_name: browserName,
-        os_name: osName,
-        ip_address: clientIp,
-        city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
-        state: (state && state !== 'Local') ? state : '',
-        last_active_at: new Date()
-      }).catch(() => {});
-    }
+    // Clear any stale auth cookie — user MUST verify email link before any session or token is issued
     const isHttps = isRequestSecure(req);
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: isHttps,
-      sameSite: isHttps ? 'none' : 'lax',
-      maxAge: 60 * 24 * 60 * 60 * 1000
-    });
+    res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
 
     // Dispatch official verification email link via Firebase Identity Toolkit
+    // Force resetEmailVerified: true so even a previously deleted email starts unverified
     try {
       const { ensureFirebaseUser, sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
       if (typeof ensureFirebaseUser === 'function') {
-        await ensureFirebaseUser(cleanEmail, cleanPhone, password);
+        await ensureFirebaseUser(cleanEmail, cleanPhone, password, { resetEmailVerified: true });
       }
       if (typeof sendFirebaseVerificationEmail === 'function') {
         await sendFirebaseVerificationEmail(cleanEmail);
@@ -1673,9 +1655,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     res.json({
       success: true,
       needs_verification: true,
-      message: `Account created successfully! An official verification link has been dispatched to ${cleanEmail}. Please check your inbox and click the link to activate your account.`,
-      token,
-      user: { id: userId, client_id: clientId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null }
+      email: cleanEmail,
+      message: `Account created successfully! An official verification link has been dispatched to ${cleanEmail}. Please check your inbox and click the link to activate your account.`
     });
   } catch (err) {
     const errorMsg = err.message || String(err);
@@ -1769,6 +1750,42 @@ async function verifyUserPasswordWithFallback(user, password) {
   return false;
 }
 
+// ─── Strict Email Verification Gatekeeper Helper ──────────────────────────
+async function enforceEmailVerificationGate(user, password) {
+  const isGoogleReviewTester = Boolean(
+    user.email && (
+      user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' ||
+      user.email.toLowerCase().trim() === 'demo@skandx.in'
+    )
+  );
+  if (user.is_admin || isGoogleReviewTester || !user.email) {
+    return { verified: true };
+  }
+  try {
+    const { getFirebaseAdminAuth, ensureFirebaseUser, sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
+    const auth = getFirebaseAdminAuth();
+    if (auth) {
+      const cleanEmail = user.email.toLowerCase().trim();
+      let fbUser = await auth.getUserByEmail(cleanEmail).catch(() => null);
+      if (!fbUser) {
+        fbUser = await ensureFirebaseUser(cleanEmail, user.phone, password, { resetEmailVerified: true }).catch(() => null);
+      }
+      if (!fbUser || fbUser.emailVerified !== true) {
+        if (typeof sendFirebaseVerificationEmail === 'function') {
+          sendFirebaseVerificationEmail(user.email).catch(e => console.warn('[AUTH GATE] Auto-dispatch verification email note:', e.message));
+        }
+        return {
+          verified: false,
+          error: `Please verify your email address to log in. An activation link was sent to ${user.email}. Check your inbox and spam folder.`
+        };
+      }
+    }
+  } catch (authErr) {
+    console.warn('[AUTH] Firebase email verification check note:', authErr.message);
+  }
+  return { verified: true };
+}
+
 // ─── 2FA & Authentication with 30-Day Device Trust ──────────────────────────
 app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   const { email, password, trusted_device_token } = req.body || {};
@@ -1791,28 +1808,13 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
 
     // 🔒 STRICT EMAIL VERIFICATION GATEKEEPER
     // Block login if user email has not been verified in Firebase
-    if (!user.is_admin && !isGoogleReviewTester && user.email) {
-      try {
-        const { getFirebaseAdminAuth } = require('./services/firebaseAuth');
-        const auth = getFirebaseAdminAuth();
-        if (auth) {
-          const fbUser = await auth.getUserByEmail(user.email.toLowerCase().trim()).catch(() => null);
-          if (fbUser && fbUser.emailVerified === false) {
-            const { sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
-            if (typeof sendFirebaseVerificationEmail === 'function') {
-              sendFirebaseVerificationEmail(user.email).catch(e => console.warn('[PRE-LOGIN] Auto-dispatch verification email note:', e.message));
-            }
-
-            return res.status(403).json({
-              error: `Please verify your email address to log in. An activation link was sent to ${user.email}. Check your inbox and spam folder.`,
-              needs_email_verification: true,
-              email: user.email
-            });
-          }
-        }
-      } catch (authErr) {
-        console.warn('[AUTH] Firebase email verification check note:', authErr.message);
-      }
+    const emailGate = await enforceEmailVerificationGate(user, password);
+    if (!emailGate.verified) {
+      return res.status(403).json({
+        error: emailGate.error,
+        needs_email_verification: true,
+        email: user.email
+      });
     }
 
     // Standard password login: trust user immediately unless they explicitly enabled Google Authenticator (TOTP)
@@ -1939,6 +1941,15 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     const valid = await verifyUserPasswordWithFallback(user, password);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+
+    const emailGate2fa = await enforceEmailVerificationGate(user, password);
+    if (!emailGate2fa.verified) {
+      return res.status(403).json({
+        error: emailGate2fa.error,
+        needs_email_verification: true,
+        email: user.email
+      });
+    }
 
     const crypto = require('crypto');
 
@@ -2182,6 +2193,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
     if (user.is_banned) {
       return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
+    }
+
+    // 🔒 STRICT EMAIL VERIFICATION GATEKEEPER
+    const emailGateLogin = await enforceEmailVerificationGate(user, password);
+    if (!emailGateLogin.verified) {
+      return res.status(403).json({
+        error: emailGateLogin.error,
+        needs_email_verification: true,
+        email: user.email
+      });
     }
 
     const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
@@ -3961,7 +3982,7 @@ app.post('/api/admin/email-settings', authenticateToken, async (req, res) => {
   }
 });
 
-// Admin: Resolve or Execute Account Deletion for a Data Rights Request
+// Admin: Resolve or Execute Automated Action for a Data Rights Request
 app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
@@ -3970,20 +3991,22 @@ app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async
     const reqRow = await db('data_rights_requests').where({ id: req.params.id }).first();
     if (!reqRow) return res.status(404).json({ error: 'Request not found' });
 
-    const { action, admin_notes } = req.body; // 'DELETE_ACCOUNT' | 'COMPLETED' | 'REJECTED'
+    const { action, admin_notes } = req.body; // 'DELETE_ACCOUNT' | 'SEND_DATA_EXPORT' | 'WITHDRAW_CONSENT' | 'COMPLETED' | 'REJECTED'
     const cleanAction = String(action || 'COMPLETED').toUpperCase();
+    const reqType = String(reqRow.request_type || '').toUpperCase();
     const notes = admin_notes ? String(admin_notes).trim().slice(0, 1000) : null;
 
-    if (cleanAction === 'DELETE_ACCOUNT') {
-      // Find user by user_id or email
-      let targetUser = null;
-      if (reqRow.user_id) {
-        targetUser = await db('users').where({ id: reqRow.user_id }).first();
-      }
-      if (!targetUser && reqRow.email) {
-        targetUser = await db('users').whereRaw('LOWER(email) = ?', [String(reqRow.email).toLowerCase().trim()]).first();
-      }
+    // Resolve matching user by user_id or email
+    let targetUser = null;
+    if (reqRow.user_id) {
+      targetUser = await db('users').where({ id: reqRow.user_id }).first();
+    }
+    if (!targetUser && reqRow.email) {
+      targetUser = await db('users').whereRaw('LOWER(email) = ?', [String(reqRow.email).toLowerCase().trim()]).first();
+    }
 
+    // ─── 1. AUTOMATED ACCOUNT DELETION (ERASURE) ────────────────────────────
+    if (cleanAction === 'DELETE_ACCOUNT') {
       if (targetUser) {
         if (targetUser.is_admin) {
           return res.status(400).json({ error: 'Cannot delete an administrator account.' });
@@ -4031,7 +4054,6 @@ app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async
           } catch (e) {}
         }
       } else {
-        // User already deleted or never existed; mark request completed
         await db('data_rights_requests').where({ id: reqRow.id }).update({
           status: 'COMPLETED',
           admin_notes: notes || 'No active user account found for this email; marked completed.',
@@ -4039,9 +4061,12 @@ app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async
         });
       }
 
-      // Send deletion confirmation email to client
+      // Also purge user from Firebase Auth so re-registration requires fresh email verification
       try {
-        const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        const { deleteFirebaseUserByEmail, sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        if (typeof deleteFirebaseUserByEmail === 'function') {
+          await deleteFirebaseUserByEmail(targetUser?.email || reqRow.email);
+        }
         if (typeof sendDataRightsNotificationEmail === 'function') {
           sendDataRightsNotificationEmail({
             event: 'DELETED',
@@ -4056,15 +4081,129 @@ app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async
       return res.json({
         success: true,
         message: targetUser
-          ? `Account for ${reqRow.email} has been permanently deleted and request ${reqRow.request_id} marked COMPLETED.`
+          ? `Account for ${reqRow.email} has been permanently deleted (DB + Firebase Auth) and request ${reqRow.request_id} marked COMPLETED.`
           : `No matching account found for ${reqRow.email}; request ${reqRow.request_id} marked COMPLETED.`
       });
     }
 
+    // ─── 2. AUTOMATED PERSONAL DATA SUMMARY & EXPORT (ACCESS) ───────────────
+    if (cleanAction === 'SEND_DATA_EXPORT' || (cleanAction === 'COMPLETED' && reqType === 'ACCESS')) {
+      let exportPayload = null;
+      if (targetUser) {
+        const { password_hash, totp_secret, reset_otp, login_email_otp, ...safeUser } = targetUser;
+        const [positions, holdings, recentOrders, consents] = await Promise.all([
+          db('positions').where({ user_id: targetUser.id }).catch(() => []),
+          db('holdings').where({ user_id: targetUser.id }).catch(() => []),
+          db('orders').where({ user_id: targetUser.id }).orderBy('created_at', 'desc').limit(500).catch(() => []),
+          db('user_consents').where({ user_id: targetUser.id }).orderBy('created_at', 'desc').catch(() => [])
+        ]);
+        exportPayload = {
+          export_version: 'v2026.1',
+          exported_at: new Date().toISOString(),
+          request_id: reqRow.request_id,
+          platform: 'SkandX (https://skandx.in)',
+          data_fiduciary: 'SkandX Technologies Pvt. Ltd.',
+          user_profile: safeUser,
+          positions,
+          holdings,
+          orders_sample: recentOrders,
+          consent_registry: consents
+        };
+      } else {
+        exportPayload = {
+          export_version: 'v2026.1',
+          exported_at: new Date().toISOString(),
+          request_id: reqRow.request_id,
+          platform: 'SkandX (https://skandx.in)',
+          user_profile: { email: reqRow.email, note: 'No active account found for this email' },
+          positions: [],
+          holdings: [],
+          orders_sample: [],
+          consent_registry: []
+        };
+      }
+
+      const finalNotes = notes || 'Automated DPDP Sec. 11 Personal Data Summary & JSON Export dispatched to client email.';
+      await db('data_rights_requests').where({ id: reqRow.id }).update({
+        status: 'COMPLETED',
+        admin_notes: finalNotes,
+        updated_at: new Date()
+      });
+
+      try {
+        const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        if (typeof sendDataRightsNotificationEmail === 'function') {
+          sendDataRightsNotificationEmail({
+            event: 'ACCESS_EXPORT',
+            requestId: reqRow.request_id,
+            email: reqRow.email,
+            requestType: reqRow.request_type,
+            adminNotes: finalNotes,
+            exportPayload
+          }).catch(() => {});
+        }
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        message: `Personal Data Summary & JSON Export automatically emailed to ${reqRow.email} and request ${reqRow.request_id} marked COMPLETED.`
+      });
+    }
+
+    // ─── 3. AUTOMATED CONSENT WITHDRAWAL (WITHDRAW_CONSENT) ─────────────────
+    if (cleanAction === 'WITHDRAW_CONSENT' || (cleanAction === 'COMPLETED' && reqType === 'WITHDRAW_CONSENT')) {
+      if (targetUser) {
+        await db('user_consents')
+          .where({ user_id: targetUser.id })
+          .whereIn('consent_type', ['MARKETING_PROMOTIONS', 'marketing_communications'])
+          .update({ status: 'WITHDRAWN' })
+          .catch(() => {});
+        await db('user_consents').insert({
+          user_id: targetUser.id,
+          email: targetUser.email || reqRow.email,
+          consent_type: 'MARKETING_PROMOTIONS',
+          status: 'WITHDRAWN',
+          consent_version: 'v2026.1',
+          ip_address: reqRow.ip_address || ''
+        }).catch(() => {});
+      }
+
+      const finalNotes = notes || 'Optional and marketing data processing consents officially revoked in compliance registry.';
+      await db('data_rights_requests').where({ id: reqRow.id }).update({
+        status: 'COMPLETED',
+        admin_notes: finalNotes,
+        updated_at: new Date()
+      });
+
+      try {
+        const { sendDataRightsNotificationEmail } = require('./services/firebaseAuth');
+        if (typeof sendDataRightsNotificationEmail === 'function') {
+          sendDataRightsNotificationEmail({
+            event: 'CONSENT_WITHDRAWN',
+            requestId: reqRow.request_id,
+            email: reqRow.email,
+            requestType: reqRow.request_type,
+            adminNotes: finalNotes
+          }).catch(() => {});
+        }
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        message: `Marketing & optional consents revoked for ${reqRow.email}, confirmation email dispatched, and request ${reqRow.request_id} marked COMPLETED.`
+      });
+    }
+
+    // ─── 4. STANDARD / CORRECTION RESOLUTION OR REJECTION ───────────────────
     const nextStatus = cleanAction === 'REJECTED' ? 'REJECTED' : 'COMPLETED';
+    const defaultNote = nextStatus === 'COMPLETED' && reqType === 'CORRECTION'
+      ? 'Requested personal data correction verified and updated by Compliance Desk.'
+      : `Marked ${nextStatus} by Admin.`;
+    const finalNotes = notes || defaultNote;
+
     await db('data_rights_requests').where({ id: reqRow.id }).update({
       status: nextStatus,
-      admin_notes: notes || `Marked ${nextStatus} by Admin.`,
+      admin_notes: finalNotes,
       updated_at: new Date()
     });
 
@@ -4077,7 +4216,7 @@ app.post('/api/admin/data-rights-requests/:id/resolve', authenticateToken, async
             requestId: reqRow.request_id,
             email: reqRow.email,
             requestType: reqRow.request_type,
-            adminNotes: notes
+            adminNotes: finalNotes
           }).catch(() => {});
         }
       } catch (e) {}
@@ -5155,6 +5294,16 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
       triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
       try {
         volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+      } catch (e) {}
+    }
+
+    // Also delete user from Firebase Auth so re-registration requires fresh email verification
+    if (targetUser && targetUser.email) {
+      try {
+        const { deleteFirebaseUserByEmail } = require('./services/firebaseAuth');
+        if (typeof deleteFirebaseUserByEmail === 'function') {
+          await deleteFirebaseUserByEmail(targetUser.email);
+        }
       } catch (e) {}
     }
 

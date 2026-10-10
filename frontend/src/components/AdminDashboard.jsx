@@ -1593,14 +1593,31 @@ export default function AdminDashboard() {
 
   const handleResolveDataRightsRequest = async (reqItem, action) => {
     const isDelete = action === 'DELETE_ACCOUNT';
-    const confirmMsg = isDelete
-      ? `⚠️ PERMANENT ACCOUNT DELETION\n\nAre you sure you want to permanently delete the user account for:\nEmail: ${reqItem.email}\nReference: ${reqItem.request_id}\n\nThis will erase their profile, positions, orders, ledger, and send a final deletion confirmation email to ${reqItem.email}.`
-      : `Mark request ${reqItem.request_id} (${reqItem.email}) as ${action}?`;
+    const isAccessExport = action === 'SEND_DATA_EXPORT' || (action === 'COMPLETED' && reqItem.request_type === 'ACCESS');
+    const isConsentWithdraw = action === 'WITHDRAW_CONSENT' || (action === 'COMPLETED' && reqItem.request_type === 'WITHDRAW_CONSENT');
+
+    let confirmMsg = `Mark request ${reqItem.request_id} (${reqItem.email}) as ${action}?`;
+    let defaultNote = '';
+
+    if (isDelete) {
+      confirmMsg = `⚠️ PERMANENT ACCOUNT DELETION\n\nAre you sure you want to permanently delete the user account for:\nEmail: ${reqItem.email}\nReference: ${reqItem.request_id}\n\nThis will erase their profile, positions, orders, ledger, Firebase Auth record, and send a final deletion confirmation email to ${reqItem.email}.`;
+      defaultNote = 'Account and personal data permanently erased per your request.';
+    } else if (isAccessExport) {
+      confirmMsg = `📨 SEND AUTOMATED PERSONAL DATA REPORT & EXPORT\n\nCompile and email the complete DPDP Sec. 11 Personal Data Summary + JSON Export attachment to:\nEmail: ${reqItem.email}\nReference: ${reqItem.request_id}?`;
+      defaultNote = 'Automated DPDP Sec. 11 Personal Data Summary & JSON Export dispatched to client email.';
+    } else if (isConsentWithdraw) {
+      confirmMsg = `🛡️ REVOKE OPTIONAL & MARKETING CONSENTS\n\nAutomatically revoke optional/marketing consents in the database and email confirmation to:\nEmail: ${reqItem.email}\nReference: ${reqItem.request_id}?`;
+      defaultNote = 'Optional and marketing data processing consents officially revoked in compliance registry.';
+    } else if (action === 'COMPLETED' && reqItem.request_type === 'CORRECTION') {
+      confirmMsg = `✅ CONFIRM PERSONAL DATA CORRECTION\n\nMark correction request ${reqItem.request_id} (${reqItem.email}) as completed and email confirmation to client?`;
+      defaultNote = 'Requested personal data correction verified and updated by Compliance Desk.';
+    }
+
     if (!window.confirm(confirmMsg)) return;
 
     const adminNotes = window.prompt(
-      isDelete ? 'Optional Compliance Note (sent in confirmation email):' : 'Optional Admin Note:',
-      isDelete ? 'Account and personal data permanently erased per your request.' : ''
+      'Optional Compliance Note (included in client confirmation email):',
+      defaultNote
     );
     if (adminNotes === null) return;
 
@@ -3340,6 +3357,7 @@ export default function AdminDashboard() {
                   { id: 'ALL', label: `All (${dataRightsRequests.length})` },
                   { id: 'PENDING', label: `Pending (${dataRightsRequests.filter(r => r.status === 'PENDING').length})` },
                   { id: 'ERASURE', label: `Deletions (${dataRightsRequests.filter(r => r.request_type === 'ERASURE').length})` },
+                  { id: 'DATA_RIGHTS', label: `Data Rights (${dataRightsRequests.filter(r => r.request_type !== 'ERASURE').length})` },
                   { id: 'COMPLETED', label: `Completed (${dataRightsRequests.filter(r => r.status === 'COMPLETED').length})` }
                 ].map(f => (
                   <button
@@ -3490,13 +3508,54 @@ export default function AdminDashboard() {
                     .filter(r => {
                       if (dataRightsFilter === 'PENDING') return r.status === 'PENDING';
                       if (dataRightsFilter === 'ERASURE') return r.request_type === 'ERASURE';
+                      if (dataRightsFilter === 'DATA_RIGHTS') return r.request_type !== 'ERASURE';
                       if (dataRightsFilter === 'COMPLETED') return r.status === 'COMPLETED';
                       return true;
                     })
                     .map(reqItem => {
-                      const isErasure = reqItem.request_type === 'ERASURE';
+                      const reqType = String(reqItem.request_type || '').toUpperCase();
+                      const isErasure = reqType === 'ERASURE';
+                      const isAccess = reqType === 'ACCESS';
+                      const isWithdraw = reqType === 'WITHDRAW_CONSENT';
+                      const isCorrection = reqType === 'CORRECTION';
                       const isPending = reqItem.status === 'PENDING';
                       const isBusy = dataRightsResolvingId === reqItem.id;
+
+                      const badgeBg = isErasure
+                        ? 'rgba(239, 68, 68, 0.15)'
+                        : isAccess
+                          ? 'rgba(56, 189, 248, 0.15)'
+                          : isWithdraw
+                            ? 'rgba(168, 85, 247, 0.15)'
+                            : 'rgba(245, 158, 11, 0.15)';
+                      const badgeColor = isErasure
+                        ? '#f87171'
+                        : isAccess
+                          ? '#38bdf8'
+                          : isWithdraw
+                            ? '#c084fc'
+                            : '#fbbf24';
+                      const badgeBorder = isErasure
+                        ? '1px solid rgba(239, 68, 68, 0.35)'
+                        : isAccess
+                          ? '1px solid rgba(56, 189, 248, 0.35)'
+                          : isWithdraw
+                            ? '1px solid rgba(168, 85, 247, 0.35)'
+                            : '1px solid rgba(245, 158, 11, 0.35)';
+                      const badgeLabel = isErasure
+                        ? '🗑️ ACCOUNT DELETION'
+                        : isAccess
+                          ? '📄 DATA ACCESS'
+                          : isWithdraw
+                            ? '🛡️ CONSENT WITHDRAWAL'
+                            : isCorrection
+                              ? '✏️ DATA CORRECTION'
+                              : reqType;
+
+                      const matchedClientObj = reqItem.matched_user_id
+                        ? (users || []).find(u => Number(u.id) === Number(reqItem.matched_user_id))
+                        : null;
+
                       return (
                         <tr key={reqItem.id} style={{ borderBottom: '1px solid var(--border-color)', background: isPending && isErasure ? 'rgba(239, 68, 68, 0.04)' : 'transparent' }}>
                           <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
@@ -3531,11 +3590,11 @@ export default function AdminDashboard() {
                               borderRadius: '5px',
                               fontSize: '10.5px',
                               fontWeight: '800',
-                              background: isErasure ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                              color: isErasure ? '#f87171' : '#fbbf24',
-                              border: isErasure ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)'
+                              background: badgeBg,
+                              color: badgeColor,
+                              border: badgeBorder
                             }}>
-                              {isErasure ? '🗑️ ACCOUNT DELETION' : reqItem.request_type}
+                              {badgeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '10px 12px', maxWidth: '300px' }}>
@@ -3583,23 +3642,89 @@ export default function AdminDashboard() {
                                     🗑️ Approve & Delete Account
                                   </button>
                                 )}
-                                <button
-                                  type="button"
-                                  disabled={isBusy}
-                                  onClick={() => handleResolveDataRightsRequest(reqItem, 'COMPLETED')}
-                                  style={{
-                                    background: 'rgba(16, 185, 129, 0.15)',
-                                    color: '#10b981',
-                                    border: '1px solid rgba(16, 185, 129, 0.4)',
-                                    borderRadius: '5px',
-                                    padding: '5px 9px',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    cursor: isBusy ? 'wait' : 'pointer'
-                                  }}
-                                >
-                                  ✅ Mark Resolved
-                                </button>
+                                {isAccess && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => handleResolveDataRightsRequest(reqItem, 'SEND_DATA_EXPORT')}
+                                    style={{
+                                      background: 'rgba(56, 189, 248, 0.18)',
+                                      color: '#38bdf8',
+                                      border: '1px solid rgba(56, 189, 248, 0.45)',
+                                      borderRadius: '5px',
+                                      padding: '5px 10px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: isBusy ? 'wait' : 'pointer'
+                                    }}
+                                  >
+                                    📨 Approve & Send Data Export
+                                  </button>
+                                )}
+                                {isWithdraw && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => handleResolveDataRightsRequest(reqItem, 'WITHDRAW_CONSENT')}
+                                    style={{
+                                      background: 'rgba(168, 85, 247, 0.18)',
+                                      color: '#c084fc',
+                                      border: '1px solid rgba(168, 85, 247, 0.45)',
+                                      borderRadius: '5px',
+                                      padding: '5px 10px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: isBusy ? 'wait' : 'pointer'
+                                    }}
+                                  >
+                                    🛡️ Approve & Revoke Consents
+                                  </button>
+                                )}
+                                {matchedClientObj && isCorrection && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedUser(matchedClientObj);
+                                      setNewBalance(matchedClientObj.balance);
+                                      setNewSubTier(matchedClientObj.subscription_tier || 'BASIC');
+                                      setNewUsername(matchedClientObj.username || '');
+                                      setNewEmail(matchedClientObj.email || '');
+                                      setNewPhone(matchedClientObj.phone || '');
+                                      setNewPassword('');
+                                    }}
+                                    style={{
+                                      background: 'rgba(245, 158, 11, 0.15)',
+                                      color: '#fbbf24',
+                                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                                      borderRadius: '5px',
+                                      padding: '5px 9px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    ⚙️ Edit Client
+                                  </button>
+                                )}
+                                {(!isAccess && !isWithdraw) && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => handleResolveDataRightsRequest(reqItem, 'COMPLETED')}
+                                    style={{
+                                      background: 'rgba(16, 185, 129, 0.15)',
+                                      color: '#10b981',
+                                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                                      borderRadius: '5px',
+                                      padding: '5px 9px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: isBusy ? 'wait' : 'pointer'
+                                    }}
+                                  >
+                                    ✅ {isCorrection ? 'Confirm & Notify' : 'Mark Resolved'}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   disabled={isBusy}
