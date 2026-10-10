@@ -2636,8 +2636,19 @@ export const useStore = create(persist((set, get) => ({
       setAppLocked(false, u.id);
     }
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('admin_token_backup');
     localStorage.removeItem('hasSkippedOnboarding');
+    try {
+      localStorage.removeItem('skandx_google_oauth_completed');
+      localStorage.removeItem('skandx_pending_oauth_state');
+      localStorage.removeItem('skandx_pending_oauth_ts');
+      localStorage.removeItem('skandx_google_id_token');
+      localStorage.removeItem('skandx_google_oauth_event');
+      sessionStorage.removeItem('skandx_pending_oauth_state');
+      sessionStorage.removeItem('skandx_pending_oauth_ts');
+      sessionStorage.removeItem('skandx_google_id_token');
+    } catch (_) {}
     set({
       hasSkippedOnboarding: false,
       token: null,

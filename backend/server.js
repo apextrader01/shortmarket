@@ -2469,7 +2469,6 @@ app.post('/api/auth/google-oauth-relay', async (req, res) => {
     const existing = (await getOauthRelayRecord(state)) || {};
     const isInApp = Boolean(
       existing.isInApp ||
-      (existing.pollCount && existing.pollCount > 0) ||
       state.startsWith('skx_app_') ||
       state.startsWith('skx_pwa_') ||
       state.startsWith('skx_cap_')
@@ -15144,37 +15143,27 @@ app.get('/__/auth/handler', (req, res, next) => {
           return;
         }
 
+        if (!fromUserClick) {
+          return;
+        }
+
+        var appReturnPath = '/?oauth_app_return=1' + (state ? ('&state=' + encodeURIComponent(state)) : '') + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '');
+        var fullReturnUrl = window.location.origin + appReturnPath;
+
         if (mode === 'cap') {
           try {
+            window.location.href = 'intent://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;S.browser_fallback_url=' + encodeURIComponent(fullReturnUrl) + ';end';
+          } catch (e) {
             window.location.href = 'skandx://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state);
-          } catch (e) {}
-          if (fromUserClick) {
-            setTimeout(function() {
-              try {
-                window.location.href = 'intent://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;end';
-              } catch (e) {}
-            }, 250);
           }
           return;
         }
 
-        // External Chrome tab for an installed PWA/TWA: only trigger Android app intent on explicit user click
-        // NEVER auto-replace the Chrome tab on a timer, or Chrome will hijack the signup flow!
-        if (fromUserClick) {
-          var appReturnPath = '/?oauth_app_return=1' + (state ? ('&state=' + encodeURIComponent(state)) : '') + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '');
-          var fullReturnUrl = window.location.origin + appReturnPath;
-          try {
-            var newWin = window.open(fullReturnUrl, '_blank', 'noopener');
-            if (newWin) {
-              setTimeout(function() { try { window.close(); } catch (e) {} }, 150);
-              return;
-            }
-          } catch (e) {}
-          try {
-            window.location.href = 'intent://' + window.location.host + appReturnPath + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fullReturnUrl) + ';end';
-          } catch (e) {
-            window.location.replace(targetUrl);
-          }
+        // External Chrome tab for an installed PWA/TWA: trigger Android Browsable Intent synchronously on user click
+        try {
+          window.location.href = 'intent://' + window.location.host + appReturnPath + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fullReturnUrl) + ';end';
+        } catch (e) {
+          window.location.replace(targetUrl);
         }
       }
 

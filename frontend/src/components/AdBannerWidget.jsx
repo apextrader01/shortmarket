@@ -46,6 +46,7 @@ function attachAdSenseLayoutGuard() {
 
 function injectAdSenseScript(clientId) {
   if (!clientId || typeof document === 'undefined') return;
+  if (isUserAdFreeTier(useStore.getState()?.user)) return;
   const cleanId = String(clientId).trim();
   if (!cleanId.startsWith('ca-pub-')) return;
   if (!document.getElementById('skandx-adsense-unfilled-css')) {
