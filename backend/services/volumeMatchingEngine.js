@@ -619,7 +619,7 @@ class VolumeMatchingEngine {
         if (isClosing) {
           const absPosQty = roundQty(Math.abs(existingPos.quantity));
           const closeQty = Math.min(sliceQtyClean, absPosQty);
-          const leftoverQty = roundQty(sliceQtyClean - closeQty);
+          let leftoverQty = roundQty(sliceQtyClean - closeQty);
           let realizedPnl = 0;
 
           if (existingPos.quantity > 0) {

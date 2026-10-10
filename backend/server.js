@@ -7820,15 +7820,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     if (existingLongPos && Number(existingLongPos.quantity) >= Number(quantity) - 0.0001) {
       isClosingOrder = true;
     } else if (isDeliveryProduct) {
-      // Check holdings
+      // Check holdings (including combined T+0 long position + T+1 holding)
       const holding = await db('holdings')
         .where({ user_id: req.user.id })
         .where(builder => {
           builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
         })
-        .where('quantity', '>=', Number(quantity) - 0.0001)
+        .where('quantity', '>', 0)
         .first();
-      if (holding) {
+      const combinedLongQty = (existingLongPos ? Number(existingLongPos.quantity) : 0) + (holding ? Number(holding.quantity) : 0);
+      if (combinedLongQty >= Number(quantity) - 0.0001) {
         isClosingOrder = true;
       }
     }
@@ -8179,8 +8180,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                       }
                   }
               } else if (isDerivative && effectiveProductType === 'DEL') {
-                  if (txLongPos) {
-                      const excessQty = Math.max(0, Number(quantity) - Number(txLongPos.quantity));
+                  const txHolding = await trx('holdings')
+                      .where({ user_id: req.user.id })
+                      .where(builder => {
+                          builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                      })
+                      .where('quantity', '>', 0)
+                      .first();
+                  const totalHeldLong = (txLongPos ? Number(txLongPos.quantity) : 0) + (txHolding ? Number(txHolding.quantity) : 0);
+                  if (totalHeldLong > 0) {
+                      const excessQty = Math.max(0, Number(quantity) - totalHeldLong);
                       if (excessQty === 0) {
                           requiresMargin = false;
                       } else {

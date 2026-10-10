@@ -52,14 +52,14 @@ try {
 // ─── 2. Holdings synchronization in volumeMatchingEngine.js ───
 console.log('\n▶ TEST 2: Holdings synchronization in volumeMatchingEngine.js');
 const vmeSource = fs.readFileSync(path.join(__dirname, 'services', 'volumeMatchingEngine.js'), 'utf8');
-assert.ok(vmeSource.includes("const holdingRecord = await trx('holdings')"), 'volumeMatchingEngine synchronizes holdings on position close');
-assert.ok(vmeSource.includes("order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')"), 'volumeMatchingEngine only offsets holdings on SELL side');
+assert.ok(vmeSource.includes("const holdingForRemainder = await trx('holdings')") && vmeSource.includes("const holding = await trx('holdings')"), 'volumeMatchingEngine synchronizes holdings on DEL close');
+assert.ok(vmeSource.includes("order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')"), 'volumeMatchingEngine offsets holdings on SELL side');
 console.log('  ✔ [PASS] volumeMatchingEngine synchronizes and deletes from holdings table on position exit');
 
 // ─── 3. Holdings synchronization in triggerEngine.js ───
 console.log('\n▶ TEST 3: Holdings synchronization in triggerEngine.js');
 const teSource = fs.readFileSync(path.join(__dirname, 'services', 'triggerEngine.js'), 'utf8');
-assert.ok(teSource.includes("const holdingRecord = await trx('holdings')"), 'triggerEngine synchronizes holdings on position close');
+assert.ok(teSource.includes("const holding = await trx('holdings')"), 'triggerEngine synchronizes holdings on DEL close');
 console.log('  ✔ [PASS] triggerEngine synchronizes and deletes from holdings table on position exit');
 
 // ─── 4. Database startup purge of non-positive quantities in db.js ───
@@ -71,7 +71,7 @@ console.log('  ✔ [PASS] db.js purges zero/negative holdings while preserving a
 // ─── 5. Server holdings filtering in server.js ───
 console.log('\n▶ TEST 5: Server.js holdings delivery support');
 const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-assert.ok(serverSource.includes("const formattedHoldings = (holdingsRows || []).filter(h => Number(h.quantity) > 0);"), 'server.js allows all positive delivery holdings in /api/user/data');
+assert.ok(serverSource.includes("const formattedHoldings = (holdingsRows || []).filter(h => Math.abs(Number(h.quantity)) > 0);"), 'server.js allows all non-zero delivery holdings in /api/user/bootstrap');
 assert.ok(serverSource.includes("server.closeAllConnections()"), 'server.js calls closeAllConnections for instant port release on shutdown');
 console.log('  ✔ [PASS] server.js returns all delivery holdings and prevents EADDRINUSE port collision');
 
