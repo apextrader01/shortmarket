@@ -1439,6 +1439,7 @@ export const useStore = create(persist((set, get) => ({
         
         if (!get().user && !user) return;
         
+        const now = Date.now();
         const incomingWatchlists = user?.watchlists ? ensureWatchlistsWithDefaults(user.watchlists) : null;
         const shouldUpdateWatchlists = (incomingWatchlists && (now - get().lastWatchlistEdit > 3000));
         
@@ -1485,7 +1486,8 @@ export const useStore = create(persist((set, get) => ({
         // Fetch restricted stocks (cached for 15m to stop 30s polling churn)
         get().fetchRestrictedStocks();
         // No initial search; let MutualFundsView handle empty state
-      } catch (_) {
+      } catch (err) {
+        console.error('[fetchUserData Error]:', err);
       } finally {
         window._activeFetchUserDataPromise = null;
         if (!get().isInitialUserDataLoaded) {
