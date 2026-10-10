@@ -95,11 +95,11 @@ function getSymbolToExpiryMap() {
 
 function parseExpiryDate(symbol) {
     if (!symbol) return null;
-    const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+    const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(NFO|BFO|MCX|CDS|EQ)$/i, '').trim();
 
     // 1. Direct algorithmic regex parsing from symbol name:
-    // 1A. Weekly options format (e.g. SENSEX2691774300CE, BANKEX2691756000PE, NIFTY2691723450PE, BANKNIFTY2691751000CE)
-    const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+    // 1A. Weekly options format (e.g. SENSEX2691774300CE, BANKEX2691756000PE, NIFTY2691723450PE, BANKNIFTY2691751000CE, SENSEX26O0172900CE)
+    const weeklyMatch = cleanSym.match(/^([A-Z0-9&_.-]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
     if (weeklyMatch) {
         const yr = 2000 + parseInt(weeklyMatch[2], 10);
         const mChar = weeklyMatch[3].toUpperCase();
@@ -112,7 +112,7 @@ function parseExpiryDate(symbol) {
     }
 
     // 1B. Standard 2-digit month weekly format (e.g. SENSEX26091774300CE)
-    const weekly2DigitMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(0[1-9]|1[0-2])(\d{2})(\d+)(CE|PE)$/i);
+    const weekly2DigitMatch = cleanSym.match(/^([A-Z0-9&_.-]+?)(\d{2})(0[1-9]|1[0-2])(\d{2})(\d+)(CE|PE)$/i);
     if (weekly2DigitMatch) {
         const yr = 2000 + parseInt(weekly2DigitMatch[2], 10);
         const m = parseInt(weekly2DigitMatch[3], 10) - 1;
@@ -145,7 +145,7 @@ function parseExpiryDate(symbol) {
     }
 
     // 3. Monthly contracts format for all NFO stocks & indices (e.g. RELIANCE26SEPFUT, TCS26OCT4100PE, SENSEX26OCTFUT, NIFTY26SEPFUT)
-    const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+    const monthlyMatch = cleanSym.match(/^([A-Z0-9&_.-]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+(?:\.\d+)?)(CE|PE)|FUT)?$/i);
     if (monthlyMatch) {
         const yr = 2000 + parseInt(monthlyMatch[2], 10);
         const mStr = monthlyMatch[3].toUpperCase();

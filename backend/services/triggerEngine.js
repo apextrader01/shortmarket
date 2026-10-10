@@ -562,6 +562,10 @@ class TriggerEngine {
                 
                 // If there's still a remaining quantity, insert an OPEN position
                 if (remainingQty !== 0) {
+                    if (order.is_exit) {
+                        console.warn(`[SAFEGUARD] Blocked exit/settlement order ${order.id} (${order.symbol}) from opening a new position with remainingQty: ${remainingQty}`);
+                        return;
+                    }
                     // SAFEGUARD: For Cash Equity Delivery (DEL/CNC), negative quantities (naked shorts) are strictly prohibited.
                     // Derivatives (Options and Futures) are permitted to have negative (short) quantities.
                     if ((order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') && remainingQty < 0 && !isDeriv) {
@@ -868,6 +872,9 @@ class TriggerEngine {
 
                         await handleRemainingPos(trx, remainingQty, execPrice, newPosMargin);
                     }
+                } else if (order.is_exit) {
+                    // Exit/settlement order for a holding when a same-side open position exists: offset holding instead of averaging
+                    await handleRemainingPos(trx, qtyChange, execPrice);
                 } else {
                     // Averaging
                     const currentTotal = Math.abs(existingPos.quantity) * Math.abs(Number(existingPos.average_price));

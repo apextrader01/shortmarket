@@ -48,12 +48,17 @@ class PositionsEngine {
         console.log('PositionsEngine Initialized (EOD Automation)');
         if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
             this.initCronJobs();
-            // Run catchup migration on startup (in case the server was down at 8:00 AM)
-            setTimeout(() => {
-                this.runHoldingsMigration(true);
-            }, 15000);
+            // Run catchup migration and past-expiry cleanup on startup
+            setTimeout(async () => {
+                try {
+                    console.log('⏰ [BOOT CATCHUP] Auditing and closing all past-expired contracts (strictly before today)...');
+                    await this.settleExpiries(false, true, true).catch(e => console.error('Startup past-expiry EQ error:', e));
+                    await this.settleExpiries(true, true, true).catch(e => console.error('Startup past-expiry MCX error:', e));
+                    await this.runHoldingsMigration(true).catch(e => console.error('Startup holdings migration error:', e));
+                } catch (e) {}
+            }, 5000);
 
-            // Run catchup expiry settlement on startup if past 03:40 PM IST
+            // Run catchup expiry settlement for TODAY's expiries on startup if past 03:40 PM IST
             setTimeout(() => {
                 try {
                     const now = new Date();
@@ -80,12 +85,18 @@ class PositionsEngine {
 
         // HOLDINGS MIGRATION (T+1)
         // Phase 0: The 8:00 AM Wipe - 08:00 AM IST
-        cron.schedule('0 8 * * *', () => {
-            this.runHoldingsMigration();
+        cron.schedule('0 8 * * *', async () => {
+            await this.settleExpiries(false, true, true).catch(() => {});
+            await this.settleExpiries(true, true, true).catch(() => {});
+            await this.runHoldingsMigration();
         }, { timezone: 'Asia/Kolkata' });
 
-        // Run catchup T+1 holdings migration immediately on startup
-        this.runHoldingsMigration(true).catch(e => console.error('[STARTUP HOLDINGS MIGRATION ERROR]:', e.message));
+        // Run catchup past-expiry cleanup & T+1 holdings migration immediately on startup
+        (async () => {
+            await this.settleExpiries(false, true, true).catch(e => console.error('[STARTUP PAST EXPIRY EQ ERROR]:', e.message));
+            await this.settleExpiries(true, true, true).catch(e => console.error('[STARTUP PAST EXPIRY MCX ERROR]:', e.message));
+            await this.runHoldingsMigration(true).catch(e => console.error('[STARTUP HOLDINGS MIGRATION ERROR]:', e.message));
+        })();
 
         // Phase 4: Final Safety Net Cleanup (Commodities) - 12:05 AM IST (00:05)
         cron.schedule('5 0 * * *', () => {
@@ -315,7 +326,7 @@ class PositionsEngine {
         }
     }
 
-    async settleExpiries(isCommodity = false, includeYesterday = false) {
+    async settleExpiries(isCommodity = false, includeYesterday = false, onlyPastExpiries = false) {
         const lockKey = isCommodity ? 'cron_settle_expiries_mcx' : 'cron_settle_expiries_eq';
         let connection = null;
         let isLocked = false;
@@ -330,7 +341,7 @@ class PositionsEngine {
                 }
             }
 
-            console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}, includeYesterday: ${includeYesterday}).`);
+            console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}, includeYesterday: ${includeYesterday}, onlyPastExpiries: ${onlyPastExpiries}).`);
             
             const monthMap = { '01':'JAN', '02':'FEB', '03':'MAR', '04':'APR', '05':'MAY', '06':'JUN', '07':'JUL', '08':'AUG', '09':'SEP', '10':'OCT', '11':'NOV', '12':'DEC' };
             const monthCharMap = { '01': '1', '02': '2', '03': '3', '04': '4', '05': '5', '06': '6', '07': '7', '08': '8', '09': '9', '10': 'O', '11': 'N', '12': 'D' };
@@ -341,7 +352,8 @@ class PositionsEngine {
             const monthPart = parts.find(p => p.type === 'month').value;
             const dayPart = parts.find(p => p.type === 'day').value;
             
-            let startOfWindow = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`).getTime();
+            const startOfTodayMs = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`).getTime();
+            let startOfWindow = startOfTodayMs;
             const endOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T23:59:59.999+05:30`).getTime();
             
             const expiryTokens = [];
@@ -365,10 +377,13 @@ class PositionsEngine {
                 }
             }
 
-            const expiringInstruments = await db('instruments')
-                .where('expiry_timestamp', '>=', startOfWindow)
-                .where('expiry_timestamp', '<=', endOfToday)
-                .select('unique_symbol');
+            let instQuery = db('instruments').where('expiry_timestamp', '>', 0);
+            if (onlyPastExpiries) {
+                instQuery = instQuery.where('expiry_timestamp', '<', startOfTodayMs);
+            } else {
+                instQuery = instQuery.where('expiry_timestamp', '<=', endOfToday);
+            }
+            const expiringInstruments = await instQuery.select('unique_symbol');
             const expiringUniqueSymbols = expiringInstruments.map(i => i.unique_symbol);
 
             // Find all active assets in Holdings, Positions, or Orders to evaluate for expiry settlement
@@ -390,6 +405,10 @@ class PositionsEngine {
                 if (expDate) {
                     const now = new Date();
                     const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                    const istStartOfToday = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), 0, 0, 0, 0);
+                    if (onlyPastExpiries) {
+                        return expDate.getTime() < istStartOfToday.getTime();
+                    }
                     if (formatDate(expDate) === formatDate(istNow)) return true;
                     if (includeYesterday) {
                         const yestDate = new Date(istNow);
@@ -490,6 +509,48 @@ class PositionsEngine {
                 const orderQty = Math.abs(item.quantity);
                 const prodType = isHolding ? 'DEL' : item.product_type;
 
+                const expDate = parseExpiryDate(sym) || parseExpiryDate(cleanSym);
+                const now = new Date();
+                const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                const istStartOfToday = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), 0, 0, 0, 0);
+                const isStrictlyPastExpiry = Boolean(onlyPastExpiries || (expDate && expDate.getTime() < istStartOfToday.getTime()));
+
+                if (isStrictlyPastExpiry) {
+                    const alreadySettledPos = await db('positions')
+                        .where({ user_id: item.user_id, quantity: 0 })
+                        .where('closed_quantity', '>', 0)
+                        .whereNotNull('exit_price')
+                        .where(builder => {
+                            builder.where({ symbol: item.symbol })
+                                   .orWhere({ symbol: cleanSym })
+                                   .orWhere({ symbol: `NSE:${cleanSym}` })
+                                   .orWhere({ symbol: `BSE:${cleanSym}` })
+                                   .orWhere({ symbol: `MCX:${cleanSym}` });
+                        })
+                        .first();
+
+                    if (alreadySettledPos) {
+                        if (isHolding) {
+                            await db('holdings').where({ id: item.id }).del();
+                        } else {
+                            await db('positions').where({ id: item.id }).update({
+                                quantity: 0,
+                                closed_quantity: orderQty,
+                                exit_price: alreadySettledPos.exit_price,
+                                margin: 0,
+                                updated_at: new Date()
+                            });
+                        }
+                        if (triggerEngine && triggerEngine.io) {
+                            try {
+                                triggerEngine.io.to(item.user_id.toString()).emit('sync_user_data');
+                            } catch (e) {}
+                        }
+                        console.log(`[PAST EXPIRY CLEANUP] Removed duplicate already-settled expired ${isHolding ? 'holding' : 'position'} ${item.symbol} for User ${item.user_id}`);
+                        return;
+                    }
+                }
+
                 let ltp = 0;
                 const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
                 let optType = null;
@@ -497,7 +558,7 @@ class PositionsEngine {
                 let underlying = null;
 
                 // Extract underlying symbol and strike/option type
-                const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+                const monthlyMatch = cleanSym.match(/^([A-Z0-9&_.-]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+(?:\.\d+)?)(CE|PE)|FUT)?$/i);
                 if (monthlyMatch) {
                     underlying = monthlyMatch[1].toUpperCase();
                     if (monthlyMatch[4] && monthlyMatch[5]) {
@@ -505,13 +566,13 @@ class PositionsEngine {
                         optType = monthlyMatch[5].toUpperCase();
                     }
                 } else {
-                    const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+                    const weeklyMatch = cleanSym.match(/^([A-Z0-9&_.-]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
                     if (weeklyMatch) {
                         underlying = weeklyMatch[1].toUpperCase();
                         strike = parseFloat(weeklyMatch[5]);
                         optType = weeklyMatch[6].toUpperCase();
                     } else {
-                        const genMatch = cleanSym.match(/([A-Z0-9]+).*?(\d{3,6})(CE|PE)$/i);
+                        const genMatch = cleanSym.match(/([A-Z0-9&_.-]+).*?(\d{3,6})(CE|PE)$/i);
                         if (genMatch) {
                             underlying = genMatch[1].toUpperCase();
                             strike = parseFloat(genMatch[2]);
@@ -836,6 +897,17 @@ class PositionsEngine {
                     orderRow.is_exit = true;
                     await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
                 }
+                if (isHolding) {
+                    await db('holdings').where({ id: item.id }).del().catch(() => {});
+                } else {
+                    await db('positions').where({ id: item.id }).whereNot({ quantity: 0 }).update({
+                        quantity: 0,
+                        closed_quantity: orderQty,
+                        exit_price: ltp,
+                        margin: 0,
+                        updated_at: new Date()
+                    }).catch(() => {});
+                }
                 if (triggerEngine && triggerEngine.io) {
                     try {
                         triggerEngine.io.to(item.user_id.toString()).emit('sync_user_data');
@@ -1015,6 +1087,11 @@ class PositionsEngine {
 
                     // Check if holding already exists (prefix-tolerant)
                     const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                    const expDate = parseExpiryDate(pos.symbol) || parseExpiryDate(cleanSym);
+                    if (expDate && expDate.getTime() < startOfToday.getTime()) {
+                        // Never migrate an already-expired contract into holdings
+                        continue;
+                    }
                     const existingHolding = await trx('holdings')
                         .where({ user_id: pos.user_id })
                         .where(builder => {
