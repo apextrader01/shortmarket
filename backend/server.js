@@ -11875,7 +11875,7 @@ app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) 
 // ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Multi-Worker Safe) ───
 let adConfigCache = {
   enabled: true,
-  show_ads_to_admin: true,
+  show_ads_to_admin: false,
   interstitial_enabled: true,
   internal_counter_enabled: false,
   direct_sponsor_enabled: false,
@@ -11904,7 +11904,7 @@ async function loadAdConfigFromDb() {
       adConfigCache = {
         ...adConfigCache,
         ...parsed,
-        show_ads_to_admin: parsed.show_ads_to_admin !== undefined ? Boolean(parsed.show_ads_to_admin) : true,
+        show_ads_to_admin: parsed.show_ads_to_admin_explicit === true ? Boolean(parsed.show_ads_to_admin) : false,
         interstitial_enabled: parsed.interstitial_enabled !== undefined ? Boolean(parsed.interstitial_enabled) : true,
         internal_counter_enabled: parsed.internal_counter_enabled === true,
         direct_sponsor_enabled: parsed.direct_sponsor_enabled === true,
@@ -11936,7 +11936,7 @@ app.get('/api/ads/config', (req, res) => {
     success: true,
     config: {
       enabled: Boolean(adConfigCache.enabled),
-      show_ads_to_admin: adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true,
+      show_ads_to_admin: Boolean(adConfigCache.show_ads_to_admin),
       interstitial_enabled: adConfigCache.interstitial_enabled !== undefined ? Boolean(adConfigCache.interstitial_enabled) : true,
       internal_counter_enabled: Boolean(adConfigCache.internal_counter_enabled),
       direct_sponsor_enabled: Boolean(adConfigCache.direct_sponsor_enabled),
@@ -12164,7 +12164,8 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
     adConfigCache = {
       ...adConfigCache,
       enabled: incoming.enabled !== undefined ? Boolean(incoming.enabled) : adConfigCache.enabled,
-      show_ads_to_admin: incoming.show_ads_to_admin !== undefined ? Boolean(incoming.show_ads_to_admin) : (adConfigCache.show_ads_to_admin !== undefined ? Boolean(adConfigCache.show_ads_to_admin) : true),
+      show_ads_to_admin: incoming.show_ads_to_admin !== undefined ? Boolean(incoming.show_ads_to_admin) : Boolean(adConfigCache.show_ads_to_admin),
+      show_ads_to_admin_explicit: true,
       interstitial_enabled: incoming.interstitial_enabled !== undefined ? Boolean(incoming.interstitial_enabled) : (adConfigCache.interstitial_enabled !== undefined ? Boolean(adConfigCache.interstitial_enabled) : true),
       internal_counter_enabled: incoming.internal_counter_enabled !== undefined ? Boolean(incoming.internal_counter_enabled) : Boolean(adConfigCache.internal_counter_enabled),
       direct_sponsor_enabled: incoming.direct_sponsor_enabled !== undefined ? Boolean(incoming.direct_sponsor_enabled) : Boolean(adConfigCache.direct_sponsor_enabled),

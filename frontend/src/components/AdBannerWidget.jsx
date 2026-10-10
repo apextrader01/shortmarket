@@ -131,15 +131,59 @@ export function useAdConfig() {
   return { config, refresh };
 }
 
+function syncAdFreeBodyStyle(isAdFree) {
+  if (typeof document === 'undefined' || !document.body) return;
+  if (!document.getElementById('skandx-adfree-guard-css')) {
+    const style = document.createElement('style');
+    style.id = 'skandx-adfree-guard-css';
+    style.textContent = `
+      body.skandx-ad-free ins.adsbygoogle,
+      body.skandx-ad-free .google-auto-placed,
+      body.skandx-ad-free div[id^="google_ads_iframe"],
+      body.skandx-ad-free iframe[id^="google_ads_iframe"],
+      body.skandx-ad-free iframe[src*="googlesyndication.com"] {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  if (isAdFree) {
+    document.body.classList.add('skandx-ad-free');
+  } else {
+    document.body.classList.remove('skandx-ad-free');
+  }
+}
+
 export function isUserAdFreeTier(user) {
-  if (!user) return false;
-  if (user.is_admin && (!cachedAdConfig || cachedAdConfig.show_ads_to_admin !== false)) {
+  if (!user) {
+    syncAdFreeBodyStyle(false);
     return false;
   }
-  const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS'];
-  const isPaid = paidTiers.includes(String(user.subscription_tier || '').toUpperCase());
+  const tier = String(user.subscription_tier || 'BASIC').trim().toUpperCase();
+  const paidTiers = ['PRO', 'MONTHLY', 'YEARLY', 'LIFETIME', 'HIGHEST', 'FEATURE', 'VIP', 'MASTERCLASS', 'ELITE', 'ENTERPRISE', 'ULTRA', 'PREMIUM'];
+  const isPaid = paidTiers.includes(tier) || (tier !== 'BASIC' && tier !== 'FREE' && tier !== '');
   const isNotExpired = !user.subscription_expires || new Date(user.subscription_expires).getTime() > Date.now();
-  return isPaid && isNotExpired;
+
+  // Any user with an active high/paid subscription tier is ALWAYS 100% ad-free
+  if (isPaid && isNotExpired) {
+    syncAdFreeBodyStyle(true);
+    return true;
+  }
+
+  // Admin accounts are also ad-free by default unless show_ads_to_admin is explicitly enabled on a BASIC tier
+  if (user.is_admin) {
+    const forceAdminAds = Boolean(cachedAdConfig && cachedAdConfig.show_ads_to_admin === true);
+    syncAdFreeBodyStyle(!forceAdminAds);
+    return !forceAdminAds;
+  }
+
+  syncAdFreeBodyStyle(false);
+  return false;
 }
 
 export function trackAdEvent(event) {

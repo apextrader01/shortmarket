@@ -1496,7 +1496,7 @@ export default function AdminDashboard() {
   // Ads & Monetization Admin State
   const [adConfig, setAdConfig] = useState({
     enabled: true,
-    show_ads_to_admin: true,
+    show_ads_to_admin: false,
     interstitial_enabled: true,
     internal_counter_enabled: false,
     direct_sponsor_enabled: false,
@@ -5208,7 +5208,7 @@ export default function AdminDashboard() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#38bdf8', background: 'rgba(56,189,248,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.25)' }}>
                   <input
                     type="checkbox"
-                    checked={adConfig.show_ads_to_admin !== false}
+                    checked={Boolean(adConfig.show_ads_to_admin)}
                     onChange={(e) => setAdConfig({ ...adConfig, show_ads_to_admin: e.target.checked })}
                     style={{ width: '16px', height: '16px', accentColor: '#38bdf8' }}
                   />
