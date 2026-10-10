@@ -518,9 +518,10 @@ async function sendDataRightsNotificationEmail({
       }
     });
 
+    const cleanSender = gmailUser.trim();
     const isErasure = String(requestType).toUpperCase() === 'ERASURE';
     const typeLabel = isErasure ? 'Account Deletion (Right to Erasure)' : `Data Rights (${requestType})`;
-    const adminRecipients = Array.from(new Set([gmailUser.trim(), process.env.ADMIN_EMAIL, 'skandx.in@gmail.com'].filter(Boolean))).join(', ');
+    const adminRecipients = Array.from(new Set([cleanSender, process.env.ADMIN_EMAIL].filter(Boolean))).join(', ');
 
     if (event === 'SUBMITTED') {
       // 1. Send instant alert email to Admin
@@ -528,16 +529,17 @@ async function sendDataRightsNotificationEmail({
         <!DOCTYPE html>
         <html>
         <head><meta charset="utf-8"></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
-          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #121721; border-radius: 12px; border: 1px solid #ef4444; overflow: hidden;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 40px 20px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
             <tr>
-              <td style="padding: 24px 28px; background: rgba(239, 68, 68, 0.12); border-bottom: 1px solid rgba(239, 68, 68, 0.3);">
-                <div style="font-size: 12px; font-weight: 800; color: #ef4444; text-transform: uppercase; letter-spacing: 1.5px;">SkandX Compliance Alert</div>
-                <h2 style="margin: 6px 0 0; font-size: 20px; font-weight: 800; color: #ffffff;">${isErasure ? '🗑️ New Account Deletion Request' : `🛡️ New ${typeLabel} Request`}</h2>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #10b981; letter-spacing: 0.5px;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Compliance &amp; Privacy Desk</p>
               </td>
             </tr>
             <tr>
-              <td style="padding: 28px;">
+              <td style="padding: 32px;">
+                <h2 style="margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #f3f4f6;">New ${typeLabel} Request</h2>
                 <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; font-size: 13.5px; color: #e5e7eb; margin-bottom: 20px;">
                   <tr>
                     <td style="color: #9ca3af; width: 140px;"><strong>Reference ID:</strong></td>
@@ -545,11 +547,11 @@ async function sendDataRightsNotificationEmail({
                   </tr>
                   <tr>
                     <td style="color: #9ca3af;"><strong>Client Email:</strong></td>
-                    <td><a href="mailto:${email}" style="color: #38bdf8; text-decoration: none; font-weight: 600;">${email}</a></td>
+                    <td style="color: #38bdf8; font-weight: 600;">${email}</td>
                   </tr>
                   <tr>
                     <td style="color: #9ca3af;"><strong>Request Type:</strong></td>
-                    <td style="color: ${isErasure ? '#ef4444' : '#f59e0b'}; font-weight: 700;">${typeLabel}</td>
+                    <td style="color: #f59e0b; font-weight: 700;">${typeLabel}</td>
                   </tr>
                   <tr>
                     <td style="color: #9ca3af;"><strong>Matched Account:</strong></td>
@@ -564,11 +566,17 @@ async function sendDataRightsNotificationEmail({
                     <td style="font-family: monospace; color: #9ca3af;">${clientIp || 'N/A'}</td>
                   </tr>
                 </table>
-                <div style="text-align: center; margin-top: 24px;">
-                  <a href="https://skandx.in/adminpanel" style="display: inline-block; padding: 12px 24px; background-color: #ef4444; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; border-radius: 8px;">
-                    Open Admin Panel &rarr; Account Deletions
-                  </a>
-                </div>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #9ca3af;">
+                  Log in to the SkandX Admin Panel under Account Deletions to review and process this request.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0d111a; border-top: 1px solid #1f2937; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563;">
+                  &copy; 2026 SkandX Trading Platform. All rights reserved.<br>
+                  <a href="https://skandx.in" style="color: #10b981; text-decoration: none;">https://skandx.in</a>
+                </p>
               </td>
             </tr>
           </table>
@@ -577,11 +585,10 @@ async function sendDataRightsNotificationEmail({
       `;
 
       await transporter.sendMail({
-        from: `"SkandX Compliance" <${gmailUser}>`,
+        from: `"SkandX Security" <${cleanSender}>`,
         to: adminRecipients,
-        replyTo: email,
-        subject: `🚨 [SkandX Admin] ${isErasure ? 'Account Deletion Request' : typeLabel}: ${email} (${requestId})`,
-        text: `New ${typeLabel} Request\nReference ID: ${requestId}\nClient Email: ${email}\nMatched User ID: ${userId || 'None'}\nReason/Details: ${details || 'N/A'}\nManage at: https://skandx.in/adminpanel`,
+        subject: `SkandX Admin Alert - ${isErasure ? 'Account Deletion Request' : typeLabel} (${requestId})`,
+        text: `New ${typeLabel} Request\nReference ID: ${requestId}\nClient Email: ${email}\nMatched User ID: ${userId || 'None'}\nReason/Details: ${details || 'N/A'}`,
         html: adminHtml
       });
 
@@ -590,26 +597,34 @@ async function sendDataRightsNotificationEmail({
         <!DOCTYPE html>
         <html>
         <head><meta charset="utf-8"></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 40px 20px; margin: 0;">
           <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
             <tr>
-              <td style="padding: 28px 28px 20px; text-align: center; border-bottom: 1px solid #1f2937;">
-                <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #10b981;">SkandX</h1>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Privacy & Compliance Desk</p>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #10b981; letter-spacing: 0.5px;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Algorithmic Trading Platform</p>
               </td>
             </tr>
             <tr>
-              <td style="padding: 28px;">
-                <h2 style="margin: 0 0 12px; font-size: 18px; color: #f3f4f6;">We Have Received Your Request</h2>
-                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
-                  Your <strong>${typeLabel}</strong> request for <strong>${email}</strong> has been logged with our Grievance & Privacy Desk.
+              <td style="padding: 32px;">
+                <h2 style="margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #f3f4f6;">We Have Received Your Request</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                  Your <strong>${typeLabel}</strong> request for <strong>${email}</strong> has been registered with our Privacy &amp; Compliance Desk.
                 </p>
-                <div style="background-color: #0a0d14; border: 1px solid #10b981; border-radius: 8px; padding: 16px; text-align: center; margin: 0 0 20px;">
-                  <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Tracking Reference ID</div>
-                  <div style="font-size: 20px; font-weight: 800; color: #10b981; font-family: monospace; margin-top: 4px;">${requestId}</div>
+                <div style="background-color: #0a0d14; border: 1px solid #10b981; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px;">
+                  <div style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Tracking Reference ID</div>
+                  <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #10b981; font-family: monospace; margin-top: 6px;">${requestId}</div>
                 </div>
-                <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #6b7280;">
-                  Our compliance team will verify and process your request within 48 business hours. You will receive a final confirmation email once completed. If you did not submit this request, please reply to this email immediately.
+                <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: #6b7280;">
+                  Our compliance team will review and process your request within 48 business hours. You will receive a confirmation email once completed.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0d111a; border-top: 1px solid #1f2937; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563;">
+                  &copy; 2026 SkandX Trading Platform. All rights reserved.<br>
+                  <a href="https://skandx.in" style="color: #10b981; text-decoration: none;">https://skandx.in</a>
                 </p>
               </td>
             </tr>
@@ -619,11 +634,10 @@ async function sendDataRightsNotificationEmail({
       `;
 
       await transporter.sendMail({
-        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        from: `"SkandX Security" <${cleanSender}>`,
         to: email,
-        replyTo: 'skandx.in@gmail.com',
-        subject: `SkandX: ${isErasure ? 'Account Deletion' : 'Data Rights'} Request Received (${requestId})`,
-        text: `Your ${typeLabel} request for ${email} has been received (Reference ID: ${requestId}). Our compliance team will process it within 48 business hours.`,
+        subject: `SkandX Request Confirmation: ${requestId}`,
+        text: `Your ${typeLabel} request for ${email} has been received. Tracking Reference ID: ${requestId}. Our compliance team will process it within 48 business hours.`,
         html: clientHtml
       });
 
@@ -636,39 +650,55 @@ async function sendDataRightsNotificationEmail({
       const holdingsCount = Array.isArray(exportPayload.holdings) ? exportPayload.holdings.length : 0;
       const ordersCount = Array.isArray(exportPayload.orders_sample) ? exportPayload.orders_sample.length : 0;
       const consentsCount = Array.isArray(exportPayload.consent_registry) ? exportPayload.consent_registry.length : 0;
+      const formattedBalance = Number(u.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const recentConsentsRows = (exportPayload.consent_registry || []).slice(0, 5).map(c =>
+        `<tr><td style="color: #9ca3af;">${String(c.consent_type || 'CONSENT')}</td><td style="color: #10b981; font-weight: 600;">${String(c.status || (c.consented ? 'GRANTED' : 'RECORDED'))}</td></tr>`
+      ).join('');
 
       const accessHtml = `
         <!DOCTYPE html>
         <html>
         <head><meta charset="utf-8"></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
-          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #121721; border-radius: 12px; border: 1px solid #38bdf8; overflow: hidden;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 40px 20px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
             <tr>
-              <td style="padding: 24px 28px; background: rgba(56, 189, 248, 0.12); border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
-                <div style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1.5px;">DPDP Act 2023 • Section 11 Personal Data Summary</div>
-                <h2 style="margin: 6px 0 0; font-size: 20px; font-weight: 800; color: #ffffff;">📄 Your Personal Data Report & Export</h2>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #10b981; letter-spacing: 0.5px;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Algorithmic Trading Platform</p>
               </td>
             </tr>
             <tr>
-              <td style="padding: 28px;">
-                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
-                  In accordance with your Right to Access request (Reference: <strong>${requestId}</strong>), please find below your personal data summary held by <strong>SkandX</strong>, along with your complete machine-readable JSON export attached to this email.
+              <td style="padding: 32px;">
+                <h2 style="margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #f3f4f6;">Personal Data Summary (${requestId})</h2>
+                <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                  Here is the summary of your personal data held on SkandX under Section 11 of the DPDP Act 2023:
                 </p>
                 <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; font-size: 13px; color: #e5e7eb; margin-bottom: 18px;">
-                  <tr><td style="color: #9ca3af; width: 160px;"><strong>Client ID:</strong></td><td style="font-family: monospace; color: #38bdf8; font-weight: 700;">${u.client_id || 'N/A'}</td></tr>
+                  <tr><td style="color: #9ca3af; width: 165px;"><strong>Reference ID:</strong></td><td style="font-family: monospace; color: #10b981; font-weight: 700;">${requestId}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Client ID:</strong></td><td style="font-family: monospace; color: #38bdf8; font-weight: 700;">${u.client_id || 'N/A'}</td></tr>
                   <tr><td style="color: #9ca3af;"><strong>Full Name:</strong></td><td>${u.username || 'N/A'}</td></tr>
                   <tr><td style="color: #9ca3af;"><strong>Registered Email:</strong></td><td>${u.email || email}</td></tr>
                   <tr><td style="color: #9ca3af;"><strong>Mobile Phone:</strong></td><td>${u.phone || 'N/A'}</td></tr>
                   <tr><td style="color: #9ca3af;"><strong>Subscription Tier:</strong></td><td>${u.subscription_tier || 'BASIC'}</td></tr>
-                  <tr><td style="color: #9ca3af;"><strong>Virtual Margin Balance:</strong></td><td>₹${Number(u.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
-                  <tr><td style="color: #9ca3af;"><strong>Recorded Positions:</strong></td><td>${positionsCount} records</td></tr>
-                  <tr><td style="color: #9ca3af;"><strong>Recorded Holdings:</strong></td><td>${holdingsCount} records</td></tr>
-                  <tr><td style="color: #9ca3af;"><strong>Order History Sample:</strong></td><td>${ordersCount} orders</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Virtual Margin Balance:</strong></td><td>INR ${formattedBalance}</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Open / Closed Positions:</strong></td><td>${positionsCount} records</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Delivery Holdings:</strong></td><td>${holdingsCount} records</td></tr>
+                  <tr><td style="color: #9ca3af;"><strong>Recorded Orders:</strong></td><td>${ordersCount} orders</td></tr>
                   <tr><td style="color: #9ca3af;"><strong>Consent Audit Logs:</strong></td><td>${consentsCount} entries</td></tr>
+                  ${recentConsentsRows}
                 </table>
                 ${adminNotes ? `<div style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9ca3af; margin-bottom: 16px;"><strong>Compliance Note:</strong> ${String(adminNotes).replace(/</g, '&lt;')}</div>` : ''}
-                <p style="margin: 0; font-size: 12.5px; color: #6b7280;">
-                  The full JSON archive (<code>skandx_personal_data_${requestId}.json</code>) is attached to this email. For further assistance, contact <a href="mailto:skandx.in@gmail.com" style="color: #38bdf8;">skandx.in@gmail.com</a>.
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6b7280;">
+                  You can also download your full machine-readable JSON archive anytime from your account at https://skandx.in/data-rights
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0d111a; border-top: 1px solid #1f2937; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563;">
+                  &copy; 2026 SkandX Trading Platform. All rights reserved.<br>
+                  <a href="https://skandx.in" style="color: #10b981; text-decoration: none;">https://skandx.in</a>
                 </p>
               </td>
             </tr>
@@ -677,29 +707,36 @@ async function sendDataRightsNotificationEmail({
         </html>
       `;
 
+      const plainTextSummary = [
+        `SkandX Personal Data Summary (Reference ID: ${requestId})`,
+        `Client ID: ${u.client_id || 'N/A'}`,
+        `Full Name: ${u.username || 'N/A'}`,
+        `Registered Email: ${u.email || email}`,
+        `Mobile Phone: ${u.phone || 'N/A'}`,
+        `Subscription Tier: ${u.subscription_tier || 'BASIC'}`,
+        `Virtual Margin Balance: INR ${formattedBalance}`,
+        `Positions: ${positionsCount} records`,
+        `Holdings: ${holdingsCount} records`,
+        `Orders: ${ordersCount} orders`,
+        `Consent Logs: ${consentsCount} entries`,
+        adminNotes ? `Compliance Note: ${adminNotes}` : ''
+      ].filter(Boolean).join('\n');
+
       await transporter.sendMail({
-        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        from: `"SkandX Security" <${cleanSender}>`,
         to: email,
-        replyTo: 'skandx.in@gmail.com',
-        subject: `SkandX: Your Personal Data Summary & Export (${requestId})`,
-        text: `Your DPDP Section 11 Personal Data Summary & JSON Export for ${email} (Reference ID: ${requestId}) is attached.`,
-        html: accessHtml,
-        attachments: [
-          {
-            filename: `skandx_personal_data_${requestId}.json`,
-            content: JSON.stringify(exportPayload, null, 2),
-            contentType: 'application/json'
-          }
-        ]
+        subject: `Your SkandX Personal Data Summary (${requestId})`,
+        text: plainTextSummary,
+        html: accessHtml
       });
       return true;
     }
 
     if (event === 'COMPLETED' || event === 'DELETED' || event === 'CONSENT_WITHDRAWN') {
       const titleText = event === 'DELETED'
-        ? 'Account Permanently Deleted'
+        ? 'Account Deletion Confirmation'
         : event === 'CONSENT_WITHDRAWN'
-          ? 'Consent Withdrawal Processed'
+          ? 'Consent Withdrawal Confirmation'
           : 'Data Rights Request Completed';
       const bodyText = event === 'DELETED'
         ? `In accordance with your erasure request (Reference: <strong>${requestId}</strong>), your SkandX account (<strong>${email}</strong>), profile credentials, and associated personal data have been permanently erased from our active systems.`
@@ -711,23 +748,31 @@ async function sendDataRightsNotificationEmail({
         <!DOCTYPE html>
         <html>
         <head><meta charset="utf-8"></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 32px 16px; margin: 0;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 40px 20px; margin: 0;">
           <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
             <tr>
-              <td style="padding: 28px 28px 20px; text-align: center; border-bottom: 1px solid #1f2937;">
-                <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #10b981;">SkandX</h1>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Privacy & Compliance Desk</p>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #10b981; letter-spacing: 0.5px;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Algorithmic Trading Platform</p>
               </td>
             </tr>
             <tr>
-              <td style="padding: 28px;">
-                <h2 style="margin: 0 0 12px; font-size: 18px; color: #10b981;">${titleText}</h2>
-                <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
+              <td style="padding: 32px;">
+                <h2 style="margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #10b981;">${titleText}</h2>
+                <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: #d1d5db;">
                   ${bodyText}
                 </p>
                 ${adminNotes ? `<div style="background-color: #0a0d14; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #9ca3af; margin-bottom: 16px;"><strong>Compliance Note:</strong> ${String(adminNotes).replace(/</g, '&lt;')}</div>` : ''}
-                <p style="margin: 0; font-size: 12.5px; color: #6b7280;">
-                  Thank you for using SkandX. For any further privacy inquiries, contact <a href="mailto:skandx.in@gmail.com" style="color: #10b981;">skandx.in@gmail.com</a>.
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6b7280;">
+                  Thank you for using SkandX. If you have any questions, you may reply directly to this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0d111a; border-top: 1px solid #1f2937; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563;">
+                  &copy; 2026 SkandX Trading Platform. All rights reserved.<br>
+                  <a href="https://skandx.in" style="color: #10b981; text-decoration: none;">https://skandx.in</a>
                 </p>
               </td>
             </tr>
@@ -737,11 +782,10 @@ async function sendDataRightsNotificationEmail({
       `;
 
       await transporter.sendMail({
-        from: `"SkandX Privacy Desk" <${gmailUser}>`,
+        from: `"SkandX Security" <${cleanSender}>`,
         to: email,
-        replyTo: 'skandx.in@gmail.com',
-        subject: `SkandX: ${titleText} (${requestId})`,
-        text: `${titleText} for ${email}. Reference ID: ${requestId}.`,
+        subject: `SkandX ${titleText} (${requestId})`,
+        text: `${titleText} for ${email}. Reference ID: ${requestId}.${adminNotes ? ` Note: ${adminNotes}` : ''}`,
         html: doneHtml
       });
       return true;
