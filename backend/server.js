@@ -2502,6 +2502,15 @@ app.get('/api/auth/google-oauth-poll', async (req, res) => {
       return res.status(400).json({ error: 'Valid state required' });
     }
     const existing = (await getOauthRelayRecord(state)) || {};
+    if (existing.completedToken && existing.completedUser) {
+      return res.json({
+        success: true,
+        status: 'completed',
+        token: existing.completedToken,
+        user: existing.completedUser,
+        idToken: existing.idToken || null
+      });
+    }
     if (existing.idToken) {
       await setOauthRelayRecord(state, {
         ...existing,
@@ -2839,11 +2848,26 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
     });
 
     const profile = await db('user_profiles').where({ user_id: user.id }).first().catch(() => null);
+    const formattedUser = formatUserForClient(user, profile);
+
+    if (req.body && req.body.state && typeof req.body.state === 'string') {
+      try {
+        const existingRelay = (await getOauthRelayRecord(req.body.state)) || {};
+        await setOauthRelayRecord(req.body.state, {
+          ...existingRelay,
+          state: req.body.state,
+          idToken: idToken || existingRelay.idToken || null,
+          completedToken: token,
+          completedUser: formattedUser,
+          updatedAt: Date.now()
+        });
+      } catch (_) {}
+    }
 
     res.json({
       success: true,
       token,
-      user: formatUserForClient(user, profile)
+      user: formattedUser
     });
   } catch (err) {
     console.error('[GOOGLE AUTH ERROR]:', err);
@@ -15097,30 +15121,60 @@ app.get('/__/auth/handler', (req, res, next) => {
 
       var isAppPrefix = state.indexOf('skx_app_') === 0 || state.indexOf('skx_pwa_') === 0 || state.indexOf('skx_cap_') === 0;
       var isCapMode = state.indexOf('skx_cap_') === 0;
+      var isCurrentlyStandalone = Boolean(
+        (window.matchMedia && (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.matchMedia('(display-mode: fullscreen)').matches ||
+          window.matchMedia('(display-mode: minimal-ui)').matches
+        )) ||
+        window.navigator.standalone === true ||
+        /; wv\)|WebView|SkandXApp/i.test(navigator.userAgent || '')
+      );
+      var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
 
       function tryCloseOrReturnToApp(mode, fromUserClick) {
+        // Always attempt to close the OAuth popup / custom tab first
         try { window.close(); } catch (e) {}
         try { window.open('', '_self'); window.close(); } catch (e) {}
 
-        var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
+        // If we are ALREADY inside the standalone PWA / WebView window, navigate directly!
+        if (isCurrentlyStandalone) {
+          window.location.replace(targetUrl);
+          return;
+        }
 
         if (mode === 'cap') {
           try {
             window.location.href = 'skandx://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state);
           } catch (e) {}
-          setTimeout(function() {
-            try {
-              window.location.href = 'intent://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;end';
-            } catch (e) {}
-          }, 350);
-          setTimeout(function() {
-            window.location.replace(targetUrl);
-          }, 1500);
+          if (fromUserClick) {
+            setTimeout(function() {
+              try {
+                window.location.href = 'intent://auth-callback?id_token=' + encodeURIComponent(idToken) + '&state=' + encodeURIComponent(state) + '#Intent;scheme=skandx;package=com.skandx.app;end';
+              } catch (e) {}
+            }, 250);
+          }
           return;
         }
 
-        // PWA or Web: Open SkandX terminal immediately with the authenticated session
-        window.location.replace(targetUrl);
+        // External Chrome tab for an installed PWA/TWA: only trigger Android app intent on explicit user click
+        // NEVER auto-replace the Chrome tab on a timer, or Chrome will hijack the signup flow!
+        if (fromUserClick) {
+          var appReturnPath = '/?oauth_app_return=1' + (state ? ('&state=' + encodeURIComponent(state)) : '') + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '');
+          var fullReturnUrl = window.location.origin + appReturnPath;
+          try {
+            var newWin = window.open(fullReturnUrl, '_blank', 'noopener');
+            if (newWin) {
+              setTimeout(function() { try { window.close(); } catch (e) {} }, 150);
+              return;
+            }
+          } catch (e) {}
+          try {
+            window.location.href = 'intent://' + window.location.host + appReturnPath + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fullReturnUrl) + ';end';
+          } catch (e) {
+            window.location.replace(targetUrl);
+          }
+        }
       }
 
       function showInAppHandoverUI(mode) {
@@ -15133,13 +15187,13 @@ app.get('/__/auth/handler', (req, res, next) => {
 
         if (spinnerEl) spinnerEl.style.display = 'none';
         if (badgeEl) badgeEl.style.display = 'flex';
-        if (titleEl) titleEl.textContent = 'Signed in to SkandX!';
+        if (titleEl) titleEl.textContent = 'Google Account Connected!';
         if (subEl) {
-          subEl.textContent = 'Your SkandX account is signed in. Tap below or continue to terminal.';
+          subEl.textContent = 'Your Google account is connected to the SkandX App. Switch back to the SkandX App or tap below.';
         }
         if (returnBtn) {
           returnBtn.style.display = 'block';
-          returnBtn.textContent = 'Open SkandX Terminal';
+          returnBtn.textContent = 'Return to SkandX App';
           returnBtn.onclick = function() {
             tryCloseOrReturnToApp(mode, true);
           };
@@ -15148,13 +15202,16 @@ app.get('/__/auth/handler', (req, res, next) => {
           webBtn.style.display = 'inline-block';
           webBtn.textContent = 'Continue in browser instead';
           webBtn.onclick = function() {
-            var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
             window.location.replace(targetUrl);
           };
         }
       }
 
       if (alreadyDone && !idToken) {
+        if (isCurrentlyStandalone) {
+          window.location.replace(targetUrl);
+          return;
+        }
         showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
         try { window.close(); } catch (e) {}
         return;
@@ -15172,33 +15229,27 @@ app.get('/__/auth/handler', (req, res, next) => {
         .then(function(data) {
           var isInApp = Boolean(isAppPrefix || (data && data.isInApp));
           var mode = (data && data.appMode) || (isCapMode ? 'cap' : (isInApp ? 'pwa' : 'web'));
-          if (isInApp) {
-            showInAppHandoverUI(mode);
-            setTimeout(function() {
-              tryCloseOrReturnToApp(mode, false);
-            }, 1200);
+          if (isCurrentlyStandalone || !isInApp) {
+            window.location.replace(targetUrl);
           } else {
-            window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
+            tryCloseOrReturnToApp(mode, false);
+            showInAppHandoverUI(mode);
           }
         })
         .catch(function() {
-          if (isAppPrefix) {
-            showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-            setTimeout(function() {
-              tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
-            }, 1200);
+          if (isCurrentlyStandalone || !isAppPrefix) {
+            window.location.replace(targetUrl);
           } else {
-            window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
+            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+            showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
           }
         });
       } else {
-        if (isAppPrefix) {
-          showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-          setTimeout(function() {
-            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
-          }, 1200);
+        if (isCurrentlyStandalone || !isAppPrefix) {
+          window.location.replace(targetUrl);
         } else {
-          window.location.replace('/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : ''));
+          tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
+          showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
         }
       }
     })();

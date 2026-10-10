@@ -404,11 +404,13 @@ export default function LoginView() {
           setLoading(false);
           return;
         }
+        const pendingState = activeOauthState || sessionStorage.getItem('skandx_pending_oauth_state') || localStorage.getItem('skandx_pending_oauth_state') || undefined;
         const res = await fetch(`${API}/api/auth/google-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             idToken: activeIdToken,
+            state: pendingState,
             phone: cleanPhone,
             username: cleanName,
             consent_terms: consentTerms,
@@ -423,8 +425,11 @@ export default function LoginView() {
           setLoading(false);
           return;
         }
+        clearPendingOauthStorage();
+        setActiveOauthState(null);
         localStorage.setItem('token', data.token);
         if (data.user) {
+          try { localStorage.setItem('user', JSON.stringify(data.user)); } catch (_) {}
           useStore.setState({
             user: data.user,
             token: data.token,
@@ -548,10 +553,11 @@ export default function LoginView() {
         }
       }
 
+      const pendingState = sessionStorage.getItem('skandx_pending_oauth_state') || localStorage.getItem('skandx_pending_oauth_state') || undefined;
       const res = await fetch(`${API}/api/auth/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: idTokenToSend })
+        body: JSON.stringify({ idToken: idTokenToSend, state: pendingState })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -569,6 +575,7 @@ export default function LoginView() {
 
       localStorage.setItem('token', data.token);
       if (data.user) {
+        try { localStorage.setItem('user', JSON.stringify(data.user)); } catch (_) {}
         useStore.setState({
           user: data.user,
           token: data.token,
@@ -644,6 +651,41 @@ export default function LoginView() {
     } catch (_) {}
   }, []);
 
+  const applyCompletedOauthSession = useCallback((token, userObj) => {
+    if (!token) return false;
+    oauthProcessingRef.current = true;
+    clearPendingOauthStorage();
+    setActiveOauthState(null);
+    setGoogleLoading(false);
+    setLoading(false);
+    try {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+    } catch (_) {}
+    oauthPopupRef.current = null;
+
+    localStorage.setItem('token', token);
+    if (userObj) {
+      try { localStorage.setItem('user', JSON.stringify(userObj)); } catch (_) {}
+      useStore.setState({
+        user: userObj,
+        token,
+        watchlists: userObj.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }]
+      });
+    } else {
+      useStore.setState({ token });
+    }
+    useStore.getState().fetchUserData?.();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
+    setTimeout(() => {
+      oauthProcessingRef.current = false;
+    }, 1500);
+    return true;
+  }, [clearPendingOauthStorage]);
+
   const consumeOauthIdToken = useCallback((idToken) => {
     if (!idToken || oauthProcessingRef.current) return;
     oauthProcessingRef.current = true;
@@ -660,6 +702,7 @@ export default function LoginView() {
       const url = new URL(window.location.href);
       url.searchParams.delete('oauth_app_return');
       url.searchParams.delete('google_oauth');
+      url.searchParams.delete('id_token');
       url.searchParams.delete('state');
       url.hash = '';
       window.history.replaceState({}, document.title, url.pathname + (url.search || ''));
@@ -672,7 +715,7 @@ export default function LoginView() {
     });
   }, [clearPendingOauthStorage, handleGoogleCredentialResponse]);
 
-  // Process Google OIDC Redirect Token on Mobile Return (Same-Tab Flow & Storage Bridge)
+  // Process Google OIDC Redirect Token on Mobile Return (Same-Tab Flow, Query Params & Storage Bridge)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let idToken = null;
@@ -684,6 +727,12 @@ export default function LoginView() {
       oauthErr = hashParams.get('error');
     }
 
+    if (!idToken && window.location.search) {
+      const searchParams = new URLSearchParams(window.location.search);
+      idToken = searchParams.get('id_token');
+      if (!oauthErr) oauthErr = searchParams.get('error');
+    }
+
     if (!idToken) {
       try {
         idToken = sessionStorage.getItem('skandx_google_id_token') || localStorage.getItem('skandx_google_id_token');
@@ -691,8 +740,13 @@ export default function LoginView() {
     }
 
     if (idToken || oauthErr) {
-      if (window.location.hash) {
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      if (window.location.hash || window.location.search.includes('id_token=')) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('id_token');
+        cleanUrl.searchParams.delete('google_oauth');
+        cleanUrl.searchParams.delete('oauth_app_return');
+        cleanUrl.hash = '';
+        window.history.replaceState({}, document.title, cleanUrl.pathname + (cleanUrl.search || ''));
       }
       if (idToken) {
         consumeOauthIdToken(idToken);
@@ -710,14 +764,25 @@ export default function LoginView() {
 
   // Poll Backend OAuth Relay & Listen on BroadcastChannel / Storage / Focus for In-App Handover
   useEffect(() => {
-    if (typeof window === 'undefined' || !activeOauthState) return;
+    if (typeof window === 'undefined') return;
 
     let cancelled = false;
 
     const checkRelayStatus = async () => {
       if (cancelled || oauthProcessingRef.current) return;
 
-      // 1. Check same-origin storage first
+      // 0. If another tab/window already completed login and stored the JWT token in localStorage, restore immediately!
+      try {
+        const existingJwt = localStorage.getItem('token');
+        if (existingJwt && !useStore.getState().user) {
+          let savedUser = null;
+          try { savedUser = JSON.parse(localStorage.getItem('user') || 'null'); } catch (_) {}
+          applyCompletedOauthSession(existingJwt, savedUser);
+          return;
+        }
+      } catch (_) {}
+
+      // 1. Check same-origin storage for Google idToken
       try {
         const localToken = sessionStorage.getItem('skandx_google_id_token') || localStorage.getItem('skandx_google_id_token');
         if (localToken) {
@@ -725,6 +790,8 @@ export default function LoginView() {
           return;
         }
       } catch (_) {}
+
+      if (!activeOauthState) return;
 
       // 2. Poll backend Redis/Memory OAuth relay (bridges Chrome Custom Tab / Browser -> Installed App)
       try {
@@ -736,7 +803,9 @@ export default function LoginView() {
         const data = await res.json();
         if (cancelled || oauthProcessingRef.current) return;
 
-        if (data && data.status === 'authenticated' && data.idToken) {
+        if (data && data.status === 'completed' && data.token) {
+          applyCompletedOauthSession(data.token, data.user);
+        } else if (data && data.status === 'authenticated' && data.idToken) {
           consumeOauthIdToken(data.idToken);
         } else if (data && data.status === 'error' && data.error) {
           clearPendingOauthStorage();
@@ -751,7 +820,7 @@ export default function LoginView() {
     };
 
     checkRelayStatus();
-    const pollTimer = setInterval(checkRelayStatus, 650);
+    const pollTimer = activeOauthState ? setInterval(checkRelayStatus, 650) : null;
 
     let bc = null;
     try {
@@ -772,7 +841,11 @@ export default function LoginView() {
     };
 
     const handleStorageEvent = (ev) => {
-      if (ev.key === 'skandx_google_id_token' && ev.newValue) {
+      if (ev.key === 'token' && ev.newValue && !useStore.getState().user) {
+        let savedUser = null;
+        try { savedUser = JSON.parse(localStorage.getItem('user') || 'null'); } catch (_) {}
+        applyCompletedOauthSession(ev.newValue, savedUser);
+      } else if (ev.key === 'skandx_google_id_token' && ev.newValue) {
         consumeOauthIdToken(ev.newValue);
       } else if (ev.key === 'skandx_google_oauth_event' && ev.newValue) {
         try {
@@ -796,7 +869,7 @@ export default function LoginView() {
 
     return () => {
       cancelled = true;
-      clearInterval(pollTimer);
+      if (pollTimer) clearInterval(pollTimer);
       try { bc?.close(); } catch (_) {}
       window.removeEventListener('message', handleWindowMessage);
       window.removeEventListener('storage', handleStorageEvent);
@@ -804,9 +877,9 @@ export default function LoginView() {
       window.removeEventListener('pageshow', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [activeOauthState, appMode, isInApp, consumeOauthIdToken, clearPendingOauthStorage]);
+  }, [activeOauthState, appMode, isInApp, consumeOauthIdToken, applyCompletedOauthSession, clearPendingOauthStorage]);
 
-  // Initialize Google Identity Services (GIS) — Desktop & Non-WebView FedCM One-Tap
+  // Initialize Google Identity Services (GIS) — Desktop, Mobile & Installed PWA FedCM One-Tap
   useEffect(() => {
     if (typeof window === 'undefined' || isCapacitorOrWebView) return;
 
@@ -847,12 +920,13 @@ export default function LoginView() {
     }
   }, [handleGoogleCredentialResponse, isCapacitorOrWebView]);
 
-  // Render Google Identity Services Button — Desktop Only
+  // Render Google Identity Services Button — Desktop, Mobile & Installed PWA (Stays 100% In-App!)
   useEffect(() => {
-    if (isMobileBrowser) return;
+    if (isCapacitorOrWebView) return;
     if ((view === 'login' || view === 'register') && gisLoaded && window.google?.accounts?.id && googleBtnContainerRef.current) {
       try {
         googleBtnContainerRef.current.innerHTML = '';
+        const btnWidth = Math.min(Math.max((window.innerWidth || 360) - 56, 240), 360);
         window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
           type: 'standard',
           theme: 'filled_black',
@@ -860,13 +934,13 @@ export default function LoginView() {
           text: view === 'register' ? 'signup_with' : 'signin_with',
           shape: 'rectangular',
           logo_alignment: 'left',
-          width: 320
+          width: btnWidth
         });
       } catch (e) {
         console.warn('[GIS] Render button notice:', e.message);
       }
     }
-  }, [gisLoaded, view, isMobileBrowser]);
+  }, [gisLoaded, view, isCapacitorOrWebView]);
 
   const handleCancelGoogleLogin = () => {
     clearPendingOauthStorage();
@@ -927,7 +1001,18 @@ export default function LoginView() {
       });
       const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-      // In mobile and standalone PWA mode, navigating the same window keeps the user 100% inside the app!
+      // When inside an installed PWA, opening a popup/Custom Tab keeps the PWA window alive in the background
+      // and allows /__/auth/handler to auto-close the popup tab via window.close()!
+      if (isStandalonePwa) {
+        try {
+          const popup = window.open(oauthUrl, 'skandx_google_oauth', 'popup=yes,width=500,height=650');
+          if (popup) {
+            oauthPopupRef.current = popup;
+            return;
+          }
+        } catch (_) {}
+      }
+
       window.location.href = oauthUrl;
       return;
     }
@@ -1690,19 +1775,19 @@ export default function LoginView() {
               </div>
 
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                {/* Official Google Identity Services Native Button Container (Desktop Only) */}
+                {/* Official Google Identity Services Native Button Container (Desktop, Mobile & Installed PWA — stays 100% in-app) */}
                 <div 
                   ref={googleBtnContainerRef} 
                   style={{ 
-                    display: (gisLoaded && !isMobileBrowser) ? 'flex' : 'none', 
+                    display: (gisLoaded && !isCapacitorOrWebView && !googleLoading) ? 'flex' : 'none', 
                     justifyContent: 'center', 
                     width: '100%', 
                     minHeight: '44px' 
                   }} 
                 />
 
-                {/* Mobile same-tab OAuth button & Desktop fallback button */}
-                {(!gisLoaded || isMobileBrowser || googleLoading) && (
+                {/* Fallback OAuth button (when GIS is loading, in native WebView, or actively connecting) */}
+                {(!gisLoaded || isCapacitorOrWebView || googleLoading) && (
                   <button
                     type="button"
                     onClick={handleGoogleLogin}
