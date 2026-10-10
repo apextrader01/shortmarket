@@ -343,15 +343,20 @@ async function sendEmailOtpViaService(email, code) {
         </html>
       `;
 
+      const cleanSender = gmailUser.trim();
       await transporter.sendMail({
-        from: `"SkandX Security" <${gmailUser}>`,
+        from: `"SkandX Security" <${cleanSender}>`,
+        replyTo: cleanSender,
         to: email,
         subject: `Your SkandX Verification Code: ${code}`,
         text: `Your SkandX verification code is: ${code}. Valid for 10 minutes.`,
-        html: htmlContent
+        html: htmlContent,
+        headers: {
+          'X-Auto-Response-Suppress': 'OOF, AutoReply'
+        }
       });
 
-      console.log(`[GMAIL SMTP] Verification OTP successfully dispatched to ${email} via ${gmailUser}`);
+      console.log(`[GMAIL SMTP] Verification OTP successfully dispatched to ${email} via ${cleanSender}`);
       return true;
     } catch (smtpErr) {
       console.warn(`[GMAIL SMTP] Failed to send via Gmail, trying fallback:`, smtpErr.message);
@@ -586,10 +591,14 @@ async function sendDataRightsNotificationEmail({
 
       await transporter.sendMail({
         from: `"SkandX Security" <${cleanSender}>`,
+        replyTo: cleanSender,
         to: adminRecipients,
         subject: `SkandX Admin Alert - ${isErasure ? 'Account Deletion Request' : typeLabel} (${requestId})`,
         text: `New ${typeLabel} Request\nReference ID: ${requestId}\nClient Email: ${email}\nMatched User ID: ${userId || 'None'}\nReason/Details: ${details || 'N/A'}`,
-        html: adminHtml
+        html: adminHtml,
+        headers: {
+          'X-Auto-Response-Suppress': 'OOF, AutoReply'
+        }
       });
 
       // 2. Send acknowledgment email to the requesting client
@@ -635,10 +644,14 @@ async function sendDataRightsNotificationEmail({
 
       await transporter.sendMail({
         from: `"SkandX Security" <${cleanSender}>`,
+        replyTo: cleanSender,
         to: email,
         subject: `SkandX Request Confirmation: ${requestId}`,
         text: `Your ${typeLabel} request for ${email} has been received. Tracking Reference ID: ${requestId}. Our compliance team will process it within 48 business hours.`,
-        html: clientHtml
+        html: clientHtml,
+        headers: {
+          'X-Auto-Response-Suppress': 'OOF, AutoReply'
+        }
       });
 
       return true;
@@ -724,10 +737,14 @@ async function sendDataRightsNotificationEmail({
 
       await transporter.sendMail({
         from: `"SkandX Security" <${cleanSender}>`,
+        replyTo: cleanSender,
         to: email,
         subject: `Your SkandX Personal Data Summary (${requestId})`,
         text: plainTextSummary,
-        html: accessHtml
+        html: accessHtml,
+        headers: {
+          'X-Auto-Response-Suppress': 'OOF, AutoReply'
+        }
       });
       return true;
     }
@@ -783,10 +800,14 @@ async function sendDataRightsNotificationEmail({
 
       await transporter.sendMail({
         from: `"SkandX Security" <${cleanSender}>`,
+        replyTo: cleanSender,
         to: email,
         subject: `SkandX ${titleText} (${requestId})`,
         text: `${titleText} for ${email}. Reference ID: ${requestId}.${adminNotes ? ` Note: ${adminNotes}` : ''}`,
-        html: doneHtml
+        html: doneHtml,
+        headers: {
+          'X-Auto-Response-Suppress': 'OOF, AutoReply'
+        }
       });
       return true;
     }

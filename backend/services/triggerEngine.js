@@ -19,6 +19,7 @@ class TriggerEngine {
         this.isProcessing = false;
         this.io = null;
         this.priceCache = {};
+        this.isMarketOpenFn = null;
         console.log('Real-Time WebSocket Trigger Engine Initialized.');
     }
     
@@ -28,6 +29,10 @@ class TriggerEngine {
 
     setPriceCache(cache) {
         this.priceCache = cache || {};
+    }
+
+    setMarketOpenChecker(fn) {
+        this.isMarketOpenFn = typeof fn === 'function' ? fn : null;
     }
 
     /**
@@ -56,6 +61,10 @@ class TriggerEngine {
             this.trailingOrders.clear();
             this.trailingOrdersBySymbol.clear();
             for (const order of orders) {
+                if (order.status === 'AMO_PENDING') continue;
+                if (typeof this.isMarketOpenFn === 'function' && order.order_variety === 'AMO' && Number(order.filled_quantity || 0) <= 0) {
+                    if (!this.isMarketOpenFn(order.symbol, order.product_type, Boolean(order.is_exit))) continue;
+                }
                 await this.addOrderToMemory(order);
                 if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
             }
@@ -68,6 +77,10 @@ class TriggerEngine {
     async addOrderToMemory(order) {
         const { generalClient } = require('./redisClient');
         if (!generalClient || !generalClient.isReady || !order) return;
+        if (order.status === 'AMO_PENDING') return;
+        if (typeof this.isMarketOpenFn === 'function' && order.order_variety === 'AMO' && Number(order.filled_quantity || 0) <= 0) {
+            if (!this.isMarketOpenFn(order.symbol, order.product_type, Boolean(order.is_exit))) return;
+        }
         
         if (Number(order.trail_amount) > 0 || order.is_trailing) {
             const ordCopy = { ...order };
@@ -209,6 +222,7 @@ class TriggerEngine {
      */
     async evaluateTick(symbol, ltp) {
         if (!ltp || !symbol) return;
+        if (typeof this.isMarketOpenFn === 'function' && !this.isMarketOpenFn(symbol)) return;
 
         // ⚡ Ratchet Trailing Stop Loss (TSL) orders in-memory (O(1) indexed by symbol)
         const cleanSym = symbol && symbol.includes(':') ? symbol.split(':')[1] : symbol;

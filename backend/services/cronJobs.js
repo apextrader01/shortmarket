@@ -106,16 +106,14 @@ async function isTradingDayForSegment(isCommodity = false) {
         const mm = String(istTime.getMonth() + 1).padStart(2, '0');
         const dd = String(istTime.getDate()).padStart(2, '0');
         const todayStr = `${yyyy}-${mm}-${dd}`;
-        const targetSeg = isCommodity ? 'COMMODITY' : 'EQUITY';
-
         const calRules = await db('market_calendar')
             .where({ date: todayStr })
-            .whereIn('segment', ['ALL', targetSeg])
             .catch(() => []);
-        const rule = calRules.find(r => r.segment === targetSeg) || calRules.find(r => r.segment === 'ALL');
+        const rule = Array.isArray(calRules) && calRules.length > 0 ? calRules[0] : null;
         if (rule) {
-            if (rule.status === 'CLOSED') return false;
-            if (rule.status === 'OPEN') return true;
+            const segStatus = isCommodity ? (rule.commodity_status || rule.status) : (rule.equity_status || rule.status);
+            if (segStatus === 'CLOSED') return false;
+            if (segStatus === 'OPEN') return true;
         }
 
         if (day === 0 || day === 6) return false;

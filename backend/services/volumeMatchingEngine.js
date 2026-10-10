@@ -132,6 +132,10 @@ class VolumeMatchingEngine {
 
   enqueueOrder(order) {
     if (!order || !order.id || !order.symbol) return;
+    if (order.status === 'AMO_PENDING') return;
+    if (typeof this.isMarketOpenFn === 'function' && order.order_variety === 'AMO' && Number(order.filled_quantity || 0) <= 0) {
+      if (!this.isMarketOpenFn(order.symbol, order.product_type, Boolean(order.is_exit))) return;
+    }
     const sym = order.symbol;
     const normSym = normalizeSymbol(sym);
     const ordObj = {

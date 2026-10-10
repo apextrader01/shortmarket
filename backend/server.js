@@ -10738,6 +10738,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           };
           if (newPendingQty <= 0 && filledQty > 0) {
               updateObj.status = 'EXECUTED';
+          } else if (!modMarketOpen && filledQty <= 0 && (order.status === 'AMO_PENDING' || order.order_variety === 'AMO')) {
+              updateObj.status = 'AMO_PENDING';
           }
 
           if (isMarket) {
@@ -15117,6 +15119,12 @@ server.listen(PORT, async () => {
     } catch (e) {}
 
     // Initialize TriggerEngine
+    if (typeof triggerEngine.setMarketOpenChecker === 'function') {
+      triggerEngine.setMarketOpenChecker((sym, productType, isExit) => {
+        const isCom = isCommodityContract(sym);
+        return Boolean(isSegmentMarketOpen(isCom, sym, productType, isExit).open);
+      });
+    }
     triggerEngine.setPriceCache(priceCache);
     triggerEngine.setSocketIo(io);
     await triggerEngine.loadPendingOrders();
@@ -15193,6 +15201,13 @@ server.listen(PORT, async () => {
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');
     if (typeof volumeMatchingEngine.setMarketOpenChecker === 'function') {
       volumeMatchingEngine.setMarketOpenChecker((sym, productType, isExit) => {
+        const isCom = isCommodityContract(sym);
+        return Boolean(isSegmentMarketOpen(isCom, sym, productType, isExit).open);
+      });
+    }
+    const triggerEngine = require('./services/triggerEngine');
+    if (typeof triggerEngine.setMarketOpenChecker === 'function') {
+      triggerEngine.setMarketOpenChecker((sym, productType, isExit) => {
         const isCom = isCommodityContract(sym);
         return Boolean(isSegmentMarketOpen(isCom, sym, productType, isExit).open);
       });
