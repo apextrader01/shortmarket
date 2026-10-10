@@ -60,7 +60,7 @@ export default function PositionsView() {
           const key = cleanSym || sym;
           const hQty = Number(h.quantity) || 0;
           const hPrice = Math.abs(Number(h.average_price) || 0);
-          if (hQty <= 0) return;
+          if (Math.abs(hQty) <= 0) return;
 
           if (!mergedHoldingsMap[key]) {
             mergedHoldingsMap[key] = {
@@ -77,11 +77,17 @@ export default function PositionsView() {
             const prevQty = Number(existing.quantity) || 0;
             const prevPrice = Math.abs(Number(existing.average_price) || 0);
             const totalQty = prevQty + hQty;
-            const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
             const absTotalQty = Math.abs(totalQty);
-            const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+            const isSameSide = (prevQty >= 0 && hQty >= 0) || (prevQty < 0 && hQty < 0);
+            let nextAvg = prevPrice;
+            if (isSameSide) {
+              const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
+              nextAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
+            } else {
+              nextAvg = Math.abs(prevQty) >= Math.abs(hQty) ? prevPrice : hPrice;
+            }
             existing.quantity = totalQty;
-            existing.average_price = Math.abs(weightedAvg);
+            existing.average_price = Math.abs(nextAvg);
             existing.side = totalQty < 0 ? 'SELL' : 'BUY';
           }
         }
@@ -99,11 +105,17 @@ export default function PositionsView() {
           const prevQty = Number(existing.quantity) || 0;
           const prevPrice = Math.abs(Number(existing.average_price) || 0);
           const totalQty = prevQty + qty;
-          const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(qty) * avg);
           const absTotalQty = Math.abs(totalQty);
-          const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+          const isSameSide = (prevQty >= 0 && qty >= 0) || (prevQty < 0 && qty < 0);
+          let nextAvg = prevPrice;
+          if (isSameSide) {
+            const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(qty) * avg);
+            nextAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
+          } else {
+            nextAvg = Math.abs(prevQty) >= Math.abs(qty) ? prevPrice : avg;
+          }
           existing.quantity = totalQty;
-          existing.average_price = Math.abs(weightedAvg);
+          existing.average_price = Math.abs(nextAvg);
           existing.side = totalQty < 0 ? 'SELL' : 'BUY';
         } else if (!mergedHoldingsMap[key]) {
           const itemKey = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;

@@ -540,7 +540,9 @@ class TriggerEngine {
                                 user_id: order.user_id, amount: principalAmount, type: 'MARGIN_RELEASE', description: `Holding principal value released for ${offsetQty} ${order.symbol}`
                             });
                         }
-                        await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
+                        await trx('orders').where({ id: order.id }).update({
+                            realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl])
+                        });
                         if (realizedPnl !== 0) {
                             await trx('ledger').insert({
                                 user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
@@ -764,28 +766,6 @@ class TriggerEngine {
                     }
                     if (rmsPenalty > 0) {
                         await trx('ledger').insert({ user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `RMS Penalty for ${order.symbol}` });
-                    }
-
-                    // Synchronize / decrement holdings table if an entry exists for this user and symbol to prevent ghost holdings
-                    const holdingRecord = await trx('holdings')
-                        .where({ user_id: order.user_id })
-                        .where(builder => {
-                            builder.where({ symbol: order.symbol })
-                                   .orWhere({ symbol: cleanSym })
-                                   .orWhere({ symbol: `NSE:${cleanSym}` })
-                                   .orWhere({ symbol: `BSE:${cleanSym}` })
-                                   .orWhere({ symbol: `MCX:${cleanSym}` });
-                        })
-                        .first();
-
-                    if (holdingRecord) {
-                        const currentHQty = Number(holdingRecord.quantity || 0);
-                        const newHQty = currentHQty - closeQty;
-                        if (newHQty <= 0) {
-                            await trx('holdings').where({ id: holdingRecord.id }).del();
-                        } else {
-                            await trx('holdings').where({ id: holdingRecord.id }).update({ quantity: newHQty, updated_at: new Date() });
-                        }
                     }
                     
                     const user = await trx('users').where({ id: order.user_id }).forUpdate().first();

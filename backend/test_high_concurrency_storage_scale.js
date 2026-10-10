@@ -114,9 +114,9 @@ test('db.js configures autovacuum_vacuum_scale_factor (0.05) on all active and a
     assert.ok(dbContent.includes('ALTER TABLE trusted_devices SET (autovacuum_vacuum_scale_factor = 0.05'), 'trusted_devices must have autovacuum 0.05');
 });
 
-test('db.js pool configuration scales up to 35 connections for high concurrency', () => {
+test('db.js pool configuration scales up to 42 connections per worker (84 total) for high concurrency', () => {
     const dbContent = fs.readFileSync(path.join(__dirname, 'database', 'db.js'), 'utf8');
-    assert.ok(dbContent.includes('max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 35'), 'Pool max must default to 35');
+    assert.ok(dbContent.includes('max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 42'), 'Pool max must default to 42 (84 total across 2 workers)');
 });
 
 // ── 4. Frontend ReportsView Integration ──────────────────────────────────────

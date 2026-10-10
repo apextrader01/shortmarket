@@ -718,7 +718,76 @@ class VolumeMatchingEngine {
               this.dequeueOrder(dangler.id, dangler.symbol);
             }
 
-            // Position Reversal: If order slice quantity exceeds closed position, open reverse position
+            // Position Reversal / Combined T+0 + T+1 Holding Offset:
+            // If order slice quantity exceeds closed T+0 position, first offset any opposite-side T+1 holding for DEL orders
+            if (leftoverQty > 0 && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+              const holdingForRemainder = await trx('holdings')
+                .where({ user_id: order.user_id })
+                .where(b => {
+                  b.where({ symbol: order.symbol })
+                    .orWhere({ symbol: cleanSym })
+                    .orWhere({ symbol: `NSE:${cleanSym}` })
+                    .orWhere({ symbol: `BSE:${cleanSym}` })
+                    .orWhere({ symbol: `MCX:${cleanSym}` });
+                })
+                .first();
+
+              const isLongHoldOffset = holdingForRemainder && Number(holdingForRemainder.quantity) > 0 && order.side === 'SELL';
+              const isShortHoldOffset = holdingForRemainder && Number(holdingForRemainder.quantity) < 0 && order.side === 'BUY';
+
+              if (isLongHoldOffset || isShortHoldOffset) {
+                const hQtySigned = roundQty(Number(holdingForRemainder.quantity));
+                const hQtyAbs = Math.abs(hQtySigned);
+                const hAvg = Math.abs(Number(holdingForRemainder.average_price || slicePrice));
+                const holdCloseQty = roundQty(Math.min(leftoverQty, hQtyAbs));
+                const newHQtyAbs = roundQty(hQtyAbs - holdCloseQty);
+
+                if (newHQtyAbs <= 0) {
+                  await trx('holdings').where({ id: holdingForRemainder.id }).del();
+                } else {
+                  await trx('holdings').where({ id: holdingForRemainder.id }).update({
+                    quantity: isLongHoldOffset ? newHQtyAbs : -newHQtyAbs,
+                    updated_at: new Date()
+                  });
+                }
+
+                const holdPnl = isLongHoldOffset
+                  ? Math.round(((slicePrice - hAvg) * holdCloseQty + Number.EPSILON) * 100) / 100
+                  : Math.round(((hAvg - slicePrice) * holdCloseQty + Number.EPSILON) * 100) / 100;
+                const holdCredit = isLongHoldOffset
+                  ? Math.round((slicePrice * holdCloseQty + Number.EPSILON) * 100) / 100
+                  : holdPnl;
+
+                await trx('positions').where({ id: existingPos.id }).update({
+                  closed_quantity: roundQty(existingPos.closed_quantity + closeQty + holdCloseQty),
+                  realized_pnl: Math.round(((Number(existingPos.realized_pnl) || 0) + realizedPnl + holdPnl + Number.EPSILON) * 100) / 100,
+                  updated_at: new Date()
+                });
+
+                if (holdPnl !== 0) {
+                  await trx('orders').where({ id: order.id }).update({
+                    realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [holdPnl])
+                  });
+                }
+
+                const holdUser = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (holdUser) {
+                  await trx('users').where({ id: order.user_id }).update({
+                    balance: Math.round((Number(holdUser.balance) + holdCredit + Number.EPSILON) * 100) / 100
+                  });
+                }
+
+                await trx('ledger').insert({
+                  user_id: order.user_id,
+                  amount: holdCredit,
+                  type: 'CREDIT',
+                  description: `Delivery Holding ${isLongHoldOffset ? 'Sale' : 'Cover'}: ${holdCloseQty} ${order.symbol} @ ₹${slicePrice}`
+                });
+
+                leftoverQty = roundQty(leftoverQty - holdCloseQty);
+              }
+            }
+
             if (leftoverQty > 0) {
               const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
               if (isExitOrder) {
@@ -896,28 +965,6 @@ class VolumeMatchingEngine {
                 type: 'REALIZED_PNL',
                 description: `Realized P&L on ${closeQty} ${order.symbol} ${orderTag}`
               });
-            }
-          }
-
-          // Synchronize / decrement holdings table if an entry exists for this user and symbol to prevent ghost holdings
-          const holdingRecord = await trx('holdings')
-            .where({ user_id: order.user_id })
-            .where(b => {
-              b.where({ symbol: order.symbol })
-                .orWhere({ symbol: cleanSym })
-                .orWhere({ symbol: `NSE:${cleanSym}` })
-                .orWhere({ symbol: `BSE:${cleanSym}` })
-                .orWhere({ symbol: `MCX:${cleanSym}` });
-            })
-            .first();
-
-          if (holdingRecord) {
-            const currentHQty = roundQty(Number(holdingRecord.quantity || 0));
-            const newHQty = roundQty(currentHQty - closeQty);
-            if (newHQty <= 0) {
-              await trx('holdings').where({ id: holdingRecord.id }).del();
-            } else {
-              await trx('holdings').where({ id: holdingRecord.id }).update({ quantity: newHQty, updated_at: new Date() });
             }
           }
         } else if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {

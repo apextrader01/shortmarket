@@ -168,11 +168,23 @@ export default function PortfolioView() {
     return `${sign}₹${abs.toFixed(0)}`;
   };
 
-  // ⚡ Performance: subscribe exclusively to prices of held assets
+  // ⚡ Performance: subscribe exclusively to prices of held assets (including prefix/EQ variants)
   const portfolioSymbols = useMemo(() => {
     const syms = new Set();
-    (holdings || []).forEach(h => { if (h?.symbol) syms.add(h.symbol); });
-    (positions || []).forEach(p => { if (p?.symbol) syms.add(p.symbol); });
+    const addSymVariants = (rawSym) => {
+      if (!rawSym) return;
+      syms.add(rawSym);
+      const cleanKeepEq = String(rawSym).replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const clean = cleanKeepEq.replace(/-EQ$/i, '');
+      syms.add(cleanKeepEq);
+      syms.add(clean);
+      syms.add(`NSE:${clean}`);
+      syms.add(`BSE:${clean}`);
+      syms.add(`MCX:${clean}`);
+      syms.add(`NSE:${clean}-EQ`);
+    };
+    (holdings || []).forEach(h => addSymVariants(h?.symbol));
+    (positions || []).forEach(p => addSymVariants(p?.symbol));
     return Array.from(syms);
   }, [holdings, positions]);
 
@@ -237,11 +249,17 @@ export default function PortfolioView() {
         const prevQty = Number(existing.quantity) || 0;
         const prevPrice = Math.abs(Number(existing.average_price) || 0);
         const totalQty = prevQty + hQty;
-        const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
         const absTotalQty = Math.abs(totalQty);
-        const weightedAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
+        const isSameSide = (prevQty >= 0 && hQty >= 0) || (prevQty < 0 && hQty < 0);
+        let nextAvg = prevPrice;
+        if (isSameSide) {
+          const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
+          nextAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
+        } else {
+          nextAvg = Math.abs(prevQty) >= Math.abs(hQty) ? prevPrice : hPrice;
+        }
         existing.quantity = totalQty;
-        existing.average_price = Math.abs(weightedAvg);
+        existing.average_price = Math.abs(nextAvg);
         existing.side = totalQty < 0 ? 'SELL' : 'BUY';
       }
     });
@@ -268,11 +286,17 @@ export default function PortfolioView() {
           const prevQty = Number(existing.quantity) || 0;
           const prevPrice = Math.abs(Number(existing.average_price) || 0);
           const totalQty = prevQty + pQty;
-          const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(pQty) * pPrice);
           const absTotalQty = Math.abs(totalQty);
-          const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+          const isSameSide = (prevQty >= 0 && pQty >= 0) || (prevQty < 0 && pQty < 0);
+          let nextAvg = prevPrice;
+          if (isSameSide) {
+            const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(pQty) * pPrice);
+            nextAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
+          } else {
+            nextAvg = Math.abs(prevQty) >= Math.abs(pQty) ? prevPrice : pPrice;
+          }
           existing.quantity = totalQty;
-          existing.average_price = Math.abs(weightedAvg);
+          existing.average_price = Math.abs(nextAvg);
           existing.side = totalQty < 0 ? 'SELL' : 'BUY';
         }
       }
@@ -283,11 +307,14 @@ export default function PortfolioView() {
     const calcPosPnL = (pos, isHolding = false) => {
       if (!pos) return;
       const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const cleanNoEq = cleanSym.replace(/-EQ$/i, '');
       const priceData = portfolioPrices[pos.symbol] 
         || portfolioPrices[cleanSym] 
-        || portfolioPrices[`NSE:${cleanSym}`] 
-        || portfolioPrices[`BSE:${cleanSym}`] 
-        || portfolioPrices[`MCX:${cleanSym}`] 
+        || portfolioPrices[cleanNoEq]
+        || portfolioPrices[`NSE:${cleanNoEq}`] 
+        || portfolioPrices[`NSE:${cleanNoEq}-EQ`]
+        || portfolioPrices[`BSE:${cleanNoEq}`] 
+        || portfolioPrices[`MCX:${cleanNoEq}`] 
         || {};
       const avg = Math.abs(parseFloat(pos.average_price) || 0);
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
@@ -411,12 +438,14 @@ export default function PortfolioView() {
     let list = (deliveryPositions || []).map(pos => {
       try {
         const cleanSym = (pos?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const cleanNoEq = cleanSym.replace(/-EQ$/i, '');
         const priceData = portfolioPrices[pos?.symbol] 
           || portfolioPrices[cleanSym] 
-          || portfolioPrices[`NSE:${cleanSym}`] 
-          || portfolioPrices[`BSE:${cleanSym}`] 
-          || portfolioPrices[`MCX:${cleanSym}`] 
-          || portfolioPrices[`NSE:${cleanSym}-EQ`] 
+          || portfolioPrices[cleanNoEq]
+          || portfolioPrices[`NSE:${cleanNoEq}`] 
+          || portfolioPrices[`NSE:${cleanNoEq}-EQ`] 
+          || portfolioPrices[`BSE:${cleanNoEq}`] 
+          || portfolioPrices[`MCX:${cleanNoEq}`] 
           || {};
         const avg = Math.abs(parseFloat(pos?.average_price) || 0);
         const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
@@ -1514,8 +1543,11 @@ export default function PortfolioView() {
                                 ) : (
                                   <>
                                     <button
-                                      onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotSize || pos.lotsize || 1, 'DEL', false)}
-                                      title="Buy More"
+                                      onClick={() => {
+                                        const addSide = pos.isShort ? 'SELL' : 'BUY';
+                                        useStore.getState().openOrderModal(pos.symbol, addSide, pos.lotSize || pos.lotsize || 1, 'DEL', false);
+                                      }}
+                                      title={pos.isShort ? 'Sell More' : 'Buy More'}
                                       style={{
                                         background: 'rgba(56, 189, 248, 0.12)',
                                         color: '#38bdf8',
@@ -1529,7 +1561,7 @@ export default function PortfolioView() {
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
-                                      + BUY
+                                      {pos.isShort ? '+ SELL' : '+ BUY'}
                                     </button>
                                     <button
                                       onClick={() => {
@@ -1538,7 +1570,7 @@ export default function PortfolioView() {
                                         const exitQty = Math.abs(rawQty || 1);
                                         useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
                                       }}
-                                      title="Exit / Sell"
+                                      title={pos.isShort ? 'Exit Short Position' : 'Exit / Sell'}
                                       style={{
                                         background: 'rgba(255, 59, 48, 0.12)',
                                         color: '#FF3B30',
@@ -1552,7 +1584,7 @@ export default function PortfolioView() {
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
-                                      SELL
+                                      {pos.isShort ? 'EXIT' : 'SELL'}
                                     </button>
                                   </>
                                 )}
