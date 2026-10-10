@@ -84,6 +84,9 @@ class PositionsEngine {
             this.runHoldingsMigration();
         }, { timezone: 'Asia/Kolkata' });
 
+        // Run self-healing derivative restoration immediately on startup
+        this.restoreErroneouslyMigratedDerivatives().catch(e => console.error('[STARTUP REPAIR ERROR]:', e.message));
+
         // Phase 4: Final Safety Net Cleanup (Commodities) - 12:05 AM IST (00:05)
         cron.schedule('5 0 * * *', () => {
             console.log('[CRON] 12:05 AM Final Cleanup for Commodities triggered.');
@@ -1005,10 +1008,12 @@ class PositionsEngine {
 
                 const deliveryPositions = await query;
 
-                for (const pos of deliveryPositions) {
-                    const isCommodity = isCommoditySymbol(pos.symbol);
-                    const isDeriv = isDerivativeSymbol(pos.symbol);
-                    const assetClass = isCommodity ? 'COMMODITY' : (isDeriv ? 'DERIVATIVE' : 'STOCK');
+                // CRITICAL FIX: Only Cash Stocks and Mutual Funds migrate to Demat holdings!
+                // Derivatives (F&O: Futures, Options) and Commodities (MCX) are open contracts that MUST remain in positions until expiry or manual exit!
+                const stockDeliveryPositions = deliveryPositions.filter(p => !isCommoditySymbol(p.symbol) && !isDerivativeSymbol(p.symbol));
+
+                for (const pos of stockDeliveryPositions) {
+                    const assetClass = 'STOCK';
 
                     // Check if holding already exists (prefix-tolerant)
                     const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
@@ -1055,8 +1060,8 @@ class PositionsEngine {
                     }
                 }
 
-                // 2. Mark migrated delivery positions as settled (quantity = 0) to preserve audit trails without data deletion
-                const migratedIds = deliveryPositions.map(p => p.id);
+                // 2. Mark ONLY migrated cash stock positions as settled (quantity = 0)
+                const migratedIds = stockDeliveryPositions.map(p => p.id);
                 if (migratedIds.length > 0) {
                     await trx('positions')
                         .whereIn('id', migratedIds)
@@ -1069,8 +1074,11 @@ class PositionsEngine {
                 }
                 
                 // ZERO TRADE DATA DELETION: Closed positions (quantity = 0) are strictly preserved for historical P&L & audit logs.
-                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${migratedIds.length} DEL positions to holdings.`);
+                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${migratedIds.length} Cash Stock DEL positions to holdings.`);
             });
+
+            // Automatically self-heal any derivative positions that were previously zeroed
+            await this.restoreErroneouslyMigratedDerivatives();
         } catch (error) {
             console.error(`[HOLDINGS MIGRATION ERROR]:`, error);
         } finally {
@@ -1079,6 +1087,62 @@ class PositionsEngine {
                     if (isLocked) {
                         await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
                     }
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }
+
+    async restoreErroneouslyMigratedDerivatives() {
+        const lockKey = 'cron_restore_erroneous_derivatives';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) return;
+            }
+
+            console.log('[AUTO-REPAIR] Auditing and restoring erroneously zeroed derivative positions...');
+            await db.transaction(async (trx) => {
+                // Find all positions where quantity = 0, closed_quantity > 0, exit_price is null (not closed via exit order), and symbol is a derivative or commodity
+                const zeroedDerivs = await trx('positions')
+                    .where({ quantity: 0 })
+                    .where('closed_quantity', '>', 0)
+                    .whereNull('exit_price');
+
+                const candidateDerivs = zeroedDerivs.filter(p => isDerivativeSymbol(p.symbol) || isCommoditySymbol(p.symbol));
+                if (candidateDerivs.length > 0) {
+                    const idsToRestore = candidateDerivs.map(p => p.id);
+                    await trx('positions')
+                        .whereIn('id', idsToRestore)
+                        .update({
+                            quantity: trx.raw('closed_quantity'),
+                            closed_quantity: 0,
+                            updated_at: new Date()
+                        });
+                    console.log(`[AUTO-REPAIR] Successfully restored ${idsToRestore.length} derivative positions to active status!`);
+                }
+
+                // Clean up any accidental holdings rows created for derivatives/commodities
+                const allHoldings = await trx('holdings').select('id', 'symbol');
+                const derivHoldingIds = (allHoldings || [])
+                    .filter(h => isDerivativeSymbol(h.symbol) || isCommoditySymbol(h.symbol))
+                    .map(h => h.id);
+                if (derivHoldingIds.length > 0) {
+                    await trx('holdings').whereIn('id', derivHoldingIds).del();
+                    console.log(`[AUTO-REPAIR] Removed ${derivHoldingIds.length} misplaced derivative rows from holdings table.`);
+                }
+            });
+        } catch (err) {
+            console.error('[AUTO-REPAIR ERROR]: Failed to restore erroneously migrated derivatives:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
                 } finally {
                     await db.client.releaseConnection(connection).catch(() => {});
                 }

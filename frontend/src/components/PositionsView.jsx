@@ -17,12 +17,17 @@ const EMPTY_PRICES = {};
 export default function PositionsView() {
 
   const isDeliveryPosition = (p) => {
+    if (!p) return false;
+    const sym = p?.symbol || '';
+    if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;
     const prod = (p?.product_type || p?.productLabel || p?.product || '').toUpperCase();
     return prod === 'DEL' || prod === 'CNC' || prod === 'DELIVERY';
   };
 
   const isOvernightDelivery = (p) => {
     if (!p) return false;
+    const sym = p?.symbol || '';
+    if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;
     if (!isDeliveryPosition(p)) return false;
     const dateToCheck = p.created_at || p.updated_at;
     if (dateToCheck && isToday(dateToCheck)) return false;

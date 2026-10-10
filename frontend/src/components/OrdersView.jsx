@@ -82,8 +82,7 @@ export default function OrdersView() {
     if (activeTab === 'Open Orders') return isPendingOrOpen;
     if (activeTab === 'Order History') {
       if (isPendingOrOpen || order.status === 'PENDING_TRIGGER') return false;
-      if (searchQuery && searchQuery.trim()) return true; // Allow searching across full historical orders
-      return !order.created_at || isToday(order.updated_at || order.created_at);
+      return true;
     }
     return false;
   });
