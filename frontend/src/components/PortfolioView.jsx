@@ -143,6 +143,11 @@ export default function PortfolioView() {
     }))
   );
 
+  // Proactively sync user portfolio data whenever PortfolioView is opened
+  useEffect(() => {
+    useStore.getState().fetchUserData?.();
+  }, []);
+
   // Currency Formatter Helper (Indian Notation)
   const formatCurrency = (val) => {
     if (val === undefined || val === null || isNaN(val)) return '₹0.00';
@@ -166,8 +171,8 @@ export default function PortfolioView() {
   // ⚡ Performance: subscribe exclusively to prices of held assets
   const portfolioSymbols = useMemo(() => {
     const syms = new Set();
-    (holdings || []).forEach(h => { if (h.symbol) syms.add(h.symbol); });
-    (positions || []).forEach(p => { if (p.symbol) syms.add(p.symbol); });
+    (holdings || []).forEach(h => { if (h?.symbol) syms.add(h.symbol); });
+    (positions || []).forEach(p => { if (p?.symbol) syms.add(p.symbol); });
     return Array.from(syms);
   }, [holdings, positions]);
 
@@ -218,7 +223,7 @@ export default function PortfolioView() {
       const key = cleanSym || sym;
       const hQty = Number(h.quantity) || 0;
       const hPrice = Math.abs(Number(h.average_price) || 0);
-      if (hQty <= 0) return;
+      if (Math.abs(hQty) <= 0) return;
 
       if (!allMergedHoldingsMap[key]) {
         allMergedHoldingsMap[key] = { 
@@ -403,48 +408,70 @@ export default function PortfolioView() {
 
   // Filter & Sort Holdings
   const processedHoldings = useMemo(() => {
-    let list = deliveryPositions.map(pos => {
-      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-      const priceData = portfolioPrices[pos.symbol] 
-        || portfolioPrices[cleanSym] 
-        || portfolioPrices[`NSE:${cleanSym}`] 
-        || portfolioPrices[`BSE:${cleanSym}`] 
-        || portfolioPrices[`MCX:${cleanSym}`] 
-        || portfolioPrices[`NSE:${cleanSym}-EQ`] 
-        || {};
-      const avg = Math.abs(parseFloat(pos.average_price) || 0);
-      const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
-      const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
-      const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
-      const qty = Math.abs(pos.quantity);
-      const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
-      const invested = avg * qty;
-      const rawCurrent = ltp * qty;
-      const pnl = isShort ? (invested - rawCurrent) : (rawCurrent - invested);
-      const current = isShort ? (invested + pnl) : rawCurrent;
-      const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-      const dayChangeVal = (isShort ? -chg : chg) * qty;
-      const isMf = isMutualFund(pos.symbol, pos.asset_class);
-      const displayName = isMf 
-        ? (getMfName(pos.symbol) || (pos.symbol || '').replace('-MF', ''))
-        : (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0];
-      return {
-        ...pos,
-        average_price: avg,
-        ltp,
-        chg,
-        chgp,
-        dayChangeVal,
-        qty,
-        invested,
-        current,
-        pnl,
-        pnlPct,
-        isProfit: pnl >= 0,
-        isShort,
-        isMf,
-        displayName
-      };
+    let list = (deliveryPositions || []).map(pos => {
+      try {
+        const cleanSym = (pos?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const priceData = portfolioPrices[pos?.symbol] 
+          || portfolioPrices[cleanSym] 
+          || portfolioPrices[`NSE:${cleanSym}`] 
+          || portfolioPrices[`BSE:${cleanSym}`] 
+          || portfolioPrices[`MCX:${cleanSym}`] 
+          || portfolioPrices[`NSE:${cleanSym}-EQ`] 
+          || {};
+        const avg = Math.abs(parseFloat(pos?.average_price) || 0);
+        const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
+        const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
+        const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
+        const qty = Math.abs(Number(pos?.quantity) || 0);
+        const isShort = Number(pos?.quantity) < 0 || pos?.side === 'SELL';
+        const invested = avg * qty;
+        const rawCurrent = ltp * qty;
+        const pnl = isShort ? (invested - rawCurrent) : (rawCurrent - invested);
+        const current = isShort ? (invested + pnl) : rawCurrent;
+        const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+        const dayChangeVal = (isShort ? -chg : chg) * qty;
+        const isMf = isMutualFund(pos?.symbol, pos?.asset_class);
+        const displayName = isMf 
+          ? (getMfName(pos?.symbol) || (pos?.symbol || '').replace('-MF', ''))
+          : (pos?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0];
+        return {
+          ...pos,
+          average_price: avg,
+          ltp,
+          chg,
+          chgp,
+          dayChangeVal,
+          qty,
+          invested,
+          current,
+          pnl,
+          pnlPct,
+          isProfit: pnl >= 0,
+          isShort,
+          isMf,
+          displayName
+        };
+      } catch (_) {
+        const fallbackAvg = Math.abs(parseFloat(pos?.average_price) || 0);
+        const fallbackQty = Math.abs(Number(pos?.quantity) || 0);
+        return {
+          ...pos,
+          average_price: fallbackAvg,
+          ltp: fallbackAvg,
+          chg: 0,
+          chgp: 0,
+          dayChangeVal: 0,
+          qty: fallbackQty,
+          invested: fallbackAvg * fallbackQty,
+          current: fallbackAvg * fallbackQty,
+          pnl: 0,
+          pnlPct: 0,
+          isProfit: true,
+          isShort: Number(pos?.quantity) < 0 || pos?.side === 'SELL',
+          isMf: false,
+          displayName: pos?.symbol || ''
+        };
+      }
     });
 
     // Asset segment filter

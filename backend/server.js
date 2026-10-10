@@ -3099,14 +3099,22 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
           this.whereNot({ quantity: 0 })
             .orWhere('updated_at', '>=', todayStartIST);
         })
-        .orderBy('updated_at', 'desc'),
-      db('holdings').where({ user_id: userId }).where('quantity', '>', 0).orderBy('id', 'desc'),
-      db('sips').where({ user_id: userId }),
+        .orderBy('updated_at', 'desc')
+        .catch(() => []),
+      db('holdings')
+        .where({ user_id: userId })
+        .where(function() {
+          this.where('quantity', '>', 0).orWhere('quantity', '<', 0);
+        })
+        .orderBy('id', 'desc')
+        .catch(() => []),
+      db('sips').where({ user_id: userId }).catch(() => []),
       // 1. ALL active/open/pending orders - ZERO truncation, guarantee 100% presence
       db('orders')
         .where({ user_id: userId })
         .whereIn('status', activeOrderStatuses)
-        .orderBy('created_at', 'desc'),
+        .orderBy('created_at', 'desc')
+        .catch(() => []),
       // 2. ALL orders created or updated today in IST (preserves all multi-sliced trades of today)
       db('orders')
         .where({ user_id: userId })
@@ -3114,12 +3122,14 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
           this.where('created_at', '>=', todayStartIST)
             .orWhere('updated_at', '>=', todayStartIST);
         })
-        .orderBy('created_at', 'desc'),
+        .orderBy('created_at', 'desc')
+        .catch(() => []),
       // 3. Fallback recent orders (up to 200) so order history is available before today's first trade
       db('orders')
         .where({ user_id: userId })
         .orderBy('created_at', 'desc')
         .limit(200)
+        .catch(() => [])
     ]);
 
     // Merge and deduplicate by order ID
@@ -3169,7 +3179,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       return false;
     };
 
-    const formattedHoldings = (holdingsRows || []).filter(h => Number(h.quantity) > 0);
+    const formattedHoldings = (holdingsRows || []).filter(h => Math.abs(Number(h.quantity)) > 0);
     for (const h of formattedHoldings) {
       if (LEGACY_FIX_MAP[h.symbol] && Math.round(Number(h.average_price)) === 100) {
         const item = LEGACY_FIX_MAP[h.symbol];
@@ -6150,10 +6160,12 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
       return false;
     };
 
-    // Filter non-positive holdings in SQL using composite index (user_id, quantity)
+    // Filter non-zero holdings in SQL using composite index (user_id, quantity)
     const holdings = await db('holdings')
       .where({ user_id: req.user.id })
-      .where('quantity', '>', 0)
+      .where(function() {
+        this.where('quantity', '>', 0).orWhere('quantity', '<', 0);
+      })
       .orderBy('id', 'desc');
 
     // Auto-align legacy MF holdings (EDEL, MIRA, NIPP) with real AMFI NAVs and calculate correct units

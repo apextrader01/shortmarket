@@ -1353,7 +1353,11 @@ export const useStore = create(persist((set, get) => ({
 
   // ── User Data ────────────────────────────────────────────────────────────────
   fetchUserData: async () => {
-    if (window._activeFetchUserDataPromise) return window._activeFetchUserDataPromise;
+    const nowStart = Date.now();
+    if (window._activeFetchUserDataPromise && window._activeFetchUserDataStart && (nowStart - window._activeFetchUserDataStart < 10000)) {
+      return window._activeFetchUserDataPromise;
+    }
+    window._activeFetchUserDataStart = nowStart;
     window._activeFetchUserDataPromise = (async () => {
       try {
         syncClientTelemetry(API).catch(() => {});
@@ -1367,7 +1371,14 @@ export const useStore = create(persist((set, get) => ({
         let isAccountDeleted = false;
 
         try {
-          const bootRes = await fetch(`${API}/api/user/bootstrap`, { credentials: 'include', headers });
+          const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+          const bootRes = await fetch(`${API}/api/user/bootstrap`, {
+            credentials: 'include',
+            headers,
+            ...(controller ? { signal: controller.signal } : {})
+          });
+          if (timeoutId) clearTimeout(timeoutId);
           if (bootRes.ok) {
             const data = await bootRes.json();
             user = data.user;
@@ -1383,38 +1394,42 @@ export const useStore = create(persist((set, get) => ({
             }
           }
         } catch (_) {
-          // Network or parsing error on bootstrap, will fallback below
+          // Network, timeout, or parsing error on bootstrap, will fallback below
         }
 
-        // Graceful Fallback to individual requests if bootstrap endpoint fails or returns error
-        if (!user && !isAccountDeleted) {
+        // Graceful Fallback to individual requests if bootstrap endpoint fails or returns incomplete portfolio data
+        if ((!user || !Array.isArray(holdData) || !Array.isArray(positions)) && !isAccountDeleted) {
           try {
-            const userRes = await fetch(`${API}/api/user`, { credentials: 'include', headers });
-            if (userRes.ok) {
-              const uData = await userRes.json();
-              if (uData && !uData.error && uData.id) {
-                user = uData;
-                authFailed = false; // Auth verified successfully via fallback!
-                const [posRes, ordRes, holdRes, sipsRes] = await Promise.all([
-                  fetch(`${API}/api/positions`, { credentials: 'include', headers }),
-                  fetch(`${API}/api/orders`, { credentials: 'include', headers }),
-                  fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
-                  fetch(`${API}/api/sips`, { credentials: 'include', headers }),
-                ]);
-                const [pData, oData, hData, sData] = await Promise.all([
-                  posRes.json().catch(() => ([])), 
-                  ordRes.json().catch(() => ([])), 
-                  holdRes.json().catch(() => ([])),
-                  sipsRes.json().catch(() => ({}))
-                ]);
-                positions = pData;
-                orders = oData;
-                holdData = hData;
-                sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
+            if (!user) {
+              const userRes = await fetch(`${API}/api/user`, { credentials: 'include', headers });
+              if (userRes.ok) {
+                const uData = await userRes.json();
+                if (uData && !uData.error && uData.id) {
+                  user = uData;
+                  authFailed = false;
+                }
+              } else if (userRes.status === 401 || userRes.status === 403 || userRes.status === 404) {
+                authFailed = true;
+                isAccountDeleted = true;
               }
-            } else if (userRes.status === 401 || userRes.status === 403 || userRes.status === 404) {
-              authFailed = true;
-              isAccountDeleted = true;
+            }
+            if ((user || get().user) && !isAccountDeleted) {
+              const [posRes, ordRes, holdRes, sipsRes] = await Promise.all([
+                !Array.isArray(positions) ? fetch(`${API}/api/positions`, { credentials: 'include', headers }).catch(() => null) : Promise.resolve(null),
+                !Array.isArray(orders) ? fetch(`${API}/api/orders`, { credentials: 'include', headers }).catch(() => null) : Promise.resolve(null),
+                !Array.isArray(holdData) ? fetch(`${API}/api/holdings`, { credentials: 'include', headers }).catch(() => null) : Promise.resolve(null),
+                !Array.isArray(sipsList) ? fetch(`${API}/api/sips`, { credentials: 'include', headers }).catch(() => null) : Promise.resolve(null),
+              ]);
+              const [pData, oData, hData, sData] = await Promise.all([
+                posRes && posRes.ok ? posRes.json().catch(() => null) : Promise.resolve(null),
+                ordRes && ordRes.ok ? ordRes.json().catch(() => null) : Promise.resolve(null),
+                holdRes && holdRes.ok ? holdRes.json().catch(() => null) : Promise.resolve(null),
+                sipsRes && sipsRes.ok ? sipsRes.json().catch(() => null) : Promise.resolve(null)
+              ]);
+              if (Array.isArray(pData)) positions = pData;
+              if (Array.isArray(oData)) orders = oData;
+              if (Array.isArray(hData)) holdData = hData;
+              if (sData && sData.success && Array.isArray(sData.sips)) sipsList = sData.sips;
             }
           } catch (_) {}
         }
@@ -1439,57 +1454,67 @@ export const useStore = create(persist((set, get) => ({
         
         if (!get().user && !user) return;
         
-        const now = Date.now();
-        const incomingWatchlists = user?.watchlists ? ensureWatchlistsWithDefaults(user.watchlists) : null;
-        const shouldUpdateWatchlists = (incomingWatchlists && (now - get().lastWatchlistEdit > 3000));
-        
         const prevUser = get().user;
         let finalUser = prevUser;
         if (user && !user.error) {
           finalUser = { ...(prevUser || {}), ...user };
         }
         
+        // 1. Commit core portfolio & trading data FIRST so watchlist/socket post-processing can never block it
         set({
           positions: Array.isArray(positions) ? positions : get().positions, 
           holdings: Array.isArray(holdData) ? holdData : get().holdings,
           sips: Array.isArray(sipsList) ? sipsList : get().sips,
           orders: Array.isArray(orders) ? orders : get().orders, 
-          user: finalUser,
-          watchlists: shouldUpdateWatchlists ? incomingWatchlists : ensureWatchlistsWithDefaults(get().watchlists)
+          user: finalUser
         });
-        
-        if (shouldUpdateWatchlists) {
-          get().pingSubscriptions();
-        }
-        const activeWl = (get().watchlists || []).find(w => String(w.id) === String(get().activeWatchlistId)) || get().watchlists?.[0];
-        const wlSymbols = activeWl?.symbols || [];
-        const posSymbols = get().positions.map(p => p.symbol);
-        const holdSymbols = get().holdings.map(h => h.symbol);
-        const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
-        const allSymbolsToSubscribe = [...new Set([...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols])];
-        if (allSymbolsToSubscribe.length > 0) {
-          if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
-          const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));
+
+        // 2. Isolate watchlist merging, WebSocket subscriptions, and price fetching in a separate try/catch
+        try {
+          const now = Date.now();
+          const incomingWatchlists = user?.watchlists ? ensureWatchlistsWithDefaults(user.watchlists) : null;
+          const shouldUpdateWatchlists = (incomingWatchlists && (now - get().lastWatchlistEdit > 3000));
           
-          if (newSymbols.length > 0) {
-            newSymbols.forEach(sym => {
-              window._subscribedUserSymbols.add(sym);
-              socket.emit('subscribe', sym);
-            });
-            const missingPriceSyms = newSymbols.filter(sym => !get().prices[sym]?.ltp);
-            if (missingPriceSyms.length > 0) {
-              get().fetchBatchPrices(missingPriceSyms);
+          set({
+            watchlists: shouldUpdateWatchlists ? incomingWatchlists : ensureWatchlistsWithDefaults(get().watchlists)
+          });
+          
+          if (shouldUpdateWatchlists) {
+            get().pingSubscriptions();
+          }
+          const activeWl = (get().watchlists || []).find(w => String(w.id) === String(get().activeWatchlistId)) || get().watchlists?.[0];
+          const wlSymbols = activeWl?.symbols || [];
+          const posSymbols = (get().positions || []).map(p => p?.symbol).filter(Boolean);
+          const holdSymbols = (get().holdings || []).map(h => h?.symbol).filter(Boolean);
+          const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
+          const allSymbolsToSubscribe = [...new Set([...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols])];
+          if (allSymbolsToSubscribe.length > 0) {
+            if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
+            const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));
+            
+            if (newSymbols.length > 0) {
+              newSymbols.forEach(sym => {
+                window._subscribedUserSymbols.add(sym);
+                socket.emit('subscribe', sym);
+              });
+              const missingPriceSyms = newSymbols.filter(sym => !get().prices[sym]?.ltp);
+              if (missingPriceSyms.length > 0) {
+                get().fetchBatchPrices(missingPriceSyms);
+              }
             }
           }
+          
+          // Fetch restricted stocks (cached for 15m to stop 30s polling churn)
+          get().fetchRestrictedStocks();
+        } catch (postErr) {
+          console.error('[fetchUserData Post-Processing Error]:', postErr);
         }
-        
-        // Fetch restricted stocks (cached for 15m to stop 30s polling churn)
-        get().fetchRestrictedStocks();
         // No initial search; let MutualFundsView handle empty state
       } catch (err) {
         console.error('[fetchUserData Error]:', err);
       } finally {
         window._activeFetchUserDataPromise = null;
+        window._activeFetchUserDataStart = 0;
         if (!get().isInitialUserDataLoaded) {
           set({ isInitialUserDataLoaded: true });
         }
@@ -3649,17 +3674,19 @@ export const useStore = create(persist((set, get) => ({
 }), {
   name: 'skandx-storage',
   partialize: (state) => ({
-    watchlists:        state.watchlists,
-    activeWatchlistId: state.activeWatchlistId,
-    token:             state.token,
-    user:              state.user,
-    theme:             state.theme,
-      fontSize:          state.fontSize,
-      accessibilityMode: state.accessibilityMode,
-    pendingTriggers:   state.pendingTriggers,
-    oneClickMode:      state.oneClickMode,
+    watchlists:         state.watchlists,
+    activeWatchlistId:  state.activeWatchlistId,
+    token:              state.token,
+    user:               state.user,
+    holdings:           state.holdings,
+    positions:          state.positions,
+    theme:              state.theme,
+    fontSize:           state.fontSize,
+    accessibilityMode:  state.accessibilityMode,
+    pendingTriggers:    state.pendingTriggers,
+    oneClickMode:       state.oneClickMode,
     oneClickMultiplier: state.oneClickMultiplier,
-    alerts:            state.alerts,
+    alerts:             state.alerts,
   }),
 }));
 
