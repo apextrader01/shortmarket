@@ -3299,25 +3299,109 @@ async function getRazorpayClient() {
   };
 }
 
+function resolvePlanMeta(plan) {
+  const p = String(plan || 'monthly').toLowerCase().trim();
+  if (p === 'lifetime' || p === 'elite_lifetime') {
+    return { tier: 'LIFETIME', amountInr: 24999, label: 'Lifetime Elite (₹24,999)' };
+  }
+  if (p === 'masterclass' || p === 'course') {
+    return { tier: 'MASTERCLASS', amountInr: 9999, label: 'Stock Market Masterclass (₹9,999)' };
+  }
+  if (p === 'highest' || p === 'feature' || p === 'vip' || p === 'elite') {
+    return { tier: 'HIGHEST', amountInr: 2999, label: 'VIP Feature Plan (₹2,999/yr)' };
+  }
+  if (p === 'yearly') {
+    return { tier: 'YEARLY', amountInr: 1999, label: 'Yearly Elite (₹1,999/yr)' };
+  }
+  return { tier: 'MONTHLY', amountInr: 199, label: 'Pro Monthly (₹199/mo)' };
+}
+
+async function logSubscriptionAttempt({
+  userId,
+  plan,
+  amount,
+  paymentType = 'ONE_TIME',
+  status = 'INITIATED',
+  razorpayOrderId = null,
+  razorpaySubscriptionId = null,
+  razorpayPaymentId = null,
+  failureReason = null,
+  expiresAt = null
+}) {
+  try {
+    const userRow = userId ? await db('users').where({ id: userId }).first().catch(() => null) : null;
+    const meta = resolvePlanMeta(plan);
+    const finalPlan = meta.tier;
+    const finalAmount = amount !== undefined && amount !== null ? Number(amount) : meta.amountInr;
+
+    if (razorpayOrderId || razorpaySubscriptionId) {
+      let existingQuery = db('subscription_payments');
+      if (razorpayOrderId && razorpaySubscriptionId) {
+        existingQuery = existingQuery.where({ razorpay_order_id: razorpayOrderId }).orWhere({ razorpay_subscription_id: razorpaySubscriptionId });
+      } else if (razorpayOrderId) {
+        existingQuery = existingQuery.where({ razorpay_order_id: razorpayOrderId });
+      } else {
+        existingQuery = existingQuery.where({ razorpay_subscription_id: razorpaySubscriptionId });
+      }
+      const existing = await existingQuery.orderBy('id', 'desc').first().catch(() => null);
+      if (existing) {
+        // Do not overwrite a SUCCESS record with CANCELLED or FAILED
+        if (existing.status === 'SUCCESS' && status !== 'SUCCESS') {
+          return existing;
+        }
+        const updatePayload = {
+          status,
+          updated_at: new Date()
+        };
+        if (razorpayPaymentId) updatePayload.razorpay_payment_id = razorpayPaymentId;
+        if (failureReason !== undefined && failureReason !== null) updatePayload.failure_reason = failureReason;
+        if (expiresAt) updatePayload.expires_at = expiresAt;
+        await db('subscription_payments').where({ id: existing.id }).update(updatePayload);
+        return { ...existing, ...updatePayload };
+      }
+    }
+
+    const [inserted] = await db('subscription_payments').insert({
+      user_id: userId || null,
+      username: userRow?.username || null,
+      email: userRow?.email || null,
+      phone: userRow?.phone || null,
+      client_id: userRow?.client_id || null,
+      plan: finalPlan,
+      amount: finalAmount,
+      payment_type: paymentType,
+      status,
+      razorpay_order_id: razorpayOrderId,
+      razorpay_subscription_id: razorpaySubscriptionId,
+      razorpay_payment_id: razorpayPaymentId,
+      failure_reason: failureReason,
+      expires_at: expiresAt,
+      created_at: new Date(),
+      updated_at: new Date()
+    }).returning('*');
+    return inserted;
+  } catch (err) {
+    console.warn('[SUBSCRIPTION LOG] Could not record subscription payment attempt:', err.message);
+    return null;
+  }
+}
+
 // 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
+  const { plan } = req.body || {};
+  const meta = resolvePlanMeta(plan);
+  const amount = meta.amountInr * 100;
   try {
-    const { plan } = req.body || {};
-    let amount = 199 * 100;
-    if (plan === 'lifetime' || plan === 'elite_lifetime') {
-      amount = 24999 * 100;
-    } else if (plan === 'masterclass' || plan === 'course') {
-      amount = 9999 * 100;
-    } else if (plan === 'highest' || plan === 'feature') {
-      amount = 2999 * 100;
-    } else if (plan === 'yearly') {
-      amount = 1999 * 100;
-    } else {
-      amount = 199 * 100;
-    }
-    
     const { client, key_id, key_secret } = await getRazorpayClient();
     if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: meta.tier,
+        amount: meta.amountInr,
+        paymentType: 'ONE_TIME',
+        status: 'FAILED',
+        failureReason: 'Razorpay keys not configured on server'
+      });
       return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
     }
 
@@ -3327,9 +3411,25 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
       receipt: "receipt_order_" + req.user.id + "_" + Date.now()
     };
     const order = await client.orders.create(options);
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: meta.tier,
+      amount: meta.amountInr,
+      paymentType: 'ONE_TIME',
+      status: 'INITIATED',
+      razorpayOrderId: order.id
+    });
     res.json({ ...order, key_id, amount, currency: "INR" });
   } catch (error) {
     const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: meta.tier,
+      amount: meta.amountInr,
+      paymentType: 'ONE_TIME',
+      status: 'FAILED',
+      failureReason: 'Razorpay Order Creation Rejected: ' + errMsg
+    });
     res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
   }
 });
@@ -3345,9 +3445,10 @@ const RAZORPAY_PLAN_MAP = {
 
 // AutoPay recurring subscription mandate endpoint
 app.post('/api/payment/create-subscription', authenticateToken, async (req, res) => {
+  const { plan } = req.body || {};
+  const selectedPlan = (plan || 'monthly').toLowerCase();
+  const meta = resolvePlanMeta(selectedPlan);
   try {
-    const { plan } = req.body || {};
-    const selectedPlan = (plan || 'monthly').toLowerCase();
     const planId = RAZORPAY_PLAN_MAP[selectedPlan];
 
     if (!planId) {
@@ -3356,6 +3457,14 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
 
     const { client, key_id, key_secret } = await getRazorpayClient();
     if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: meta.tier,
+        amount: meta.amountInr,
+        paymentType: 'AUTOPAY',
+        status: 'FAILED',
+        failureReason: 'Razorpay keys not configured on server'
+      });
       return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel.' });
     }
 
@@ -3373,6 +3482,15 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
       }
     });
 
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: meta.tier,
+      amount: meta.amountInr,
+      paymentType: 'AUTOPAY',
+      status: 'INITIATED',
+      razorpaySubscriptionId: subscription.id
+    });
+
     res.json({
       ...subscription,
       subscription_id: subscription.id,
@@ -3381,6 +3499,14 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
     });
   } catch (error) {
     const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: meta.tier,
+      amount: meta.amountInr,
+      paymentType: 'AUTOPAY',
+      status: 'FAILED',
+      failureReason: 'Razorpay AutoPay Creation Rejected: ' + errMsg
+    });
     res.status(500).json({ error: 'Razorpay AutoPay Rejected: ' + errMsg });
   }
 });
@@ -3388,6 +3514,8 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
+    const meta = resolvePlanMeta(plan);
+    const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
     
     const { key_secret: secret } = await getRazorpayConfig();
     if (!secret || secret === 'secret_placeholder') {
@@ -3395,6 +3523,17 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
     }
 
     if (!razorpay_payment_id || !razorpay_signature) {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: meta.tier,
+        amount: meta.amountInr,
+        paymentType,
+        status: 'FAILED',
+        razorpayOrderId: razorpay_order_id || null,
+        razorpaySubscriptionId: razorpay_subscription_id || null,
+        razorpayPaymentId: razorpay_payment_id || null,
+        failureReason: 'Missing required payment verification parameters'
+      });
       return res.status(400).json({ error: 'Missing required payment verification parameters' });
     }
 
@@ -3413,6 +3552,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
     const isAuthentic = expectedSignature.length === razorpay_signature.length &&
       crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
     if (isAuthentic) {
+      let computedExpires = null;
       await db.transaction(async (trx) => {
         const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
         if (!user) throw new Error('User not found');
@@ -3440,6 +3580,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
           targetTier = 'MONTHLY';
           expires.setMonth(expires.getMonth() + 1);
         }
+        computedExpires = expires;
 
         await trx('users').where({ id: req.user.id }).update({
           subscription_tier: targetTier,
@@ -3488,12 +3629,69 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         }
       });
 
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: meta.tier,
+        amount: meta.amountInr,
+        paymentType,
+        status: 'SUCCESS',
+        razorpayOrderId: razorpay_order_id || null,
+        razorpaySubscriptionId: razorpay_subscription_id || null,
+        razorpayPaymentId: razorpay_payment_id || null,
+        failureReason: null,
+        expiresAt: computedExpires
+      });
+
       res.json({ success: true, message: 'Upgraded to PRO successfully!' });
     } else {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: meta.tier,
+        amount: meta.amountInr,
+        paymentType,
+        status: 'FAILED',
+        razorpayOrderId: razorpay_order_id || null,
+        razorpaySubscriptionId: razorpay_subscription_id || null,
+        razorpayPaymentId: razorpay_payment_id || null,
+        failureReason: 'Invalid Payment Signature'
+      });
       res.status(400).json({ error: 'Invalid Payment Signature' });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Report failed or cancelled payment attempt from Razorpay checkout modal
+app.post('/api/payment/report-failure', authenticateToken, async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_subscription_id,
+      razorpay_payment_id,
+      plan,
+      status,
+      failure_reason
+    } = req.body || {};
+    const meta = resolvePlanMeta(plan);
+    const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
+    const normalizedStatus = String(status || 'FAILED').toUpperCase() === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
+
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: meta.tier,
+      amount: meta.amountInr,
+      paymentType,
+      status: normalizedStatus,
+      razorpayOrderId: razorpay_order_id || null,
+      razorpaySubscriptionId: razorpay_subscription_id || null,
+      razorpayPaymentId: razorpay_payment_id || null,
+      failureReason: failure_reason || (normalizedStatus === 'CANCELLED' ? 'Checkout closed by user before completing payment' : 'Payment failed at gateway')
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -5346,6 +5544,19 @@ app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res)
       subscription_tier: tier,
       subscription_expires: expires || null
     });
+
+    const cleanTier = String(tier || 'BASIC').toUpperCase();
+    const meta = resolvePlanMeta(cleanTier);
+    await logSubscriptionAttempt({
+      userId: Number(req.params.id),
+      plan: cleanTier === 'BASIC' ? 'BASIC' : meta.tier,
+      amount: 0,
+      paymentType: 'ADMIN_GRANT',
+      status: 'SUCCESS',
+      failureReason: `Manually set to ${cleanTier} by Admin (${admin.username})`,
+      expiresAt: expires || null
+    });
+
     if (typeof io !== 'undefined' && io) {
       io.to(`user_${req.params.id}`).emit('subscription_updated', {
         userId: Number(req.params.id),
@@ -5355,6 +5566,205 @@ app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res)
     }
     res.json({ success: true, subscription_tier: tier, subscription_expires: expires || null });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    // 1. Auto-backfill any existing subscribed users who don't yet have a record in subscription_payments
+    try {
+      const paidUsers = await db('users')
+        .whereRaw("UPPER(COALESCE(subscription_tier, 'BASIC')) NOT IN ('BASIC', 'FREE', 'NORMAL', '')")
+        .select('id', 'username', 'email', 'phone', 'client_id', 'subscription_tier', 'subscription_expires', 'updated_at', 'created_at');
+
+      if (paidUsers.length > 0) {
+        const existingUserIdsRows = await db('subscription_payments').whereNotNull('user_id').distinct('user_id');
+        const existingUserIds = new Set(existingUserIdsRows.map(r => Number(r.user_id)));
+
+        for (const u of paidUsers) {
+          if (!existingUserIds.has(Number(u.id))) {
+            const meta = resolvePlanMeta(u.subscription_tier);
+            await db('subscription_payments').insert({
+              user_id: u.id,
+              username: u.username,
+              email: u.email,
+              phone: u.phone,
+              client_id: u.client_id,
+              plan: String(u.subscription_tier).toUpperCase(),
+              amount: meta.amountInr,
+              payment_type: 'ACTIVE_SUBSCRIPTION',
+              status: 'SUCCESS',
+              failure_reason: 'Active plan synced from user profile',
+              expires_at: u.subscription_expires || null,
+              created_at: u.updated_at || u.created_at || new Date(),
+              updated_at: u.updated_at || new Date()
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (bfErr) {
+      console.warn('[SUBSCRIPTIONS] Backfill note:', bfErr.message);
+    }
+
+    // 2. Optional live Razorpay gateway sync (?syncRazorpay=true)
+    if (req.query.syncRazorpay === 'true') {
+      try {
+        const { client, key_id, key_secret } = await getRazorpayClient();
+        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
+          const rzpPayments = await client.payments.all({ count: 50 }).catch(() => null);
+          if (rzpPayments && Array.isArray(rzpPayments.items)) {
+            for (const p of rzpPayments.items) {
+              const exists = await db('subscription_payments')
+                .where({ razorpay_payment_id: p.id })
+                .orWhere(builder => {
+                  if (p.order_id) builder.where({ razorpay_order_id: p.order_id });
+                })
+                .first();
+
+              const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
+              const amountInr = Math.round((Number(p.amount) || 0) / 100);
+              let inferredPlan = 'MONTHLY';
+              if (amountInr >= 20000) inferredPlan = 'LIFETIME';
+              else if (amountInr >= 8000) inferredPlan = 'MASTERCLASS';
+              else if (amountInr >= 2500) inferredPlan = 'HIGHEST';
+              else if (amountInr >= 1500) inferredPlan = 'YEARLY';
+
+              const failMsg = p.error_description || p.error_reason || null;
+
+              if (exists) {
+                if (exists.status !== 'SUCCESS' && rzpStatus === 'SUCCESS') {
+                  await db('subscription_payments').where({ id: exists.id }).update({
+                    status: 'SUCCESS',
+                    razorpay_payment_id: p.id,
+                    updated_at: new Date()
+                  });
+                } else if (exists.status === 'INITIATED' && rzpStatus === 'FAILED') {
+                  await db('subscription_payments').where({ id: exists.id }).update({
+                    status: 'FAILED',
+                    razorpay_payment_id: p.id,
+                    failure_reason: failMsg || exists.failure_reason,
+                    updated_at: new Date()
+                  });
+                }
+              } else {
+                const matchedUser = p.email
+                  ? await db('users').whereRaw('LOWER(email) = ?', [String(p.email).toLowerCase().trim()]).first().catch(() => null)
+                  : null;
+                await db('subscription_payments').insert({
+                  user_id: matchedUser?.id || (p.notes?.user_id ? Number(p.notes.user_id) : null),
+                  username: matchedUser?.username || null,
+                  email: matchedUser?.email || p.email || null,
+                  phone: matchedUser?.phone || p.contact || null,
+                  client_id: matchedUser?.client_id || null,
+                  plan: p.notes?.plan ? resolvePlanMeta(p.notes.plan).tier : inferredPlan,
+                  amount: amountInr,
+                  payment_type: p.invoice_id ? 'AUTOPAY' : 'ONE_TIME',
+                  status: rzpStatus,
+                  razorpay_order_id: p.order_id || null,
+                  razorpay_payment_id: p.id,
+                  failure_reason: failMsg,
+                  created_at: p.created_at ? new Date(p.created_at * 1000) : new Date(),
+                  updated_at: new Date()
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[SUBSCRIPTIONS] Razorpay sync note:', syncErr.message);
+      }
+    }
+
+    // 3. Query subscription_payments joined with users
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+
+    let query = db('subscription_payments')
+      .leftJoin('users', 'subscription_payments.user_id', 'users.id')
+      .select(
+        'subscription_payments.*',
+        db.raw('COALESCE(users.username, subscription_payments.username) as username'),
+        db.raw('COALESCE(users.email, subscription_payments.email) as email'),
+        db.raw('COALESCE(users.phone, subscription_payments.phone) as phone'),
+        db.raw('COALESCE(users.client_id, subscription_payments.client_id) as client_id'),
+        'users.subscription_tier as current_user_tier',
+        'users.subscription_expires as current_user_expires'
+      )
+      .orderBy('subscription_payments.created_at', 'desc')
+      .limit(1000);
+
+    if (startDate) query = query.where('subscription_payments.created_at', '>=', startDate);
+    if (endDate) query = query.where('subscription_payments.created_at', '<=', endDate);
+
+    const payments = await query;
+
+    // 4. Query all currently active subscribers from users table
+    const activeSubscribers = await db('users')
+      .whereRaw("UPPER(COALESCE(subscription_tier, 'BASIC')) NOT IN ('BASIC', 'FREE', 'NORMAL', '')")
+      .select('id', 'username', 'email', 'phone', 'client_id', 'subscription_tier', 'subscription_expires', 'created_at', 'updated_at')
+      .orderBy('updated_at', 'desc');
+
+    // 5. Compute summary stats
+    let totalSuccess = 0;
+    let totalFailed = 0;
+    let totalCancelled = 0;
+    let totalInitiated = 0;
+    let totalRevenue = 0;
+    const planBreakdown = {
+      MONTHLY: 0,
+      YEARLY: 0,
+      HIGHEST: 0,
+      MASTERCLASS: 0,
+      LIFETIME: 0
+    };
+
+    for (const p of payments) {
+      const st = String(p.status || '').toUpperCase();
+      if (st === 'SUCCESS') {
+        totalSuccess++;
+        if (p.payment_type !== 'ADMIN_GRANT') {
+          totalRevenue += Number(p.amount) || 0;
+        }
+      } else if (st === 'FAILED') {
+        totalFailed++;
+      } else if (st === 'CANCELLED') {
+        totalCancelled++;
+      } else {
+        totalInitiated++;
+      }
+    }
+
+    for (const sub of activeSubscribers) {
+      const t = String(sub.subscription_tier || '').toUpperCase();
+      if (planBreakdown[t] !== undefined) {
+        planBreakdown[t]++;
+      } else if (t === 'PRO') {
+        planBreakdown.MONTHLY++;
+      } else if (t === 'FEATURE' || t === 'VIP' || t === 'ELITE') {
+        planBreakdown.HIGHEST++;
+      }
+    }
+
+    res.json({
+      success: true,
+      payments,
+      activeSubscribers,
+      summary: {
+        totalSuccess,
+        totalFailed,
+        totalCancelled,
+        totalInitiated,
+        totalRevenue,
+        activeSubscribersCount: activeSubscribers.length,
+        planBreakdown
+      }
+    });
+  } catch (err) {
+    console.error('[SUBSCRIPTIONS ADMIN] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -67,12 +67,34 @@ export default function PricingView({ setActiveTab }) {
         monthly: '#3B82F6'
       };
 
+      let paymentCompleted = false;
+      const reportPaymentStatus = async (status, reason, paymentId = null) => {
+        try {
+          await fetch(`${API}/api/payment/report-failure`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              razorpay_order_id: orderData.id || null,
+              razorpay_subscription_id: orderData.subscription_id || null,
+              razorpay_payment_id: paymentId,
+              plan,
+              status,
+              failure_reason: reason
+            })
+          });
+        } catch (_) {}
+      };
+
       const options = {
         key: orderData.key_id,
         name: 'SkandX',
         description: `Subscribe to ${planTitle}`,
         image: 'https://skandx.in/skandx-playstore-icon.png',
         handler: async function (response) {
+          paymentCompleted = true;
           try {
             const verifyPayload = {
               razorpay_payment_id: response.razorpay_payment_id,
@@ -105,6 +127,13 @@ export default function PricingView({ setActiveTab }) {
             alert('Error verifying payment: ' + err.message);
           }
         },
+        modal: {
+          ondismiss: function () {
+            if (!paymentCompleted) {
+              reportPaymentStatus('CANCELLED', 'User closed Razorpay checkout window before completing payment');
+            }
+          }
+        },
         prefill: {
           name: user?.name || user?.username || '',
           email: user?.email || '',
@@ -124,7 +153,15 @@ export default function PricingView({ setActiveTab }) {
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
-        alert(response.error?.description || 'Payment cancelled or failed');
+        const errObj = response?.error || {};
+        const reasonParts = [
+          errObj.description,
+          errObj.reason ? `Reason: ${errObj.reason}` : null,
+          errObj.step ? `Step: ${errObj.step}` : null
+        ].filter(Boolean);
+        const failMsg = reasonParts.join(' | ') || 'Payment failed at gateway';
+        reportPaymentStatus('FAILED', failMsg, errObj.metadata?.payment_id || null);
+        alert(errObj.description || 'Payment cancelled or failed');
       });
       rzp.open();
     } catch (err) {

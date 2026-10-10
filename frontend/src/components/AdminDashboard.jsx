@@ -2407,6 +2407,8 @@ export default function AdminDashboard() {
         await fetchAdminContests?.();
       } else if (activeTab === 'deletions') {
         await fetchDataRightsRequests();
+      } else if (activeTab === 'subscriptions') {
+        await fetchAdminSubscriptions();
       } else if (activeTab === 'ads') {
         await fetchAdminAdConfig();
       } else if (activeTab === 'razorpay') {
@@ -2427,6 +2429,137 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- Subscriptions & Payment Logs Admin State ---
+  const [subscriptionPayments, setSubscriptionPayments] = useState([]);
+  const [activeSubscribersList, setActiveSubscribersList] = useState([]);
+  const [subscriptionSummary, setSubscriptionSummary] = useState({
+    totalSuccess: 0,
+    totalFailed: 0,
+    totalCancelled: 0,
+    totalInitiated: 0,
+    totalRevenue: 0,
+    activeSubscribersCount: 0,
+    planBreakdown: { MONTHLY: 0, YEARLY: 0, HIGHEST: 0, MASTERCLASS: 0, LIFETIME: 0 }
+  });
+  const [subStatusFilter, setSubStatusFilter] = useState('ALL'); // 'ALL' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'INITIATED' | 'ACTIVE_SUBSCRIBERS'
+  const [subPlanFilter, setSubPlanFilter] = useState('ALL'); // 'ALL' | 'MONTHLY' | 'YEARLY' | 'HIGHEST' | 'MASTERCLASS' | 'LIFETIME'
+  const [subSearch, setSubSearch] = useState('');
+  const [subDatePreset, setSubDatePreset] = useState('all');
+  const [subCustomStart, setSubCustomStart] = useState('');
+  const [subCustomEnd, setSubCustomEnd] = useState('');
+  const [subSyncing, setSubSyncing] = useState(false);
+
+  const fetchAdminSubscriptions = async (syncRazorpay = false) => {
+    if (syncRazorpay) setSubSyncing(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const { startDate, endDate } = calculateDateBounds(subDatePreset, subCustomStart, subCustomEnd);
+      const params = new URLSearchParams();
+      if (syncRazorpay) params.set('syncRazorpay', 'true');
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      const res = await fetch(`${API_URL}/api/admin/subscriptions?${params.toString()}`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setSubscriptionPayments(data.payments || []);
+        setActiveSubscribersList(data.activeSubscribers || []);
+        if (data.summary) setSubscriptionSummary(data.summary);
+      }
+    } catch (err) {
+      console.error('Failed to fetch admin subscriptions:', err);
+    } finally {
+      if (syncRazorpay) setSubSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminSubscriptions(false);
+  }, []);
+
+  const filteredSubscriptionRows = useMemo(() => {
+    let list = subStatusFilter === 'ACTIVE_SUBSCRIBERS'
+      ? (activeSubscribersList || []).map(u => ({
+          id: `user_${u.id}`,
+          user_id: u.id,
+          username: u.username,
+          email: u.email,
+          phone: u.phone,
+          client_id: u.client_id,
+          plan: String(u.subscription_tier || 'MONTHLY').toUpperCase(),
+          amount: u.subscription_tier === 'LIFETIME' ? 24999 : u.subscription_tier === 'MASTERCLASS' ? 9999 : ['HIGHEST', 'FEATURE', 'VIP', 'ELITE'].includes(String(u.subscription_tier).toUpperCase()) ? 2999 : u.subscription_tier === 'YEARLY' ? 1999 : 199,
+          payment_type: 'ACTIVE_SUBSCRIPTION',
+          status: 'SUCCESS',
+          current_user_tier: u.subscription_tier,
+          current_user_expires: u.subscription_expires,
+          expires_at: u.subscription_expires,
+          failure_reason: 'Currently Active Subscriber',
+          created_at: u.updated_at || u.created_at
+        }))
+      : (subscriptionPayments || []);
+
+    if (subStatusFilter !== 'ALL' && subStatusFilter !== 'ACTIVE_SUBSCRIBERS') {
+      list = list.filter(item => String(item.status || '').toUpperCase() === subStatusFilter);
+    }
+
+    if (subPlanFilter !== 'ALL') {
+      list = list.filter(item => {
+        const p = String(item.plan || '').toUpperCase();
+        if (subPlanFilter === 'MONTHLY') return p === 'MONTHLY' || p === 'PRO';
+        if (subPlanFilter === 'HIGHEST') return ['HIGHEST', 'FEATURE', 'VIP', 'ELITE'].includes(p);
+        return p === subPlanFilter;
+      });
+    }
+
+    if (subSearch.trim()) {
+      const q = subSearch.toLowerCase().trim();
+      list = list.filter(item =>
+        (item.username && item.username.toLowerCase().includes(q)) ||
+        (item.client_id && item.client_id.toLowerCase().includes(q)) ||
+        (item.email && item.email.toLowerCase().includes(q)) ||
+        (item.phone && String(item.phone).toLowerCase().includes(q)) ||
+        (item.plan && item.plan.toLowerCase().includes(q)) ||
+        (item.status && item.status.toLowerCase().includes(q)) ||
+        (item.razorpay_payment_id && item.razorpay_payment_id.toLowerCase().includes(q)) ||
+        (item.razorpay_order_id && item.razorpay_order_id.toLowerCase().includes(q)) ||
+        (item.razorpay_subscription_id && item.razorpay_subscription_id.toLowerCase().includes(q)) ||
+        (item.failure_reason && item.failure_reason.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [subscriptionPayments, activeSubscribersList, subStatusFilter, subPlanFilter, subSearch]);
+
+  const handleExportSubscriptions = async (format) => {
+    setExporting(true);
+    try {
+      const cols = [
+        { header: 'Date & Time', key: 'created_at', formatter: val => val ? new Date(val).toLocaleString('en-IN') : '-' },
+        { header: 'Client ID', key: 'client_id', formatter: val => val || '-' },
+        { header: 'Username', key: 'username', formatter: val => val || '-' },
+        { header: 'Email', key: 'email', formatter: val => val || '-' },
+        { header: 'Phone', key: 'phone', formatter: val => val || '-' },
+        { header: 'Plan', key: 'plan', formatter: val => val || '-' },
+        { header: 'Amount (INR)', key: 'amount', formatter: val => `₹${Number(val || 0).toLocaleString('en-IN')}` },
+        { header: 'Payment Type', key: 'payment_type', formatter: val => val || '-' },
+        { header: 'Status', key: 'status', formatter: val => val || '-' },
+        { header: 'Payment / Order ID', key: 'razorpay_payment_id', formatter: (val, row) => val || row.razorpay_subscription_id || row.razorpay_order_id || '-' },
+        { header: 'Details / Failure Reason', key: 'failure_reason', formatter: val => val || '-' },
+        { header: 'Plan Expiry', key: 'expires_at', formatter: (val, row) => (val || row.current_user_expires) ? new Date(val || row.current_user_expires).toLocaleDateString('en-IN') : '-' }
+      ];
+      const subtitle = `Status: ${subStatusFilter} | Plan: ${subPlanFilter}${subSearch ? ` | Search: "${subSearch}"` : ''}`;
+      if (format === 'excel') {
+        exportToExcel(filteredSubscriptionRows, cols, `SkandX_Subscriptions_${subStatusFilter}`);
+      } else {
+        exportToPDF(filteredSubscriptionRows, cols, 'SkandX Subscriptions & Payment Report', subtitle);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [
@@ -2436,7 +2569,8 @@ export default function AdminDashboard() {
     positionsPage, debouncedPositionSearch, positionsDatePreset, positionsCustomStart, positionsCustomEnd,
     ledgerPage, debouncedLedgerSearch, ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd,
     depositsPage, debouncedDepositSearch, depositsDatePreset, depositsCustomStart, depositsCustomEnd,
-    withdrawalsPage, debouncedWithdrawalSearch, withdrawalsDatePreset, withdrawalsCustomStart, withdrawalsCustomEnd
+    withdrawalsPage, debouncedWithdrawalSearch, withdrawalsDatePreset, withdrawalsCustomStart, withdrawalsCustomEnd,
+    subDatePreset, subCustomStart, subCustomEnd
   ]);
 
   // --- Export Handlers ---
@@ -3245,6 +3379,22 @@ export default function AdminDashboard() {
           Client Management
         </button>
         <button 
+          onClick={() => { setActiveTab('subscriptions'); fetchAdminSubscriptions(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'subscriptions' ? '2px solid #10b981' : '2px solid transparent', color: activeTab === 'subscriptions' ? '#34d399' : 'var(--text-secondary)', fontWeight: activeTab === 'subscriptions' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+        >
+          👑 Subscriptions
+          {subscriptionSummary.activeSubscribersCount > 0 && (
+            <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '999px', padding: '1px 6px', fontSize: '10px', fontWeight: '800', lineHeight: '1.3' }}>
+              {subscriptionSummary.activeSubscribersCount}
+            </span>
+          )}
+          {subscriptionSummary.totalFailed > 0 && (
+            <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '999px', padding: '1px 6px', fontSize: '10px', fontWeight: '800', lineHeight: '1.3' }} title="Failed Payment Attempts">
+              {subscriptionSummary.totalFailed} Failed
+            </span>
+          )}
+        </button>
+        <button 
           onClick={() => { setActiveTab('deletions'); fetchDataRightsRequests(); }} 
           style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'deletions' ? '2px solid #ef4444' : '2px solid transparent', color: activeTab === 'deletions' ? '#f87171' : (dataRightsPendingCount > 0 ? '#fca5a5' : 'var(--text-secondary)'), fontWeight: (activeTab === 'deletions' || dataRightsPendingCount > 0) ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
         >
@@ -3327,6 +3477,362 @@ export default function AdminDashboard() {
       <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>Loading platform data...</div>
+        ) : activeTab === 'subscriptions' ? (
+          <div style={{ padding: isMobile ? '12px' : '18px 22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Top Banner */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '12px',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              borderRadius: '10px',
+              padding: '14px 18px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CreditCard size={18} color="#10b981" />
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                    Subscriptions & Payment Activity
+                  </h3>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  See who subscribed to which plan, whether the payment succeeded or failed, failure reasons, and active plan expiries.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => fetchAdminSubscriptions(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <RefreshCw size={13} /> Refresh
+                </button>
+                <button
+                  onClick={() => fetchAdminSubscriptions(true)}
+                  disabled={subSyncing}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    border: 'none',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    cursor: subSyncing ? 'not-allowed' : 'pointer',
+                    opacity: subSyncing ? 0.7 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Zap size={13} /> {subSyncing ? 'Syncing Razorpay...' : 'Sync from Razorpay'}
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px' }}>
+              <div
+                onClick={() => setSubStatusFilter('ACTIVE_SUBSCRIBERS')}
+                style={{ background: 'rgba(16, 185, 129, 0.07)', border: subStatusFilter === 'ACTIVE_SUBSCRIBERS' ? '1.5px solid #10b981' : '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#34d399', fontWeight: '700', textTransform: 'uppercase' }}>👑 Active Subscribers</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{subscriptionSummary.activeSubscribersCount || 0}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  M:{subscriptionSummary.planBreakdown?.MONTHLY || 0} • Y:{subscriptionSummary.planBreakdown?.YEARLY || 0} • VIP:{subscriptionSummary.planBreakdown?.HIGHEST || 0} • MC:{subscriptionSummary.planBreakdown?.MASTERCLASS || 0} • LT:{subscriptionSummary.planBreakdown?.LIFETIME || 0}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubStatusFilter('SUCCESS')}
+                style={{ background: 'rgba(34, 197, 94, 0.07)', border: subStatusFilter === 'SUCCESS' ? '1.5px solid #22c55e' : '1px solid rgba(34, 197, 94, 0.25)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#4ade80', fontWeight: '700', textTransform: 'uppercase' }}>✅ Successful Payments</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#4ade80', marginTop: '4px' }}>{subscriptionSummary.totalSuccess || 0}</div>
+                <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: '600' }}>
+                  Revenue: ₹{Number(subscriptionSummary.totalRevenue || 0).toLocaleString('en-IN')}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubStatusFilter('FAILED')}
+                style={{ background: 'rgba(239, 68, 68, 0.08)', border: subStatusFilter === 'FAILED' ? '1.5px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.28)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#f87171', fontWeight: '700', textTransform: 'uppercase' }}>❌ Failed Payments</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#f87171', marginTop: '4px' }}>{subscriptionSummary.totalFailed || 0}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Bank / UPI declined or error
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubStatusFilter('CANCELLED')}
+                style={{ background: 'rgba(245, 158, 11, 0.08)', border: subStatusFilter === 'CANCELLED' ? '1.5px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.28)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#fbbf24', fontWeight: '700', textTransform: 'uppercase' }}>⚠️ Cancelled Checkout</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>{subscriptionSummary.totalCancelled || 0}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Closed modal before paying
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubStatusFilter('INITIATED')}
+                style={{ background: 'rgba(59, 130, 246, 0.08)', border: subStatusFilter === 'INITIATED' ? '1.5px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.28)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#60a5fa', fontWeight: '700', textTransform: 'uppercase' }}>⏳ Initiated / Pending</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#60a5fa', marginTop: '4px' }}>{subscriptionSummary.totalInitiated || 0}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Checkout opened / awaiting status
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Pills + Plan Select + Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'ALL', label: `All Logs (${subscriptionPayments.length})` },
+                  { id: 'SUCCESS', label: `✅ Successful (${subscriptionSummary.totalSuccess || 0})` },
+                  { id: 'FAILED', label: `❌ Failed (${subscriptionSummary.totalFailed || 0})` },
+                  { id: 'CANCELLED', label: `⚠️ Cancelled (${subscriptionSummary.totalCancelled || 0})` },
+                  { id: 'INITIATED', label: `⏳ Initiated (${subscriptionSummary.totalInitiated || 0})` },
+                  { id: 'ACTIVE_SUBSCRIBERS', label: `👑 Active Subscribers (${activeSubscribersList.length})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSubStatusFilter(tab.id)}
+                    style={{
+                      background: subStatusFilter === tab.id ? 'var(--color-blue)' : 'rgba(255,255,255,0.04)',
+                      color: subStatusFilter === tab.id ? '#fff' : 'var(--text-secondary)',
+                      border: subStatusFilter === tab.id ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '5px 10px',
+                      fontSize: '11px',
+                      fontWeight: subStatusFilter === tab.id ? '700' : '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={subPlanFilter}
+                  onChange={e => setSubPlanFilter(e.target.value)}
+                  style={{
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    fontSize: '11.5px'
+                  }}
+                >
+                  <option value="ALL">All Plans</option>
+                  <option value="MONTHLY">Pro Monthly (₹199)</option>
+                  <option value="YEARLY">Yearly Elite (₹1,999)</option>
+                  <option value="HIGHEST">VIP Highest (₹2,999)</option>
+                  <option value="MASTERCLASS">Masterclass (₹9,999)</option>
+                  <option value="LIFETIME">Lifetime Elite (₹24,999)</option>
+                </select>
+
+                <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '260px' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search client, email, phone, plan, payment ID..."
+                    value={subSearch}
+                    onChange={e => setSubSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '5px 26px 5px 28px',
+                      fontSize: '11.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {subSearch && (
+                    <button
+                      onClick={() => setSubSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DateRangeExportBar
+              datePreset={subDatePreset}
+              setDatePreset={setSubDatePreset}
+              customStart={subCustomStart}
+              setCustomStart={setSubCustomStart}
+              customEnd={subCustomEnd}
+              setCustomEnd={setSubCustomEnd}
+              onExportExcel={() => handleExportSubscriptions('excel')}
+              onExportPDF={() => handleExportSubscriptions('pdf')}
+              exporting={exporting}
+            />
+
+            {/* Subscriptions Table */}
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '9px 12px' }}>Date & Time</th>
+                    <th style={{ padding: '9px 12px' }}>Client Details</th>
+                    <th style={{ padding: '9px 12px' }}>Plan Taken</th>
+                    <th style={{ padding: '9px 12px' }}>Amount</th>
+                    <th style={{ padding: '9px 12px' }}>Status</th>
+                    <th style={{ padding: '9px 12px' }}>Payment Reference / Failure Reason</th>
+                    <th style={{ padding: '9px 12px' }}>Plan Expiry</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSubscriptionRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ padding: '28px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No subscription records match your current filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSubscriptionRows.map(row => {
+                      const st = String(row.status || 'INITIATED').toUpperCase();
+                      const planUpper = String(row.plan || 'MONTHLY').toUpperCase();
+                      const planColor =
+                        planUpper === 'LIFETIME' ? '#f43f5e' :
+                        planUpper === 'MASTERCLASS' ? '#14b8a6' :
+                        ['HIGHEST', 'FEATURE', 'VIP', 'ELITE'].includes(planUpper) ? '#a855f7' :
+                        planUpper === 'YEARLY' ? '#f59e0b' : '#3b82f6';
+                      const statusBg =
+                        st === 'SUCCESS' ? 'rgba(34, 197, 94, 0.15)' :
+                        st === 'FAILED' ? 'rgba(239, 68, 68, 0.15)' :
+                        st === 'CANCELLED' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+                      const statusColor =
+                        st === 'SUCCESS' ? '#4ade80' :
+                        st === 'FAILED' ? '#f87171' :
+                        st === 'CANCELLED' ? '#fbbf24' : '#60a5fa';
+                      const expiryDate = row.expires_at || row.current_user_expires;
+                      const isExpiredNow = expiryDate && new Date(expiryDate).getTime() <= Date.now();
+
+                      return (
+                        <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                            {row.created_at ? new Date(row.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
+                          <td style={{ padding: '9px 12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                              <span>{row.username || 'Unknown User'}</span>
+                              {row.client_id && (
+                                <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '1px 5px', borderRadius: '4px' }}>
+                                  {row.client_id}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {row.email || '—'} {row.phone ? `• ${row.phone}` : ''}
+                            </div>
+                          </td>
+                          <td style={{ padding: '9px 12px' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              background: `${planColor}22`,
+                              color: planColor,
+                              border: `1px solid ${planColor}55`,
+                              borderRadius: '5px',
+                              padding: '2px 7px',
+                              fontSize: '10.5px',
+                              fontWeight: '800'
+                            }}>
+                              {planUpper}
+                            </span>
+                            <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                              {row.payment_type === 'AUTOPAY' ? '🔄 AutoPay Mandate' : row.payment_type === 'ADMIN_GRANT' ? '🛡️ Admin Assigned' : row.payment_type === 'ACTIVE_SUBSCRIPTION' ? '👑 Active Profile Plan' : '💳 One-Time Order'}
+                            </div>
+                          </td>
+                          <td style={{ padding: '9px 12px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            {row.payment_type === 'ADMIN_GRANT' ? '₹0 (Admin)' : `₹${Number(row.amount || 0).toLocaleString('en-IN')}`}
+                          </td>
+                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: statusBg,
+                              color: statusColor,
+                              border: `1px solid ${statusColor}44`,
+                              borderRadius: '999px',
+                              padding: '2px 8px',
+                              fontSize: '10.5px',
+                              fontWeight: '800'
+                            }}>
+                              {st === 'SUCCESS' ? '✅ SUCCESS' : st === 'FAILED' ? '❌ FAILED' : st === 'CANCELLED' ? '⚠️ CANCELLED' : '⏳ INITIATED'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '9px 12px', maxWidth: '300px' }}>
+                            {(row.razorpay_payment_id || row.razorpay_subscription_id || row.razorpay_order_id) && (
+                              <div style={{ fontFamily: 'monospace', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                                {row.razorpay_payment_id && <div>Pay ID: <strong style={{ color: 'var(--text-primary)' }}>{row.razorpay_payment_id}</strong></div>}
+                                {row.razorpay_subscription_id && <div>Sub ID: {row.razorpay_subscription_id}</div>}
+                                {row.razorpay_order_id && <div>Ord ID: {row.razorpay_order_id}</div>}
+                              </div>
+                            )}
+                            {row.failure_reason && (
+                              <div style={{
+                                marginTop: '3px',
+                                fontSize: '10.5px',
+                                color: st === 'FAILED' ? '#f87171' : st === 'CANCELLED' ? '#fbbf24' : 'var(--text-secondary)',
+                                fontWeight: (st === 'FAILED' || st === 'CANCELLED') ? '600' : '400'
+                              }}>
+                                {row.failure_reason}
+                              </div>
+                            )}
+                            {!row.razorpay_payment_id && !row.razorpay_subscription_id && !row.razorpay_order_id && !row.failure_reason && '—'}
+                          </td>
+                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                            {planUpper === 'LIFETIME' && st === 'SUCCESS' ? (
+                              <span style={{ color: '#f43f5e', fontWeight: '700', fontSize: '11px' }}>♾️ Lifetime (Never)</span>
+                            ) : expiryDate ? (
+                              <div>
+                                <div style={{ color: isExpiredNow ? '#f87171' : '#4ade80', fontWeight: '600' }}>
+                                  {new Date(expiryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </div>
+                                <div style={{ fontSize: '9.5px', color: isExpiredNow ? '#f87171' : 'var(--text-secondary)' }}>
+                                  {isExpiredNow ? 'Expired' : 'Active'}
+                                </div>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : activeTab === 'deletions' ? (
           <div style={{ padding: isMobile ? '12px' : '18px 22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Top Summary & Filter Bar */}

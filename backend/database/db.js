@@ -1224,6 +1224,31 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_data_rights_requests_email ON data_rights_requests(email)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_data_rights_requests_status ON data_rights_requests(status)').catch(() => {});
 
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS subscription_payments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        username VARCHAR(255),
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        client_id VARCHAR(50),
+        plan VARCHAR(100) NOT NULL,
+        amount DECIMAL(14, 2) NOT NULL DEFAULT 0,
+        payment_type VARCHAR(50) NOT NULL DEFAULT 'ONE_TIME',
+        status VARCHAR(50) NOT NULL DEFAULT 'INITIATED',
+        razorpay_order_id VARCHAR(255),
+        razorpay_subscription_id VARCHAR(255),
+        razorpay_payment_id VARCHAR(255),
+        failure_reason TEXT,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sub_payments_user_id ON subscription_payments(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sub_payments_status ON subscription_payments(status)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sub_payments_created_at ON subscription_payments(created_at DESC)').catch(() => {});
+
     // High-Performance Query Indexes to eliminate full table scans & slash CPU/RAM
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
@@ -1235,7 +1260,7 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_created_at ON ledger(created_at)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_created ON ledger(user_id, created_at DESC, id DESC)');
 
-    console.log('✅ Critical columns, high-performance indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
+    console.log('✅ Critical columns, high-performance indexes, system_settings, contests, user_sessions, market_calendar, subscription_payments, and journal tables verified on tables');
     
     // Initialize enterprise monthly table partitioning (orders_archive & ledger_archive)
     await ensureMonthlyPartitions();
