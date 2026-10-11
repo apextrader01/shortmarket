@@ -2581,7 +2581,7 @@ app.get('/api/auth/google/redirect', (req, res) => {
 
 // ─── Google OAuth Sign-In / Sign-Up ──────────────────────────────────────────
 app.post('/api/auth/google-login', authLimiter, async (req, res) => {
-  const { idToken, phone, username: requestedUsername, consent_terms, consent_data_processing, consent_marketing, referral_code } = req.body || {};
+  const { idToken, phone, username: requestedUsername, consent_terms, consent_data_processing, consent_marketing, consents, referral_code } = req.body || {};
   if (!idToken) return res.status(400).json({ error: 'Google ID token is required' });
 
   try {
@@ -2665,7 +2665,10 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       }
 
       // Enforce mandatory DPDP consents
-      if (consent_terms !== true || consent_data_processing !== true) {
+      const hasTermsConsent = consent_terms === true || Boolean(consents && consents.terms_and_privacy);
+      const hasDataConsent = consent_data_processing === true || Boolean(consents && consents.data_processing);
+      const hasMarketingConsent = Boolean(consent_marketing || (consents && consents.marketing_communications));
+      if (!hasTermsConsent || !hasDataConsent) {
         return res.status(400).json({ error: 'You must accept the mandatory Terms of Service and Core Data Processing consents to create an account.' });
       }
 
@@ -2706,9 +2709,9 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       // Record DPDP Consents in batch
       try {
         const consentsToRecord = [
-          { type: 'TERMS_AND_PRIVACY', granted: !!consent_terms },
-          { type: 'DATA_PROCESSING_CORE', granted: !!consent_data_processing },
-          { type: 'MARKETING_PROMOTIONS', granted: !!consent_marketing }
+          { type: 'TERMS_AND_PRIVACY', granted: hasTermsConsent },
+          { type: 'DATA_PROCESSING_CORE', granted: hasDataConsent },
+          { type: 'MARKETING_PROMOTIONS', granted: hasMarketingConsent }
         ];
         const consentRows = consentsToRecord
           .filter(item => item.granted)
@@ -2778,6 +2781,13 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
           return res.status(400).json({ error: 'An account with this phone number already exists.' });
         }
 
+        const hasTermsConsent = consent_terms === true || Boolean(consents && consents.terms_and_privacy);
+        const hasDataConsent = consent_data_processing === true || Boolean(consents && consents.data_processing);
+        const hasMarketingConsent = Boolean(consent_marketing || (consents && consents.marketing_communications));
+        if (!hasTermsConsent || !hasDataConsent) {
+          return res.status(400).json({ error: 'You must accept the mandatory Terms of Service and Core Data Processing consents to continue.' });
+        }
+
         const updatePayload = { phone: cleanPhone };
         const cleanUsername = String(requestedUsername || user.username || '').replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
         const letterCount = cleanUsername.replace(/[^A-Za-z]/g, '').length;
@@ -2798,30 +2808,42 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         await db('users').where({ id: user.id }).update(updatePayload).catch(() => {});
         user.phone = cleanPhone;
 
-        // Record DPDP Consents if provided during profile completion
-        if (consents && typeof consents === 'object') {
-          try {
-            const consentTypes = ['terms_and_privacy', 'data_processing', 'marketing_communications'];
-            for (const cType of consentTypes) {
-              if (consents[cType] !== undefined) {
-                await db('user_consents').insert({
-                  user_id: user.id,
-                  consent_type: cType,
-                  consented: Boolean(consents[cType]),
-                  consent_version: 'v2026.1',
-                  ip_address: clientIp,
-                  user_agent: req.headers['user-agent'] || ''
-                }).catch(() => {});
-              }
-            }
-          } catch (cErr) {}
-        }
+        // Record DPDP Consents during profile completion
+        try {
+          const consentsToRecord = [
+            { type: 'TERMS_AND_PRIVACY', granted: hasTermsConsent },
+            { type: 'DATA_PROCESSING_CORE', granted: hasDataConsent },
+            { type: 'MARKETING_PROMOTIONS', granted: hasMarketingConsent }
+          ];
+          const consentRows = consentsToRecord
+            .filter(item => item.granted)
+            .map(item => ({
+              user_id: user.id,
+              email,
+              consent_type: item.type,
+              status: 'GRANTED',
+              consent_version: 'v2026.1',
+              ip_address: clientIp,
+              user_agent: req.headers['user-agent'] || ''
+            }));
+          if (consentRows.length > 0) {
+            await db('user_consents').insert(consentRows).catch(() => {});
+          }
+        } catch (cErr) {}
       }
     }
 
     if (user.is_banned) {
       return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
     }
+
+    // Ensure Firebase Auth user exists and is marked emailVerified: true since Google verified the email
+    try {
+      const { ensureFirebaseUser } = require('./services/firebaseAuth');
+      if (typeof ensureFirebaseUser === 'function') {
+        ensureFirebaseUser(email, user.phone || null, null, { markEmailVerified: true }).catch(() => {});
+      }
+    } catch (_) {}
 
     // Standardize any legacy random SKX... or missing client_id to sequential SE00000... format
     let clientId = user.client_id;
@@ -3324,6 +3346,9 @@ async function getRazorpayClient() {
 
 function resolvePlanMeta(plan) {
   const p = String(plan || 'monthly').toLowerCase().trim();
+  if (p === 'basic' || p === 'free' || p === 'normal') {
+    return { tier: 'BASIC', amountInr: 0, label: 'Basic Free Tier (₹0)' };
+  }
   if (p === 'lifetime' || p === 'elite_lifetime') {
     return { tier: 'LIFETIME', amountInr: 24999, label: 'Lifetime Elite (₹24,999)' };
   }
