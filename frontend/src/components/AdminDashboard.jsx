@@ -2464,7 +2464,18 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data && data.success) {
-        setSubscriptionPayments(data.payments || []);
+        const paperValidAmounts = [0, 199, 1999, 2999, 9999, 24999];
+        const algoPlans = ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'];
+        const cleanPaperPayments = (data.payments || []).filter(item => {
+          const p = String(item.plan || '').toUpperCase().trim();
+          const reason = String(item.failure_reason || '').toLowerCase();
+          const amt = Math.round(Number(item.amount || 0));
+          if (p.startsWith('ALGO_') || algoPlans.includes(p)) return false;
+          if (reason.includes('algo') || reason.includes('static ip') || reason.includes('demat slot')) return false;
+          if (!paperValidAmounts.includes(amt)) return false;
+          return true;
+        });
+        setSubscriptionPayments(cleanPaperPayments);
         setActiveSubscribersList(data.activeSubscribers || []);
         if (data.summary) setSubscriptionSummary(data.summary);
       }
@@ -2499,6 +2510,15 @@ export default function AdminDashboard() {
           created_at: u.updated_at || u.created_at
         }))
       : (subscriptionPayments || []);
+
+    // Strict client-side guard: never show SkandX Algo rows in Paper Trade Admin
+    list = list.filter(item => {
+      const p = String(item.plan || '').toUpperCase().trim();
+      if (p.startsWith('ALGO_') || ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'].includes(p)) {
+        return false;
+      }
+      return true;
+    });
 
     if (subStatusFilter !== 'ALL' && subStatusFilter !== 'ACTIVE_SUBSCRIBERS') {
       list = list.filter(item => String(item.status || '').toUpperCase() === subStatusFilter);

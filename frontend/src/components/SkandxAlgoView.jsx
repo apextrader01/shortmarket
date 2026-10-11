@@ -686,8 +686,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     if (!selectedStockForOrder) return;
     const chosenDemat = demats.find(d => d.id === orderTargetDemat);
     const payload = {
-      broker: chosenDemat ? chosenDemat.broker : (demats[0]?.broker || 'Paper OMS Simulator'),
-      account: chosenDemat ? chosenDemat.clientCode : (demats[0]?.clientCode || 'PAPER-SIM'),
+      broker: chosenDemat ? chosenDemat.broker : (demats[0]?.broker || 'SkandX Algo Simulator'),
+      account: chosenDemat ? chosenDemat.clientCode : (demats[0]?.clientCode || 'ALGO-SIM'),
       symbol: selectedStockForOrder.symbol,
       side: orderSide,
       qty: Number(orderQty) || 50,
@@ -1239,29 +1239,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </div>
           )}
 
-          {/* Open Paper Trading Terminal Button */}
-          {onOpenPaperTrading && (
-            <button
-              onClick={onOpenPaperTrading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                border: '1px solid rgba(56, 189, 248, 0.45)',
-                color: '#fff',
-                padding: isMobile ? '5px 9px' : '6px 12px',
-                borderRadius: '6px',
-                fontSize: isMobile ? '11px' : '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Zap size={12} /> {isMobile ? 'Terminal' : 'Paper Terminal'}
-            </button>
-          )}
-
           {/* Exit / Back to Home Button (Desktop) */}
           {!isMobile && onBack && (
             <button
@@ -1786,7 +1763,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         No Personal Demat Account Connected Yet
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        Connect Zerodha Kite, Angel One, Upstox, Dhan, or Fyers to route live automated orders, or run strategies in Paper Mode.
+                        Connect Zerodha Kite, Angel One, Upstox, Dhan, or Fyers to route live automated orders, or test strategies in Sandbox Mode.
                       </div>
                     </div>
                   </div>
@@ -2832,7 +2809,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       {watchlist.filter(w => (w.mode || 'LIVE') === 'LIVE').length} LIVE
                     </span>
                     <span style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
-                      {watchlist.filter(w => w.mode === 'PAPER').length} PAPER
+                      {watchlist.filter(w => w.mode === 'PAPER' || w.mode === 'SANDBOX').length} SANDBOX
                     </span>
                   </div>
                 </div>
@@ -2877,7 +2854,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 color: isLive ? '#22c55e' : '#38bdf8',
                                 border: `1px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`
                               }}>
-                                {isLive ? '● LIVE' : '○ PAPER'}
+                                {isLive ? '● LIVE' : '○ SANDBOX'}
                               </span>
                             </div>
                             <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3523,17 +3500,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Plan 1: Starter Free */}
                 <div style={{ background: '#101726', border: config.activePlan === 'STARTER' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.5px' }}>STARTER</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Paper & Basic Algo</h3>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Starter Basic Algo</h3>
                   <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
                     ₹0 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
-                    Perfect for testing strategies, backtesting signals, and paper trading risk-free.
+                    Perfect for testing automated strategies, backtesting signals, and routing single-demat signals.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> 1 Connected Demat Account</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Paper Trading Simulation OMS</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Sandbox Strategy Testing OMS</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> TradingView & Chartink Webhook Bridge</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Standard 150ms execution router</div>
                   </div>
@@ -5257,7 +5234,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   onChange={e => setOrderTargetDemat(e.target.value)}
                   style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
                 >
-                  <option value="ALL">ALL CONNECTED DEMATS / PAPER OMS</option>
+                  <option value="ALL">ALL CONNECTED DEMATS (MULTI-ACCOUNT OMS)</option>
                   {demats.map(d => (
                     <option key={d.id} value={d.id}>{d.broker} ({d.clientCode})</option>
                   ))}

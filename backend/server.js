@@ -5717,11 +5717,29 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
 
               const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
               const amountInr = Math.round((Number(p.amount) || 0) / 100);
+              const noteItemType = String(p.notes?.item_type || '').toUpperCase();
+              const descLower = String(p.description || p.notes?.title || '').toLowerCase();
+              const isAlgoPayment =
+                Boolean(noteItemType) ||
+                descLower.includes('algo') ||
+                descLower.includes('static ip') ||
+                descLower.includes('demat slot') ||
+                [250, 350, 500, 999, 2499].includes(amountInr) ||
+                ![0, 199, 1999, 2999, 9999, 24999].includes(amountInr);
+
               let inferredPlan = 'MONTHLY';
-              if (amountInr >= 20000) inferredPlan = 'LIFETIME';
-              else if (amountInr >= 8000) inferredPlan = 'MASTERCLASS';
-              else if (amountInr >= 2500) inferredPlan = 'HIGHEST';
-              else if (amountInr >= 1500) inferredPlan = 'YEARLY';
+              if (isAlgoPayment) {
+                if (noteItemType === 'STATIC_IP' || amountInr === 350) inferredPlan = 'ALGO_STATIC_IP';
+                else if (noteItemType === 'LINK_USER' || amountInr === 250) inferredPlan = 'ALGO_LINK_USER';
+                else if (noteItemType === 'PLAN_PRO' || amountInr === 999) inferredPlan = 'ALGO_PRO';
+                else if (noteItemType === 'PLAN_INSTITUTIONAL' || amountInr === 2499) inferredPlan = 'ALGO_INSTITUTIONAL';
+                else inferredPlan = 'ALGO_WALLET';
+              } else {
+                if (amountInr >= 20000) inferredPlan = 'LIFETIME';
+                else if (amountInr >= 8000) inferredPlan = 'MASTERCLASS';
+                else if (amountInr >= 2500) inferredPlan = 'HIGHEST';
+                else if (amountInr >= 1500) inferredPlan = 'YEARLY';
+              }
 
               const failMsg = p.error_description || p.error_reason || null;
 
@@ -5750,7 +5768,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
                   email: matchedUser?.email || p.email || null,
                   phone: matchedUser?.phone || p.contact || null,
                   client_id: matchedUser?.client_id || null,
-                  plan: p.notes?.plan ? resolvePlanMeta(p.notes.plan).tier : inferredPlan,
+                  plan: isAlgoPayment ? inferredPlan : (p.notes?.plan ? resolvePlanMeta(p.notes.plan).tier : inferredPlan),
                   amount: amountInr,
                   payment_type: p.invoice_id ? 'AUTOPAY' : 'ONE_TIME',
                   status: rzpStatus,
@@ -5769,13 +5787,21 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       }
     }
 
-    // 3. Heal any legacy Algo orders that were logged as MONTHLY before plan separation, then query Paper Trading subscription_payments
+    // 3. Heal any legacy Algo orders that were logged under Paper Trading plans before separation
     try {
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 500 }).update({ plan: 'ALGO_WALLET' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 350 }).update({ plan: 'ALGO_STATIC_IP' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 250 }).update({ plan: 'ALGO_LINK_USER' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 999 }).update({ plan: 'ALGO_PRO' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 2499 }).update({ plan: 'ALGO_INSTITUTIONAL' });
+      await db('subscription_payments').where({ amount: 350 }).whereNot('plan', 'ALGO_STATIC_IP').update({ plan: 'ALGO_STATIC_IP' });
+      await db('subscription_payments').where({ amount: 250 }).whereNot('plan', 'ALGO_LINK_USER').update({ plan: 'ALGO_LINK_USER' });
+      await db('subscription_payments').where({ amount: 999 }).whereNot('plan', 'ALGO_PRO').update({ plan: 'ALGO_PRO' });
+      await db('subscription_payments').where({ amount: 2499 }).whereNot('plan', 'ALGO_INSTITUTIONAL').update({ plan: 'ALGO_INSTITUTIONAL' });
+      await db('subscription_payments').where({ amount: 500 }).whereNot('plan', 'ALGO_WALLET').update({ plan: 'ALGO_WALLET' });
+      await db('subscription_payments')
+        .whereNotIn('amount', [0, 199, 250, 350, 999, 1999, 2499, 2999, 9999, 24999])
+        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
+        .update({ plan: 'ALGO_WALLET' });
+      await db('subscription_payments')
+        .whereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%algo%'")
+        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
+        .update({ plan: 'ALGO_WALLET' });
     } catch (_) {}
 
     const startDate = req.query.startDate;
@@ -5784,7 +5810,9 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
     let query = db('subscription_payments')
       .leftJoin('users', 'subscription_payments.user_id', 'users.id')
       .whereRaw("UPPER(COALESCE(subscription_payments.plan, '')) NOT LIKE 'ALGO_%'")
-      .whereNotIn('subscription_payments.plan', ['STATIC_IP', 'LINK_USER', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE'])
+      .whereNotIn('subscription_payments.plan', ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'])
+      .whereRaw("LOWER(COALESCE(subscription_payments.failure_reason, '')) NOT LIKE '%algo%'")
+      .whereIn('subscription_payments.amount', [0, 199, 1999, 2999, 9999, 24999])
       .select(
         'subscription_payments.*',
         db.raw('COALESCE(users.username, subscription_payments.username) as username'),
@@ -15880,14 +15908,23 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       }
     } catch (_) {}
 
-    // 1b. Heal any legacy Algo orders that were logged with plan='MONTHLY' before plan separation,
+    // 1b. Heal any legacy Algo orders that were logged with non-ALGO plan tags before plan separation,
     // and resolve any INITIATED Algo orders by checking Razorpay or auto-cancelling after 2 minutes.
     try {
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 500 }).update({ plan: 'ALGO_WALLET' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 350 }).update({ plan: 'ALGO_STATIC_IP' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 250 }).update({ plan: 'ALGO_LINK_USER' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 999 }).update({ plan: 'ALGO_PRO' });
-      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 2499 }).update({ plan: 'ALGO_INSTITUTIONAL' });
+      await db('subscription_payments').where({ amount: 500 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_WALLET' });
+      await db('subscription_payments').where({ amount: 350 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_STATIC_IP' });
+      await db('subscription_payments').where({ amount: 250 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_LINK_USER' });
+      await db('subscription_payments').where({ amount: 999 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_PRO' });
+      await db('subscription_payments').where({ amount: 2499 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_INSTITUTIONAL' });
+      await db('subscription_payments')
+        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
+        .andWhere(b => {
+          b.whereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%algo%'")
+            .orWhereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%static ip%'")
+            .orWhereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%wallet%'")
+            .orWhereNotIn('amount', [0, 199, 1999, 2999, 9999, 24999]);
+        })
+        .update({ plan: 'ALGO_WALLET' });
 
       const pendingAlgoRows = await db('subscription_payments')
         .where({ status: 'INITIATED' })
