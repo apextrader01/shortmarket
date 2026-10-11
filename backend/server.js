@@ -620,8 +620,12 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
 // When running in PM2 Cluster Mode, NODE_APP_INSTANCE tells us the worker ID
 const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
+const isStagingInstance = String(process.env.PORT) === '5001' || process.env.NODE_ENV === 'staging' || __dirname.includes('shortmarket-staging');
+// Only Production Master (PORT 5000, instance 0) opens the Fyers WebSocket and runs TOTP login.
+// Staging (PORT 5001) receives live LTP ticks from Production via Redis ('price_cache_batch_sync') so deploy-all.sh never causes a Fyers WebSocket collision.
+const isFyersMaster = isMaster && !isStagingInstance;
 
-const socketKey = process.env.SOCKET_KEY || (process.env.PORT == 5001 ? 'socket.io-staging' : 'socket.io');
+const socketKey = process.env.SOCKET_KEY || (isStagingInstance ? 'socket.io-staging' : 'socket.io');
 
 const io = new Server(server, {
   cors: { origin: true, credentials: true, methods: ['GET', 'POST'] },
@@ -639,6 +643,12 @@ if (globalSubClient) {
     const setupClusterSync = () => {
         globalSubClient.subscribe('fyers_token_updated', () => {
             try {
+                if (isStagingInstance) {
+                    // Staging reloads the new token from disk in-place without restarting or opening a WebSocket
+                    const { initFyers } = require('./services/fyers');
+                    if (initFyers) initFyers(io, priceCache, false);
+                    return;
+                }
                 const { reloadFyersToken } = require('./services/fyers');
                 if (reloadFyersToken) reloadFyersToken();
             } catch(e) {}
@@ -669,9 +679,9 @@ if (globalSubClient) {
     else globalSubClient.on('ready', setupClusterSync);
 }
 
-// Redis Pub/Sub for syncing priceCache across cluster nodes
+// Redis Pub/Sub for syncing priceCache and DB triggers across cluster nodes
 if (isMaster) {
-  // Master node also needs to listen to reload_triggers (when an order is placed via API on Master)
+  // Master node listens to reload_triggers & reload_volume_orders
   const { subClient: cacheSubClient } = require('./services/redisClient');
   const triggerEngine = require('./services/triggerEngine');
   const setupMasterSync = () => {
@@ -689,9 +699,11 @@ if (isMaster) {
   if (cacheSubClient.isReady) setupMasterSync();
   else cacheSubClient.on('ready', setupMasterSync);
 }
-if (!isMaster) {
+if (!isFyersMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
-  const { updateWorkerTickTime } = require('./services/fyers');
+  const { updateWorkerTickTime, isAnyTradingSessionOpen } = require('./services/fyers');
+  const triggerEngine = require('./services/triggerEngine');
+  const volumeMatchingEngine = require('./services/volumeMatchingEngine');
   
   const setupCacheSync = () => {
     cacheSubClient.subscribe('price_cache_batch_sync', (message) => {
@@ -701,7 +713,7 @@ if (!isMaster) {
         if (keys.length > 0 && updateWorkerTickTime) {
           updateWorkerTickTime();
         }
-        // Workers update their local priceCache and emit price_snapshot directly to their local Socket.IO symbol rooms
+        // Workers and Staging update their local priceCache and emit price_snapshot directly to their local Socket.IO symbol rooms
         keys.forEach(symbol => {
           const priceObj = batchUpdate[symbol];
           if (symbol && priceObj) {
@@ -735,21 +747,26 @@ if (!isMaster) {
                 ]
               });
             }
+            // If this is the Staging master process, also evaluate Staging's resting orders/triggers against live ticks
+            if (isStagingInstance && isMaster && Number(priceObj.ltp) > 0 && (!isAnyTradingSessionOpen || isAnyTradingSessionOpen(symbol))) {
+              if (triggerEngine) triggerEngine.evaluateTick(symbol, Number(priceObj.ltp)).catch(() => {});
+              if (volumeMatchingEngine) volumeMatchingEngine.onTick(symbol, priceObj).catch(() => {});
+            }
           }
         });
       } catch(e){}
     }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
     
-    // Subscribe to trigger reloads
-    cacheSubClient.subscribe('reload_triggers', () => {
-        const triggerEngine = require('./services/triggerEngine');
-        triggerEngine.loadPendingOrders();
-    }).catch(err => console.error(err));
+    if (!isMaster) {
+      // Production Workers also subscribe to trigger reloads
+      cacheSubClient.subscribe('reload_triggers', () => {
+          triggerEngine.loadPendingOrders();
+      }).catch(err => console.error(err));
 
-    cacheSubClient.subscribe('reload_volume_orders', async () => {
-        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
-        await volumeMatchingEngine.loadPendingVolumeOrders();
-    }).catch(err => console.error(err));
+      cacheSubClient.subscribe('reload_volume_orders', async () => {
+          await volumeMatchingEngine.loadPendingVolumeOrders();
+      }).catch(err => console.error(err));
+    }
   };
   
   if (cacheSubClient.isReady) setupCacheSync();
@@ -12029,7 +12046,7 @@ io.on('connection', (socket) => {
     if (Array.isArray(data)) {
         const syms = data.map(sym => typeof sym === 'string' ? sym : sym?.symbol).filter(Boolean);
         emitCachedPricesForNewRooms(syms);
-        if (isMaster) {
+        if (isFyersMaster) {
             const { addSubscriptionBatch } = require('./services/fyers');
             if (addSubscriptionBatch) addSubscriptionBatch(data);
         } else {
@@ -12041,7 +12058,7 @@ io.on('connection', (socket) => {
     } else {
         let symbol = typeof data === 'string' ? data : data?.symbol;
         if (symbol) emitCachedPricesForNewRooms([symbol]);
-        if (isMaster) {
+        if (isFyersMaster) {
             const { addSubscription } = require('./services/fyers');
             if (addSubscription) addSubscription(data, io, priceCache);
         } else {
@@ -12059,7 +12076,7 @@ io.on('connection', (socket) => {
     // Join socket.io rooms for each symbol and push price_init for any newly joined rooms
     emitCachedPricesForNewRooms(symbolsArray);
 
-    if (isMaster) {
+    if (isFyersMaster) {
       const { handlePingSubscriptions } = require('./services/fyers');
       if (handlePingSubscriptions) handlePingSubscriptions(symbolsArray);
     } else {
@@ -15733,38 +15750,39 @@ server.listen(PORT, async () => {
     console.warn('Startup schema check error:', err.message);
   }
 
-  // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
-  await initFyers(io, priceCache, isMaster);
+  // Always initialize Fyers (only Production Master opens the live WebSocket; Staging/Workers share via Redis)
+  await initFyers(io, priceCache, isFyersMaster);
 
     if (isMaster) {
-      console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
+      console.log(`👑 Master Instance (${isFyersMaster ? 'Fyers WebSocket Primary' : 'Staging Read-Replica via Redis'}): Starting background tasks...`);
 
       // Zero Trade Data Deletion: Preserve historical closed positions for tax reports, audit trails, and journals
       console.log('👑 Master Instance: Historical positions preserved for reporting.');
 
-      
-      // Listen for WebSocket subscriptions from Worker nodes
-      const { subClient: cacheSubClient } = require('./services/redisClient');
-      const setupMasterSubscriptions = () => {
-          cacheSubClient.subscribe('fyers_subscribe', (message) => {
-              try {
-                  const symbols = JSON.parse(message);
-                  const { addSubscriptionBatch } = require('./services/fyers');
-                  if (addSubscriptionBatch) addSubscriptionBatch(symbols);
-              } catch(e){}
-          }).catch(console.error);
+      if (isFyersMaster) {
+        // Listen for WebSocket subscriptions from Worker nodes and Staging
+        const { subClient: cacheSubClient } = require('./services/redisClient');
+        const setupMasterSubscriptions = () => {
+            cacheSubClient.subscribe('fyers_subscribe', (message) => {
+                try {
+                    const symbols = JSON.parse(message);
+                    const { addSubscriptionBatch } = require('./services/fyers');
+                    if (addSubscriptionBatch) addSubscriptionBatch(symbols);
+                } catch(e){}
+            }).catch(console.error);
 
-          cacheSubClient.subscribe('fyers_ping', (message) => {
-              try {
-                  const symbols = JSON.parse(message);
-                  const { handlePingSubscriptions } = require('./services/fyers');
-                  if (handlePingSubscriptions) handlePingSubscriptions(symbols);
-              } catch(e){}
-          }).catch(console.error);
-      };
-      
-      if (cacheSubClient.isReady) setupMasterSubscriptions();
-      else cacheSubClient.on('ready', setupMasterSubscriptions);
+            cacheSubClient.subscribe('fyers_ping', (message) => {
+                try {
+                    const symbols = JSON.parse(message);
+                    const { handlePingSubscriptions } = require('./services/fyers');
+                    if (handlePingSubscriptions) handlePingSubscriptions(symbols);
+                } catch(e){}
+            }).catch(console.error);
+        };
+        
+        if (cacheSubClient.isReady) setupMasterSubscriptions();
+        else cacheSubClient.on('ready', setupMasterSubscriptions);
+      }
 
       // --- BOOT & RECURRING SELF-SUBSCRIPTION ---
       const bootSubscribeFromDB = async (includeWatchlists = false) => {
@@ -15847,34 +15865,36 @@ server.listen(PORT, async () => {
     const { initCronJobs } = require('./services/cronJobs');
     const schedule = require('node-schedule');
 
-    // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Mon-Fri & Weekends)
-    const loginRule = new schedule.RecurrenceRule();
-    loginRule.hour = 8;
-    loginRule.minute = 0;
-    loginRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(loginRule, async () => {
-      console.log('⏰ Daily 08:00 AM Cron: Running automated Fyers TOTP Login...');
-      try {
-        const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
-        await performFyersAutoLogin();
-      } catch(e) { console.error('Auto-login cron error:', e); }
-    });
-
-    const loginBackupRule = new schedule.RecurrenceRule();
-    loginBackupRule.hour = 8;
-    loginBackupRule.minute = 30;
-    loginBackupRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(loginBackupRule, async () => {
-      console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
-      try {
-        const { getFyersStatus } = require('./services/fyers');
-        const status = getFyersStatus ? getFyersStatus() : {};
-        if (!status.hasAccessToken || status.tokenExpired) {
+    if (isFyersMaster) {
+      // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Production Master only to prevent TOTP collision with Staging)
+      const loginRule = new schedule.RecurrenceRule();
+      loginRule.hour = 8;
+      loginRule.minute = 0;
+      loginRule.tz = 'Asia/Kolkata';
+      schedule.scheduleJob(loginRule, async () => {
+        console.log('⏰ Daily 08:00 AM Cron: Running automated Fyers TOTP Login...');
+        try {
           const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
           await performFyersAutoLogin();
-        }
-      } catch(e) { console.error('Backup auto-login cron error:', e); }
-    });
+        } catch(e) { console.error('Auto-login cron error:', e); }
+      });
+
+      const loginBackupRule = new schedule.RecurrenceRule();
+      loginBackupRule.hour = 8;
+      loginBackupRule.minute = 30;
+      loginBackupRule.tz = 'Asia/Kolkata';
+      schedule.scheduleJob(loginBackupRule, async () => {
+        console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
+        try {
+          const { getFyersStatus } = require('./services/fyers');
+          const status = getFyersStatus ? getFyersStatus() : {};
+          if (!status.hasAccessToken || status.tokenExpired) {
+            const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+            await performFyersAutoLogin();
+          }
+        } catch(e) { console.error('Backup auto-login cron error:', e); }
+      });
+    }
 
     // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun)
     const optionsMorningRule = new schedule.RecurrenceRule();

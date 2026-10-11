@@ -391,34 +391,51 @@ function isTokenExpired(token) {
     return false;
 }
 
-// On boot, try to load token from disk
+// On boot, try to load token from disk (with read-only fallback to Production token for Staging on the same VM)
 function loadTokenFromDisk() {
     try {
-        const pAppId = path.join(__dirname, '../fyers_appid.txt');
-        if (fs.existsSync(pAppId)) {
-            const appIdFromFile = fs.readFileSync(pAppId, 'utf8');
-            if (appIdFromFile && appIdFromFile.trim().length > 3) {
-                activeAppId = appIdFromFile.trim();
-                fyers.setAppId(activeAppId);
+        const appIdPaths = [
+            path.join(__dirname, '../fyers_appid.txt'),
+            '/home/centralasp123/shortmarket/backend/fyers_appid.txt'
+        ];
+        for (const pAppId of appIdPaths) {
+            if (fs.existsSync(pAppId)) {
+                const appIdFromFile = fs.readFileSync(pAppId, 'utf8');
+                if (appIdFromFile && appIdFromFile.trim().length > 3) {
+                    activeAppId = appIdFromFile.trim();
+                    fyers.setAppId(activeAppId);
+                    break;
+                }
             }
         }
 
-        const p = path.join(__dirname, '../fyers_token.txt');
-        if (fs.existsSync(p)) {
-            const token = fs.readFileSync(p, 'utf8');
-            if (token && token.trim().length > 20) {
-                activeAccessToken = token.trim();
-                fyers.setAccessToken(activeAccessToken);
-                if (isTokenExpired(activeAccessToken)) {
-                    isFyersConnected = false;
-                    lastDataSocketError = 'Token Expired: Daily Fyers token has expired. Please reconnect via Connect Web.';
-                    console.warn("⚠️ Fyers token on disk is EXPIRED. Please connect via Admin Dashboard.");
-                    return false;
+        const tokenPaths = [
+            path.join(__dirname, '../fyers_token.txt'),
+            '/home/centralasp123/shortmarket/backend/fyers_token.txt'
+        ];
+        for (const p of tokenPaths) {
+            if (fs.existsSync(p)) {
+                const token = fs.readFileSync(p, 'utf8');
+                if (token && token.trim().length > 20) {
+                    const candidate = token.trim();
+                    if (!isTokenExpired(candidate)) {
+                        activeAccessToken = candidate;
+                        fyers.setAccessToken(activeAccessToken);
+                        isFyersConnected = true;
+                        console.log("🔌 Loaded valid Fyers token from disk.");
+                        return true;
+                    } else if (!activeAccessToken) {
+                        activeAccessToken = candidate;
+                        fyers.setAccessToken(activeAccessToken);
+                    }
                 }
-                isFyersConnected = true;
-                console.log("🔌 Loaded valid Fyers token from disk.");
-                return true;
             }
+        }
+        if (activeAccessToken && isTokenExpired(activeAccessToken)) {
+            isFyersConnected = false;
+            lastDataSocketError = 'Token Expired: Daily Fyers token has expired. Please reconnect via Connect Web.';
+            console.warn("⚠️ Fyers token on disk is EXPIRED. Please connect via Admin Dashboard.");
+            return false;
         }
     } catch (e) {}
     return false;
@@ -939,6 +956,16 @@ async function processSubQueue() {
 function addSubscriptionBatch(symbols) {
     if (Array.isArray(symbols)) symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
     if (!Array.isArray(symbols) || symbols.length === 0) return;
+
+    if (!isMasterNode) {
+        try {
+            const { pubClient } = require('./redisClient');
+            if (pubClient?.isReady) {
+                pubClient.publish('fyers_subscribe', JSON.stringify(symbols)).catch(() => {});
+            }
+        } catch (_) {}
+        return;
+    }
     
     const now = Date.now();
     symbols.forEach(item => {
