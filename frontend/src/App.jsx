@@ -1,5 +1,5 @@
 import { registerServiceWorker } from './services/pushManager';
-import React, { useEffect, useState, useMemo, useRef, Suspense, lazy } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import MarketWatch from './components/MarketWatch';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -93,7 +93,7 @@ import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
 import { useStore, DEFAULT_WATCHLIST_SYMBOLS, ensureWatchlistsWithDefaults } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu } from 'lucide-react';
+import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu, ArrowLeft } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -481,17 +481,89 @@ function App() {
   const isClosingFromPopstateRef = useRef(false);
   const isPoppingModalHistoryRef = useRef(false);
   const lastBackPressTimeRef = useRef(0);
+  const tabHistoryStackRef = useRef([]);
+  const lastRecordedTabRef = useRef(activeTab);
+  const isHandlingBackNavRef = useRef(false);
+  const userGestureGuardCountRef = useRef(0);
 
-  // On mobile devices, ensure there is an initial history buffer for hardware back interception
+  const getUrlForTab = useCallback((tabName, calcTypeOverride) => {
+    if (!tabName || tabName === 'Home') return '/';
+    if (tabName === 'Watchlist' || tabName === 'Markets') return '/markets';
+    if (tabName === 'Calculators') {
+      const cType = calcTypeOverride !== undefined ? calcTypeOverride : calculatorsInitialType;
+      return cType && cType !== 'all' ? `/calculators/${cType}` : '/calculators';
+    }
+    if (tabName === 'WealthOS') return '/wealth-hub';
+    if (tabName === 'Algo') return '/algo';
+    if (tabName === 'TradeDiary') return '/trade-diary';
+    if (tabName === 'PrimaryMarkets') return '/primary-markets';
+    if (tabName === 'Journal') return '/journal';
+    if (tabName === 'Community') return '/community';
+    if (tabName === 'AboutUs') return '/aboutus';
+    return `/${String(tabName).toLowerCase()}`;
+  }, [calculatorsInitialType]);
+
+  // Unified in-app Back handler (used by both top-left <- Back buttons and Android hardware Back)
+  const handleBackNavigation = useCallback(() => {
+    const currentUser = userRef.current;
+    const rootTab = currentUser ? 'Watchlist' : 'Home';
+    const currentTab = activeTabRef.current || rootTab;
+    let nextTab = rootTab;
+
+    while (tabHistoryStackRef.current.length > 0) {
+      const candidate = tabHistoryStackRef.current.pop();
+      if (candidate && candidate !== currentTab) {
+        nextTab = candidate;
+        break;
+      }
+    }
+    if (nextTab === currentTab) {
+      nextTab = rootTab;
+    }
+
+    isHandlingBackNavRef.current = true;
+    lastRecordedTabRef.current = nextTab;
+    activeTabRef.current = nextTab;
+    const nextUrl = getUrlForTab(nextTab);
+    try {
+      window.history.replaceState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+      window.history.pushState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+    } catch (_) {}
+    setActiveTab(nextTab);
+  }, [getUrlForTab]);
+
+  // On mobile devices, ensure both an initial guard and a real user-gesture-activated guard exist
+  // so Android Capacitor WebView (webView.canGoBack()) never skips the entry or exits to the phone launcher
   useEffect(() => {
     const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    if (isMobileScreen) {
+    if (!isMobileScreen) return;
+
+    try {
+      if (!window.history.state?.hasGuard) {
+        window.history.pushState({ appTab: activeTabRef.current, hasGuard: true }, '', window.location.pathname);
+      }
+    } catch (_) {}
+
+    const ensureUserActivatedGuard = () => {
+      if (userGestureGuardCountRef.current >= 2) return;
+      userGestureGuardCountRef.current += 1;
       try {
-        if (!window.history.state?.hasGuard) {
-          window.history.pushState({ hasGuard: true }, '', window.location.pathname);
-        }
+        window.history.pushState(
+          { appTab: activeTabRef.current, hasGuard: true, userActivated: true },
+          '',
+          window.location.pathname
+        );
       } catch (_) {}
-    }
+    };
+
+    window.addEventListener('pointerdown', ensureUserActivatedGuard, { capture: true, passive: true });
+    window.addEventListener('touchstart', ensureUserActivatedGuard, { capture: true, passive: true });
+    window.addEventListener('click', ensureUserActivatedGuard, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', ensureUserActivatedGuard, { capture: true });
+      window.removeEventListener('touchstart', ensureUserActivatedGuard, { capture: true });
+      window.removeEventListener('click', ensureUserActivatedGuard, { capture: true });
+    };
   }, []);
 
   // Check if any modal, sheet, or drawer is currently active
@@ -517,19 +589,22 @@ function App() {
   );
 
   // Synchronize modal state with browser history stack for hardware back button support
+  // IMPORTANT: Never call window.history.back() when a modal closes via UI tap (e.g. clicking an item
+  // in showMobileMenu), because async history.back() pops the new tab's history entry and empties WebView back stack!
   useEffect(() => {
     if (hasOpenModal) {
       if (!modalHistoryPushedRef.current) {
-        window.history.pushState({ isModal: true }, '');
-        modalHistoryPushedRef.current = true;
+        try {
+          window.history.pushState({ isModal: true, hasGuard: true, appTab: activeTabRef.current }, '', window.location.pathname);
+          modalHistoryPushedRef.current = true;
+        } catch (_) {}
       }
     } else {
       if (modalHistoryPushedRef.current && !isClosingFromPopstateRef.current) {
         modalHistoryPushedRef.current = false;
         try {
           if (window.history.state?.isModal) {
-            isPoppingModalHistoryRef.current = true;
-            window.history.back();
+            window.history.replaceState({ appTab: activeTabRef.current, hasGuard: true, userActivated: true }, '', window.location.pathname);
           }
         } catch (_) {}
       }
@@ -545,9 +620,35 @@ function App() {
     if (fetchBroadcastNotifications) fetchBroadcastNotifications();
   }, []);
 
-  // Sync activeTab to URL and handle browser back/forward buttons
+  // Sync activeTab to URL, maintain mobile navigation stack, and push history entries
   useEffect(() => {
     if (activeTab) {
+      const prevTab = lastRecordedTabRef.current;
+      const currentUser = userRef.current;
+      const isRoot = currentUser
+        ? (activeTab === 'Watchlist' || activeTab === 'Markets')
+        : (activeTab === 'Home');
+
+      if (prevTab && prevTab !== activeTab) {
+        if (isHandlingBackNavRef.current) {
+          isHandlingBackNavRef.current = false;
+        } else if (isRoot) {
+          // Tapping the primary Root tab (Watchlist when logged in, Home when guest) resets stack to root
+          tabHistoryStackRef.current = [];
+        } else {
+          const normalizedPrev = (currentUser && prevTab === 'Markets') ? 'Watchlist' : prevTab;
+          const filtered = tabHistoryStackRef.current.filter(
+            (t) => t !== activeTab && t !== normalizedPrev
+          );
+          filtered.push(normalizedPrev);
+          if (filtered.length > 15) filtered.shift();
+          tabHistoryStackRef.current = filtered;
+        }
+        lastRecordedTabRef.current = activeTab;
+      } else {
+        isHandlingBackNavRef.current = false;
+      }
+
       const currentPathname = window.location.pathname;
       const lowerPath = currentPathname.toLowerCase();
       const seg0 = (lowerPath.split('/')[1] || '').split('?')[0];
@@ -590,7 +691,7 @@ function App() {
       else if (activeTab === 'Algo') newPath = ['algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge'].includes(seg0) ? `/${seg0}` : '/algo';
       else if (activeTab === 'TradeDiary') newPath = ['tradediary', 'trade-diary'].includes(seg0) ? `/${seg0}` : '/trade-diary';
       else if (activeTab === 'PrimaryMarkets') newPath = ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos'].includes(seg0) ? `/${seg0}` : '/primary-markets';
-      else if (activeTab === 'Markets') newPath = ['markets', 'paper-trading', 'papertrading'].includes(seg0) ? `/${seg0}` : '/markets';
+      else if (activeTab === 'Markets' || activeTab === 'Watchlist') newPath = ['markets', 'paper-trading', 'papertrading', 'watchlist'].includes(seg0) ? `/${seg0}` : '/markets';
       else if (activeTab === 'Journal') newPath = ['journal', 'tradingjournal', 'trading-journal'].includes(seg0) ? `/${seg0}` : '/journal';
       else if (activeTab === 'Community') newPath = '/community';
       else if (activeTab === 'AboutUs') newPath = ['aboutus', 'about'].includes(seg0) ? `/${seg0}` : '/aboutus';
@@ -600,20 +701,22 @@ function App() {
       const isAlreadyDeepCalc = activeTab === 'Calculators' && lowerPath.startsWith('/calculators/') && calculatorsInitialType && calculatorsInitialType !== 'all';
       const targetUrl = isAlreadyDeepCalc ? `/calculators/${calculatorsInitialType}` : newPath;
 
-      if (currentPathname !== targetUrl) {
-        const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      try {
         if (isMobileScreen) {
-          window.history.replaceState({ appTab: activeTab, hasGuard: true }, '', targetUrl);
-        } else {
-          window.history.pushState(null, '', targetUrl);
+          if (currentPathname !== targetUrl || prevTab !== activeTab) {
+            window.history.pushState({ appTab: activeTab, hasGuard: true, userActivated: true }, '', targetUrl);
+          }
+        } else if (currentPathname !== targetUrl) {
+          window.history.pushState({ appTab: activeTab }, '', targetUrl);
         }
-      }
+      } catch (_) {}
       applyDynamicSEO(window.location.pathname);
     }
   }, [activeTab, calculatorsInitialType]);
 
   useEffect(() => {
-    const handlePopState = (event) => {
+    const handlePopState = () => {
       if (isPoppingModalHistoryRef.current) {
         isPoppingModalHistoryRef.current = false;
         return;
@@ -625,7 +728,7 @@ function App() {
       const rootTab = currentUser ? 'Watchlist' : 'Home';
       const rootPath = currentUser ? '/markets' : '/';
 
-      // 1. If any modal, sheet, or drawer is open, close it and stay in the app
+      // 1. If any modal, sheet, or drawer is open, close it and stay on the current screen
       const anyModalOpen = Boolean(
         storeState.chartModalSymbol ||
         storeState.orderModal?.isOpen ||
@@ -675,27 +778,44 @@ function App() {
 
         if (isMobileScreen) {
           try {
-            window.history.pushState({ hasGuard: true }, '', window.location.pathname);
+            window.history.pushState({ appTab: currentTab, hasGuard: true, userActivated: true }, '', window.location.pathname);
           } catch (_) {}
         }
         return;
       }
 
-      // --- MOBILE-ONLY NATIVE NAVIGATION HANDLER ---
+      // --- MOBILE NATIVE-LIKE BACK STACK NAVIGATION ---
       if (isMobileScreen) {
         const isRoot = (currentTab === rootTab) || (currentUser && (currentTab === 'Markets' || currentTab === 'Watchlist'));
 
-        // 2. If on ANY secondary screen, return directly to the Root tab (Watchlist if logged in, Home if guest)
+        // 2. If on ANY secondary page or Hub, step back to the previous tab in stack (or Root)
         if (!isRoot) {
-          setActiveTab(rootTab);
+          let nextTab = rootTab;
+          while (tabHistoryStackRef.current.length > 0) {
+            const candidate = tabHistoryStackRef.current.pop();
+            if (candidate && candidate !== currentTab) {
+              nextTab = candidate;
+              break;
+            }
+          }
+          if (nextTab === currentTab) {
+            nextTab = rootTab;
+          }
+
+          isHandlingBackNavRef.current = true;
+          lastRecordedTabRef.current = nextTab;
+          activeTabRef.current = nextTab;
+          const nextUrl = getUrlForTab(nextTab);
           try {
-            window.history.replaceState({ appTab: rootTab }, '', rootPath);
-            window.history.pushState({ hasGuard: true }, '', rootPath);
+            window.history.replaceState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+            window.history.pushState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
           } catch (_) {}
+          setActiveTab(nextTab);
           return;
         }
 
         // 3. Already on Root screen: Double-tap to exit guard
+        tabHistoryStackRef.current = [];
         const now = Date.now();
         if (now - lastBackPressTimeRef.current > 2000) {
           lastBackPressTimeRef.current = now;
@@ -704,7 +824,7 @@ function App() {
           }
           // Push guard so next back press triggers popstate again
           try {
-            window.history.pushState({ hasGuard: true }, '', rootPath);
+            window.history.pushState({ appTab: rootTab, hasGuard: true, userActivated: true }, '', rootPath);
           } catch (_) {}
           return;
         } else {
@@ -762,6 +882,7 @@ function App() {
       window.removeEventListener('open-deposit-modal', handleOpenDeposit);
     };
   }, [
+    getUrlForTab,
     showDepositModal,
     showMobileMenu,
     notificationDrawerOpen,
@@ -1451,7 +1572,7 @@ function App() {
           <PrimaryMarketsView 
             initialTab={primaryMarketsInitialTab}
             onOpenPaperTrading={() => setActiveTab('Markets')} 
-            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
+            onBack={handleBackNavigation} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
         </Suspense>
@@ -1460,7 +1581,7 @@ function App() {
           <TradeDiaryView 
             initialTab={tradeDiaryInitialTab}
             onOpenPaperTrading={() => setActiveTab('Markets')} 
-            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
+            onBack={handleBackNavigation} 
             onOpenProfile={() => setActiveTab('ClientData')}
             onNavigate={(tab) => setActiveTab(tab)}
           />
@@ -1470,7 +1591,7 @@ function App() {
         <Suspense fallback={<TabLoader />}>
           <SkandxAlgoView 
             initialTab={algoInitialTab}
-            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
+            onBack={handleBackNavigation} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
@@ -1479,7 +1600,7 @@ function App() {
         <Suspense fallback={<TabLoader />}>
           <CalculatorsSuiteView 
             initialType={calculatorsInitialType}
-            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
+            onBack={handleBackNavigation} 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />
@@ -1489,7 +1610,7 @@ function App() {
           <WealthPersonalFinanceModal 
             isFullPage={true}
             initialTab={wealthInitialTab}
-            onBack={() => setActiveTab(user ? 'Watchlist' : 'Home')} 
+            onBack={handleBackNavigation} 
             onOpenPaperTrading={() => setActiveTab('Markets')}
             onOpenCalculators={(t) => {
               setCalculatorsInitialType(t || 'all');
@@ -1503,6 +1624,31 @@ function App() {
           <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)', padding: '0 10px', gap: '6px' }}>
               {/* Left: title + index pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexShrink: 0 }}>
+                {activeTab !== 'Watchlist' && activeTab !== 'Markets' && (
+                  <button
+                    type="button"
+                    className="mobile-only"
+                    onClick={handleBackNavigation}
+                    aria-label="Go Back"
+                    title="Back"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      flexShrink: 0
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '4px' }}>
                   <div 
                     onClick={() => setActiveTab(user ? 'Watchlist' : 'Home')}
@@ -1753,7 +1899,7 @@ function App() {
               {activeTab === 'Journal' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <TradingJournalView onBack={() => setActiveTab('Markets')} />
+                    <TradingJournalView onBack={handleBackNavigation} />
                   </Suspense>
                 </div>
               )}
@@ -1774,7 +1920,7 @@ function App() {
               {activeTab === 'Reports' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <ReportsView onBack={() => setActiveTab('ClientData')} />
+                    <ReportsView onBack={handleBackNavigation} />
                   </Suspense>
                 </div>
               )}
@@ -1801,13 +1947,13 @@ function App() {
                     </Suspense>
                   </div>
                 ) : (
-                  <PermissionDenied onBack={() => setActiveTab('Markets')} />
+                  <PermissionDenied onBack={handleBackNavigation} />
                 )
               )}
               {(activeTab === 'Legal' || activeTab === 'Privacy') && (
                 <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-main)' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <LegalView initialTab="privacy" onBack={() => setActiveTab('Markets')} />
+                    <LegalView initialTab="privacy" onBack={handleBackNavigation} />
                   </Suspense>
                 </div>
               )}
