@@ -54,9 +54,10 @@ export default function ChartWidget({
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
 
-  const { selectedSymbol, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
+  const { storeSelectedSymbol, chartModalSymbol, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ storeSelectedSymbol: state.selectedSymbol, chartModalSymbol: state.chartModalSymbol, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
 
-  const price   = useStore(state => state.prices[state.selectedSymbol]);
+  const selectedSymbol = (isModal && chartModalSymbol) ? chartModalSymbol : storeSelectedSymbol;
+  const price   = useStore(state => state.prices[selectedSymbol]);
   const candles = candleData[`${selectedSymbol}_${chartInterval}`] || candleData[selectedSymbol] || [];
   const isLight = theme === 'light';
 
@@ -393,7 +394,7 @@ export default function ChartWidget({
 
       chartRef.current?.timeScale().fitContent();
     } catch (e) { console.error(e) }
-  }, [candles, showSMA, showEMA, showRSI, showMACD, theme, applyLiveTickToCandle]);
+  }, [candles, selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD, theme, applyLiveTickToCandle]);
 
   // Live tick update
   useEffect(() => {

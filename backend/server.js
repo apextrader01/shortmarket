@@ -11320,8 +11320,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
 
 // ─── Historical Chart Data (Candles) — 1-Lakh User High-Throughput Engine ───────────
-const candleCache = {}; // RAM cache (capped at 2,500 symbol-interval pairs ≈ 15 MB RAM)
-const MAX_CANDLE_CACHE_ITEMS = 2500;
+const candleCache = {}; // RAM cache (capped at 6,000 symbol-interval pairs ≈ 35 MB RAM)
+const MAX_CANDLE_CACHE_ITEMS = 6000;
 const inflightRouteCandleRequests = new Map(); // Single-flight lock at route level
 
 // Ensure persistent PostgreSQL candle cache table exists so server restarts never re-burn Fyers 500 daily quota
@@ -11346,7 +11346,7 @@ let isCandleDbReady = false;
 function getIntervalSeconds(interval) {
   const map = {
     ONE_MINUTE: 60, '1': 60,
-     '2': 120,
+    '2': 120,
     THREE_MINUTE: 180, '3': 180,
     FIVE_MINUTE: 300, '5': 300,
     TEN_MINUTE: 600, '10': 600,
@@ -11404,24 +11404,89 @@ function mergeLiveTickIntoCandles(candles, cleanSymbol, interval) {
     );
 
     if (isWithinSession) {
-      candles.push({
-        time: currentBucketTime,
-        open: ltp,
-        high: ltp,
-        low: ltp,
-        close: ltp,
-        volume: 0,
-      });
+      if (bucketSec === 86400) {
+        const dayOpen = Number(livePrice.open) > 0 ? Number(livePrice.open) : ltp;
+        const dayHigh = Number(livePrice.high) > 0 ? Math.max(Number(livePrice.high), ltp, dayOpen) : Math.max(ltp, dayOpen);
+        const dayLow  = Number(livePrice.low)  > 0 ? Math.min(Number(livePrice.low),  ltp, dayOpen) : Math.min(ltp, dayOpen);
+        candles.push({
+          time: currentBucketTime,
+          open: dayOpen,
+          high: dayHigh,
+          low: dayLow,
+          close: ltp,
+          volume: Number(livePrice.volume) || 0,
+        });
+      } else {
+        candles.push({
+          time: currentBucketTime,
+          open: ltp,
+          high: ltp,
+          low: ltp,
+          close: ltp,
+          volume: 0,
+        });
+      }
       if (candles.length > 1500) candles.shift();
       return candles;
     }
   }
 
   // Update current (last) candle OHLC in-place
-  last.close = ltp;
-  if (ltp > last.high) last.high = ltp;
-  if (ltp < last.low) last.low = ltp;
+  if (bucketSec === 86400) {
+    if (Number(livePrice.open) > 0) last.open = Number(livePrice.open);
+    last.high = Math.max(last.high, Number(livePrice.high) || ltp, ltp);
+    last.low  = Math.min(last.low,  Number(livePrice.low)  || ltp, ltp);
+    last.close = ltp;
+  } else {
+    last.close = ltp;
+    if (ltp > last.high) last.high = ltp;
+    if (ltp < last.low) last.low = ltp;
+  }
   return candles;
+}
+
+// Final Safety Net: If a brand-new Option/MCX contract is clicked after all 500 daily Fyers calls are exhausted,
+// construct a clean intraday/daily candle series from the live WebSocket priceCache so no chart is ever blank.
+function buildSyntheticCandlesFromLivePrice(cleanSymbol, interval) {
+  const livePrice = resolveLivePriceForSymbol(cleanSymbol);
+  const ltp = Number(livePrice?.ltp);
+  if (!Number.isFinite(ltp) || ltp <= 0) return [];
+
+  const open = Number(livePrice.open) > 0 ? Number(livePrice.open) : ltp;
+  const high = Number(livePrice.high) > 0 ? Math.max(Number(livePrice.high), ltp, open) : Math.max(ltp, open);
+  const low  = Number(livePrice.low)  > 0 ? Math.min(Number(livePrice.low),  ltp, open) : Math.min(ltp, open);
+  const prevClose = Number(livePrice.prev_close || livePrice.close) > 0 ? Number(livePrice.prev_close || livePrice.close) : open;
+
+  const bucketSec = getIntervalSeconds(interval);
+  const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
+  const nowSec = Math.floor(Date.now() / 1000) + 19800;
+  const currentBucket = Math.floor((nowSec - alignOffset) / bucketSec) * bucketSec + alignOffset;
+
+  const bars = [];
+  const count = 30;
+  for (let i = count; i >= 1; i--) {
+    const t = currentBucket - i * bucketSec;
+    const ratio = (count - i) / count;
+    const base = prevClose + (open - prevClose) * ratio;
+    const nextBase = prevClose + (open - prevClose) * ((count - i + 1) / count);
+    bars.push({
+      time: t,
+      open: Number(base.toFixed(2)),
+      high: Number(Math.max(base, nextBase).toFixed(2)),
+      low:  Number(Math.min(base, nextBase).toFixed(2)),
+      close: Number(nextBase.toFixed(2)),
+      volume: 0,
+    });
+  }
+  bars.push({
+    time: currentBucket,
+    open,
+    high,
+    low,
+    close: ltp,
+    volume: Number(livePrice.volume) || 0,
+  });
+  return bars;
 }
 
 // Continuous 2-second RAM candle updater: keeps all active cached symbol-interval series
@@ -11471,7 +11536,7 @@ setInterval(() => {
   }
 }, 3600000).unref();
 
-// Smart Timeframe Cache: Since live WebSocket ticks continuously roll & update every 1m/3m/5m/15m/30m/1h
+// Smart Timeframe Cache: Since live WebSocket ticks continuously roll & update every 1m/5m/15m/30m/1h
 // candle bar in RAM every 2 seconds, base historical candles stay valid for the full 6-hour trading session
 // (or 12h for daily), so clicking at a 2-minute, 15-minute, or 3-hour gap uses ZERO additional Fyers API calls!
 function getCacheDuration(interval, symbol) {
@@ -11495,7 +11560,7 @@ function getCacheDuration(interval, symbol) {
 
   // Market-Hours Smart TTLs (live WebSocket ticks continuously build & roll over new bars in RAM)
   if (interval === 'D' || interval === '1D' || interval === 'ONE_DAY') return 12 * 60 * 60 * 1000; // 12 hours
-  return 6 * 60 * 60 * 1000; // 6 hours (full trading session) — new 1m/3m/5m/15m/30m/1h bars are built in RAM from WebSocket!
+  return 6 * 60 * 60 * 1000; // 6 hours (full trading session) — new 1m/5m/15m/30m/1h bars are built in RAM from WebSocket!
 }
 
 function isIntradayInterval(interval) {
@@ -11503,7 +11568,7 @@ function isIntradayInterval(interval) {
   return sec >= 60 && sec <= 3600;
 }
 
-// Resample 1-minute candles into any higher intraday timeframe (3m, 5m, 10m, 15m, 30m, 1h) in <0.3ms in RAM.
+// Resample 1-minute candles into any higher intraday timeframe (5m, 15m, 30m, 1h) in <0.3ms in RAM.
 // Aligns 30m and 1h bars to the 09:15 AM IST market open (+900s offset) exactly like Fyers & TradingView.
 function resampleCandlesFromOneMinute(oneMinCandles, targetInterval) {
   if (!Array.isArray(oneMinCandles) || oneMinCandles.length === 0) return [];
@@ -11567,7 +11632,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
       return res.json(liveMerged);
     }
 
-    // 1b. If an intraday timeframe (3m, 5m, 15m, 30m, 1h) is requested and we ALREADY have the Master 1-Minute
+    // 1b. If an intraday timeframe (5m, 15m, 30m, 1h) is requested and we ALREADY have the Master 1-Minute
     // candles for this stock in RAM, resample it in <0.3ms in RAM with ZERO upstream API calls!
     if (isIntradayInterval(interval)) {
       const master1mItem = candleCache[master1mKey] || candleCache[`${cleanSymbol}_1`];
@@ -11581,8 +11646,8 @@ app.get('/api/candles/:symbol', async (req, res) => {
       }
     }
 
-    // 2. Single-flight lock: for ALL intraday intervals (1m, 3m, 5m, 15m, 30m, 1h) on the same stock,
-    // coalesce onto a single Master 1-Minute fetch so 6 users clicking 6 different timeframes use ONLY 1 API call!
+    // 2. Single-flight lock: for ALL intraday intervals (1m, 5m, 15m, 30m, 1h) on the same stock,
+    // coalesce onto a single Master 1-Minute fetch so multiple users clicking different timeframes use ONLY 1 API call!
     const lockKey = isIntradayInterval(interval) ? `INTRADAY_MASTER_${cleanSymbol}` : cacheKey;
     let fetchTask = inflightRouteCandleRequests.get(lockKey);
     if (!fetchTask) {
@@ -11605,12 +11670,8 @@ app.get('/api/candles/:symbol', async (req, res) => {
               } catch (_) {}
             }
 
-            // Fetch Master 1-Minute series once from Fyers
-            let oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
-            if (!oneMinCandles || oneMinCandles.length === 0) {
-              await new Promise(r => setTimeout(r, 400));
-              oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
-            }
+            // Fetch Master 1-Minute series once from Fyers / Redis / Fallback
+            const oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
             if (Array.isArray(oneMinCandles) && oneMinCandles.length > 0) {
               const live1m = mergeLiveTickIntoCandles(oneMinCandles, cleanSymbol, 'ONE_MINUTE');
               setCandleCache(master1mKey, live1m, Date.now(), cleanSymbol, 'ONE_MINUTE', true);
@@ -11634,12 +11695,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
           }
 
           // 2b. Fetch requested interval directly (e.g. ONE_DAY or fallback if 1m wasn't available)
-          let candles = await fetchCandleData(cleanSymbol, interval);
-
-          if (!candles || candles.length === 0) {
-            await new Promise(r => setTimeout(r, 400));
-            candles = await fetchCandleData(cleanSymbol, interval);
-          }
+          const candles = await fetchCandleData(cleanSymbol, interval);
 
           if (Array.isArray(candles) && candles.length > 0) {
             const liveMerged = mergeLiveTickIntoCandles(candles, cleanSymbol, interval);
@@ -11647,7 +11703,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
             return liveMerged;
           }
 
-          // 2c. Stale-if-error fallback
+          // 2c. Stale-if-error fallback from RAM or PostgreSQL
           if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0) {
             return mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
           }
@@ -11662,6 +11718,13 @@ app.get('/api/candles/:symbol', async (req, res) => {
             } catch (_) {}
           }
 
+          // 2d. Final Safety Net: Build live candles from WebSocket priceCache (for uncached F&O Options / MCX if quota exhausted)
+          const synthetic = buildSyntheticCandlesFromLivePrice(cleanSymbol, interval);
+          if (synthetic.length > 0) {
+            setCandleCache(cacheKey, synthetic, Date.now(), cleanSymbol, interval, false);
+            return synthetic;
+          }
+
           return [];
         } finally {
           inflightRouteCandleRequests.delete(lockKey);
@@ -11671,7 +11734,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
     }
 
     const baseCandles = await fetchTask;
-    // If lockKey was INTRADAY_MASTER_${cleanSymbol} and caller asked for 3m/5m/15m/30m/1h, resample from 1m now
+    // If lockKey was INTRADAY_MASTER_${cleanSymbol} and caller asked for 5m/15m/30m/1h, resample from 1m now
     if (isIntradayInterval(interval) && getIntervalSeconds(interval) > 60 && Array.isArray(baseCandles) && baseCandles.length > 0) {
       const resampled = resampleCandlesFromOneMinute(baseCandles, interval);
       const liveMerged = mergeLiveTickIntoCandles(resampled, cleanSymbol, interval);

@@ -1276,6 +1276,43 @@ const INTERVAL_MAP = {
 const { generalClient } = require('./redisClient');
 const inflightCandleFetches = new Map(); // Single-flight request coalescing for 100k concurrent users
 
+// Fyers History Burst & Daily Quota Guard (protects the 10 req/sec & 500/day Fyers limit when 5,000 symbols are clicked at once)
+let fyersHistoryCallsThisSec = 0;
+let fyersHistorySecWindow = Math.floor(Date.now() / 1000);
+let fyersDailyHistoryCount = 0;
+let fyersHistoryDayKey = '';
+
+function canUseFyersHistoryQuota(fSym) {
+    const now = new Date();
+    const istDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    if (fyersHistoryDayKey !== istDateStr) {
+        fyersHistoryDayKey = istDateStr;
+        fyersDailyHistoryCount = 0;
+    }
+    const curSec = Math.floor(Date.now() / 1000);
+    if (curSec !== fyersHistorySecWindow) {
+        fyersHistorySecWindow = curSec;
+        fyersHistoryCallsThisSec = 0;
+    }
+
+    const isEquityOrIndex = fSym && (
+        ((fSym.startsWith('NSE:') || fSym.startsWith('BSE:')) && fSym.endsWith('-EQ')) ||
+        fSym.includes('NIFTY') || fSym.includes('SENSEX') || fSym.includes('INDIAVIX')
+    ) && !(/\d{2}[A-Z]{3}\d+/i.test(fSym)); // Not an F&O derivative contract
+
+    // Hard daily cap at 490 to prevent Fyers account block
+    if (fyersDailyHistoryCount >= 490) return false;
+    // Reserve calls #350–#490 exclusively for F&O Options, Futures, and MCX (since Equities/Indices have Yahoo fallback)
+    if (isEquityOrIndex && fyersDailyHistoryCount >= 350) return false;
+    // If burst rate > 8 calls/sec, immediately route Equities/Indices to Yahoo fallback in 0ms instead of queuing/429ing
+    if (isEquityOrIndex && fyersHistoryCallsThisSec >= 6) return false;
+    if (fyersHistoryCallsThisSec >= 9) return false;
+
+    fyersHistoryCallsThisSec++;
+    fyersDailyHistoryCount++;
+    return true;
+}
+
 async function fetchYahooFallbackCandles(rawSymbol, fSym, res) {
     try {
         const clean = String(rawSymbol || fSym || '').trim();
@@ -1292,6 +1329,12 @@ async function fetchYahooFallbackCandles(rawSymbol, fSym, res) {
             const tickerCore = fSym.split(':')[1].replace(/-EQ$/i, '');
             if (/^[A-Z0-9&-]+$/i.test(tickerCore)) {
                 yahooTicker = `${tickerCore}.${exch}`;
+            }
+        } else {
+            const stripped = clean.replace(/^(NSE:|BSE:)/i, '').replace(/-EQ$/i, '');
+            if (/^[A-Z0-9&-]+$/i.test(stripped) && !(/\d{2}[A-Z]{3}\d+/i.test(stripped))) {
+                const exch = clean.toUpperCase().startsWith('BSE:') ? 'BO' : 'NS';
+                yahooTicker = `${stripped}.${exch}`;
             }
         }
         if (!yahooTicker) return [];
@@ -1380,7 +1423,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
 
     const workPromise = (async () => {
         try {
-            if (activeAccessToken && fSym) {
+            if (activeAccessToken && fSym && canUseFyersHistoryQuota(fSym)) {
                 const formatDate = (d) => {
                     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 };
@@ -1419,9 +1462,9 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
                             volume: c[5]
                         }));
 
-                        // Save to Redis: 1 hour for 1D, 10 minutes for intraday (live ticks update the tip in RAM)
+                        // Save to Redis: 6 hours for 1D & intraday (live ticks update the tip in RAM)
                         // Also store a 24h stale backup key to survive rate limits / quota exhaustion
-                        const primaryTtlSec = res === '1D' ? 3600 : 600;
+                        const primaryTtlSec = 21600;
                         try {
                             if (generalClient?.isReady) {
                                 const serialized = JSON.stringify(formattedCandles);
@@ -1438,6 +1481,9 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
                     } else if (response && (response.code === -15 || response.code === -17) && isTokenExpired(activeAccessToken)) {
                         lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
                         isFyersConnected = false;
+                    } else if (response && (response.code === -429 || String(response.message || '').toLowerCase().includes('limit'))) {
+                        // Fyers daily or burst limit reached — mark daily count at threshold so subsequent stock calls skip straight to fallback in 0ms
+                        fyersDailyHistoryCount = Math.max(fyersDailyHistoryCount, 490);
                     }
                 } catch (e) {
                     if (e && (e.code === -15 || e.code === -17) && isTokenExpired(activeAccessToken)) {
@@ -1466,7 +1512,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
                     if (generalClient?.isReady) {
                         const serialized = JSON.stringify(yahooCandles);
                         await Promise.all([
-                            generalClient.setEx(cacheKey, 300, serialized),
+                            generalClient.setEx(cacheKey, 21600, serialized),
                             generalClient.setEx(backupCacheKey, 86400, serialized)
                         ]);
                     }

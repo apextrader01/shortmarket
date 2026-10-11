@@ -717,7 +717,10 @@ export const useStore = create(persist((set, get) => ({
   setIsAdModalOpen: (isOpen) => set({ isAdModalOpen: Boolean(isOpen) }),
 
   chartModalSymbol: null,
-  setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
+  setChartModalSymbol: (symbol) => set((state) => ({
+    chartModalSymbol: symbol,
+    selectedSymbol: symbol || state.selectedSymbol,
+  })),
 
   mobileStockOverviewSymbol: null,
   setMobileStockOverviewSymbol: (symbol) => set({ mobileStockOverviewSymbol: symbol }),
