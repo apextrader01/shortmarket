@@ -171,23 +171,31 @@ export default function AlgoPaymentGatewayModal({
             setProcessStepText('');
             if (!paymentCompleted && !paymentFailedReported) {
               try {
-                const failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
+                const failPayload = {
+                  razorpay_order_id: resolvedOrderId,
+                  error_description: 'Checkout dismissed by user before completing payment',
+                  error_reason: 'user_cancelled',
+                  status: 'CANCELLED',
+                  plan: item?.type || 'STATIC_IP',
+                  itemType: item?.type || 'STATIC_IP',
+                  amount: effectiveAmount,
+                  failure_reason: 'Checkout dismissed by user before completing payment',
+                  title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+                };
+                let failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
                   method: 'POST',
                   headers: getAuthHeaders(),
-                  body: JSON.stringify({
-                    razorpay_order_id: resolvedOrderId,
-                    error_description: 'Checkout dismissed by user before completing payment',
-                    error_reason: 'user_cancelled',
-                    status: 'CANCELLED',
-                    itemType: item?.type || 'STATIC_IP',
-                    amount: effectiveAmount,
-                    title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
-                  })
+                  body: JSON.stringify(failPayload)
                 });
-                const failData = await failRes.json().catch(() => ({}));
-                if (failData?.transactions) {
-                  notifyParent({ paymentFailed: true, transactions: failData.transactions });
+                if (failRes.status === 404) {
+                  failRes = await fetch(`${API}/api/payment/report-failure`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(failPayload)
+                  });
                 }
+                const failData = await failRes.json().catch(() => ({}));
+                notifyParent({ paymentFailed: true, transactions: failData?.transactions });
               } catch (_) {}
             }
           }
@@ -244,24 +252,32 @@ export default function AlgoPaymentGatewayModal({
         const failDesc = resp?.error?.description || resp?.error?.reason || 'Payment failed or was declined by the bank.';
         setErrorMsg(failDesc);
         try {
-          const failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
+          const failPayload = {
+            razorpay_order_id: resp?.error?.metadata?.order_id || resolvedOrderId,
+            razorpay_payment_id: resp?.error?.metadata?.payment_id || null,
+            error_description: failDesc,
+            error_reason: resp?.error?.reason || 'payment_failed',
+            status: 'FAILED',
+            plan: item?.type || 'STATIC_IP',
+            itemType: item?.type || 'STATIC_IP',
+            amount: effectiveAmount,
+            failure_reason: failDesc,
+            title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+          };
+          let failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({
-              razorpay_order_id: resp?.error?.metadata?.order_id || resolvedOrderId,
-              razorpay_payment_id: resp?.error?.metadata?.payment_id || null,
-              error_description: failDesc,
-              error_reason: resp?.error?.reason || 'payment_failed',
-              status: 'FAILED',
-              itemType: item?.type || 'STATIC_IP',
-              amount: effectiveAmount,
-              title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
-            })
+            body: JSON.stringify(failPayload)
           });
-          const failData = await failRes.json().catch(() => ({}));
-          if (failData?.transactions) {
-            notifyParent({ paymentFailed: true, transactions: failData.transactions });
+          if (failRes.status === 404) {
+            failRes = await fetch(`${API}/api/payment/report-failure`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify(failPayload)
+            });
           }
+          const failData = await failRes.json().catch(() => ({}));
+          notifyParent({ paymentFailed: true, transactions: failData?.transactions });
         } catch (_) {}
       });
       rzp.open();

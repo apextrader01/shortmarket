@@ -2464,7 +2464,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data && data.success) {
-        const paperValidAmounts = [0, 199, 1999, 2999, 9999, 24999];
+        const algoAmounts = [250, 350, 500, 999, 2499];
         const algoPlans = ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'];
         const cleanPaperPayments = (data.payments || []).filter(item => {
           const p = String(item.plan || '').toUpperCase().trim();
@@ -2472,7 +2472,7 @@ export default function AdminDashboard() {
           const amt = Math.round(Number(item.amount || 0));
           if (p.startsWith('ALGO_') || algoPlans.includes(p)) return false;
           if (reason.includes('algo') || reason.includes('static ip') || reason.includes('demat slot')) return false;
-          if (!paperValidAmounts.includes(amt)) return false;
+          if (algoAmounts.includes(amt)) return false;
           return true;
         });
         setSubscriptionPayments(cleanPaperPayments);

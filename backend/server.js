@@ -3475,6 +3475,83 @@ async function logSubscriptionAttempt({
   }
 }
 
+async function healAndSeparateSubscriptionPayments() {
+  try {
+    // 1. Restore any Paper Trading payment rows that were accidentally tagged as ALGO_*
+    const algoRows = await db('subscription_payments')
+      .whereRaw("UPPER(COALESCE(plan, '')) LIKE 'ALGO_%'")
+      .select('id', 'plan', 'amount', 'payment_type', 'razorpay_subscription_id', 'failure_reason', 'created_at')
+      .catch(() => []);
+
+    const algoLaunchCutoffMs = new Date('2026-10-11T15:50:00.000Z').getTime(); // ~9:20 PM IST on Oct 11, 2026
+    const paperStandardAmounts = new Set([199, 1999, 2999, 9999, 24999]);
+    const algoStandardAmounts = new Set([250, 350, 500, 999, 1000, 2499, 2500, 5000]);
+
+    for (const r of algoRows) {
+      const amt = Math.round(Number(r.amount || 0));
+      const pType = String(r.payment_type || '').toUpperCase();
+      const reason = String(r.failure_reason || '');
+      const reasonLower = reason.toLowerCase();
+      const createdMs = r.created_at ? new Date(r.created_at).getTime() : 0;
+
+      const isExplicitAlgoAdminGrant = reason.startsWith('Algo Plan set to');
+      const isExplicitAlgoFailure = reasonLower.includes('algo') || reasonLower.includes('static ip') || reasonLower.includes('demat');
+
+      const shouldRestoreToPaper =
+        !isExplicitAlgoAdminGrant &&
+        !isExplicitAlgoFailure &&
+        (
+          (createdMs > 0 && createdMs < algoLaunchCutoffMs) ||
+          pType === 'AUTOPAY' ||
+          pType === 'ACTIVE_SUBSCRIPTION' ||
+          Boolean(r.razorpay_subscription_id) ||
+          paperStandardAmounts.has(amt) ||
+          (amt > 0 && amt < 100) ||
+          (amt === 0 && pType === 'ADMIN_GRANT') ||
+          (!algoStandardAmounts.has(amt) && String(r.plan).toUpperCase() === 'ALGO_WALLET')
+        );
+
+      if (shouldRestoreToPaper) {
+        let restoredPlan = 'MONTHLY';
+        if (amt === 0) restoredPlan = 'BASIC';
+        else if (amt >= 20000) restoredPlan = 'LIFETIME';
+        else if (amt >= 8000) restoredPlan = 'MASTERCLASS';
+        else if (amt >= 2500) restoredPlan = 'HIGHEST';
+        else if (amt >= 1500) restoredPlan = 'YEARLY';
+        await db('subscription_payments').where({ id: r.id }).update({ plan: restoredPlan });
+      }
+    }
+
+    // 2. Tag genuine SkandX Algo rows (created after Algo launch with Algo amounts) as ALGO_*
+    const cutoffDate = new Date('2026-10-11T15:50:00.000Z');
+    await db('subscription_payments')
+      .where('created_at', '>=', cutoffDate)
+      .where({ amount: 350 })
+      .whereNot('plan', 'ALGO_STATIC_IP')
+      .update({ plan: 'ALGO_STATIC_IP' });
+    await db('subscription_payments')
+      .where('created_at', '>=', cutoffDate)
+      .where({ amount: 250 })
+      .whereNot('plan', 'ALGO_LINK_USER')
+      .update({ plan: 'ALGO_LINK_USER' });
+    await db('subscription_payments')
+      .where('created_at', '>=', cutoffDate)
+      .where({ amount: 500 })
+      .whereNot('plan', 'ALGO_WALLET')
+      .update({ plan: 'ALGO_WALLET' });
+    await db('subscription_payments')
+      .where('created_at', '>=', cutoffDate)
+      .where({ amount: 999 })
+      .whereNot('plan', 'ALGO_PRO')
+      .update({ plan: 'ALGO_PRO' });
+    await db('subscription_payments')
+      .where('created_at', '>=', cutoffDate)
+      .where({ amount: 2499 })
+      .whereNot('plan', 'ALGO_INSTITUTIONAL')
+      .update({ plan: 'ALGO_INSTITUTIONAL' });
+  } catch (_) {}
+}
+
 // 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999 & Algo Add-ons
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   const { plan, itemType, amount: customAmount } = req.body || {};
@@ -5672,7 +5749,10 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
         .select('id', 'username', 'email', 'phone', 'client_id', 'subscription_tier', 'subscription_expires', 'updated_at', 'created_at');
 
       if (paidUsers.length > 0) {
-        const existingUserIdsRows = await db('subscription_payments').whereNotNull('user_id').distinct('user_id');
+        const existingUserIdsRows = await db('subscription_payments')
+          .whereNotNull('user_id')
+          .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
+          .distinct('user_id');
         const existingUserIds = new Set(existingUserIdsRows.map(r => Number(r.user_id)));
 
         for (const u of paidUsers) {
@@ -5724,8 +5804,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
                 descLower.includes('algo') ||
                 descLower.includes('static ip') ||
                 descLower.includes('demat slot') ||
-                [250, 350, 500, 999, 2499].includes(amountInr) ||
-                ![0, 199, 1999, 2999, 9999, 24999].includes(amountInr);
+                [250, 350, 500, 999, 2499].includes(amountInr);
 
               let inferredPlan = 'MONTHLY';
               if (isAlgoPayment) {
@@ -5750,7 +5829,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
                     razorpay_payment_id: p.id,
                     updated_at: new Date()
                   });
-                } else if (exists.status === 'INITIATED' && rzpStatus === 'FAILED') {
+                } else if ((exists.status === 'INITIATED' || exists.status === 'CANCELLED') && rzpStatus === 'FAILED') {
                   await db('subscription_payments').where({ id: exists.id }).update({
                     status: 'FAILED',
                     razorpay_payment_id: p.id,
@@ -5787,22 +5866,8 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       }
     }
 
-    // 3. Heal any legacy Algo orders that were logged under Paper Trading plans before separation
-    try {
-      await db('subscription_payments').where({ amount: 350 }).whereNot('plan', 'ALGO_STATIC_IP').update({ plan: 'ALGO_STATIC_IP' });
-      await db('subscription_payments').where({ amount: 250 }).whereNot('plan', 'ALGO_LINK_USER').update({ plan: 'ALGO_LINK_USER' });
-      await db('subscription_payments').where({ amount: 999 }).whereNot('plan', 'ALGO_PRO').update({ plan: 'ALGO_PRO' });
-      await db('subscription_payments').where({ amount: 2499 }).whereNot('plan', 'ALGO_INSTITUTIONAL').update({ plan: 'ALGO_INSTITUTIONAL' });
-      await db('subscription_payments').where({ amount: 500 }).whereNot('plan', 'ALGO_WALLET').update({ plan: 'ALGO_WALLET' });
-      await db('subscription_payments')
-        .whereNotIn('amount', [0, 199, 250, 350, 999, 1999, 2499, 2999, 9999, 24999])
-        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
-        .update({ plan: 'ALGO_WALLET' });
-      await db('subscription_payments')
-        .whereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%algo%'")
-        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
-        .update({ plan: 'ALGO_WALLET' });
-    } catch (_) {}
+    // 3. Heal & strictly separate Paper Trading vs SkandX Algo rows
+    await healAndSeparateSubscriptionPayments();
 
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
@@ -5811,8 +5876,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       .leftJoin('users', 'subscription_payments.user_id', 'users.id')
       .whereRaw("UPPER(COALESCE(subscription_payments.plan, '')) NOT LIKE 'ALGO_%'")
       .whereNotIn('subscription_payments.plan', ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'])
-      .whereRaw("LOWER(COALESCE(subscription_payments.failure_reason, '')) NOT LIKE '%algo%'")
-      .whereIn('subscription_payments.amount', [0, 199, 1999, 2999, 9999, 24999])
+      .whereNotIn('subscription_payments.amount', [250, 350, 500, 999, 2499])
       .select(
         'subscription_payments.*',
         db.raw('COALESCE(users.username, subscription_payments.username) as username'),
@@ -15908,31 +15972,19 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       }
     } catch (_) {}
 
-    // 1b. Heal any legacy Algo orders that were logged with non-ALGO plan tags before plan separation,
-    // and resolve any INITIATED Algo orders by checking Razorpay or auto-cancelling after 2 minutes.
-    try {
-      await db('subscription_payments').where({ amount: 500 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_WALLET' });
-      await db('subscription_payments').where({ amount: 350 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_STATIC_IP' });
-      await db('subscription_payments').where({ amount: 250 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_LINK_USER' });
-      await db('subscription_payments').where({ amount: 999 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_PRO' });
-      await db('subscription_payments').where({ amount: 2499 }).whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'").update({ plan: 'ALGO_INSTITUTIONAL' });
-      await db('subscription_payments')
-        .whereRaw("UPPER(COALESCE(plan, '')) NOT LIKE 'ALGO_%'")
-        .andWhere(b => {
-          b.whereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%algo%'")
-            .orWhereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%static ip%'")
-            .orWhereRaw("LOWER(COALESCE(failure_reason, '')) LIKE '%wallet%'")
-            .orWhereNotIn('amount', [0, 199, 1999, 2999, 9999, 24999]);
-        })
-        .update({ plan: 'ALGO_WALLET' });
+    // 1b. Heal & strictly separate Paper Trading vs SkandX Algo rows,
+    // and resolve any INITIATED / CANCELLED Algo orders by checking Razorpay or auto-cancelling after 2 minutes.
+    await healAndSeparateSubscriptionPayments();
 
+    try {
       const pendingAlgoRows = await db('subscription_payments')
-        .where({ status: 'INITIATED' })
+        .whereIn('status', ['INITIATED', 'CANCELLED'])
         .andWhere(builder => {
           builder.whereRaw("UPPER(COALESCE(plan, '')) LIKE 'ALGO_%'")
             .orWhereIn('plan', ['STATIC_IP', 'LINK_USER', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE']);
         })
         .select('*')
+        .orderBy('created_at', 'desc')
         .limit(20)
         .catch(() => []);
 
@@ -15975,7 +16027,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
           }
 
           const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-          if (!resolvedViaRzp && (!createdMs || createdMs < twoMinsAgoMs)) {
+          if (!resolvedViaRzp && row.status === 'INITIATED' && (!createdMs || createdMs < twoMinsAgoMs)) {
             await db('subscription_payments').where({ id: row.id }).update({
               status: 'CANCELLED',
               failure_reason: 'Checkout dismissed or timed out before payment completion',
@@ -16009,7 +16061,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
                     razorpay_payment_id: p.id,
                     updated_at: new Date()
                   });
-                } else if (exists.status === 'INITIATED' && rzpStatus === 'FAILED') {
+                } else if ((exists.status === 'INITIATED' || exists.status === 'CANCELLED') && rzpStatus === 'FAILED') {
                   await db('subscription_payments').where({ id: exists.id }).update({
                     status: 'FAILED',
                     razorpay_payment_id: p.id,
@@ -16367,8 +16419,10 @@ app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireA
         state.transactions.unshift({
           id: 'ADM_' + Math.floor(100000 + Math.random() * 900000),
           date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          createdAtIso: new Date().toISOString(),
           type: diff >= 0 ? 'CREDIT' : 'DEBIT',
           itemTitle: 'Admin Algo Wallet Adjustment',
+          planKey: 'ALGO_WALLET',
           amount: Math.abs(diff),
           method: `Admin Override (₹${prevBal.toLocaleString('en-IN')} ➔ ₹${nextBal.toLocaleString('en-IN')})`,
           status: 'SUCCESS'
@@ -16379,6 +16433,7 @@ app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireA
 
     // 2. Update Active Algo Plan
     if (activePlan) {
+      const prevPlan = String(state.config.activePlan || state.config.currentPlan || 'STARTER').toUpperCase().trim();
       const cleanPlan = String(activePlan).toUpperCase().trim();
       state.config.activePlan = cleanPlan;
       state.config.currentPlan = cleanPlan;
@@ -16387,15 +16442,17 @@ app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireA
       } else if (cleanPlan === 'INSTITUTIONAL') {
         state.config.totalLinkSlots = Math.max(state.config.totalLinkSlots || 1, 15);
       }
-      await logSubscriptionAttempt({
-        userId: targetUserId,
-        plan: cleanPlan === 'INSTITUTIONAL' ? 'ALGO_INSTITUTIONAL' : (cleanPlan === 'PRO' ? 'ALGO_PRO' : 'ALGO_WALLET'),
-        amount: 0,
-        paymentType: 'ADMIN_GRANT',
-        status: 'SUCCESS',
-        failureReason: `Algo Plan set to ${cleanPlan} by Algo Admin`
-      });
-      actionSummary = `Algo Plan set to ${cleanPlan}`;
+      if (cleanPlan !== prevPlan) {
+        await logSubscriptionAttempt({
+          userId: targetUserId,
+          plan: cleanPlan === 'INSTITUTIONAL' ? 'ALGO_INSTITUTIONAL' : (cleanPlan === 'PRO' ? 'ALGO_PRO' : 'ALGO_WALLET'),
+          amount: 0,
+          paymentType: 'ADMIN_GRANT',
+          status: 'SUCCESS',
+          failureReason: `Algo Plan set to ${cleanPlan} by Algo Admin`
+        });
+        actionSummary = `Algo Plan set to ${cleanPlan}`;
+      }
     }
 
     // 3. Update Per-User Algo Risk Limits (Max Order Qty / Daily Loss Limit)
