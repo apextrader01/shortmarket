@@ -488,12 +488,6 @@ async function initFyers(io, pc, isMaster = true) {
         setInterval(() => {
             if (dirtySymbols.size === 0 || !global_io) return;
 
-            // ⚡ Off-Market Deep Sleep: If it is night or weekend and all trading sessions are closed, skip broadcast
-            if (!isAnyTradingSessionOpen()) {
-                dirtySymbols.clear();
-                return;
-            }
-
             // Build one batch object with ALL updated prices — slimmed to essential fields
             // to slash network egress bandwidth and Redis loopback traffic by >80%
             const batchUpdate = {};
@@ -985,6 +979,7 @@ function addSubscriptionBatch(symbols) {
         // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
+        if (sharedPriceCache[s]) dirtySymbols.add(s);
         
         const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
@@ -1019,6 +1014,7 @@ function handlePingSubscriptions(symbols) {
         
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
+        if (sharedPriceCache[s]) dirtySymbols.add(s);
         
         if (!clientSubscriptions.has(s)) {
             clientSubscriptions.add(s);

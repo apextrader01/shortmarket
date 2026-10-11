@@ -12665,6 +12665,7 @@ app.use('/api/community', apiLimiter, communityRouter);
 
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+  index: false,
   maxAge: '1y',
   immutable: true,
   setHeaders: (res, filePath) => {
@@ -15675,6 +15676,8 @@ app.use((req, res) => {
   }
 
   const cleanPath = (req.path || '/').toLowerCase().replace(/\/+$/, '') || '/';
+  const ua = String(req.headers['user-agent'] || '');
+  const isCrawlerRequest = /Mediapartners-Google|AdsBot-Google|Googlebot|Google-InspectionTool|GoogleOther|Google-Extended|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|ia_archiver|GPTBot|OAI-SearchBot|ClaudeBot|PerplexityBot|Applebot|Lighthouse|Chrome-Lighthouse|PageSpeed/i.test(ua);
 
   // Google AdSense Policy Compliance: Never load adsbygoogle.js on login, account deletion, admin, or auth utility pages
   const isNoAdsUtilityRoute = [
@@ -15692,6 +15695,15 @@ app.use((req, res) => {
       .replace(/<meta\s+name="google-adsense-account"[^>]*>/gi, '')
       .replace(/<script[^>]*pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js[^>]*><\/script>/gi, '')
       .replace('</head>', '<meta name="robots" content="noindex, nofollow" /></head>');
+  }
+
+  // For AdSense & Search Crawlers, move the rich publisher article directly into <div id="root"> so it is visible in the main DOM body.
+  // For human browsers, keep <div id="root"></div> empty so there is zero text flash before React mounts.
+  if (isCrawlerRequest && !isNoAdsUtilityRoute) {
+    baseHtml = baseHtml.replace(
+      /<div id="root"><\/div>\s*<noscript>\s*([\s\S]*?)\s*<\/noscript>/i,
+      '<div id="root">$1</div>'
+    );
   }
 
   const seoEntry = SERVER_SEO_MAP[cleanPath];
