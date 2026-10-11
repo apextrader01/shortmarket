@@ -4,6 +4,7 @@ import {
   ArrowRight, AlertCircle, Sparkles, Zap, Building2, Smartphone
 } from 'lucide-react';
 import { useStore, API } from '../store';
+import logoImg from '../assets/logo.png';
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -212,9 +213,30 @@ export default function AlgoPaymentGatewayModal({
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', (resp) => {
+      rzp.on('payment.failed', async (resp) => {
         setIsProcessing(false);
-        setErrorMsg(resp?.error?.description || 'Payment failed or was declined by the bank.');
+        const failDesc = resp?.error?.description || resp?.error?.reason || 'Payment failed or was declined by the bank.';
+        setErrorMsg(failDesc);
+        try {
+          const failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              razorpay_order_id: resp?.error?.metadata?.order_id || resolvedOrderId,
+              razorpay_payment_id: resp?.error?.metadata?.payment_id || null,
+              error_description: failDesc,
+              error_reason: resp?.error?.reason || 'payment_failed',
+              status: 'FAILED',
+              itemType: item?.type || 'STATIC_IP',
+              amount: effectiveAmount,
+              title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+            })
+          });
+          const failData = await failRes.json().catch(() => ({}));
+          if (failData?.transactions) {
+            notifyParent({ paymentFailed: true, transactions: failData.transactions });
+          }
+        } catch (_) {}
       });
       rzp.open();
     } catch (err) {
@@ -304,21 +326,20 @@ export default function AlgoPaymentGatewayModal({
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)'
-            }}>
-              <ShieldCheck size={18} color="#fff" />
-            </div>
+            <img
+              src={logoImg}
+              alt="SkandX Logo"
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)',
+                flexShrink: 0
+              }}
+            />
             <div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>SkandX × Razorpay Checkout</span>
+                <span>Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> × Razorpay Checkout</span>
                 <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
                   LIVE GATEWAY
                 </span>

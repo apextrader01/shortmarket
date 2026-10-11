@@ -15766,9 +15766,121 @@ app.post('/api/v1/bridge/wallet/pay', authenticateToken, async (req, res) => {
   }
 });
 
+// Record Failed / Rejected / Cancelled Razorpay Checkout Attempts
+app.post('/api/v1/bridge/razorpay/fail', authenticateToken, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, error_description, error_reason, status: reqStatus, itemType, amount, title } = req.body || {};
+    const resolved = resolveAlgoPaymentItem({ itemType, amount, title });
+    const finalStatus = reqStatus === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
+    const failReason = String(error_description || error_reason || (finalStatus === 'CANCELLED' ? 'Checkout dismissed by user' : 'Payment declined by bank / UPI gateway')).slice(0, 240);
+
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: resolved.planKey,
+      amount: resolved.amountInr,
+      paymentType: 'ONE_TIME',
+      status: finalStatus,
+      razorpayOrderId: razorpay_order_id || null,
+      razorpayPaymentId: razorpay_payment_id || null,
+      failureReason: failReason
+    });
+
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const txRecord = {
+      id: razorpay_payment_id || razorpay_order_id || ('REJ_' + Math.floor(100000 + Math.random() * 900000)),
+      date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      type: 'REJECTED',
+      itemTitle: resolved.title,
+      amount: resolved.amountInr,
+      method: `Razorpay (${finalStatus}) • ${resolved.title} — ${failReason}`,
+      status: finalStatus,
+      failureReason: failReason
+    };
+    state.transactions.unshift(txRecord);
+    if (state.transactions.length > 50) state.transactions.pop();
+    await saveUserBridgeState(userObj, state);
+
+    appendAlgoAuditLog(`[PAYMENT_${finalStatus}] ${userObj.email || userObj.username} • ${resolved.title} (₹${resolved.amountInr}): ${failReason}`, false);
+
+    res.json({
+      success: true,
+      txRecord,
+      transactions: state.transactions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 10. Institutional Algo Admin Suite Endpoints (STRICTLY ADMIN-ONLY!)
+let globalAlgoFreezeActive = false;
+
 app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 1. Hydrate all saved per-user Algo Hub states from system_settings into memory cache
+    try {
+      const stateRows = await db('system_settings').where('key', 'like', 'algo_hub_state_u_%').select('key', 'value');
+      for (const r of stateRows) {
+        const uid = String(r.key).replace('algo_hub_state_u_', '');
+        if (!userBridgeStatesCache.has(uid) && r.value) {
+          try {
+            const parsed = JSON.parse(r.value);
+            if (parsed && typeof parsed === 'object') {
+              recalculateBridgeStats(parsed);
+              userBridgeStatesCache.set(uid, parsed);
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // 2. Optional live Razorpay sync (?syncRazorpay=true)
+    if (req.query.syncRazorpay === 'true') {
+      try {
+        const { client, key_id, key_secret } = await getRazorpayClient();
+        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
+          const rzpPayments = await client.payments.all({ count: 50 }).catch(() => null);
+          if (rzpPayments && Array.isArray(rzpPayments.items)) {
+            for (const p of rzpPayments.items) {
+              const exists = await db('subscription_payments')
+                .where({ razorpay_payment_id: p.id })
+                .orWhere(builder => {
+                  if (p.order_id) builder.where({ razorpay_order_id: p.order_id });
+                })
+                .first();
+              const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
+              const amountInr = Math.round((Number(p.amount) || 0) / 100);
+              const failMsg = p.error_description || p.error_reason || null;
+              if (exists) {
+                if (exists.status !== 'SUCCESS' && rzpStatus === 'SUCCESS') {
+                  await db('subscription_payments').where({ id: exists.id }).update({
+                    status: 'SUCCESS',
+                    razorpay_payment_id: p.id,
+                    updated_at: new Date()
+                  });
+                } else if (exists.status === 'INITIATED' && rzpStatus === 'FAILED') {
+                  await db('subscription_payments').where({ id: exists.id }).update({
+                    status: 'FAILED',
+                    razorpay_payment_id: p.id,
+                    failure_reason: failMsg || exists.failure_reason,
+                    updated_at: new Date()
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Query all user accounts from PostgreSQL / SQLite
+    const dbUsers = await db('users')
+      .select('id', 'username', 'email', 'phone', 'client_id', 'balance', 'is_admin', 'is_banned', 'subscription_tier', 'subscription_expires', 'created_at', 'updated_at')
+      .orderBy('id', 'desc')
+      .limit(500)
+      .catch(() => []);
+
     let totalDematsAcrossPlatform = 0;
     let activeDematsAcrossPlatform = 0;
     let expiredDematsAcrossPlatform = 0;
@@ -15776,21 +15888,197 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     let totalLinkedClientsAcrossPlatform = 0;
     let totalLinkCapacityAcrossPlatform = 0;
     let totalOrdersAcrossPlatform = 0;
+    let totalAlgoWalletMoney = 0;
+    let totalPaperMoney = 0;
 
-    for (const [, st] of userBridgeStatesCache.entries()) {
-      totalDematsAcrossPlatform += (st.demats || []).length;
-      activeDematsAcrossPlatform += (st.demats || []).filter(d => d.status === 'ACTIVE').length;
-      expiredDematsAcrossPlatform += (st.demats || []).filter(d => d.status === 'EXPIRED').length;
-      totalStaticIpsAcrossPlatform += (st.staticIps || []).length;
-      totalLinkedClientsAcrossPlatform += (st.linkedUsers || []).length;
-      totalLinkCapacityAcrossPlatform += Number(st.config?.totalLinkSlots || 1);
-      totalOrdersAcrossPlatform += (st.orders || []).length;
+    const allDemats = [];
+    const allStaticIps = [];
+    const allLinkedUsers = [];
+    const allOrders = [];
+
+    const accounts = dbUsers.map(u => {
+      const uid = String(u.id);
+      const st = userBridgeStatesCache.get(uid) || null;
+      const algoBal = Number(st?.config?.availableCredit || 0);
+      const paperBal = Number(u.balance || 0);
+      const userDemats = Array.isArray(st?.demats) ? st.demats : [];
+      const userIps = Array.isArray(st?.staticIps) ? st.staticIps : [];
+      const userLinks = Array.isArray(st?.linkedUsers) ? st.linkedUsers : [];
+      const userWatchlist = Array.isArray(st?.watchlist) ? st.watchlist : [];
+      const userOrders = Array.isArray(st?.orders) ? st.orders : [];
+      const linkSlots = Number(st?.config?.totalLinkSlots || 1);
+      const activePlan = st?.config?.activePlan || st?.config?.currentPlan || (u.subscription_tier && !['BASIC', 'FREE', 'NORMAL'].includes(String(u.subscription_tier).toUpperCase()) ? String(u.subscription_tier).toUpperCase() : 'STARTER');
+
+      totalDematsAcrossPlatform += userDemats.length;
+      activeDematsAcrossPlatform += userDemats.filter(d => d.status === 'ACTIVE').length;
+      expiredDematsAcrossPlatform += userDemats.filter(d => d.status === 'EXPIRED').length;
+      totalStaticIpsAcrossPlatform += userIps.length;
+      totalLinkedClientsAcrossPlatform += userLinks.length;
+      totalLinkCapacityAcrossPlatform += linkSlots;
+      totalOrdersAcrossPlatform += userOrders.length;
+      totalAlgoWalletMoney += algoBal;
+      totalPaperMoney += paperBal;
+
+      const clientIdStr = u.client_id || `SKX-${String(u.id).padStart(4, '0')}`;
+
+      userDemats.forEach(d => {
+        allDemats.push({
+          ...d,
+          ownerId: u.id,
+          ownerEmail: u.email || u.username,
+          ownerClientId: clientIdStr
+        });
+      });
+
+      userIps.forEach(ip => {
+        allStaticIps.push({
+          ...ip,
+          ownerId: u.id,
+          ownerEmail: u.email || u.username,
+          ownerClientId: clientIdStr
+        });
+      });
+
+      userLinks.forEach(lnk => {
+        allLinkedUsers.push({
+          ...lnk,
+          ownerId: u.id,
+          ownerEmail: u.email || u.username,
+          ownerClientId: clientIdStr
+        });
+      });
+
+      userOrders.slice(0, 15).forEach(ord => {
+        allOrders.push({
+          ...ord,
+          ownerId: u.id,
+          ownerEmail: u.email || u.username,
+          ownerClientId: clientIdStr
+        });
+      });
+
+      return {
+        id: u.id,
+        clientId: clientIdStr,
+        username: u.username || (u.email ? u.email.split('@')[0] : `User #${u.id}`),
+        email: u.email || '',
+        phone: u.phone || '',
+        isAdmin: Boolean(u.is_admin),
+        isBanned: Boolean(u.is_banned),
+        paperBalance: paperBal,
+        algoWalletBalance: algoBal,
+        activePlan,
+        paperSubscriptionTier: u.subscription_tier || 'BASIC',
+        subscriptionExpires: u.subscription_expires || null,
+        dematsCount: userDemats.length,
+        activeDematsCount: userDemats.filter(d => d.status === 'ACTIVE').length,
+        expiredDematsCount: userDemats.filter(d => d.status === 'EXPIRED').length,
+        staticIpsCount: userIps.length,
+        linkedUsersCount: userLinks.length,
+        totalLinkSlots: linkSlots,
+        watchlistCount: userWatchlist.length,
+        activeAlgosCount: userWatchlist.filter(w => w.algoActive).length,
+        ordersCount: userOrders.length,
+        copyGroupStatus: st?.copyGroups?.status || 'PAUSED',
+        followersCount: (st?.copyGroups?.followers || []).length,
+        telegramConnected: Boolean(st?.telegramConfig?.connected || st?.telegram?.connected),
+        createdAt: u.created_at,
+        demats: userDemats,
+        staticIps: userIps,
+        linkedUsers: userLinks
+      };
+    });
+
+    // 4. Query all payment records (Successful, Rejected/Failed, Initiated) from subscription_payments + user transactions
+    const dbPayments = await db('subscription_payments')
+      .leftJoin('users', 'subscription_payments.user_id', 'users.id')
+      .select(
+        'subscription_payments.*',
+        db.raw('COALESCE(users.username, subscription_payments.username) as resolved_username'),
+        db.raw('COALESCE(users.email, subscription_payments.email) as resolved_email'),
+        db.raw('COALESCE(users.phone, subscription_payments.phone) as resolved_phone'),
+        db.raw('COALESCE(users.client_id, subscription_payments.client_id) as resolved_client_id')
+      )
+      .orderBy('subscription_payments.created_at', 'desc')
+      .limit(500)
+      .catch(() => []);
+
+    const payments = dbPayments.map(p => ({
+      id: p.id,
+      txRef: p.razorpay_payment_id || p.razorpay_order_id || p.razorpay_subscription_id || `PAY-${p.id}`,
+      orderId: p.razorpay_order_id || null,
+      paymentId: p.razorpay_payment_id || null,
+      userId: p.user_id,
+      username: p.resolved_username || 'Trader',
+      email: p.resolved_email || '—',
+      phone: p.resolved_phone || '—',
+      clientId: p.resolved_client_id || (p.user_id ? `SKX-${String(p.user_id).padStart(4, '0')}` : '—'),
+      plan: p.plan || 'ALGO_SERVICE',
+      amount: Number(p.amount || 0),
+      paymentType: p.payment_type || 'ONE_TIME',
+      status: String(p.status || 'INITIATED').toUpperCase(),
+      failureReason: p.failure_reason || null,
+      createdAt: p.created_at
+    }));
+
+    // Also include any Wallet or Algo transactions not already in subscription_payments
+    const seenRefs = new Set(payments.map(p => String(p.txRef)));
+    for (const acc of accounts) {
+      const st = userBridgeStatesCache.get(String(acc.id));
+      if (st && Array.isArray(st.transactions)) {
+        for (const tx of st.transactions) {
+          if (tx && tx.id && !seenRefs.has(String(tx.id))) {
+            seenRefs.add(String(tx.id));
+            const txStatus = String(tx.status || 'SUCCESS').toUpperCase();
+            payments.push({
+              id: tx.id,
+              txRef: tx.id,
+              orderId: null,
+              paymentId: tx.id,
+              userId: acc.id,
+              username: acc.username,
+              email: acc.email,
+              phone: acc.phone,
+              clientId: acc.clientId,
+              plan: tx.itemTitle || tx.type || 'ALGO_WALLET',
+              amount: Number(tx.amount || 0),
+              paymentType: String(tx.id).startsWith('WAL_') ? 'ALGO_WALLET' : (String(tx.id).startsWith('ADM_') ? 'ADMIN_GRANT' : 'RAZORPAY'),
+              status: txStatus === 'REJECTED' ? 'FAILED' : txStatus,
+              failureReason: tx.failureReason || (tx.method && txStatus !== 'SUCCESS' ? tx.method : null),
+              createdAt: tx.date || new Date().toISOString()
+            });
+          }
+        }
+      }
+    }
+
+    let totalRevenue = 0;
+    let algoRevenue = 0;
+    let successCount = 0;
+    let failedCount = 0;
+    let initiatedCount = 0;
+
+    for (const p of payments) {
+      const st = String(p.status || '').toUpperCase();
+      if (st === 'SUCCESS') {
+        successCount++;
+        if (p.paymentType !== 'ADMIN_GRANT') {
+          totalRevenue += Number(p.amount || 0);
+          if (String(p.plan || '').includes('ALGO') || String(p.plan || '').includes('STATIC_IP') || String(p.plan || '').includes('LINK') || String(p.plan || '').includes('WALLET') || p.paymentType === 'ALGO_WALLET') {
+            algoRevenue += Number(p.amount || 0);
+          }
+        }
+      } else if (st === 'FAILED' || st === 'REJECTED') {
+        failedCount++;
+      } else {
+        initiatedCount++;
+      }
     }
 
     res.json({
       success: true,
       infrastructure: {
-        bkcGatewayStatus: 'ONLINE_ACTIVE',
+        bkcGatewayStatus: globalAlgoFreezeActive ? 'FROZEN_BY_ADMIN' : 'ONLINE_ACTIVE',
         bkcLatencyMs: 1.8,
         serverUptimePct: 99.98,
         redisQueueBacklog: 0,
@@ -15798,31 +16086,194 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         packetLossPct: 0.00
       },
       summary: {
+        globalFreeze: globalAlgoFreezeActive,
+        totalUsers: accounts.length,
+        totalUsersConfigured: Math.max(1, accounts.length),
         totalDemats: totalDematsAcrossPlatform,
         activeDemats: activeDematsAcrossPlatform,
         expiredDemats: expiredDematsAcrossPlatform,
         totalOrdersToday: totalOrdersAcrossPlatform,
         todayOrders: totalOrdersAcrossPlatform,
-        totalUsersConfigured: Math.max(1, userBridgeStatesCache.size),
         totalStaticIps: totalStaticIpsAcrossPlatform,
         totalLinkedClients: totalLinkedClientsAcrossPlatform,
-        totalLinkCapacity: Math.max(5, totalLinkCapacityAcrossPlatform)
+        totalLinkCapacity: Math.max(1, totalLinkCapacityAcrossPlatform),
+        totalAlgoWalletMoney,
+        totalPaperMoney,
+        totalRevenue,
+        algoRevenue,
+        successPaymentsCount: successCount,
+        failedPaymentsCount: failedCount,
+        initiatedPaymentsCount: initiatedCount
       },
+      accounts,
+      payments,
+      allDemats,
+      allStaticIps,
+      allLinkedUsers,
+      allOrders,
       gateways: [
-        { name: 'Zerodha Kite Connect', api: 'REST API v3 + WebSocket Ticker', latency: '4.2 ms', sessions: activeDematsAcrossPlatform + 12, activeSessions: activeDematsAcrossPlatform + 12, status: 'OPERATIONAL' },
-        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: 8, activeSessions: 8, status: 'OPERATIONAL' },
-        { name: 'Upstox Pro API v2', api: 'Pro API v2 Protobuf Feed', latency: '8.4 ms', sessions: 6, activeSessions: 6, status: 'OPERATIONAL' },
-        { name: 'DhanHQ Open API', api: 'DhanHQ v2 Feed & Order API', latency: '5.1 ms', sessions: 4, activeSessions: 4, status: 'OPERATIONAL' },
-        { name: 'Fyers API v3', api: 'Fyers API v3 Multi-Socket', latency: '7.8 ms', sessions: 5, activeSessions: 5, status: 'OPERATIONAL' }
+        { name: 'Zerodha Kite Connect', api: 'REST API v3 + WebSocket Ticker', latency: '4.2 ms', sessions: activeDematsAcrossPlatform + 12, activeSessions: activeDematsAcrossPlatform + 12, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: 8, activeSessions: 8, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Upstox Pro API v2', api: 'Pro API v2 Protobuf Feed', latency: '8.4 ms', sessions: 6, activeSessions: 6, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'DhanHQ Open API', api: 'DhanHQ v2 Feed & Order API', latency: '5.1 ms', sessions: 4, activeSessions: 4, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Fyers API v3', api: 'Fyers API v3 Multi-Socket', latency: '7.8 ms', sessions: 5, activeSessions: 5, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
       ],
       brokerGateways: [
-        { name: 'Zerodha Kite Connect v3', latency: '4.2 ms', activeSessions: activeDematsAcrossPlatform + 12, status: 'OPERATIONAL' },
-        { name: 'Angel One SmartAPI v2', latency: '6.1 ms', activeSessions: 8, status: 'OPERATIONAL' },
-        { name: 'Upstox Pro API v2', latency: '8.4 ms', activeSessions: 6, status: 'OPERATIONAL' },
-        { name: 'DhanHQ Open API', latency: '5.1 ms', activeSessions: 4, status: 'OPERATIONAL' },
-        { name: 'Fyers API v3', latency: '7.8 ms', activeSessions: 5, status: 'OPERATIONAL' }
+        { name: 'Zerodha Kite Connect v3', latency: '4.2 ms', activeSessions: activeDematsAcrossPlatform + 12, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Angel One SmartAPI v2', latency: '6.1 ms', activeSessions: 8, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Upstox Pro API v2', latency: '8.4 ms', activeSessions: 6, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'DhanHQ Open API', latency: '5.1 ms', activeSessions: 4, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
+        { name: 'Fyers API v3', latency: '7.8 ms', activeSessions: 5, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
       ],
       auditLogs: algoAdminAuditLogs
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Per-User Account Management (Modify Algo Wallet Balance, Paper Balance, Plan, Static IPs, Link Slots, Demat Status)
+app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const targetUserId = Number(req.params.userId);
+    if (!targetUserId || isNaN(targetUserId)) {
+      return res.status(400).json({ error: 'Valid target user ID is required' });
+    }
+
+    const targetUser = await db('users').where({ id: targetUserId }).first();
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user account not found' });
+    }
+
+    const targetUserObj = {
+      id: targetUser.id,
+      username: targetUser.username,
+      email: targetUser.email,
+      client_id: targetUser.client_id,
+      is_admin: Boolean(targetUser.is_admin),
+      isGuest: false
+    };
+
+    const state = await getUserBridgeState(targetUserObj);
+    const {
+      action,
+      algoWalletBalance,
+      paperBalance,
+      activePlan,
+      slotsToAdd,
+      totalLinkSlots
+    } = req.body || {};
+
+    let actionSummary = 'Updated account settings';
+
+    // 1. Update Algo Wallet Balance (Current Money in Algo Hub)
+    if (algoWalletBalance !== undefined && algoWalletBalance !== null && !isNaN(Number(algoWalletBalance))) {
+      const prevBal = Number(state.config.availableCredit || 0);
+      const nextBal = Math.max(0, Number(Number(algoWalletBalance).toFixed(2)));
+      const diff = Number((nextBal - prevBal).toFixed(2));
+      state.config.availableCredit = nextBal;
+      state.transactions.unshift({
+        id: 'ADM_' + Math.floor(100000 + Math.random() * 900000),
+        date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        type: diff >= 0 ? 'CREDIT' : 'DEBIT',
+        itemTitle: 'Admin Algo Wallet Adjustment',
+        amount: Math.abs(diff),
+        method: `Admin Override (₹${prevBal.toLocaleString('en-IN')} ➔ ₹${nextBal.toLocaleString('en-IN')})`,
+        status: 'SUCCESS'
+      });
+      actionSummary = `Algo Wallet set to ₹${nextBal.toLocaleString('en-IN')}`;
+    }
+
+    // 2. Update Paper Trading Balance (Current Money in Paper Terminal)
+    if (paperBalance !== undefined && paperBalance !== null && !isNaN(Number(paperBalance))) {
+      const nextPaper = Math.max(0, Number(Number(paperBalance).toFixed(2)));
+      const prevPaper = Number(targetUser.balance || 0);
+      const delta = Number((nextPaper - prevPaper).toFixed(2));
+      await db('users').where({ id: targetUserId }).update({ balance: nextPaper });
+      if (delta !== 0) {
+        await db('ledger').insert({
+          user_id: targetUserId,
+          amount: delta,
+          type: delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL',
+          description: `Algo Admin balance adjustment (₹${prevPaper.toLocaleString('en-IN')} ➔ ₹${nextPaper.toLocaleString('en-IN')})`
+        }).catch(() => {});
+      }
+      actionSummary = `Paper Balance set to ₹${nextPaper.toLocaleString('en-IN')}`;
+    }
+
+    // 3. Update Active Algo Plan
+    if (activePlan) {
+      const cleanPlan = String(activePlan).toUpperCase().trim();
+      state.config.activePlan = cleanPlan;
+      state.config.currentPlan = cleanPlan;
+      if (cleanPlan === 'PRO') {
+        state.config.totalLinkSlots = Math.max(state.config.totalLinkSlots || 1, 5);
+      } else if (cleanPlan === 'INSTITUTIONAL') {
+        state.config.totalLinkSlots = Math.max(state.config.totalLinkSlots || 1, 15);
+      }
+      await logSubscriptionAttempt({
+        userId: targetUserId,
+        plan: cleanPlan === 'INSTITUTIONAL' ? 'ALGO_INSTITUTIONAL' : (cleanPlan === 'PRO' ? 'ALGO_PRO' : 'BASIC'),
+        amount: 0,
+        paymentType: 'ADMIN_GRANT',
+        status: 'SUCCESS',
+        failureReason: `Plan set to ${cleanPlan} by Algo Admin`
+      });
+      actionSummary = `Algo Plan set to ${cleanPlan}`;
+    }
+
+    // 4. Grant Static IP to this specific user
+    if (action === 'GRANT_STATIC_IP') {
+      const octet = Math.floor(40 + Math.random() * 180);
+      const newIp = {
+        id: 'IP-' + Math.floor(100 + Math.random() * 900),
+        ip: `103.212.120.${octet}`,
+        datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+        status: 'WHITELISTED',
+        latency: '1.7 ms',
+        assignedTo: 'Unassigned (Admin Granted)',
+        port: '8080 (SOCKS5/HTTP)',
+        expiresAt: '30 Days (Admin Grant)'
+      };
+      state.staticIps.unshift(newIp);
+      actionSummary = `Granted Static IP ${newIp.ip}`;
+    }
+
+    // 5. Grant or Set Client Link Slots
+    if (slotsToAdd) {
+      const addCount = Math.max(1, Number(slotsToAdd) || 1);
+      state.config.totalLinkSlots = (state.config.totalLinkSlots || 1) + addCount;
+      actionSummary = `Granted +${addCount} Link Slot(s) (Total: ${state.config.totalLinkSlots})`;
+    } else if (totalLinkSlots !== undefined && !isNaN(Number(totalLinkSlots))) {
+      state.config.totalLinkSlots = Math.max(1, Number(totalLinkSlots));
+      actionSummary = `Link Slots set to ${state.config.totalLinkSlots}`;
+    }
+
+    // 6. Renew all Demat sessions for this user
+    if (action === 'RENEW_DEMATS') {
+      (state.demats || []).forEach(d => {
+        d.status = 'ACTIVE';
+        d.lastLogin = 'Just now (Admin Renewed)';
+        d.expiresIn = 'Active (Valid 24h)';
+      });
+      actionSummary = `Renewed all Demat sessions for ${targetUser.email || targetUser.username}`;
+    }
+
+    // 7. Pause all Algos / Copy group for this user
+    if (action === 'PAUSE_ALGOS') {
+      state.copyGroups.status = 'PAUSED';
+      (state.demats || []).forEach(d => { d.tradingActive = false; });
+      (state.watchlist || []).forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+      actionSummary = `Paused all active algos & copy trading for ${targetUser.email || targetUser.username}`;
+    }
+
+    await saveUserBridgeState(targetUserObj, state);
+    appendAlgoAuditLog(`[ADMIN_USER_EDIT] ${targetUser.email || targetUser.username}: ${actionSummary}`, true);
+
+    res.json({
+      success: true,
+      message: `${targetUser.email || targetUser.username}: ${actionSummary}`,
+      stats: state.config
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -15869,16 +16320,26 @@ app.post('/api/v1/bridge/admin/grant-slot', authenticateToken, requireAdmin, asy
 
 app.post('/api/v1/bridge/admin/global-freeze', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    for (const [uid, st] of userBridgeStatesCache.entries()) {
-      st.copyGroups.status = 'PAUSED';
-      (st.demats || []).forEach(a => { a.tradingActive = false; });
-      (st.watchlist || []).forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
-      if (uid !== 'guest') {
-        await saveUserBridgeState({ id: uid, isGuest: false }, st);
+    const nextFreeze = req.body?.freeze !== undefined ? Boolean(req.body.freeze) : !globalAlgoFreezeActive;
+    globalAlgoFreezeActive = nextFreeze;
+    if (nextFreeze) {
+      for (const [uid, st] of userBridgeStatesCache.entries()) {
+        st.copyGroups.status = 'PAUSED';
+        (st.demats || []).forEach(a => { a.tradingActive = false; });
+        (st.watchlist || []).forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+        if (uid !== 'guest') {
+          await saveUserBridgeState({ id: uid, isGuest: false }, st);
+        }
       }
     }
-    appendAlgoAuditLog(`[GLOBAL_FREEZE] Admin ${req.user?.email || req.user?.id} activated Global OMS Freeze!`, false);
-    res.json({ success: true, message: 'GLOBAL EMERGENCY FREEZE ACTIVATED: All user algos and copy executions halted.' });
+    appendAlgoAuditLog(`[GLOBAL_FREEZE] Admin ${req.user?.email || req.user?.id} ${nextFreeze ? 'ACTIVATED' : 'RELEASED'} Global OMS Freeze!`, !nextFreeze);
+    res.json({
+      success: true,
+      globalFreeze: globalAlgoFreezeActive,
+      message: nextFreeze
+        ? 'GLOBAL EMERGENCY FREEZE ACTIVATED: All user algos and copy executions halted.'
+        : 'GLOBAL OMS FREEZE RELEASED: Normal multi-broker order routing resumed.'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

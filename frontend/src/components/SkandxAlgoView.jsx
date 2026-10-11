@@ -5,13 +5,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore, API } from '../store';
 import AlgoPaymentGatewayModal from './AlgoPaymentGatewayModal';
 import DeployAlgoModal from './DeployAlgoModal';
+import logoImg from '../assets/logo.png';
 import {
   X, Layers, ShieldCheck, Zap, Copy, RefreshCw, Send, CheckCircle2,
   AlertTriangle, Users, Cpu, Server, Wifi, Globe,
   Clock, CreditCard, Check, Sliders, Code,
   Folder, Bookmark, ShoppingBag, Activity, Plus,
   Trash2, Power, ShieldAlert,
-  ArrowLeft, Wallet, Lock
+  ArrowLeft, Wallet, Lock, Search, Edit2, XCircle
 } from 'lucide-react';
 
 const resolveAlgoTab = (tab) => {
@@ -144,6 +145,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   // Admin Suite State
   const [adminStats, setAdminStats] = useState(null);
   const [loadingAdminStats, setLoadingAdminStats] = useState(false);
+  const [adminSubTab, setAdminSubTab] = useState('ACCOUNTS'); // 'ACCOUNTS' | 'PAYMENTS' | 'INFRASTRUCTURE' | 'DEMATS_IPS' | 'AUDIT_LOGS'
+  const [adminUserSearch, setAdminUserSearch] = useState('');
+  const [adminPlanFilter, setAdminPlanFilter] = useState('ALL');
+  const [adminPaymentFilter, setAdminPaymentFilter] = useState('ALL'); // 'ALL' | 'SUCCESS' | 'FAILED' | 'INITIATED'
+  const [adminPaymentSearch, setAdminPaymentSearch] = useState('');
+  const [editingAdminUser, setEditingAdminUser] = useState(null);
+  const [editAlgoWalletVal, setEditAlgoWalletVal] = useState('');
+  const [editPaperBalanceVal, setEditPaperBalanceVal] = useState('');
+  const [editAlgoPlanVal, setEditAlgoPlanVal] = useState('STARTER');
+  const [editLinkSlotsVal, setEditLinkSlotsVal] = useState(1);
 
   // Demat & Order Modals
   const [showAddDematModal, setShowAddDematModal] = useState(false);
@@ -416,6 +427,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   const handlePaymentSuccess = (result) => {
+    if (result?.paymentFailed) {
+      if (Array.isArray(result.transactions)) {
+        setTransactions(result.transactions);
+      }
+      return;
+    }
     if (result.stats) {
       setConfig(prev => ({ ...prev, ...result.stats }));
     }
@@ -822,17 +839,84 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   // ── Admin Suite Handlers (Strictly Admin Only) ───────────────────────────
-  const fetchAdminStats = useCallback(async () => {
+  const fetchAdminStats = useCallback(async (syncRazorpay = false) => {
     if (!isAdmin) return;
     setLoadingAdminStats(true);
     try {
-      const data = await apiFetch('/api/v1/bridge/admin/system-stats');
+      const query = syncRazorpay === true ? '?syncRazorpay=true' : '';
+      const data = await apiFetch(`/api/v1/bridge/admin/system-stats${query}`);
       if (data.success) {
         setAdminStats(data);
+        if (syncRazorpay === true) {
+          showToast('Synced live Razorpay payments & refreshed all Algo accounts!');
+        }
       }
     } catch (_) {}
     setLoadingAdminStats(false);
-  }, [apiFetch, isAdmin]);
+  }, [apiFetch, isAdmin, showToast]);
+
+  useEffect(() => {
+    if (activeMenu === 'AlgoAdmin' && isAdmin) {
+      fetchAdminStats(false);
+    }
+  }, [activeMenu, isAdmin, fetchAdminStats]);
+
+  const handleOpenEditAdminUser = (acc) => {
+    setEditingAdminUser(acc);
+    setEditAlgoWalletVal(String(acc.algoWalletBalance ?? 0));
+    setEditPaperBalanceVal(String(acc.paperBalance ?? 1000000));
+    setEditAlgoPlanVal(acc.activePlan || 'STARTER');
+    setEditLinkSlotsVal(acc.totalLinkSlots || 1);
+  };
+
+  const handleSaveAdminUserEdit = async (e) => {
+    if (e) e.preventDefault();
+    if (!isAdmin || !editingAdminUser) return;
+    try {
+      const data = await apiFetch(`/api/v1/bridge/admin/user/${editingAdminUser.id}/update`, {
+        method: 'POST',
+        body: JSON.stringify({
+          algoWalletBalance: Number(editAlgoWalletVal),
+          paperBalance: Number(editPaperBalanceVal),
+          activePlan: editAlgoPlanVal,
+          totalLinkSlots: Number(editLinkSlotsVal)
+        })
+      });
+      if (data.success) {
+        showToast(data.message || 'Account updated successfully!');
+        if (String(editingAdminUser.id) === String(user?.id) && data.stats) {
+          setConfig(prev => ({ ...prev, ...data.stats }));
+        }
+        setEditingAdminUser(null);
+        fetchAdminStats(false);
+      } else {
+        showToast(data.error || 'Failed to update account.');
+      }
+    } catch (_) {
+      showToast('Failed to update account.');
+    }
+  };
+
+  const handleQuickAdminUserAction = async (targetUserId, payload) => {
+    if (!isAdmin) return;
+    try {
+      const data = await apiFetch(`/api/v1/bridge/admin/user/${targetUserId}/update`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (data.success) {
+        showToast(data.message || 'Action applied!');
+        if (String(targetUserId) === String(user?.id) && data.stats) {
+          setConfig(prev => ({ ...prev, ...data.stats }));
+        }
+        fetchAdminStats(false);
+      } else {
+        showToast(data.error || 'Failed to apply admin action.');
+      }
+    } catch (_) {
+      showToast('Failed to apply admin action.');
+    }
+  };
 
   const handleAdminProvisionIp = async () => {
     if (!isAdmin) return;
@@ -963,33 +1047,36 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         zIndex: 50,
         backdropFilter: 'blur(10px)'
       }}>
-        {/* Left: Brand + Latency */}
+        {/* Left: Official SkandX Brand Logo + Latency */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? '8px' : '10px',
-            fontWeight: '900',
-            fontSize: isMobile ? '15px' : '19px',
-            letterSpacing: '0.5px'
-          }}>
-            <span style={{
-              background: 'linear-gradient(135deg, #0284c7, #3b82f6)',
-              color: '#fff',
-              width: isMobile ? '28px' : '32px',
-              height: isMobile ? '28px' : '32px',
-              borderRadius: '8px',
+          <div
+            onClick={onBack}
+            style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: isMobile ? '14px' : '17px',
+              gap: isMobile ? '8px' : '10px',
               fontWeight: '900',
-              boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)',
-              flexShrink: 0
-            }}>
-              ⚡
+              fontSize: isMobile ? '15px' : '19px',
+              letterSpacing: '0.5px',
+              cursor: onBack ? 'pointer' : 'default',
+              userSelect: 'none'
+            }}
+            title="SkandX Multi-Broker Algo Platform"
+          >
+            <img
+              src={logoImg}
+              alt="SkandX Logo"
+              style={{
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
+                borderRadius: '8px',
+                boxShadow: '0 0 14px rgba(56, 189, 248, 0.4)',
+                flexShrink: 0
+              }}
+            />
+            <span style={{ color: '#fff', letterSpacing: '-0.3px', whiteSpace: 'nowrap', fontFamily: "'Outfit', Inter, sans-serif", fontWeight: '800' }}>
+              Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> <span style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '900', color: '#e2e8f0', letterSpacing: '0.5px' }}>ALGO</span>
             </span>
-            <span style={{ color: '#fff', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>SKANDX ALGO</span>
             <span style={{
               fontSize: '10px',
               color: '#38bdf8',
@@ -3655,16 +3742,20 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </tr>
                       </thead>
                       <tbody>
-                        {transactions.map(tx => (
-                          <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#38bdf8' }}>{tx.id}</td>
-                            <td style={{ padding: '8px 10px', color: '#94a3b8' }}>{tx.date}</td>
-                            <td style={{ padding: '8px 10px', fontWeight: '800', color: tx.type === 'CREDIT' ? '#22c55e' : '#f59e0b' }}>{tx.type}</td>
-                            <td style={{ padding: '8px 10px' }}>{tx.method}</td>
-                            <td style={{ padding: '8px 10px', fontWeight: '800' }}>₹{Number(tx.amount || 0).toLocaleString('en-IN')}</td>
-                            <td style={{ padding: '8px 10px', color: '#22c55e', fontWeight: '700' }}>{tx.status}</td>
-                          </tr>
-                        ))}
+                        {transactions.map(tx => {
+                          const st = String(tx.status || 'SUCCESS').toUpperCase();
+                          const isRej = st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED' || tx.type === 'REJECTED';
+                          return (
+                            <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#38bdf8' }}>{tx.id}</td>
+                              <td style={{ padding: '8px 10px', color: '#94a3b8' }}>{tx.date}</td>
+                              <td style={{ padding: '8px 10px', fontWeight: '800', color: isRej ? '#ef4444' : (tx.type === 'CREDIT' ? '#22c55e' : '#f59e0b') }}>{tx.type}</td>
+                              <td style={{ padding: '8px 10px' }}>{tx.method}</td>
+                              <td style={{ padding: '8px 10px', fontWeight: '800' }}>₹{Number(tx.amount || 0).toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '8px 10px', color: isRej ? '#ef4444' : '#22c55e', fontWeight: '800' }}>{tx.status}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -3676,204 +3767,945 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* ───────────────────────────────────────────────────────────── */}
           {/* TAB 10: INSTITUTIONAL ALGO ADMIN SUITE (STRICTLY ADMIN ONLY)  */}
           {/* ───────────────────────────────────────────────────────────── */}
-          {activeMenu === 'AlgoAdmin' && isAdmin && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
+          {activeMenu === 'AlgoAdmin' && isAdmin && (() => {
+            const allAccounts = Array.isArray(adminStats?.accounts) ? adminStats.accounts : [];
+            const allPayments = Array.isArray(adminStats?.payments) ? adminStats.payments : [];
+            const allDematsList = Array.isArray(adminStats?.allDemats) ? adminStats.allDemats : demats;
+            const allIpsList = Array.isArray(adminStats?.allStaticIps) ? adminStats.allStaticIps : staticIps;
+            const allOrdersList = Array.isArray(adminStats?.allOrders) ? adminStats.allOrders : orders;
+            const auditLogsList = Array.isArray(adminStats?.auditLogs) ? adminStats.auditLogs : [];
+
+            const filteredAccounts = allAccounts.filter(acc => {
+              const q = adminUserSearch.trim().toLowerCase();
+              const matchSearch = !q ||
+                String(acc.email || '').toLowerCase().includes(q) ||
+                String(acc.username || '').toLowerCase().includes(q) ||
+                String(acc.clientId || '').toLowerCase().includes(q) ||
+                String(acc.phone || '').toLowerCase().includes(q);
+              const matchPlan = adminPlanFilter === 'ALL' || String(acc.activePlan || 'STARTER').toUpperCase() === adminPlanFilter;
+              return matchSearch && matchPlan;
+            });
+
+            const filteredPayments = allPayments.filter(p => {
+              const st = String(p.status || 'INITIATED').toUpperCase();
+              const matchStatus =
+                adminPaymentFilter === 'ALL' ||
+                (adminPaymentFilter === 'SUCCESS' && st === 'SUCCESS') ||
+                (adminPaymentFilter === 'FAILED' && (st === 'FAILED' || st === 'REJECTED')) ||
+                (adminPaymentFilter === 'INITIATED' && (st === 'INITIATED' || st === 'CANCELLED'));
+              const q = adminPaymentSearch.trim().toLowerCase();
+              const matchQuery = !q ||
+                String(p.email || '').toLowerCase().includes(q) ||
+                String(p.username || '').toLowerCase().includes(q) ||
+                String(p.clientId || '').toLowerCase().includes(q) ||
+                String(p.txRef || '').toLowerCase().includes(q) ||
+                String(p.plan || '').toLowerCase().includes(q) ||
+                String(p.failureReason || '').toLowerCase().includes(q);
+              return matchStatus && matchQuery;
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                {/* Top Header Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <ShieldAlert size={22} color="#f87171" />
+                      <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                        SkandX Algo Master Admin Suite & Account Control
+                      </h2>
+                    </div>
+                    <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                      Complete control over all user accounts, current Algo Wallet & Paper money, Successful & Rejected Razorpay payments, Demats, Static IPs & OMS Gateways.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => fetchAdminStats(true)}
+                      disabled={loadingAdminStats}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        background: 'rgba(56, 189, 248, 0.14)',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        color: '#38bdf8',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <RefreshCw size={13} /> {loadingAdminStats ? 'Syncing...' : 'Sync Razorpay & Accounts'}
+                    </button>
+
+                    <button
+                      onClick={handleAdminGlobalFreeze}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: adminStats?.summary?.globalFreeze ? '#16a34a' : '#ef4444',
+                        border: 'none',
+                        color: '#fff',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Power size={13} /> {adminStats?.summary?.globalFreeze ? 'Release OMS Freeze' : 'Global Freeze Switch'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Server Telemetry Banner */}
+                <div style={{
+                  background: '#090d16',
+                  border: '1px solid #1e293b',
+                  borderRadius: '12px',
+                  padding: '12px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  fontSize: '12px'
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <ShieldAlert size={22} color="#f87171" />
-                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
-                      Institutional Algo Administration & OMS Control
-                    </h2>
+                    <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', background: adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e', boxShadow: `0 0 10px ${adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e'}` }}></span>
+                    <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (NSE Colocation)'}</span>
                   </div>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Core colocation server telemetry, broker OMS gateway health, IP pool provisioning & kill switches.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={fetchAdminStats}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 14px',
-                      background: '#1e293b',
-                      border: '1px solid #334155',
-                      color: '#cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <RefreshCw size={13} /> Refresh Telemetry
-                  </button>
-
-                  <button
-                    onClick={handleAdminGlobalFreeze}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 16px',
-                      background: adminStats?.summary?.globalFreeze ? '#16a34a' : '#ef4444',
-                      border: 'none',
-                      color: '#fff',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Power size={13} /> {adminStats?.summary?.globalFreeze ? 'Release OMS Freeze' : 'Global Freeze Switch'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Server Telemetry Banner */}
-              <div style={{
-                background: '#090d16',
-                border: '1px solid #1e293b',
-                borderRadius: '12px',
-                padding: '14px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px',
-                fontSize: '12.5px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
-                  <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (NSE Colocation)'}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', color: '#94a3b8', flexWrap: 'wrap' }}>
-                  <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>{adminStats?.serverStatus?.clockSync || '±0.4μs OK'}</strong></span>
-                  <span>Tick Throughput: <strong style={{ color: '#38bdf8' }}>{adminStats?.serverStatus?.tickRate || '68,420 / sec'}</strong></span>
-                  <span>OMS Latency: <strong style={{ color: '#10b981' }}>1.8 ms</strong></span>
-                  <span>Uptime: <strong style={{ color: '#fff' }}>{adminStats?.serverStatus?.uptime || '99.98%'}</strong></span>
-                </div>
-              </div>
-
-              {/* 4 Admin KPI Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>TOTAL DEMATS ACTIVE</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginTop: '6px' }}>
-                    {adminStats?.summary?.totalDemats ?? demats.length}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '4px' }}>
-                    ● {adminStats?.summary?.activeDemats ?? demats.filter(d => d.status === 'ACTIVE').length} Active • {adminStats?.summary?.expiredDemats ?? demats.filter(d => d.status === 'EXPIRED').length} Re-auth
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '18px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                    <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>±0.4μs OK</strong></span>
+                    <span>Tick Throughput: <strong style={{ color: '#38bdf8' }}>{adminStats?.infrastructure?.activeTicksPerSec ? `${adminStats.infrastructure.activeTicksPerSec.toLocaleString('en-IN')} / sec` : '68,420 / sec'}</strong></span>
+                    <span>OMS Latency: <strong style={{ color: '#10b981' }}>1.8 ms</strong></span>
+                    <span>Uptime: <strong style={{ color: '#fff' }}>99.98%</strong></span>
                   </div>
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>TODAY ROUTED ORDERS</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#38bdf8', marginTop: '6px' }}>
-                    {adminStats?.summary?.todayOrders ?? orders.length}
+                {/* 8 Master Admin KPI Cards (Accounts, Money, Payments, Demats, IPs, Slots) */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: adminSubTab === 'ACCOUNTS' ? '1px solid #38bdf8' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL USER ACCOUNTS</div>
+                    <div style={{ fontSize: '23px', fontWeight: '900', color: '#fff', marginTop: '5px' }}>
+                      {adminStats?.summary?.totalUsers ?? allAccounts.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '3px' }}>
+                      Click to view & edit all accounts
+                    </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px' }}>
-                    Across {adminStats?.summary?.totalUsersConfigured ?? 1} Algo Hub Users
+
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL ALGO WALLET MONEY</div>
+                    <div style={{ fontSize: '23px', fontWeight: '900', color: '#10b981', marginTop: '5px' }}>
+                      ₹{Number(adminStats?.summary?.totalAlgoWalletMoney || 0).toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                      Paper Capital: ₹{Number((adminStats?.summary?.totalPaperMoney || 0) / 100000).toFixed(1)}L across users
+                    </div>
+                  </div>
+
+                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('SUCCESS'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'SUCCESS' ? '1px solid #22c55e' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>SUCCESSFUL PAYMENTS</div>
+                    <div style={{ fontSize: '23px', fontWeight: '900', color: '#22c55e', marginTop: '5px' }}>
+                      {adminStats?.summary?.successPaymentsCount ?? 0} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(adminStats?.summary?.totalRevenue || 0).toLocaleString('en-IN')})</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '3px' }}>
+                      ● Verified Razorpay & Wallet Credits
+                    </div>
+                  </div>
+
+                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('FAILED'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'FAILED' ? '1px solid #ef4444' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>REJECTED / FAILED PAYMENTS</div>
+                    <div style={{ fontSize: '23px', fontWeight: '900', color: '#ef4444', marginTop: '5px' }}>
+                      {adminStats?.summary?.failedPaymentsCount ?? 0}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#f87171', marginTop: '3px' }}>
+                      ● {adminStats?.summary?.initiatedPaymentsCount ?? 0} Initiated / Cancelled
+                    </div>
+                  </div>
+
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL DEMATS ACTIVE</div>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', marginTop: '5px' }}>
+                      {adminStats?.summary?.totalDemats ?? demats.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '3px' }}>
+                      ● {adminStats?.summary?.activeDemats ?? demats.filter(d => d.status === 'ACTIVE').length} Active • {adminStats?.summary?.expiredDemats ?? 0} Re-auth
+                    </div>
+                  </div>
+
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TODAY ROUTED ORDERS</div>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '5px' }}>
+                      {adminStats?.summary?.todayOrders ?? orders.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '3px' }}>
+                      Across {adminStats?.summary?.totalUsersConfigured ?? 1} Accounts
+                    </div>
+                  </div>
+
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>STATIC IP POOL (₹350/mo)</div>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#10b981', marginTop: '5px' }}>
+                      {adminStats?.summary?.totalStaticIps ?? staticIps.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px' }}>Clean BKC Class-C Subnets</div>
+                  </div>
+
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>CLIENT LINK SLOTS (₹250/mo)</div>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#a855f7', marginTop: '5px' }}>
+                      {adminStats?.summary?.totalLinkedClients ?? linkedUsers.length} / {adminStats?.summary?.totalLinkCapacity ?? (config.totalLinkSlots || 1)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '3px' }}>Follower Copy Capacity</div>
                   </div>
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>STATIC IP POOL</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#10b981', marginTop: '6px' }}>
-                    {adminStats?.summary?.totalStaticIps ?? staticIps.length}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>Clean BKC Class-C Subnets</div>
+                {/* Admin Navigation Sub-Tabs */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  overflowX: 'auto',
+                  paddingBottom: '4px',
+                  borderBottom: '1px solid #1e293b'
+                }}>
+                  {[
+                    { id: 'ACCOUNTS', label: `👥 All Accounts & Money (${allAccounts.length})` },
+                    { id: 'PAYMENTS', label: `💳 Payments: Success & Rejected (${allPayments.length})` },
+                    { id: 'INFRASTRUCTURE', label: '🖥️ Broker Gateways & OMS Overrides' },
+                    { id: 'DEMATS_IPS', label: `🔗 All Demats (${allDematsList.length}) & Static IPs (${allIpsList.length})` },
+                    { id: 'AUDIT_LOGS', label: `📜 Security Audit Logs (${auditLogsList.length})` }
+                  ].map(tab => {
+                    const active = adminSubTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setAdminSubTab(tab.id)}
+                        style={{
+                          padding: '9px 16px',
+                          borderRadius: '8px',
+                          border: active ? '1px solid #38bdf8' : '1px solid #1e293b',
+                          background: active ? 'rgba(56, 189, 248, 0.16)' : '#101726',
+                          color: active ? '#38bdf8' : '#cbd5e1',
+                          fontSize: '12.5px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>CLIENT LINK SLOTS</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#a855f7', marginTop: '6px' }}>
-                    {linkedUsers.length} / {config.totalLinkSlots || 1}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '4px' }}>Follower Copy Capacity</div>
-                </div>
-              </div>
+                {/* ── SUB-TAB 1: ALL ACCOUNTS & CURRENT MONEY ── */}
+                {adminSubTab === 'ACCOUNTS' && (
+                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
+                          All Registered User Accounts — Current Algo Wallet & Paper Money ({filteredAccounts.length})
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                          View each user's live Algo Wallet balance, Paper Trading capital, active Algo Plan, connected Demats, Static IPs & Link Slots.
+                        </div>
+                      </div>
 
-              {/* Broker Gateways Health Table */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
-                  Institutional Broker Gateway Health & Latency
-                </div>
-                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                  <table style={{ width: '100%', minWidth: '600px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
-                    <thead>
-                      <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 14px' }}>Broker Gateway</th>
-                        <th style={{ padding: '10px 14px' }}>Ping Latency</th>
-                        <th style={{ padding: '10px 14px' }}>Active Sessions</th>
-                        <th style={{ padding: '10px 14px' }}>Gateway Status</th>
-                        <th style={{ padding: '10px 14px' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(adminStats?.brokerGateways || [
-                        { name: 'Zerodha Kite Connect v3', latency: '4.2ms', activeSessions: 1, status: 'OPERATIONAL' },
-                        { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' },
-                        { name: 'Upstox Pro API v2', latency: '8.4ms', activeSessions: 1, status: 'OPERATIONAL' },
-                        { name: 'DhanHQ Open API', latency: '5.1ms', activeSessions: 1, status: 'OPERATIONAL' },
-                        { name: 'Fyers API v3', latency: '7.8ms', activeSessions: 1, status: 'OPERATIONAL' }
-                      ]).map((bg, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: '800', color: '#fff' }}>{bg.name}</td>
-                          <td style={{ padding: '12px 14px', color: '#10b981', fontWeight: '800' }}>{bg.latency}</td>
-                          <td style={{ padding: '12px 14px', color: '#38bdf8', fontWeight: '700' }}>{bg.activeSessions} Demats</td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '3px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800' }}>
-                              ● {bg.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <button
-                              onClick={() => showToast(`Gateway health check OK for ${bg.name}`)}
-                              style={{ background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
-                            >
-                              Test Ping
-                            </button>
-                          </td>
-                        </tr>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ position: 'relative' }}>
+                          <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input
+                            type="text"
+                            placeholder="Search email, user, SKX ID..."
+                            value={adminUserSearch}
+                            onChange={e => setAdminUserSearch(e.target.value)}
+                            style={{
+                              background: '#090d16',
+                              border: '1px solid #334155',
+                              borderRadius: '8px',
+                              padding: '7px 12px 7px 30px',
+                              color: '#fff',
+                              fontSize: '12px',
+                              width: isMobile ? '180px' : '240px'
+                            }}
+                          />
+                        </div>
+
+                        <select
+                          value={adminPlanFilter}
+                          onChange={e => setAdminPlanFilter(e.target.value)}
+                          style={{
+                            background: '#090d16',
+                            border: '1px solid #334155',
+                            borderRadius: '8px',
+                            padding: '7px 10px',
+                            color: '#cbd5e1',
+                            fontSize: '12px',
+                            fontWeight: '700'
+                          }}
+                        >
+                          <option value="ALL">All Plans</option>
+                          <option value="STARTER">Starter (Free)</option>
+                          <option value="PRO">Pro (₹999/mo)</option>
+                          <option value="INSTITUTIONAL">Institutional (₹2,499/mo)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '980px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                        <thead>
+                          <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                            <th style={{ padding: '10px 12px' }}>Client ID & Account</th>
+                            <th style={{ padding: '10px 12px' }}>Algo Wallet Money</th>
+                            <th style={{ padding: '10px 12px' }}>Paper Trading Money</th>
+                            <th style={{ padding: '10px 12px' }}>Algo Plan</th>
+                            <th style={{ padding: '10px 12px' }}>Demats</th>
+                            <th style={{ padding: '10px 12px' }}>Static IPs</th>
+                            <th style={{ padding: '10px 12px' }}>Link Slots</th>
+                            <th style={{ padding: '10px 12px' }}>Active Algos</th>
+                            <th style={{ padding: '10px 12px' }}>Admin Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredAccounts.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                                {loadingAdminStats ? 'Loading user accounts...' : 'No matching accounts found.'}
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredAccounts.map(acc => (
+                              <tr key={acc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#38bdf8', fontWeight: '800' }}>{acc.clientId}</span>
+                                    {acc.isAdmin && (
+                                      <span style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                        ADMIN
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontWeight: '800', color: '#fff', fontSize: '13px', marginTop: '2px' }}>{acc.username}</div>
+                                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>{acc.email || acc.phone || '—'}</div>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: '900', color: '#10b981' }}>
+                                    ₹{Number(acc.algoWalletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </div>
+                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Algo Credit</div>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#e2e8f0' }}>
+                                    ₹{Number(acc.paperBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  </div>
+                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Paper Capital ({acc.paperSubscriptionTier})</div>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: '800',
+                                    background: acc.activePlan === 'INSTITUTIONAL' ? 'rgba(168,85,247,0.2)' : (acc.activePlan === 'PRO' ? 'rgba(37,99,235,0.2)' : 'rgba(148,163,184,0.12)'),
+                                    color: acc.activePlan === 'INSTITUTIONAL' ? '#c084fc' : (acc.activePlan === 'PRO' ? '#60a5fa' : '#94a3b8'),
+                                    border: '1px solid rgba(255,255,255,0.08)'
+                                  }}>
+                                    {acc.activePlan || 'STARTER'}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{ fontWeight: '800', color: acc.activeDematsCount > 0 ? '#22c55e' : '#94a3b8' }}>
+                                    {acc.activeDematsCount} Active
+                                  </span>
+                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Total: {acc.dematsCount}</div>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{ fontWeight: '800', color: acc.staticIpsCount > 0 ? '#38bdf8' : '#94a3b8' }}>
+                                    {acc.staticIpsCount} IP{acc.staticIpsCount === 1 ? '' : 's'}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{ fontWeight: '800', color: '#a855f7' }}>
+                                    {acc.linkedUsersCount} / {acc.totalLinkSlots}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{ fontWeight: '700', color: acc.activeAlgosCount > 0 ? '#22c55e' : '#64748b' }}>
+                                    {acc.activeAlgosCount} / {acc.watchlistCount}
+                                  </span>
+                                  <div style={{ fontSize: '10px', color: '#64748b' }}>{acc.ordersCount} Orders</div>
+                                </td>
+
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    <button
+                                      onClick={() => handleOpenEditAdminUser(acc)}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: '#2563eb',
+                                        border: 'none',
+                                        color: '#fff',
+                                        padding: '5px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '800',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <Edit2 size={11} /> Edit Money & Plan
+                                    </button>
+                                    <button
+                                      onClick={() => handleQuickAdminUserAction(acc.id, { action: 'GRANT_STATIC_IP' })}
+                                      title="Grant 1 Dedicated Static IP to this account"
+                                      style={{
+                                        background: 'rgba(16,185,129,0.16)',
+                                        border: '1px solid rgba(16,185,129,0.35)',
+                                        color: '#10b981',
+                                        padding: '5px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '800',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      +1 IP
+                                    </button>
+                                    <button
+                                      onClick={() => handleQuickAdminUserAction(acc.id, { slotsToAdd: 1 })}
+                                      title="Grant 1 Client Link Slot to this account"
+                                      style={{
+                                        background: 'rgba(168,85,247,0.16)',
+                                        border: '1px solid rgba(168,85,247,0.35)',
+                                        color: '#c084fc',
+                                        padding: '5px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '800',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      +1 Slot
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SUB-TAB 2: PAYMENTS: SUCCESSFUL & REJECTED / FAILED ── */}
+                {adminSubTab === 'PAYMENTS' && (
+                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
+                          Razorpay & Algo Wallet Payment Ledger — Successful, Rejected & Initiated ({filteredPayments.length})
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                          Real-time log of every successful order, bank/UPI rejection with exact failure reason, wallet debit, and admin grant.
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {[
+                          { id: 'ALL', label: `All (${allPayments.length})`, color: '#38bdf8' },
+                          { id: 'SUCCESS', label: `✅ Successful (${adminStats?.summary?.successPaymentsCount ?? 0})`, color: '#22c55e' },
+                          { id: 'FAILED', label: `❌ Rejected / Failed (${adminStats?.summary?.failedPaymentsCount ?? 0})`, color: '#ef4444' },
+                          { id: 'INITIATED', label: `⏳ Initiated (${adminStats?.summary?.initiatedPaymentsCount ?? 0})`, color: '#f59e0b' }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setAdminPaymentFilter(f.id)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: adminPaymentFilter === f.id ? `1px solid ${f.color}` : '1px solid #334155',
+                              background: adminPaymentFilter === f.id ? 'rgba(255,255,255,0.08)' : '#090d16',
+                              color: adminPaymentFilter === f.id ? f.color : '#94a3b8',
+                              fontSize: '11.5px',
+                              fontWeight: '800',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+
+                        <input
+                          type="text"
+                          placeholder="Search email, order_id, reason..."
+                          value={adminPaymentSearch}
+                          onChange={e => setAdminPaymentSearch(e.target.value)}
+                          style={{
+                            background: '#090d16',
+                            border: '1px solid #334155',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            width: isMobile ? '160px' : '210px'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                        <thead>
+                          <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                            <th style={{ padding: '10px 12px' }}>Ref / Razorpay ID</th>
+                            <th style={{ padding: '10px 12px' }}>Account (User / Email)</th>
+                            <th style={{ padding: '10px 12px' }}>Plan / Algo Service</th>
+                            <th style={{ padding: '10px 12px' }}>Amount</th>
+                            <th style={{ padding: '10px 12px' }}>Method</th>
+                            <th style={{ padding: '10px 12px' }}>Status</th>
+                            <th style={{ padding: '10px 12px' }}>Verification / Rejection Reason</th>
+                            <th style={{ padding: '10px 12px' }}>Date & Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredPayments.length === 0 ? (
+                            <tr>
+                              <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                                No payment records match the selected filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredPayments.map((p, idx) => {
+                              const st = String(p.status || 'INITIATED').toUpperCase();
+                              const isSuccess = st === 'SUCCESS';
+                              const isFailed = st === 'FAILED' || st === 'REJECTED';
+                              return (
+                                <tr key={`${p.id}_${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#38bdf8' }}>
+                                    <div>{p.txRef}</div>
+                                    {p.orderId && p.orderId !== p.txRef && (
+                                      <div style={{ fontSize: '10px', color: '#64748b' }}>Ord: {p.orderId}</div>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <div style={{ fontWeight: '800', color: '#fff' }}>{p.username} <span style={{ fontSize: '10.5px', color: '#38bdf8', fontFamily: 'monospace' }}>({p.clientId})</span></div>
+                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.email}</div>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontWeight: '800', color: '#e2e8f0' }}>
+                                    {p.plan}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontWeight: '900', color: isSuccess ? '#10b981' : (isFailed ? '#f87171' : '#f59e0b') }}>
+                                    ₹{Number(p.amount || 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: '#cbd5e1' }}>
+                                    {p.paymentType}
+                                  </td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <span style={{
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '10.5px',
+                                      fontWeight: '900',
+                                      background: isSuccess ? 'rgba(34,197,94,0.16)' : (isFailed ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.16)'),
+                                      color: isSuccess ? '#22c55e' : (isFailed ? '#f87171' : '#f59e0b')
+                                    }}>
+                                      ● {isFailed ? 'REJECTED / FAILED' : st}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: isFailed ? '#fca5a5' : '#94a3b8', maxWidth: '260px' }}>
+                                    {p.failureReason || (isSuccess ? 'Razorpay Signature Verified & Provisioned' : 'Awaiting gateway completion')}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                    {p.createdAt ? new Date(p.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SUB-TAB 3: BROKER GATEWAYS & OMS OVERRIDES ── */}
+                {adminSubTab === 'INFRASTRUCTURE' && (
+                  <>
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
+                        Institutional Broker Gateway Health & Latency
+                      </div>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={{ width: '100%', minWidth: '600px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                          <thead>
+                            <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                              <th style={{ padding: '10px 14px' }}>Broker Gateway</th>
+                              <th style={{ padding: '10px 14px' }}>Ping Latency</th>
+                              <th style={{ padding: '10px 14px' }}>Active Sessions</th>
+                              <th style={{ padding: '10px 14px' }}>Gateway Status</th>
+                              <th style={{ padding: '10px 14px' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(adminStats?.brokerGateways || [
+                              { name: 'Zerodha Kite Connect v3', latency: '4.2ms', activeSessions: 1, status: 'OPERATIONAL' },
+                              { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' },
+                              { name: 'Upstox Pro API v2', latency: '8.4ms', activeSessions: 1, status: 'OPERATIONAL' },
+                              { name: 'DhanHQ Open API', latency: '5.1ms', activeSessions: 1, status: 'OPERATIONAL' },
+                              { name: 'Fyers API v3', latency: '7.8ms', activeSessions: 1, status: 'OPERATIONAL' }
+                            ]).map((bg, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
+                                <td style={{ padding: '12px 14px', fontWeight: '800', color: '#fff' }}>{bg.name}</td>
+                                <td style={{ padding: '12px 14px', color: '#10b981', fontWeight: '800' }}>{bg.latency}</td>
+                                <td style={{ padding: '12px 14px', color: '#38bdf8', fontWeight: '700' }}>{bg.activeSessions} Demats</td>
+                                <td style={{ padding: '12px 14px' }}>
+                                  <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '3px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800' }}>
+                                    ● {bg.status}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px 14px' }}>
+                                  <button
+                                    onClick={() => showToast(`Gateway health check OK for ${bg.name}`)}
+                                    style={{ background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                                  >
+                                    Test Ping
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
+                        Admin Quota & IP Provisioning Overrides
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px' }}>
+                        <button
+                          onClick={handleAdminProvisionIp}
+                          style={{ padding: '12px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                        >
+                          + Provision New Static IP to Pool
+                        </button>
+
+                        <button
+                          onClick={handleAdminGrantSlots}
+                          style={{ padding: '12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                        >
+                          + Grant 2 Client Slots (Admin Override)
+                        </button>
+
+                        <button
+                          onClick={handleRenewAllAccounts}
+                          style={{ padding: '12px', background: '#ef4444', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                        >
+                          🔄 Force Reset All Expired Sessions
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── SUB-TAB 4: ALL CONNECTED DEMATS, STATIC IPS & ORDERS ACROSS ACCOUNTS ── */}
+                {adminSubTab === 'DEMATS_IPS' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                        All Connected Demat Accounts Across Platform ({allDematsList.length})
+                      </div>
+                      {allDematsList.length === 0 ? (
+                        <div style={{ fontSize: '12.5px', color: '#64748b' }}>No Demat accounts connected across users yet.</div>
+                      ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                            <thead>
+                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                                <th style={{ padding: '9px 12px' }}>Owner Account</th>
+                                <th style={{ padding: '9px 12px' }}>Broker</th>
+                                <th style={{ padding: '9px 12px' }}>Client UCC</th>
+                                <th style={{ padding: '9px 12px' }}>Assigned IP</th>
+                                <th style={{ padding: '9px 12px' }}>Session Status</th>
+                                <th style={{ padding: '9px 12px' }}>Algo Execution</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allDematsList.map((d, i) => (
+                                <tr key={`${d.id}_${i}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '9px 12px' }}>
+                                    <span style={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: '800' }}>{d.ownerClientId || 'SELF'}</span> • {d.ownerEmail || userDisplayEmail}
+                                  </td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: '#fff' }}>{d.broker}</td>
+                                  <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#f8fafc' }}>{d.clientCode}</td>
+                                  <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#10b981' }}>{d.ip}</td>
+                                  <td style={{ padding: '9px 12px', color: d.status === 'ACTIVE' ? '#22c55e' : '#ef4444', fontWeight: '800' }}>{d.status}</td>
+                                  <td style={{ padding: '9px 12px', color: d.tradingActive ? '#22c55e' : '#f59e0b', fontWeight: '700' }}>
+                                    {d.tradingActive ? 'ENABLED' : 'PAUSED'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                        All Provisioned Static IPs Across Platform ({allIpsList.length})
+                      </div>
+                      {allIpsList.length === 0 ? (
+                        <div style={{ fontSize: '12.5px', color: '#64748b' }}>No Static IPs provisioned yet.</div>
+                      ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                            <thead>
+                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                                <th style={{ padding: '9px 12px' }}>Owner Account</th>
+                                <th style={{ padding: '9px 12px' }}>IPv4 Address</th>
+                                <th style={{ padding: '9px 12px' }}>Datacenter</th>
+                                <th style={{ padding: '9px 12px' }}>Bound Demat</th>
+                                <th style={{ padding: '9px 12px' }}>Status</th>
+                                <th style={{ padding: '9px 12px' }}>Validity</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allIpsList.map((ip, i) => (
+                                <tr key={`${ip.id}_${i}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '9px 12px' }}>
+                                    <span style={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: '800' }}>{ip.ownerClientId || 'POOL'}</span> • {ip.ownerEmail || userDisplayEmail}
+                                  </td>
+                                  <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: '800', color: '#10b981' }}>{ip.ip}</td>
+                                  <td style={{ padding: '9px 12px' }}>{ip.datacenter}</td>
+                                  <td style={{ padding: '9px 12px', color: '#38bdf8' }}>{ip.assignedTo}</td>
+                                  <td style={{ padding: '9px 12px', color: '#22c55e', fontWeight: '800' }}>{ip.status}</td>
+                                  <td style={{ padding: '9px 12px', color: '#94a3b8' }}>{ip.expiresAt}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                        Recent Routed Algo Orders Across Platform ({allOrdersList.length})
+                      </div>
+                      {allOrdersList.length === 0 ? (
+                        <div style={{ fontSize: '12.5px', color: '#64748b' }}>No routed Algo orders recorded yet.</div>
+                      ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                            <thead>
+                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                                <th style={{ padding: '9px 12px' }}>Order ID</th>
+                                <th style={{ padding: '9px 12px' }}>Account</th>
+                                <th style={{ padding: '9px 12px' }}>Symbol</th>
+                                <th style={{ padding: '9px 12px' }}>Side & Qty</th>
+                                <th style={{ padding: '9px 12px' }}>Broker / Mode</th>
+                                <th style={{ padding: '9px 12px' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allOrdersList.map((o, i) => (
+                                <tr key={`${o.id}_${i}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#38bdf8' }}>{o.id}</td>
+                                  <td style={{ padding: '9px 12px' }}>{o.ownerEmail || o.account || '—'}</td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: '#fff' }}>{o.symbol}</td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: o.side === 'BUY' ? '#22c55e' : '#ef4444' }}>{o.side} • {o.qty}</td>
+                                  <td style={{ padding: '9px 12px' }}>{o.broker}</td>
+                                  <td style={{ padding: '9px 12px', color: '#22c55e', fontWeight: '800' }}>{o.status}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SUB-TAB 5: SECURITY & OMS AUDIT LOGS ── */}
+                {adminSubTab === 'AUDIT_LOGS' && (
+                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                      Real-Time Algo OMS & Payment Security Audit Stream
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {auditLogsList.map((log, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            background: '#090d16',
+                            border: '1px solid #1e293b',
+                            borderLeft: `3px solid ${log.ok ? '#22c55e' : '#ef4444'}`,
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            fontSize: '12px'
+                          }}
+                        >
+                          <span style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{log.event}</span>
+                          <span style={{ color: '#64748b', fontSize: '11px', whiteSpace: 'nowrap' }}>{log.time}</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── MODAL: ADMIN EDIT USER MONEY, PLAN & QUOTAS ── */}
+                {editingAdminUser && (
+                  <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 100040,
+                    background: 'rgba(0,0,0,0.82)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '16px'
+                  }}>
+                    <div style={{
+                      background: '#121826',
+                      border: '1px solid rgba(56,189,248,0.35)',
+                      borderRadius: '16px',
+                      width: '100%',
+                      maxWidth: '500px',
+                      padding: '22px',
+                      color: '#fff',
+                      boxShadow: '0 24px 60px rgba(0,0,0,0.85)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <div>
+                          <div style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>
+                            Manage Account — {editingAdminUser.username}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#38bdf8', fontFamily: 'monospace' }}>
+                            {editingAdminUser.clientId} • {editingAdminUser.email}
+                          </div>
+                        </div>
+                        <button onClick={() => setEditingAdminUser(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveAdminUserEdit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>
+                            SkandX Algo Wallet Current Money (₹)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editAlgoWalletVal}
+                            onChange={e => setEditAlgoWalletVal(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#10b981', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>
+                            Paper Trading Virtual Capital Balance (₹)
+                          </label>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={editPaperBalanceVal}
+                            onChange={e => setEditPaperBalanceVal(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#38bdf8', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Active Algo Plan</label>
+                            <select
+                              value={editAlgoPlanVal}
+                              onChange={e => setEditAlgoPlanVal(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
+                            >
+                              <option value="STARTER">STARTER (Free)</option>
+                              <option value="PRO">PRO (₹999/mo)</option>
+                              <option value="INSTITUTIONAL">INSTITUTIONAL (₹2,499/mo)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Total Client Link Slots</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="500"
+                              value={editLinkSlotsVal}
+                              onChange={e => setEditLinkSlotsVal(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#a855f7', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAdminUserAction(editingAdminUser.id, { action: 'RENEW_DEMATS' })}
+                            style={{ flex: 1, padding: '8px', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                          >
+                            🔄 Renew User Demats
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAdminUserAction(editingAdminUser.id, { action: 'PAUSE_ALGOS' })}
+                            style={{ flex: 1, padding: '8px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                          >
+                            ⏸️ Pause User Algos
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingAdminUser(null)}
+                            style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700', cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #0284c7, #2563eb)', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                          >
+                            Save Account Changes
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Admin Quick Provisioning Actions */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
-                  Admin Quota & IP Provisioning Overrides
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px' }}>
-                  <button
-                    onClick={handleAdminProvisionIp}
-                    style={{ padding: '12px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    + Provision New Static IP to Pool
-                  </button>
-
-                  <button
-                    onClick={handleAdminGrantSlots}
-                    style={{ padding: '12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    + Grant 2 Client Slots (Admin Override)
-                  </button>
-
-                  <button
-                    onClick={handleRenewAllAccounts}
-                    style={{ padding: '12px', background: '#ef4444', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    🔄 Force Reset All Expired Sessions
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
         </main>
       </div>
