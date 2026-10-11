@@ -1,6 +1,6 @@
 // frontend/src/components/LandingHomeView.jsx
 // 🌟 Institutional 6-Hub Fintech Command Center & Interactive Live Financial Sandbox
-// Engineered for high user retention (dwell time), 0ms chunk prefetch, real-time WebSocket telemetry, and deep-linked SEO.
+// Fully responsive Desktop + Mobile Native-App UX (zero horizontal overflow, unified sticky header, safe-area aware, 4-tab live sandbox).
 
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
@@ -8,9 +8,9 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   TrendingUp, BookOpen, Building2, Calculator,
   Sparkles, ShieldCheck, ArrowRight, CheckCircle2,
-  BarChart2, Zap, Layers, Cpu, PieChart,
+  Zap, Layers, Cpu, PieChart,
   Search, ChevronDown, Activity, ArrowUpRight,
-  Sliders, Target, Flame, RefreshCw, Play, Award
+  Sliders, Target, Play
 } from 'lucide-react';
 
 export default function LandingHomeView({
@@ -101,6 +101,7 @@ export default function LandingHomeView({
             rawPct: chpNum,
             ltp: ltpNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             change: `${isUp ? '+' : ''}${chNum.toFixed(2)} (${isUp ? '+' : ''}${chpNum.toFixed(2)}%)`,
+            shortChange: `${isUp ? '+' : ''}${chpNum.toFixed(2)}%`,
             isUp
           };
         }
@@ -111,6 +112,7 @@ export default function LandingHomeView({
         rawPct: fallbackPct,
         ltp: fallbackLtp,
         change: fallbackChange,
+        shortChange: `${fallbackUp ? '+' : ''}${fallbackPct}%`,
         isUp: fallbackUp
       };
     };
@@ -170,10 +172,10 @@ export default function LandingHomeView({
     const maxVal = Math.max(...candles.map(c => c.high));
     const span = Math.max(maxVal - minVal, 1);
     const width = 520;
-    const height = 148;
+    const height = 136;
     const pathCoords = pts.map((v, idx) => {
       const x = (idx / (totalPoints - 1)) * width;
-      const y = height - ((v - minVal) / span) * (height - 24) - 12;
+      const y = height - ((v - minVal) / span) * (height - 22) - 11;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
     const linePath = `M ${pathCoords.join(' L ')}`;
@@ -250,7 +252,7 @@ export default function LandingHomeView({
       return {
         primaryLabel: 'Projected Maturity Wealth',
         primaryValue: `₹${Math.round(corpus).toLocaleString('en-IN')}`,
-        subLeftLabel: 'Total Invested',
+        subLeftLabel: 'Invested',
         subLeftValue: `₹${Math.round(totalInvested).toLocaleString('en-IN')}`,
         subRightLabel: 'Wealth Gained',
         subRightValue: `+₹${Math.round(wealthGained).toLocaleString('en-IN')}`,
@@ -267,7 +269,7 @@ export default function LandingHomeView({
       return {
         primaryLabel: 'Monthly Reducing Balance EMI',
         primaryValue: `₹${Math.round(emi).toLocaleString('en-IN')}/mo`,
-        subLeftLabel: 'Loan Principal',
+        subLeftLabel: 'Principal',
         subLeftValue: `₹${Math.round(loanAmount).toLocaleString('en-IN')}`,
         subRightLabel: 'Total Interest',
         subRightValue: `₹${Math.round(totalInterest).toLocaleString('en-IN')}`,
@@ -360,7 +362,7 @@ export default function LandingHomeView({
       color: '#0284c7',
       gradient: 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
       border: 'rgba(56, 189, 248, 0.35)',
-      badge: 'Free ₹10L–₹10Cr Capital',
+      badge: 'Free ₹10L–₹10Cr',
       badgeColor: '#38bdf8',
       kpiLeft: { label: 'Virtual Margin', value: `₹${(liveTelemetry.balance / 100000).toFixed(2)}L` },
       kpiRight: { label: 'Active Positions', value: `${liveTelemetry.openCount} Open` },
@@ -448,13 +450,13 @@ export default function LandingHomeView({
       id: 4,
       hubNum: '04',
       category: 'CALCULATORS',
-      title: 'Financial Calculators Suite & AI Wealth Planning',
+      title: 'Financial Calculators & AI Wealth',
       shortDesc: '10 institutional calculators: Reducing & Flat EMI Loans, SIP Step-Up Compounder, MTF 4x Leverage, Stock Averaging, STT & Black-Scholes Greeks.',
       icon: Calculator,
       color: '#f59e0b',
       gradient: 'linear-gradient(145deg, rgba(245, 158, 11, 0.22), rgba(15, 23, 42, 0.95))',
       border: 'rgba(245, 158, 11, 0.35)',
-      badge: 'Full Suite + PDF/Excel',
+      badge: '10 Calculators',
       badgeColor: '#f59e0b',
       kpiLeft: { label: 'Active Engines', value: '10 Calculators' },
       kpiRight: { label: 'Schedules', value: 'Chart + PDF/Excel' },
@@ -490,19 +492,18 @@ export default function LandingHomeView({
       color: '#10b981',
       gradient: 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
       border: 'rgba(16, 185, 129, 0.35)',
-      badge: '360° Financial Cockpit',
+      badge: '360° Tax & Wealth',
       badgeColor: '#10b981',
       kpiLeft: { label: 'Tax Regime', value: 'FY25 STCG/LTCG' },
-      kpiRight: { label: 'Protection', value: 'Actuarial HLV + Solvency' },
-      tags: ['Consolidated Net Worth', '50/30/20 Budget', 'Expense Leaks', 'Actuarial HLV Gap', 'Family Floater', 'Tax-Loss Harvesting FY25', 'STCG 20% / LTCG 12.5%'],
+      kpiRight: { label: 'Protection', value: 'Actuarial HLV' },
+      tags: ['Consolidated Net Worth', '50/30/20 Budget', 'Expense Leaks', 'Actuarial HLV Gap', 'Family Floater', 'Tax-Loss Harvesting FY25'],
       tagActions: {
         'Consolidated Net Worth': () => onOpenWealthFinance('NET_WORTH'),
         '50/30/20 Budget': () => onOpenWealthFinance('BUDGET'),
         'Expense Leaks': () => onOpenWealthFinance('BUDGET'),
         'Actuarial HLV Gap': () => onOpenWealthFinance('INSURANCE'),
         'Family Floater': () => onOpenWealthFinance('INSURANCE'),
-        'Tax-Loss Harvesting FY25': () => onOpenWealthFinance('TAX_LOSS'),
-        'STCG 20% / LTCG 12.5%': () => onOpenWealthFinance('TAX_LOSS')
+        'Tax-Loss Harvesting FY25': () => onOpenWealthFinance('TAX_LOSS')
       },
       actionLabel: 'Launch Wealth OS & Tax Hub',
       primaryAction: () => onOpenWealthFinance('NET_WORTH'),
@@ -517,23 +518,24 @@ export default function LandingHomeView({
       id: 6,
       hubNum: '06',
       category: 'TRADING',
-      title: 'SkandX Algo Multi-Broker Demat & Bridge Suite',
+      title: 'SkandX Algo Demat & Bridge Suite',
       shortDesc: 'Multi-broker Demat connection, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account copy trading.',
       icon: Cpu,
       color: '#0284c7',
       gradient: 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
       border: 'rgba(56, 189, 248, 0.35)',
-      badge: 'SKANDX ALGO PRO',
+      badge: 'ALGO PRO',
       badgeColor: '#38bdf8',
       kpiLeft: { label: 'Supported Brokers', value: 'Zerodha, Fyers, Dhan+' },
       kpiRight: { label: 'Bridge Latency', value: '<15ms Webhook' },
-      tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts'],
+      tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts', 'Copy Trading'],
       tagActions: {
         'Share Demat Link': () => onOpenAlgoBridge('SHARE_LINK'),
         'Demat API Keys': () => onOpenAlgoBridge('API_KEYS'),
         'Static IPs': () => onOpenAlgoBridge('STATIC_IP'),
         'JSON Webhook Bridge': () => onOpenAlgoBridge('WEBHOOK'),
-        'TradingView Alerts': () => onOpenAlgoBridge('WEBHOOK')
+        'TradingView Alerts': () => onOpenAlgoBridge('WEBHOOK'),
+        'Copy Trading': () => onOpenAlgoBridge('SHARE_LINK')
       },
       actionLabel: 'Launch SkandX Algo Console',
       primaryAction: () => (onOpenAlgoBridge ? onOpenAlgoBridge('SHARE_LINK') : onOpenPaperTrading()),
@@ -547,15 +549,14 @@ export default function LandingHomeView({
   ];
 
   const SPOTLIGHT_TOOLS = [
-    { label: '💬 Traders Community & Clubs', action: () => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading()), color: '#38bdf8' },
-    { label: '🧮 SIP & Step-Up Calculator', action: () => onOpenCalculators('sip'), color: '#38bdf8' },
-    { label: '🏠 Reducing Balance Loan EMI', action: () => onOpenCalculators('reducing-loan'), color: '#10b981' },
-    { label: '🏦 Fixed / Flat Rate Loan', action: () => onOpenCalculators('fixed-loan'), color: '#f59e0b' },
-    { label: '⚡ MTF 4x Leverage Calculator', action: () => onOpenCalculators('mtf'), color: '#a855f7' },
-    { label: '📉 Share Price Averaging', action: () => onOpenCalculators('average-price'), color: '#06b6d4' },
-    { label: '✂️ FY25 Tax-Loss Harvester', action: () => onOpenWealthFinance('TAX_LOSS'), color: '#ec4899' },
-    { label: '🏛️ Live IPO GMP & Allotment', action: () => onOpenPrimaryMarkets('IPO'), color: '#34d399' },
-    { label: '🤖 TradingView Webhook Bridge', action: () => onOpenAlgoBridge('WEBHOOK'), color: '#60a5fa' }
+    { label: '💬 Traders Community', action: () => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading()), color: '#38bdf8' },
+    { label: '🧮 SIP & Step-Up Calc', action: () => onOpenCalculators('sip'), color: '#38bdf8' },
+    { label: '🏠 Reducing Loan EMI', action: () => onOpenCalculators('reducing-loan'), color: '#10b981' },
+    { label: '🏦 Fixed Rate Loan', action: () => onOpenCalculators('fixed-loan'), color: '#f59e0b' },
+    { label: '⚡ MTF 4x Leverage', action: () => onOpenCalculators('mtf'), color: '#a855f7' },
+    { label: '📉 Share Price Avg', action: () => onOpenCalculators('average-price'), color: '#06b6d4' },
+    { label: '✂️ FY25 Tax Harvester', action: () => onOpenWealthFinance('TAX_LOSS'), color: '#ec4899' },
+    { label: '🏛️ Live IPO & GMP', action: () => onOpenPrimaryMarkets('IPO'), color: '#34d399' }
   ];
 
   const filteredHubs = useMemo(() => {
@@ -571,8 +572,9 @@ export default function LandingHomeView({
   }, [selectedCategory, searchQuery, liveTelemetry]);
 
   return (
-    <div style={{
+    <div className="skx-landing-root" style={{
       width: '100%',
+      maxWidth: '100vw',
       minHeight: '100%',
       backgroundColor: '#060911',
       backgroundImage: 'radial-gradient(circle at 18% 12%, rgba(2, 132, 199, 0.14) 0%, transparent 42%), radial-gradient(circle at 84% 18%, rgba(99, 102, 241, 0.13) 0%, transparent 45%), radial-gradient(circle at 50% 65%, rgba(16, 185, 129, 0.07) 0%, transparent 50%)',
@@ -581,241 +583,395 @@ export default function LandingHomeView({
       flexDirection: 'column',
       fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
       position: 'relative',
-      overflowX: 'hidden'
+      overflowX: 'hidden',
+      boxSizing: 'border-box'
     }}>
-      {/* Scoped Institutional Styles — Eliminates ugly Windows horizontal scrollbars and adds hover polish */}
+      {/* Scoped Desktop + Mobile Responsive Architecture */}
       <style>{`
+        .skx-landing-root *, .skx-landing-root *::before, .skx-landing-root *::after {
+          box-sizing: border-box;
+        }
         .skx-no-scrollbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
         .skx-no-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
-        .skx-hub-card { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease; }
+        .skx-hub-card { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease; min-width: 0; }
         .skx-hub-card:hover { transform: translateY(-4px); box-shadow: 0 20px 42px rgba(0, 0, 0, 0.55) !important; }
-        .skx-pill-btn { transition: all 0.16s ease; }
+        .skx-pill-btn { transition: all 0.16s ease; min-width: 0; }
         .skx-pill-btn:hover { transform: translateY(-1px); background: rgba(56, 189, 248, 0.14) !important; border-color: rgba(56, 189, 248, 0.45) !important; }
-        .skx-hero-grid { display: grid; grid-template-columns: 1.04fr 1.16fr; gap: 28px; align-items: stretch; }
-        .skx-lab-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        @media (max-width: 1080px) {
-          .skx-hero-grid { grid-template-columns: 1fr; }
-          .skx-lab-grid { grid-template-columns: 1fr; }
+
+        /* Unified Sticky Top Deck (prevents any gap between navbar and ticker on scroll & clears Android status bar) */
+        .skx-sticky-top-deck {
+          position: sticky;
+          top: 0;
+          z-index: 80;
+          width: 100%;
+          background: rgba(6, 9, 17, 0.96);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(56, 189, 248, 0.16);
+          padding-top: env(safe-area-inset-top, 0px);
         }
+
+        .skx-hero-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.04fr) minmax(0, 1.16fr);
+          gap: 26px;
+          align-items: stretch;
+          width: 100%;
+        }
+        .skx-lab-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          width: 100%;
+        }
+        .skx-hubs-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+          gap: 20px;
+          width: 100%;
+        }
+        .skx-spotlight-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 7px;
+          width: 100%;
+        }
+        .skx-cta-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 18px;
+          width: 100%;
+        }
+        .skx-trade-controls-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          align-items: center;
+        }
+        .skx-trade-metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .skx-mobile-quicknav {
+          display: none;
+        }
+
+        @media (max-width: 1080px) {
+          .skx-hero-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+          .skx-lab-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+          .skx-spotlight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 768px) {
+          .skx-sticky-top-deck {
+            padding-top: max(env(safe-area-inset-top, 0px), 26px);
+          }
+          .skx-nav-bar {
+            padding: 10px 14px !important;
+          }
+          .skx-brand-subtitle {
+            display: none !important;
+          }
+          .skx-mobile-quicknav {
+            display: flex !important;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 7px 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(9, 13, 24, 0.95);
+          }
+          .skx-section-pad {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+          }
+          .skx-cta-row {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px !important;
+          }
+          .skx-cta-primary {
+            grid-column: 1 / -1;
+            justify-content: center !important;
+            width: 100% !important;
+          }
+          .skx-cta-secondary {
+            justify-content: center !important;
+            width: 100% !important;
+            padding: 11px 10px !important;
+            font-size: 12px !important;
+          }
+          .skx-trade-controls-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+          }
+          .skx-trade-metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .skx-hubs-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 14px;
+          }
+          .skx-search-box {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+          }
+        }
+
         @keyframes skxLivePulse {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.35); opacity: 0.55; }
         }
       `}</style>
 
-      {/* 1. Real-Time Clickable Market Ribbon (Zero Horizontal Scrollbar!) */}
-      <div
-        className="skx-no-scrollbar"
-        style={{
-          background: 'rgba(8, 12, 22, 0.96)',
-          borderBottom: '1px solid rgba(56, 189, 248, 0.14)',
-          padding: '7px 18px',
-          overflowX: 'auto',
+      {/* 1 & 2. UNIFIED STICKY TOP DECK: Executive Navbar + Live Market Ribbon + Mobile Quick-Nav (Zero Scroll Gap!) */}
+      <div className="skx-sticky-top-deck">
+        {/* Top Row: Brand Emblem + Desktop Nav + Launch CTA */}
+        <header className="skx-nav-bar" style={{
+          padding: '10px 22px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px',
-          fontSize: '11.5px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 60,
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(16, 185, 129, 0.12)',
-            border: '1px solid rgba(16, 185, 129, 0.32)',
-            padding: '3px 9px',
-            borderRadius: '20px',
-            color: '#34d399',
-            fontWeight: '800',
-            fontSize: '10.5px',
-            letterSpacing: '0.4px'
-          }}>
-            <span style={{
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              background: '#10b981',
-              display: 'inline-block',
-               boxShadow: '0 0 8px #10b981',
-              animation: 'skxLivePulse 1.8s infinite'
-            }} />
-            LIVE NSE • BSE • MCX
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', whiteSpace: 'nowrap' }}>
-            {LIVE_TICKERS.map((t, idx) => {
-              const isSelected = activeTickerIdx === idx;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handleTickerClick(t.targetSymbol, idx)}
-                  title={`Click to test ${t.label} in Interactive Sandbox or double-click for Full Terminal`}
-                  onDoubleClick={() => handleLaunchSymbolInTerminal(t.targetSymbol)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: isSelected ? 'rgba(2, 132, 199, 0.22)' : 'rgba(255, 255, 255, 0.03)',
-                    border: isSelected ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.07)',
-                    borderRadius: '7px',
-                    padding: '4px 10px',
-                    cursor: 'pointer',
-                    color: '#f8fafc',
-                    fontSize: '11.5px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span style={{ fontWeight: '700', color: isSelected ? '#38bdf8' : '#cbd5e1' }}>{t.label}</span>
-                  <span style={{ fontWeight: '800', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>{t.ltp}</span>
-                  <span style={{ color: t.isUp ? '#10b981' : '#ef4444', fontWeight: '700', fontSize: '11px', fontVariantNumeric: 'tabular-nums' }}>
-                    {t.change}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap', fontSize: '11px', color: '#94a3b8' }}>
-          <span>INDIA VIX: <strong style={{ color: '#34d399' }}>13.42 (-1.8%)</strong></span>
-          <span>•</span>
-          <span>NIFTY PCR: <strong style={{ color: '#38bdf8' }}>1.14 (Bullish)</strong></span>
-        </div>
-      </div>
-
-      {/* 2. Executive Top Navigation Bar */}
-      <header style={{
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-        backdropFilter: 'blur(14px)',
-        position: 'sticky',
-        top: '37px',
-        zIndex: 50,
-        background: 'rgba(6, 9, 17, 0.88)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer' }} onClick={() => scrollToSection('hubs-command-center')}>
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '11px',
-            background: 'linear-gradient(135deg, #0284c7, #4f46e5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(56, 189, 248, 0.45)',
-            border: '1px solid rgba(125, 211, 252, 0.4)'
-          }}>
-            <TrendingUp size={20} color="#ffffff" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: '900', fontSize: '18px', letterSpacing: '0.6px', background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                SKANDX
-              </span>
-              <span style={{ fontSize: '9.5px', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
-                PRO OS
+          gap: '10px',
+          width: '100%'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0 }} onClick={() => scrollToSection('hubs-command-center')}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #0284c7, #4f46e5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 18px rgba(56, 189, 248, 0.42)',
+              border: '1px solid rgba(125, 211, 252, 0.4)',
+              flexShrink: 0
+            }}>
+              <TrendingUp size={19} color="#ffffff" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: '900', fontSize: '17px', letterSpacing: '0.5px', background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  SKANDX
+                </span>
+                <span style={{ fontSize: '9px', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', padding: '1px 5px', borderRadius: '4px', fontWeight: '800', whiteSpace: 'nowrap' }}>
+                  PRO OS
+                </span>
+              </div>
+              <span className="skx-brand-subtitle" style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '500', display: 'block', whiteSpace: 'nowrap' }}>
+                Institutional Paper Trade, Options &amp; Wealth OS
               </span>
             </div>
-            <span style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '500' }}>Institutional Paper Trade, Options & Wealth OS</span>
           </div>
-        </div>
 
-        {/* Desktop Quick Jump Links */}
-        <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => scrollToSection('interactive-edge-lab')}
-            style={{ padding: '6px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '5px' }}
-          >
-            <Sliders size={13} />
-            <span>Trader Edge Lab</span>
-          </button>
-          <button
-            onClick={() => scrollToSection('hubs-command-center')}
-            style={{ padding: '6px 12px', background: 'rgba(56, 189, 248, 0.09)', border: '1px solid rgba(56, 189, 248, 0.25)', color: '#38bdf8', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            <span>6 Platform Hubs</span>
-            <ChevronDown size={13} />
-          </button>
-          <button
-            onClick={() => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading())}
-            onMouseEnter={() => prefetchHubChunk(7)}
-            style={{ padding: '6px 12px', background: 'rgba(37, 99, 235, 0.14)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#60a5fa', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px' }}
-          >
-            💬 Community & Clubs
-          </button>
-          <button
-            onClick={() => onOpenTradeDiary('CHECKLIST')}
-            onMouseEnter={() => prefetchHubChunk(2)}
-            style={{ padding: '6px 11px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
-          >
-            Trade Diary
-          </button>
-          <button
-            onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}
-            onMouseEnter={() => prefetchHubChunk(3)}
-            style={{ padding: '6px 11px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
-          >
-            Bhavcopy & IPO
-          </button>
-          <button
-            onClick={() => onOpenCalculators('all')}
-            onMouseEnter={() => prefetchHubChunk(4)}
-            style={{ padding: '6px 11px', background: 'transparent', border: 'none', color: '#fbbf24', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
-          >
-            10 Calculators
-          </button>
-          <button
-            onClick={() => onOpenWealthFinance('NET_WORTH')}
-            onMouseEnter={() => prefetchHubChunk(5)}
-            style={{ padding: '6px 11px', background: 'transparent', border: 'none', color: '#34d399', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            <PieChart size={13} /> Wealth & Tax
-          </button>
-          <button
-            onClick={() => onOpenAlgoBridge('SHARE_LINK')}
-            onMouseEnter={() => prefetchHubChunk(6)}
-            style={{ padding: '6px 11px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
-          >
-            SkandX Algo
-          </button>
-        </div>
+          {/* Desktop Quick Jump Links */}
+          <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => scrollToSection('interactive-edge-lab')}
+              style={{ padding: '6px 11px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <Sliders size={13} />
+              <span>Trader Edge Lab</span>
+            </button>
+            <button
+              onClick={() => scrollToSection('hubs-command-center')}
+              style={{ padding: '6px 11px', background: 'rgba(56, 189, 248, 0.09)', border: '1px solid rgba(56, 189, 248, 0.25)', color: '#38bdf8', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <span>6 Platform Hubs</span>
+              <ChevronDown size={13} />
+            </button>
+            <button
+              onClick={() => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading())}
+              onMouseEnter={() => prefetchHubChunk(7)}
+              style={{ padding: '6px 11px', background: 'rgba(37, 99, 235, 0.14)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#60a5fa', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px' }}
+            >
+              💬 Community &amp; Clubs
+            </button>
+            <button
+              onClick={() => onOpenTradeDiary('CHECKLIST')}
+              onMouseEnter={() => prefetchHubChunk(2)}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+            >
+              Trade Diary
+            </button>
+            <button
+              onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}
+              onMouseEnter={() => prefetchHubChunk(3)}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+            >
+              Bhavcopy &amp; IPO
+            </button>
+            <button
+              onClick={() => onOpenCalculators('all')}
+              onMouseEnter={() => prefetchHubChunk(4)}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#fbbf24', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+            >
+              10 Calculators
+            </button>
+            <button
+              onClick={() => onOpenWealthFinance('NET_WORTH')}
+              onMouseEnter={() => prefetchHubChunk(5)}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#34d399', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <PieChart size={13} /> Wealth &amp; Tax
+            </button>
+            <button
+              onClick={() => onOpenAlgoBridge('SHARE_LINK')}
+              onMouseEnter={() => prefetchHubChunk(6)}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+            >
+              SkandX Algo
+            </button>
+          </div>
 
-        {/* Direct Action Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Direct Action Button (Single-Line on Both Mobile & Desktop) */}
           <button
             onClick={onOpenPaperTrading}
             style={{
-              padding: '9px 18px',
+              padding: '8px 14px',
               background: 'linear-gradient(135deg, #0284c7, #2563eb)',
               border: '1px solid rgba(125, 211, 252, 0.45)',
               borderRadius: '9px',
               color: '#fff',
               fontWeight: '800',
-              fontSize: '12.5px',
+              fontSize: '12px',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '5px',
               cursor: 'pointer',
-              boxShadow: '0 4px 18px rgba(2, 132, 199, 0.4)'
+              boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
           >
-            <Zap size={14} /> Launch Paper Trading
+            <Zap size={13} />
+            <span>Launch Terminal</span>
           </button>
+        </header>
+
+        {/* Second Row inside Unified Sticky Deck: Real-Time Clickable Market Ribbon */}
+        <div
+          className="skx-no-scrollbar"
+          style={{
+            background: 'rgba(10, 15, 28, 0.95)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            padding: '6px 14px',
+            overflowX: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            fontSize: '11px',
+            width: '100%'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.32)',
+              padding: '2px 8px',
+              borderRadius: '20px',
+              color: '#34d399',
+              fontWeight: '800',
+              fontSize: '10px',
+              letterSpacing: '0.3px'
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#10b981',
+                display: 'inline-block',
+                boxShadow: '0 0 8px #10b981',
+                animation: 'skxLivePulse 1.8s infinite'
+              }} />
+              LIVE
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
+              {LIVE_TICKERS.map((t, idx) => {
+                const isSelected = activeTickerIdx === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleTickerClick(t.targetSymbol, idx)}
+                    title={`Tap to test ${t.label} in Sandbox`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: isSelected ? 'rgba(2, 132, 199, 0.24)' : 'rgba(255, 255, 255, 0.03)',
+                      border: isSelected ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.07)',
+                      borderRadius: '6px',
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                      color: '#f8fafc',
+                      fontSize: '11px'
+                    }}
+                  >
+                    <span style={{ fontWeight: '700', color: isSelected ? '#38bdf8' : '#cbd5e1' }}>{t.short}</span>
+                    <span style={{ fontWeight: '800', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>{t.ltp}</span>
+                    <span style={{ color: t.isUp ? '#10b981' : '#ef4444', fontWeight: '700', fontSize: '10.5px', fontVariantNumeric: 'tabular-nums' }}>
+                      {t.shortChange}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap', fontSize: '11px', color: '#94a3b8' }}>
+            <span>INDIA VIX: <strong style={{ color: '#34d399' }}>13.42 (-1.8%)</strong></span>
+            <span>•</span>
+            <span>NIFTY PCR: <strong style={{ color: '#38bdf8' }}>1.14 (Bullish)</strong></span>
+          </div>
         </div>
-      </header>
+
+        {/* Third Row (Mobile Only): Swipeable Quick-Jump Hub Bar for 1-Tap Mobile Navigation */}
+        <div className="skx-mobile-quicknav skx-no-scrollbar">
+          {[
+            { label: '⚡ Sandbox', action: () => scrollToSection('mobile-sandbox-anchor'), color: '#38bdf8' },
+            { label: '🧭 6 Hubs', action: () => scrollToSection('hubs-command-center'), color: '#818cf8' },
+            { label: '⛓️ Option Chain', action: () => (onOpenOptionChain ? onOpenOptionChain() : onOpenPaperTrading()), color: '#a5b4fc' },
+            { label: '🧮 Calculators', action: () => onOpenCalculators('all'), color: '#fbbf24' },
+            { label: '💬 Community', action: () => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading()), color: '#60a5fa' },
+            { label: '📓 Trade Diary', action: () => onOpenTradeDiary('CHECKLIST'), color: '#c084fc' },
+            { label: '🏛️ IPO & Bhavcopy', action: () => onOpenPrimaryMarkets('BHAVCOPY'), color: '#34d399' },
+            { label: '💰 Wealth & Tax', action: () => onOpenWealthFinance('NET_WORTH'), color: '#10b981' },
+            { label: '🤖 SkandX Algo', action: () => onOpenAlgoBridge('SHARE_LINK'), color: '#38bdf8' }
+          ].map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={item.action}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '16px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${item.color}40`,
+                color: '#f8fafc',
+                fontSize: '11px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* 3. Split-Screen Hero + Interactive 4-Tab Live Financial Sandbox */}
-      <section style={{
-        padding: '28px 22px 24px',
+      <section className="skx-section-pad" style={{
+        padding: '22px 22px 20px',
         maxWidth: '1320px',
         margin: '0 auto',
         width: '100%'
@@ -826,35 +982,41 @@ export default function LandingHomeView({
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '18px'
+            gap: '16px',
+            minWidth: 0,
+            width: '100%'
           }}>
-            <div>
-              {/* Status Pill */}
+            <div style={{ minWidth: 0, width: '100%' }}>
+              {/* Status Pill (Wraps cleanly on small mobile screens) */}
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '5px 13px',
+                gap: '6px',
+                padding: '5px 11px',
                 background: 'linear-gradient(90deg, rgba(2, 132, 199, 0.16), rgba(99, 102, 241, 0.16))',
                 border: '1px solid rgba(56, 189, 248, 0.32)',
                 borderRadius: '20px',
                 color: '#7dd3fc',
-                fontSize: '11.5px',
+                fontSize: '11px',
                 fontWeight: '700',
-                marginBottom: '14px'
+                marginBottom: '12px',
+                maxWidth: '100%'
               }}>
-                <Sparkles size={13} color="#38bdf8" />
-                <span>India&apos;s #1 Real-Time Paper Trade, Option Greeks &amp; Wealth OS</span>
+                <Sparkles size={13} color="#38bdf8" style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  India&apos;s #1 Real-Time Paper Trade, Option Greeks &amp; Wealth OS
+                </span>
               </div>
 
               {/* Commanding Headline */}
               <h1 style={{
-                fontSize: 'clamp(28px, 3.4vw, 44px)',
+                fontSize: 'clamp(24px, 5.2vw, 42px)',
                 fontWeight: '900',
-                lineHeight: '1.13',
-                margin: '0 0 14px',
-                letterSpacing: '-0.7px',
-                color: '#ffffff'
+                lineHeight: '1.16',
+                margin: '0 0 12px',
+                letterSpacing: '-0.5px',
+                color: '#ffffff',
+                wordBreak: 'break-word'
               }}>
                 Trade Live NSE/BSE Markets with{' '}
                 <span style={{
@@ -869,26 +1031,21 @@ export default function LandingHomeView({
 
               {/* Subtitle */}
               <p style={{
-                fontSize: '14px',
+                fontSize: '13.5px',
                 color: '#94a3b8',
-                lineHeight: '1.6',
-                margin: '0 0 20px'
+                lineHeight: '1.58',
+                margin: '0 0 16px'
               }}>
                 Test options strategies, bracket orders, and algorithmic webhooks on real-time market ticks right inside our interactive sandbox — or audit your loans, SIPs, net worth, and FY25 taxes in one unified terminal.
               </p>
 
-              {/* Primary CTA Row */}
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '20px'
-              }}>
+              {/* Primary CTA Row (Full-width primary + 50/50 secondary pair on mobile!) */}
+              <div className="skx-cta-row">
                 <button
                   onClick={onOpenPaperTrading}
+                  className="skx-cta-primary"
                   style={{
-                    padding: '13px 22px',
+                    padding: '13px 20px',
                     background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                     border: '1px solid rgba(125, 211, 252, 0.4)',
                     borderRadius: '11px',
@@ -909,77 +1066,82 @@ export default function LandingHomeView({
 
                 <button
                   onClick={() => (onOpenOptionChain ? onOpenOptionChain() : onOpenPaperTrading())}
+                  className="skx-cta-secondary"
                   style={{
-                    padding: '13px 18px',
+                    padding: '12px 16px',
                     background: 'rgba(99, 102, 241, 0.14)',
                     border: '1px solid rgba(129, 140, 248, 0.4)',
                     borderRadius: '11px',
                     color: '#c7d2fe',
                     fontWeight: '700',
-                    fontSize: '13.5px',
+                    fontSize: '13px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '7px',
+                    gap: '6px',
                     cursor: 'pointer'
                   }}
                 >
-                  <Layers size={16} color="#818cf8" />
-                  <span>Live Option Chain</span>
+                  <Layers size={15} color="#818cf8" style={{ flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>Option Chain</span>
                 </button>
 
                 <button
                   onClick={() => onOpenCalculators('all')}
                   onMouseEnter={() => prefetchHubChunk(4)}
+                  className="skx-cta-secondary"
                   style={{
-                    padding: '13px 18px',
+                    padding: '12px 16px',
                     background: 'rgba(245, 158, 11, 0.12)',
                     border: '1px solid rgba(245, 158, 11, 0.38)',
                     borderRadius: '11px',
                     color: '#fde68a',
                     fontWeight: '700',
-                    fontSize: '13.5px',
+                    fontSize: '13px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '7px',
+                    gap: '6px',
                     cursor: 'pointer'
                   }}
                 >
-                  <Calculator size={16} color="#fbbf24" />
-                  <span>10 Calculators Suite</span>
+                  <Calculator size={15} color="#fbbf24" style={{ flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>10 Calculators</span>
                 </button>
               </div>
             </div>
 
-            {/* Live Account & Session Telemetry Card */}
+            {/* Live Account & Session Telemetry Card (100% Mobile-Contained, Zero Cutoff) */}
             <div style={{
               background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 132, 199, 0.15))',
               border: '1px solid rgba(56, 189, 248, 0.3)',
               borderRadius: '15px',
-              padding: '16px 18px',
-              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.35)'
+              padding: '14px 15px',
+              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.35)',
+              width: '100%',
+              minWidth: 0
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                   <div style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '11px',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
                     background: 'rgba(16, 185, 129, 0.16)',
                     border: '1px solid rgba(16, 185, 129, 0.38)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#10b981'
+                    color: '#10b981',
+                    flexShrink: 0
                   }}>
-                    <Activity size={22} />
+                    <Activity size={20} />
                   </div>
-                  <div>
-                    <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: '800' }}>
-                      {user?.username ? `LIVE TRADING DESK • ${user.username.toUpperCase()}` : 'LIVE SIMULATED TRADING DESK'}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '800', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user?.username ? `LIVE DESK • ${user.username.toUpperCase()}` : 'LIVE SIMULATED DESK'}
                     </div>
-                    <div style={{ fontSize: '19px', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 'clamp(16px, 4.2vw, 19px)', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums', lineHeight: '1.2' }}>
                       ₹{Math.round(liveTelemetry.balance).toLocaleString('en-IN')}{' '}
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#38bdf8' }}>Available Virtual Capital</span>
+                      <span style={{ fontSize: '11px', fontWeight: '600', color: '#38bdf8', display: 'inline-block' }}>Virtual Capital</span>
                     </div>
                   </div>
                 </div>
@@ -987,163 +1149,169 @@ export default function LandingHomeView({
                 <button
                   onClick={onOpenPaperTrading}
                   style={{
-                    padding: '7px 13px',
+                    padding: '6px 10px',
                     background: 'rgba(56, 189, 248, 0.14)',
                     border: '1px solid rgba(56, 189, 248, 0.35)',
                     borderRadius: '8px',
                     color: '#38bdf8',
-                    fontSize: '11.5px',
+                    fontSize: '11px',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px'
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
                   }}
                 >
-                  <span>Full Desk</span>
-                  <ArrowUpRight size={13} />
+                  <span>Desk</span>
+                  <ArrowUpRight size={12} />
                 </button>
               </div>
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '10px',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '8px',
                 paddingTop: '10px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.07)',
-                fontSize: '12px'
+                borderTop: '1px solid rgba(255, 255, 255, 0.07)'
               }}>
-                <div style={{ background: 'rgba(0,0,0,0.28)', padding: '8px 10px', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Open Positions</div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.openCount} Active</div>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                  <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Positions</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.openCount} Open</div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.28)', padding: '8px 10px', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Executed Orders</div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.executedCount} Fills</div>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                  <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Orders</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.executedCount} Fills</div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.28)', padding: '8px 10px', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Realized P&amp;L</div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: liveTelemetry.realizedPnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
-                    {liveTelemetry.realizedPnl >= 0 ? '+' : ''}₹{liveTelemetry.realizedPnl.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                  <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Realized P&amp;L</div>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: liveTelemetry.realizedPnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {liveTelemetry.realizedPnl >= 0 ? '+' : ''}₹{Math.round(liveTelemetry.realizedPnl).toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 1-Click Direct Tool Spotlight Dock */}
+            {/* 1-Click Direct Tool Spotlight Dock (2x4 Grid on Mobile, 4x2 on Desktop) */}
             <div style={{
               background: 'rgba(15, 23, 42, 0.72)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '14px',
-              padding: '12px 14px'
+              padding: '12px',
+              width: '100%',
+              minWidth: 0
             }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '9px'
+                marginBottom: '8px'
               }}>
-                <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                <span style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   ⚡ Instant 1-Click Tool Launcher:
                 </span>
-                <span style={{ fontSize: '10.5px', color: '#38bdf8', fontWeight: '600' }}>0ms Direct Access</span>
+                <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '700' }}>Direct Access</span>
               </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-                gap: '7px'
-              }}>
+              <div className="skx-spotlight-grid">
                 {SPOTLIGHT_TOOLS.map((tool, idx) => (
                   <button
                     key={idx}
                     onClick={tool.action}
                     className="skx-pill-btn"
                     style={{
-                      padding: '7px 10px',
+                      padding: '7px 9px',
                       borderRadius: '8px',
                       background: 'rgba(255, 255, 255, 0.035)',
                       border: `1px solid ${tool.color}33`,
                       color: '#e2e8f0',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '600',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: '5px',
-                      textAlign: 'left'
+                      gap: '4px',
+                      textAlign: 'left',
+                      minWidth: 0
                     }}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tool.label}</span>
-                    <ArrowUpRight size={12} color={tool.color} style={{ flexShrink: 0 }} />
+                    <ArrowUpRight size={11} color={tool.color} style={{ flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Interactive 4-Tab Live Market & Wealth Sandbox (Playable Right on Landing Page!) */}
-          <div style={{
-            background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(9, 13, 24, 0.98))',
-            border: '1px solid rgba(56, 189, 248, 0.32)',
-            borderRadius: '18px',
-            padding: '18px',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            gap: '14px'
-          }}>
+          {/* RIGHT COLUMN: Interactive 4-Tab Live Market & Wealth Sandbox */}
+          <div
+            id="mobile-sandbox-anchor"
+            style={{
+              background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(9, 13, 24, 0.98))',
+              border: '1px solid rgba(56, 189, 248, 0.32)',
+              borderRadius: '18px',
+              padding: '15px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '12px',
+              minWidth: 0,
+              width: '100%'
+            }}
+          >
             {/* Top Sandbox Window Bar + 4 Interactive Mode Tabs */}
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '10px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                flexWrap: 'wrap'
+                gap: '8px',
+                paddingBottom: '10px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                    <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-                    <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                   </div>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#cbd5e1', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                    INTERACTIVE TERMINAL SANDBOX (TEST LIVE NOW)
+                  <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#cbd5e1', letterSpacing: '0.4px', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    LIVE INTERACTIVE SANDBOX
                   </span>
                 </div>
 
                 <span style={{
-                  fontSize: '10.5px',
-                  padding: '2px 8px',
+                  fontSize: '10px',
+                  padding: '2px 7px',
                   borderRadius: '12px',
                   background: 'rgba(16, 185, 129, 0.14)',
                   color: '#34d399',
-                  fontWeight: '700'
+                  fontWeight: '700',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}>
-                  ● Interactive Preview
+                  ● Try Here
                 </span>
               </div>
 
               {/* 4 Interactive Mode Selector Tabs */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '6px',
-                marginTop: '12px',
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gap: '4px',
+                marginTop: '10px',
                 background: 'rgba(0, 0, 0, 0.35)',
-                padding: '5px',
-                borderRadius: '11px',
+                padding: '4px',
+                borderRadius: '10px',
                 border: '1px solid rgba(255, 255, 255, 0.06)'
               }}>
                 {[
-                  { id: 'TRADE', label: '⚡ Quick Trade' },
-                  { id: 'OPTIONS', label: '⛓️ Option Chain' },
-                  { id: 'CALC', label: '🧮 SIP & Loan' },
-                  { id: 'MOVERS', label: '🔥 NSE Delivery' }
+                  { id: 'TRADE', label: '⚡ Trade' },
+                  { id: 'OPTIONS', label: '⛓️ Options' },
+                  { id: 'CALC', label: '🧮 SIP/Loan' },
+                  { id: 'MOVERS', label: '🔥 Delivery' }
                 ].map(tab => {
                   const active = cockpitTab === tab.id;
                   return (
@@ -1152,16 +1320,18 @@ export default function LandingHomeView({
                       type="button"
                       onClick={() => setCockpitTab(tab.id)}
                       style={{
-                        padding: '8px 6px',
-                        borderRadius: '8px',
+                        padding: '7px 4px',
+                        borderRadius: '7px',
                         border: active ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
                         background: active ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(37, 99, 235, 0.35))' : 'transparent',
                         color: active ? '#ffffff' : '#94a3b8',
-                        fontSize: '11.5px',
+                        fontSize: '11px',
                         fontWeight: active ? '800' : '600',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       {tab.label}
@@ -1173,9 +1343,9 @@ export default function LandingHomeView({
 
             {/* ─── TAB 1: LIVE INTERACTIVE QUICK-TRADE & CHART SIMULATOR ─── */}
             {cockpitTab === 'TRADE' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
                 {/* Instrument Switcher Pills */}
-                <div className="skx-no-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+                <div className="skx-no-scrollbar" style={{ display: 'flex', gap: '5px', overflowX: 'auto' }}>
                   {LIVE_TICKERS.slice(0, 6).map((inst, idx) => {
                     const active = activeTickerIdx === idx;
                     return (
@@ -1187,15 +1357,16 @@ export default function LandingHomeView({
                           setSimulatedOrder(null);
                         }}
                         style={{
-                          padding: '5px 10px',
+                          padding: '5px 9px',
                           borderRadius: '7px',
                           border: active ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
                           background: active ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.03)',
                           color: active ? '#38bdf8' : '#cbd5e1',
-                          fontSize: '11px',
+                          fontSize: '10.5px',
                           fontWeight: '700',
                           cursor: 'pointer',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}
                       >
                         {inst.short}
@@ -1209,39 +1380,40 @@ export default function LandingHomeView({
                   background: 'rgba(0, 0, 0, 0.38)',
                   border: '1px solid rgba(255, 255, 255, 0.07)',
                   borderRadius: '12px',
-                  padding: '12px 14px'
+                  padding: '10px 12px',
+                  minWidth: 0
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '15px', fontWeight: '900', color: '#ffffff' }}>{activeInstrument.label}</span>
-                        <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', fontWeight: '700' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#ffffff' }}>{activeInstrument.label}</span>
+                        <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', fontWeight: '700' }}>
                           Lot: {activeInstrument.lotSize}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-                        <span style={{ fontSize: '21px', fontWeight: '900', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '19px', fontWeight: '900', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
                           ₹{activeInstrument.ltp}
                         </span>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: activeInstrument.isUp ? '#10b981' : '#ef4444' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: activeInstrument.isUp ? '#10b981' : '#ef4444' }}>
                           {activeInstrument.change}
                         </span>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '7px' }}>
+                    <div style={{ display: 'flex', gap: '3px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '7px' }}>
                       {['1m', '5m', '15m', '1D'].map(tf => (
                         <button
                           key={tf}
                           type="button"
                           onClick={() => setChartTimeframe(tf)}
                           style={{
-                            padding: '4px 8px',
+                            padding: '3px 7px',
                             borderRadius: '5px',
                             border: 'none',
                             background: chartTimeframe === tf ? '#0284c7' : 'transparent',
                             color: chartTimeframe === tf ? '#fff' : '#94a3b8',
-                            fontSize: '10.5px',
+                            fontSize: '10px',
                             fontWeight: '700',
                             cursor: 'pointer'
                           }}
@@ -1253,15 +1425,14 @@ export default function LandingHomeView({
                   </div>
 
                   {/* Interactive SVG Area + Candlestick Hybrid Chart */}
-                  <div style={{ width: '100%', height: '142px', position: 'relative' }}>
-                    <svg viewBox={`0 0 ${chartData.width} ${chartData.height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                  <div style={{ width: '100%', height: '128px', position: 'relative', overflow: 'hidden' }}>
+                    <svg viewBox={`0 0 ${chartData.width} ${chartData.height}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
                       <defs>
                         <linearGradient id="skxChartGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
                           <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
                         </linearGradient>
                       </defs>
-                      {/* Horizontal Grid Lines */}
                       {[0.2, 0.5, 0.8].map((g, i) => (
                         <line
                           key={i}
@@ -1273,16 +1444,14 @@ export default function LandingHomeView({
                           strokeDasharray="3 3"
                         />
                       ))}
-                      {/* Area & Line Path */}
                       <path d={chartData.areaPath} fill="url(#skxChartGrad)" />
                       <path d={chartData.linePath} fill="none" stroke="#38bdf8" strokeWidth="2.4" strokeLinecap="round" />
-                      {/* Overlay Mini Candlesticks */}
                       {chartData.candles.map((c, idx) => {
                         const x = (idx / (chartData.candles.length - 1)) * chartData.width;
-                        const yOpen = chartData.height - ((c.open - chartData.minVal) / chartData.span) * (chartData.height - 24) - 12;
-                        const yClose = chartData.height - ((c.close - chartData.minVal) / chartData.span) * (chartData.height - 24) - 12;
-                        const yHigh = chartData.height - ((c.high - chartData.minVal) / chartData.span) * (chartData.height - 24) - 12;
-                        const yLow = chartData.height - ((c.low - chartData.minVal) / chartData.span) * (chartData.height - 24) - 12;
+                        const yOpen = chartData.height - ((c.open - chartData.minVal) / chartData.span) * (chartData.height - 22) - 11;
+                        const yClose = chartData.height - ((c.close - chartData.minVal) / chartData.span) * (chartData.height - 22) - 11;
+                        const yHigh = chartData.height - ((c.high - chartData.minVal) / chartData.span) * (chartData.height - 22) - 11;
+                        const yLow = chartData.height - ((c.low - chartData.minVal) / chartData.span) * (chartData.height - 22) - 11;
                         const color = c.isUp ? '#10b981' : '#ef4444';
                         return (
                           <g key={idx} opacity="0.85">
@@ -1307,66 +1476,65 @@ export default function LandingHomeView({
                   background: 'rgba(15, 23, 42, 0.75)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '12px',
-                  padding: '12px 14px',
+                  padding: '11px 12px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '10px'
+                  gap: '9px',
+                  minWidth: 0
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    {/* BUY / SELL Toggle */}
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '5px' }}>
                       <button
                         type="button"
                         onClick={() => setTradeSide('BUY')}
                         style={{
-                          padding: '6px 14px',
+                          padding: '5px 11px',
                           borderRadius: '7px',
                           border: tradeSide === 'BUY' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
                           background: tradeSide === 'BUY' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(255,255,255,0.03)',
                           color: tradeSide === 'BUY' ? '#34d399' : '#94a3b8',
-                          fontSize: '12px',
+                          fontSize: '11px',
                           fontWeight: '800',
                           cursor: 'pointer'
                         }}
                       >
-                        🟢 BUY / LONG
+                        🟢 BUY
                       </button>
                       <button
                         type="button"
                         onClick={() => setTradeSide('SELL')}
                         style={{
-                          padding: '6px 14px',
+                          padding: '5px 11px',
                           borderRadius: '7px',
                           border: tradeSide === 'SELL' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)',
                           background: tradeSide === 'SELL' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(255,255,255,0.03)',
                           color: tradeSide === 'SELL' ? '#f87171' : '#94a3b8',
-                          fontSize: '12px',
+                          fontSize: '11px',
                           fontWeight: '800',
                           cursor: 'pointer'
                         }}
                       >
-                        🔴 SELL / SHORT
+                        🔴 SELL
                       </button>
                     </div>
 
-                    {/* Product Type Pills */}
                     <div style={{ display: 'flex', gap: '4px' }}>
                       {[
                         { id: 'MIS', label: 'MIS 5x' },
                         { id: 'NRML', label: 'NRML' },
-                        { id: 'BO', label: 'Bracket SL/TP' }
+                        { id: 'BO', label: 'BO SL/TP' }
                       ].map(p => (
                         <button
                           key={p.id}
                           type="button"
                           onClick={() => setTradeProduct(p.id)}
                           style={{
-                            padding: '5px 9px',
+                            padding: '4px 8px',
                             borderRadius: '6px',
                             border: tradeProduct === p.id ? '1px solid rgba(56,189,248,0.5)' : '1px solid rgba(255,255,255,0.08)',
                             background: tradeProduct === p.id ? 'rgba(56,189,248,0.16)' : 'transparent',
                             color: tradeProduct === p.id ? '#38bdf8' : '#94a3b8',
-                            fontSize: '11px',
+                            fontSize: '10.5px',
                             fontWeight: '700',
                             cursor: 'pointer'
                           }}
@@ -1378,7 +1546,7 @@ export default function LandingHomeView({
                   </div>
 
                   {/* Lot Stepper & SL / Target Sliders */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', alignItems: 'center' }}>
+                  <div className="skx-trade-controls-grid">
                     <div>
                       <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '4px' }}>
                         Lots ({tradeMetrics.qty} Qty)
@@ -1408,7 +1576,7 @@ export default function LandingHomeView({
                     </div>
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '2px' }}>
                         <span>Stop-Loss</span>
                         <span style={{ color: '#f87171' }}>-{slPoints} pts</span>
                       </div>
@@ -1424,7 +1592,7 @@ export default function LandingHomeView({
                     </div>
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '2px' }}>
                         <span>Target Profit</span>
                         <span style={{ color: '#34d399' }}>+{tpPoints} pts</span>
                       </div>
@@ -1440,86 +1608,84 @@ export default function LandingHomeView({
                     </div>
                   </div>
 
-                  {/* Live Margin, Target Profit & Risk-Reward Summary Bar */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: '8px',
+                  {/* Live Margin, Target Profit & Risk-Reward Summary Bar (2x2 on Mobile, 4x1 on Desktop) */}
+                  <div className="skx-trade-metrics-grid" style={{
                     background: 'rgba(0, 0, 0, 0.35)',
                     padding: '8px 10px',
                     borderRadius: '8px',
                     fontSize: '11px'
                   }}>
                     <div>
-                      <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>REQ. MARGIN</div>
+                      <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>REQ. MARGIN</div>
                       <div style={{ fontWeight: '800', color: '#e2e8f0' }}>₹{tradeMetrics.marginRequired.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>TARGET PROFIT</div>
+                      <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>TARGET PROFIT</div>
                       <div style={{ fontWeight: '800', color: '#34d399' }}>+₹{tradeMetrics.maxProfit.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>MAX SL RISK</div>
+                      <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>MAX SL RISK</div>
                       <div style={{ fontWeight: '800', color: '#f87171' }}>-₹{tradeMetrics.maxRisk.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>RISK : REWARD</div>
+                      <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>RISK : REWARD</div>
                       <div style={{ fontWeight: '800', color: '#38bdf8' }}>1 : {tradeMetrics.rrRatio}</div>
                     </div>
                   </div>
 
-                  {/* Simulated Fill Feedback Banner (If user clicked Test Fill) */}
+                  {/* Simulated Fill Feedback Banner */}
                   {simulatedOrder && (
                     <div style={{
                       background: 'rgba(16, 185, 129, 0.14)',
                       border: '1px solid rgba(16, 185, 129, 0.4)',
                       borderRadius: '9px',
-                      padding: '8px 12px',
+                      padding: '8px 10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: '8px',
-                      fontSize: '11.5px'
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      fontSize: '11px'
                     }}>
                       <div>
-                        <strong style={{ color: '#34d399' }}>✔ SIMULATED {simulatedOrder.side} FILL:</strong>{' '}
-                        {simulatedOrder.symbol} ({simulatedOrder.qty} Qty @ ₹{simulatedOrder.entryPrice.toLocaleString('en-IN')})
+                        <strong style={{ color: '#34d399' }}>✔ SIMULATED {simulatedOrder.side}:</strong>{' '}
+                        {simulatedOrder.symbol} ({simulatedOrder.qty} Qty)
                       </div>
-                      <span style={{ fontWeight: '800', color: '#34d399', whiteSpace: 'nowrap' }}>
-                        Live Est. P&amp;L: +₹{simulatedOrder.simulatedPnl.toLocaleString('en-IN')}
+                      <span style={{ fontWeight: '800', color: '#34d399' }}>
+                        Est. P&amp;L: +₹{simulatedOrder.simulatedPnl.toLocaleString('en-IN')}
                       </span>
                     </div>
                   )}
 
                   {/* Action Buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
                     <button
                       type="button"
                       onClick={handleSimulateOrderOnPage}
                       style={{
-                        padding: '10px 12px',
+                        padding: '10px 8px',
                         borderRadius: '8px',
                         border: '1px solid rgba(56, 189, 248, 0.45)',
                         background: 'rgba(56, 189, 248, 0.12)',
                         color: '#38bdf8',
                         fontWeight: '800',
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px'
+                        gap: '5px'
                       }}
                     >
-                      <Play size={13} />
-                      <span>Simulate Instant Fill Here</span>
+                      <Play size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Test Fill Here</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleLaunchSymbolInTerminal(activeInstrument.targetSymbol)}
                       style={{
-                        padding: '10px 14px',
+                        padding: '10px 8px',
                         borderRadius: '8px',
                         border: 'none',
                         background: tradeSide === 'BUY'
@@ -1527,17 +1693,17 @@ export default function LandingHomeView({
                           : 'linear-gradient(135deg, #ef4444, #dc2626)',
                         color: '#ffffff',
                         fontWeight: '800',
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
+                        gap: '5px',
                         boxShadow: '0 4px 14px rgba(0,0,0,0.35)'
                       }}
                     >
-                      <span>Execute {tradeSide} in Live Terminal</span>
-                      <ArrowRight size={14} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Execute {tradeSide} Live</span>
+                      <ArrowRight size={13} style={{ flexShrink: 0 }} />
                     </button>
                   </div>
                 </div>
@@ -1546,25 +1712,25 @@ export default function LandingHomeView({
 
             {/* ─── TAB 2: LIVE INTERACTIVE OPTION CHAIN & GREEKS SANDBOX ─── */}
             {cockpitTab === 'OPTIONS' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   background: 'rgba(0,0,0,0.35)',
-                  padding: '9px 12px',
+                  padding: '8px 10px',
                   borderRadius: '10px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   flexWrap: 'wrap',
-                  gap: '8px'
+                  gap: '6px'
                 }}>
                   <div>
-                    <span style={{ color: '#94a3b8' }}>NIFTY 50 SPOT: </span>
+                    <span style={{ color: '#94a3b8' }}>NIFTY SPOT: </span>
                     <strong style={{ color: '#f8fafc' }}>₹{niftySpot.toLocaleString('en-IN')}</strong>
-                    <span style={{ marginLeft: '10px', color: '#94a3b8' }}>ATM: </span>
+                    <span style={{ marginLeft: '8px', color: '#94a3b8' }}>ATM: </span>
                     <strong style={{ color: '#38bdf8' }}>{atmStrike}</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <span>PCR: <strong style={{ color: '#34d399' }}>1.14</strong></span>
                     <span>Max Pain: <strong style={{ color: '#fbbf24' }}>{atmStrike}</strong></span>
                   </div>
@@ -1575,26 +1741,26 @@ export default function LandingHomeView({
                   background: 'rgba(0,0,0,0.35)',
                   border: '1px solid rgba(255,255,255,0.07)',
                   borderRadius: '10px',
-                  overflow: 'hidden',
-                  fontSize: '11px'
+                  overflowX: 'auto',
+                  fontSize: '10.5px'
                 }}>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 0.8fr 1fr 1.1fr 1fr 0.8fr 1fr',
-                    padding: '7px 10px',
+                    gridTemplateColumns: '0.9fr 0.75fr 1fr 1.15fr 1fr 0.75fr 0.9fr',
+                    padding: '6px 6px',
                     background: 'rgba(255,255,255,0.04)',
                     color: '#94a3b8',
                     fontWeight: '800',
                     textAlign: 'center',
-                    fontSize: '10px'
+                    fontSize: '9.5px'
                   }}>
-                    <span>CALL OI</span>
-                    <span>CALL Δ</span>
-                    <span style={{ color: '#34d399' }}>CALL LTP</span>
+                    <span>CE OI</span>
+                    <span>CE Δ</span>
+                    <span style={{ color: '#34d399' }}>CE LTP</span>
                     <span style={{ color: '#38bdf8' }}>STRIKE</span>
-                    <span style={{ color: '#f87171' }}>PUT LTP</span>
-                    <span>PUT Δ</span>
-                    <span>PUT OI</span>
+                    <span style={{ color: '#f87171' }}>PE LTP</span>
+                    <span>PE Δ</span>
+                    <span>PE OI</span>
                   </div>
 
                   {optionChainRows.map((row) => {
@@ -1605,8 +1771,8 @@ export default function LandingHomeView({
                         onClick={() => setSelectedStrikeOffset(row.offset)}
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 0.8fr 1fr 1.1fr 1fr 0.8fr 1fr',
-                          padding: '7.5px 10px',
+                          gridTemplateColumns: '0.9fr 0.75fr 1fr 1.15fr 1fr 0.75fr 0.9fr',
+                          padding: '7px 6px',
                           alignItems: 'center',
                           textAlign: 'center',
                           cursor: 'pointer',
@@ -1631,10 +1797,11 @@ export default function LandingHomeView({
                           fontWeight: '900',
                           color: row.isAtm ? '#fbbf24' : '#f8fafc',
                           background: row.isAtm ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
-                          borderRadius: '5px',
-                          padding: '2px 4px'
+                          borderRadius: '4px',
+                          padding: '2px 3px',
+                          fontSize: '10px'
                         }}>
-                          {row.strike} {row.isAtm ? 'ATM' : ''}
+                          {row.strike}
                         </span>
                         <span
                           onClick={(e) => { e.stopPropagation(); setSelectedStrikeOffset(row.offset); setSelectedOptionType('PE'); }}
@@ -1658,15 +1825,15 @@ export default function LandingHomeView({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '10px',
+                  gap: '8px',
                   flexWrap: 'wrap'
                 }}>
-                  <div style={{ fontSize: '11.5px' }}>
+                  <div style={{ fontSize: '11px' }}>
                     <div style={{ fontWeight: '800', color: '#e2e8f0' }}>
-                      Selected: NIFTY {selectedChainRow.strike} {selectedOptionType} @ ₹{selectedOptionType === 'CE' ? selectedChainRow.callLtp : selectedChainRow.putLtp}
+                      NIFTY {selectedChainRow.strike} {selectedOptionType} @ ₹{selectedOptionType === 'CE' ? selectedChainRow.callLtp : selectedChainRow.putLtp}
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
-                      IV: <strong style={{ color: '#38bdf8' }}>{selectedChainRow.iv}%</strong> • Theta: <strong style={{ color: '#f87171' }}>{selectedChainRow.theta}/day</strong> • Delta: <strong style={{ color: '#34d399' }}>{selectedOptionType === 'CE' ? selectedChainRow.callDelta : selectedChainRow.putDelta}</strong>
+                    <div style={{ color: '#94a3b8', fontSize: '10.5px', marginTop: '2px' }}>
+                      IV: <strong style={{ color: '#38bdf8' }}>{selectedChainRow.iv}%</strong> • Theta: <strong style={{ color: '#f87171' }}>{selectedChainRow.theta}/d</strong> • Δ: <strong style={{ color: '#34d399' }}>{selectedOptionType === 'CE' ? selectedChainRow.callDelta : selectedChainRow.putDelta}</strong>
                     </div>
                   </div>
 
@@ -1674,12 +1841,12 @@ export default function LandingHomeView({
                     type="button"
                     onClick={() => (onOpenOptionChain ? onOpenOptionChain() : onOpenPaperTrading())}
                     style={{
-                      padding: '8px 14px',
+                      padding: '8px 12px',
                       borderRadius: '8px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                       color: '#fff',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '800',
                       cursor: 'pointer',
                       display: 'flex',
@@ -1687,7 +1854,7 @@ export default function LandingHomeView({
                       gap: '5px'
                     }}
                   >
-                    <span>Trade in Full Option Chain</span>
+                    <span>Open Option Chain</span>
                     <ArrowRight size={13} />
                   </button>
                 </div>
@@ -1696,98 +1863,96 @@ export default function LandingHomeView({
 
             {/* ─── TAB 3: LIVE INTERACTIVE SIP & LOAN EMI CALCULATOR SANDBOX ─── */}
             {cockpitTab === 'CALC' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => setCalcMode('SIP')}
                     style={{
-                      flex: 1,
-                      padding: '8px',
+                      padding: '8px 6px',
                       borderRadius: '8px',
                       border: calcMode === 'SIP' ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
                       background: calcMode === 'SIP' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.03)',
                       color: calcMode === 'SIP' ? '#38bdf8' : '#94a3b8',
-                      fontSize: '12px',
+                      fontSize: '11px',
                       fontWeight: '800',
                       cursor: 'pointer'
                     }}
                   >
-                    📈 SIP &amp; Step-Up Wealth Compounder
+                    📈 SIP Compounder
                   </button>
                   <button
                     type="button"
                     onClick={() => setCalcMode('EMI')}
                     style={{
-                      flex: 1,
-                      padding: '8px',
+                      padding: '8px 6px',
                       borderRadius: '8px',
                       border: calcMode === 'EMI' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
                       background: calcMode === 'EMI' ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255,255,255,0.03)',
                       color: calcMode === 'EMI' ? '#34d399' : '#94a3b8',
-                      fontSize: '12px',
+                      fontSize: '11px',
                       fontWeight: '800',
                       cursor: 'pointer'
                     }}
                   >
-                    🏠 Reducing Balance Loan EMI
+                    🏠 Reducing Loan EMI
                   </button>
                 </div>
 
                 {calcMode === 'SIP' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.32)', padding: '12px 14px', borderRadius: '11px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: 'rgba(0,0,0,0.32)', padding: '11px 12px', borderRadius: '11px' }}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '3px' }}>
                         <span style={{ color: '#cbd5e1' }}>Monthly SIP Investment</span>
                         <span style={{ color: '#38bdf8' }}>₹{sipMonthly.toLocaleString('en-IN')}/mo</span>
                       </div>
                       <input type="range" min="2000" max="200000" step="1000" value={sipMonthly} onChange={e => setSipMonthly(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                          <span style={{ color: '#94a3b8' }}>Return %</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          <span style={{ color: '#94a3b8' }}>Return</span>
                           <span style={{ color: '#34d399' }}>{sipRate}%</span>
                         </div>
                         <input type="range" min="8" max="25" step="0.5" value={sipRate} onChange={e => setSipRate(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }} />
                       </div>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                          <span style={{ color: '#94a3b8' }}>Duration</span>
-                          <span style={{ color: '#f8fafc' }}>{sipYears} Yrs</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          <span style={{ color: '#94a3b8' }}>Years</span>
+                          <span style={{ color: '#f8fafc' }}>{sipYears}Y</span>
                         </div>
                         <input type="range" min="3" max="30" step="1" value={sipYears} onChange={e => setSipYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#818cf8', cursor: 'pointer' }} />
                       </div>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                          <span style={{ color: '#94a3b8' }}>Step-Up</span>
-                          <span style={{ color: '#fbbf24' }}>{sipStepUp}%/yr</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          <span style={{ color: '#94a3b8' }}>StepUp</span>
+                          <span style={{ color: '#fbbf24' }}>{sipStepUp}%</span>
                         </div>
                         <input type="range" min="0" max="25" step="5" value={sipStepUp} onChange={e => setSipStepUp(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.32)', padding: '12px 14px', borderRadius: '11px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: 'rgba(0,0,0,0.32)', padding: '11px 12px', borderRadius: '11px' }}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '3px' }}>
                         <span style={{ color: '#cbd5e1' }}>Loan Principal Amount</span>
                         <span style={{ color: '#34d399' }}>₹{loanAmount.toLocaleString('en-IN')}</span>
                       </div>
                       <input type="range" min="200000" max="20000000" step="100000" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }} />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                          <span style={{ color: '#94a3b8' }}>Interest Rate (p.a.)</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          <span style={{ color: '#94a3b8' }}>Interest Rate</span>
                           <span style={{ color: '#fbbf24' }}>{loanRate}%</span>
                         </div>
                         <input type="range" min="6.5" max="18" step="0.25" value={loanRate} onChange={e => setLoanRate(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
                       </div>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                          <span style={{ color: '#94a3b8' }}>Loan Tenure</span>
-                          <span style={{ color: '#f8fafc' }}>{loanYears} Years</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          <span style={{ color: '#94a3b8' }}>Tenure</span>
+                          <span style={{ color: '#f8fafc' }}>{loanYears} Yrs</span>
                         </div>
                         <input type="range" min="1" max="30" step="1" value={loanYears} onChange={e => setLoanYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
                       </div>
@@ -1800,25 +1965,24 @@ export default function LandingHomeView({
                   background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(16, 185, 129, 0.14))',
                   border: '1px solid rgba(56, 189, 248, 0.35)',
                   borderRadius: '12px',
-                  padding: '12px 14px'
+                  padding: '11px 12px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
                     <div>
-                      <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>{calcSandboxResult.primaryLabel}</div>
-                      <div style={{ fontSize: '23px', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>{calcSandboxResult.primaryValue}</div>
+                      <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>{calcSandboxResult.primaryLabel}</div>
+                      <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>{calcSandboxResult.primaryValue}</div>
                     </div>
-                    <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: '800', fontSize: '12px' }}>
+                    <span style={{ padding: '3px 8px', borderRadius: '7px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: '800', fontSize: '11px' }}>
                       {calcSandboxResult.multiplier}
                     </span>
                   </div>
 
-                  {/* Visual Composition Bar */}
-                  <div style={{ height: '7px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden', margin: '10px 0', display: 'flex' }}>
+                  <div style={{ height: '6px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden', margin: '8px 0', display: 'flex' }}>
                     <div style={{ width: `${100 - calcSandboxResult.barPct}%`, background: '#38bdf8' }} />
                     <div style={{ width: `${calcSandboxResult.barPct}%`, background: '#10b981' }} />
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#cbd5e1', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1', marginBottom: '9px', flexWrap: 'wrap', gap: '4px' }}>
                     <span>{calcSandboxResult.subLeftLabel}: <strong>{calcSandboxResult.subLeftValue}</strong></span>
                     <span>{calcSandboxResult.subRightLabel}: <strong style={{ color: '#34d399' }}>{calcSandboxResult.subRightValue}</strong></span>
                   </div>
@@ -1828,13 +1992,13 @@ export default function LandingHomeView({
                     onClick={() => onOpenCalculators(calcMode === 'SIP' ? 'sip' : 'reducing-loan')}
                     style={{
                       width: '100%',
-                      padding: '9px 14px',
+                      padding: '9px 12px',
                       borderRadius: '8px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                       color: '#fff',
                       fontWeight: '800',
-                      fontSize: '12px',
+                      fontSize: '11.5px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1842,8 +2006,8 @@ export default function LandingHomeView({
                       gap: '6px'
                     }}
                   >
-                    <span>Open Full Schedule + Download PDF / Excel</span>
-                    <ArrowRight size={14} />
+                    <span>Open Full Schedule + PDF / Excel</span>
+                    <ArrowRight size={13} />
                   </button>
                 </div>
               </div>
@@ -1851,21 +2015,21 @@ export default function LandingHomeView({
 
             {/* ─── TAB 4: LIVE NSE HIGH-DELIVERY (>60%) & IPO GMP PULSE ─── */}
             {cockpitTab === 'MOVERS' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
                 <div style={{
                   background: 'rgba(0,0,0,0.35)',
                   border: '1px solid rgba(255,255,255,0.07)',
                   borderRadius: '10px',
-                  padding: '10px 12px'
+                  padding: '10px 11px'
                 }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    🏛️ Institutional High-Delivery Accumulation (&gt;60% NSE Bhavcopy)
+                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    🏛️ High-Delivery Accumulation (&gt;60% NSE Bhavcopy)
                   </div>
                   {[
-                    { sym: 'RELIANCE', ltp: LIVE_TICKERS[4]?.ltp || '1,294.50', deliv: '68.4%', vol: '2.1x Surge', target: 'NSE:RELIANCE-EQ' },
-                    { sym: 'TCS', ltp: LIVE_TICKERS[5]?.ltp || '4,142.00', deliv: '71.2%', vol: '1.8x Surge', target: 'NSE:TCS-EQ' },
-                    { sym: 'HDFCBANK', ltp: '1,684.20', deliv: '66.9%', vol: '2.4x Surge', target: 'NSE:HDFCBANK-EQ' },
-                    { sym: 'INFY', ltp: '1,918.40', deliv: '64.5%', vol: '1.7x Surge', target: 'NSE:INFY-EQ' }
+                    { sym: 'RELIANCE', ltp: LIVE_TICKERS[4]?.ltp || '1,294.50', deliv: '68.4%', vol: '2.1x', target: 'NSE:RELIANCE-EQ' },
+                    { sym: 'TCS', ltp: LIVE_TICKERS[5]?.ltp || '4,142.00', deliv: '71.2%', vol: '1.8x', target: 'NSE:TCS-EQ' },
+                    { sym: 'HDFCBANK', ltp: '1,684.20', deliv: '66.9%', vol: '2.4x', target: 'NSE:HDFCBANK-EQ' },
+                    { sym: 'INFY', ltp: '1,918.40', deliv: '64.5%', vol: '1.7x', target: 'NSE:INFY-EQ' }
                   ].map((item, i) => (
                     <div
                       key={i}
@@ -1875,28 +2039,29 @@ export default function LandingHomeView({
                         justifyContent: 'space-between',
                         padding: '7px 0',
                         borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                        fontSize: '11.5px'
+                        fontSize: '11px',
+                        gap: '6px'
                       }}
                     >
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <strong style={{ color: '#f8fafc' }}>{item.sym}</strong>
-                        <span style={{ color: '#94a3b8', marginLeft: '8px' }}>₹{item.ltp}</span>
+                        <span style={{ color: '#94a3b8', marginLeft: '6px' }}>₹{item.ltp}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ padding: '2px 7px', borderRadius: '5px', background: 'rgba(16,185,129,0.15)', color: '#34d399', fontWeight: '700', fontSize: '10.5px' }}>
-                          {item.deliv} Deliv
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '5px', background: 'rgba(16,185,129,0.15)', color: '#34d399', fontWeight: '700', fontSize: '10px' }}>
+                          {item.deliv}
                         </span>
-                        <span style={{ color: '#38bdf8', fontSize: '10.5px', fontWeight: '700' }}>{item.vol}</span>
+                        <span style={{ color: '#38bdf8', fontSize: '10px', fontWeight: '700' }}>{item.vol}</span>
                         <button
                           type="button"
                           onClick={() => handleLaunchSymbolInTerminal(item.target)}
                           style={{
-                            padding: '3px 8px',
+                            padding: '3px 7px',
                             borderRadius: '5px',
                             border: '1px solid rgba(56,189,248,0.4)',
                             background: 'rgba(56,189,248,0.12)',
                             color: '#38bdf8',
-                            fontSize: '10.5px',
+                            fontSize: '10px',
                             fontWeight: '700',
                             cursor: 'pointer'
                           }}
@@ -1908,38 +2073,38 @@ export default function LandingHomeView({
                   ))}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
                   <button
                     type="button"
                     onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}
                     style={{
-                      padding: '10px',
+                      padding: '9px 6px',
                       borderRadius: '8px',
                       border: '1px solid rgba(16,185,129,0.4)',
                       background: 'rgba(16,185,129,0.14)',
                       color: '#34d399',
                       fontWeight: '800',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       cursor: 'pointer'
                     }}
                   >
-                    Open Full Bhavcopy Screener →
+                    Bhavcopy Screener →
                   </button>
                   <button
                     type="button"
                     onClick={() => onOpenPrimaryMarkets('IPO')}
                     style={{
-                      padding: '10px',
+                      padding: '9px 6px',
                       borderRadius: '8px',
                       border: '1px solid rgba(56,189,248,0.4)',
                       background: 'rgba(56,189,248,0.14)',
                       color: '#38bdf8',
                       fontWeight: '800',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       cursor: 'pointer'
                     }}
                   >
-                    Live IPO GMP &amp; PAN Allotment →
+                    Live IPO &amp; GMP →
                   </button>
                 </div>
               </div>
@@ -1951,11 +2116,12 @@ export default function LandingHomeView({
       {/* 4. Interactive "Trader Edge & Risk Lab" — 3 Hands-On Widgets Right on the Landing Page */}
       <section
         id="interactive-edge-lab"
+        className="skx-section-pad"
         style={{
           maxWidth: '1320px',
           margin: '0 auto',
           width: '100%',
-          padding: '8px 22px 28px'
+          padding: '8px 22px 26px'
         }}
       >
         <div style={{
@@ -1963,27 +2129,26 @@ export default function LandingHomeView({
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '10px',
-          marginBottom: '14px'
+          gap: '8px',
+          marginBottom: '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{
               padding: '3px 9px',
               borderRadius: '6px',
               background: 'rgba(16, 185, 129, 0.15)',
               border: '1px solid rgba(16, 185, 129, 0.35)',
               color: '#34d399',
-              fontSize: '10.5px',
+              fontSize: '10px',
               fontWeight: '800',
               textTransform: 'uppercase'
             }}>
               Interactive Trader Edge Lab
             </span>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
-              Size Your Position, Audit Oct-2024 STT Charges &amp; Check Readiness Before You Trade
+            <h2 style={{ margin: 0, fontSize: 'clamp(15px, 4vw, 18px)', fontWeight: '800', color: '#f8fafc' }}>
+              Size Your Position, Audit Oct-2024 STT Charges &amp; Check Readiness
             </h2>
           </div>
-          <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>Adjust sliders &amp; checkboxes live below</span>
         </div>
 
         <div className="skx-lab-grid">
@@ -1992,22 +2157,23 @@ export default function LandingHomeView({
             background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
             border: '1px solid rgba(56, 189, 248, 0.25)',
             borderRadius: '16px',
-            padding: '18px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            minWidth: 0
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Target size={18} color="#38bdf8" />
-                  <span style={{ fontWeight: '800', fontSize: '14px', color: '#f8fafc' }}>1. Instant Position Sizer</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Target size={17} color="#38bdf8" />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>1. Instant Position Sizer</span>
                 </div>
-                <span style={{ fontSize: '10.5px', color: '#38bdf8', fontWeight: '700' }}>Risk Guard</span>
+                <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '700' }}>Risk Guard</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11.5px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                     <span style={{ color: '#94a3b8' }}>Trading Capital</span>
@@ -2016,7 +2182,7 @@ export default function LandingHomeView({
                   <input type="range" min="100000" max="5000000" step="100000" value={riskCapital} onChange={e => setRiskCapital(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                       <span style={{ color: '#94a3b8' }}>Risk / Trade</span>
@@ -2038,22 +2204,23 @@ export default function LandingHomeView({
             <div style={{
               background: 'rgba(0,0,0,0.35)',
               borderRadius: '10px',
-              padding: '10px 12px',
+              padding: '10px 11px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: '8px'
             }}>
-              <div>
-                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700' }}>MAX SAFE QUANTITY</div>
-                <div style={{ fontSize: '16px', fontWeight: '900', color: '#38bdf8' }}>
-                  {positionSizerResult.safeQty} Qty ({positionSizerResult.niftyLots} Nifty Lots)
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>MAX SAFE QUANTITY</div>
+                <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#38bdf8' }}>
+                  {positionSizerResult.safeQty} Qty ({positionSizerResult.niftyLots} Lots)
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>Max Risk: ₹{positionSizerResult.maxRiskRs.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>Max Risk: ₹{positionSizerResult.maxRiskRs.toLocaleString('en-IN')}</div>
               </div>
               <button
                 type="button"
                 onClick={() => onOpenCalculators('position-sizing')}
-                style={{ padding: '7px 11px', borderRadius: '7px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(56,189,248,0.12)', color: '#38bdf8', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(56,189,248,0.12)', color: '#38bdf8', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Full Sizer ↗
               </button>
@@ -2065,22 +2232,23 @@ export default function LandingHomeView({
             background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
             border: '1px solid rgba(245, 158, 11, 0.25)',
             borderRadius: '16px',
-            padding: '18px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            minWidth: 0
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Calculator size={18} color="#fbbf24" />
-                  <span style={{ fontWeight: '800', fontSize: '14px', color: '#f8fafc' }}>2. Live STT &amp; Breakeven Audit</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Calculator size={17} color="#fbbf24" />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>2. STT &amp; Breakeven Audit</span>
                 </div>
-                <span style={{ fontSize: '10.5px', color: '#fbbf24', fontWeight: '700' }}>Oct 2024 Mandate</span>
+                <span style={{ fontSize: '10px', color: '#fbbf24', fontWeight: '700' }}>Oct 2024 Rules</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', marginBottom: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '4px', marginBottom: '10px' }}>
                 {[
                   { id: 'OPT_BUY', label: 'Opt Buy' },
                   { id: 'OPT_SELL', label: 'Opt Sell' },
@@ -2092,14 +2260,15 @@ export default function LandingHomeView({
                     type="button"
                     onClick={() => setBrokSegment(seg.id)}
                     style={{
-                      padding: '5px 4px',
+                      padding: '5px 3px',
                       borderRadius: '6px',
                       border: brokSegment === seg.id ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.08)',
                       background: brokSegment === seg.id ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.03)',
                       color: brokSegment === seg.id ? '#fde68a' : '#94a3b8',
-                      fontSize: '10.5px',
+                      fontSize: '10px',
                       fontWeight: '700',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     {seg.label}
@@ -2108,7 +2277,7 @@ export default function LandingHomeView({
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
                   <span style={{ color: '#94a3b8' }}>Order Size ({brokerageLabResult.qty} Qty)</span>
                   <strong style={{ color: '#fbbf24' }}>{brokLots} Lots</strong>
                 </div>
@@ -2119,22 +2288,23 @@ export default function LandingHomeView({
             <div style={{
               background: 'rgba(0,0,0,0.35)',
               borderRadius: '10px',
-              padding: '10px 12px',
+              padding: '10px 11px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: '8px'
             }}>
-              <div>
-                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700' }}>TOTAL TAXES &amp; BREAKEVEN</div>
-                <div style={{ fontSize: '16px', fontWeight: '900', color: '#fbbf24' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>TOTAL TAXES &amp; BREAKEVEN</div>
+                <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fbbf24' }}>
                   ₹{brokerageLabResult.totalTax} • {brokerageLabResult.breakevenPts} pts to BE
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>STT: ₹{brokerageLabResult.stt} • GST: ₹{brokerageLabResult.gst}</div>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>STT: ₹{brokerageLabResult.stt} • GST: ₹{brokerageLabResult.gst}</div>
               </div>
               <button
                 type="button"
                 onClick={() => onOpenCalculators('brokerage')}
-                style={{ padding: '7px 11px', borderRadius: '7px', border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#fbbf24', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#fbbf24', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Tax Sheet ↗
               </button>
@@ -2146,20 +2316,21 @@ export default function LandingHomeView({
             background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
             border: '1px solid rgba(16, 185, 129, 0.25)',
             borderRadius: '16px',
-            padding: '18px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            minWidth: 0
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle2 size={18} color="#10b981" />
-                  <span style={{ fontWeight: '800', fontSize: '14px', color: '#f8fafc' }}>3. Pre-Trade Discipline Gate</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <CheckCircle2 size={17} color="#10b981" />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>3. Discipline Gate</span>
                 </div>
                 <span style={{
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   padding: '2px 8px',
                   borderRadius: '10px',
                   background: disciplineScore === 100 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)',
@@ -2170,7 +2341,7 @@ export default function LandingHomeView({
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {[
                   'HTF Trend & VWAP structure confirmed',
                   'Stop-Loss & Position Size <= 1.5% capital',
@@ -2183,7 +2354,7 @@ export default function LandingHomeView({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       color: disciplineChecks[idx] ? '#e2e8f0' : '#94a3b8',
                       cursor: 'pointer',
                       padding: '4px 6px',
@@ -2199,7 +2370,7 @@ export default function LandingHomeView({
                         next[idx] = !next[idx];
                         setDisciplineChecks(next);
                       }}
-                      style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                      style={{ accentColor: '#10b981', cursor: 'pointer', flexShrink: 0 }}
                     />
                     <span>{rule}</span>
                   </label>
@@ -2210,18 +2381,19 @@ export default function LandingHomeView({
             <div style={{
               background: 'rgba(0,0,0,0.35)',
               borderRadius: '10px',
-              padding: '10px 12px',
+              padding: '10px 11px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: '8px'
             }}>
-              <div style={{ fontSize: '11.5px', fontWeight: '700', color: disciplineScore === 100 ? '#34d399' : '#cbd5e1' }}>
-                {disciplineScore === 100 ? '✔ All 4 Core Rules Cleared!' : 'Check rules to unlock 100% score'}
+              <div style={{ fontSize: '11px', fontWeight: '700', color: disciplineScore === 100 ? '#34d399' : '#cbd5e1' }}>
+                {disciplineScore === 100 ? '✔ All 4 Rules Cleared!' : 'Check rules for 100% score'}
               </div>
               <button
                 type="button"
                 onClick={() => onOpenTradeDiary('CHECKLIST')}
-                style={{ padding: '7px 11px', borderRadius: '7px', border: '1px solid rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.12)', color: '#34d399', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.12)', color: '#34d399', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Open Journal ↗
               </button>
@@ -2233,6 +2405,7 @@ export default function LandingHomeView({
       {/* 5. The 6-Hub Institutional Command Center */}
       <section
         id="hubs-command-center"
+        className="skx-section-pad"
         style={{
           maxWidth: '1320px',
           margin: '0 auto',
@@ -2246,45 +2419,45 @@ export default function LandingHomeView({
           flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'flex-end',
-          marginBottom: '16px',
+          marginBottom: '14px',
           gap: '12px'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '11.5px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
               <Sparkles size={14} />
               <span>Complete Platform Ecosystem</span>
             </div>
-            <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
+            <h2 style={{ fontSize: 'clamp(21px, 5vw, 26px)', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
               6 Specialized Institutional Hubs &amp; Suites
             </h2>
-            <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
-              Click any Hub card, feature pill, or quick link below to jump straight into that workspace.
+            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+              Tap any Hub card or feature pill below to jump straight into that workspace.
             </p>
           </div>
 
           {/* Quick Search Input */}
-          <div style={{
+          <div className="skx-search-box" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             background: 'rgba(15, 23, 42, 0.8)',
             border: '1px solid rgba(56, 189, 248, 0.25)',
             borderRadius: '10px',
-            padding: '9px 14px',
-            minWidth: '280px',
+            padding: '9px 13px',
+            minWidth: '260px',
             maxWidth: '380px'
           }}>
-            <Search size={15} color="#38bdf8" />
+            <Search size={15} color="#38bdf8" style={{ flexShrink: 0 }} />
             <input
               type="text"
-              placeholder="Search tools (e.g. Loan, SIP, Tax, Algo, IPO)..."
+              placeholder="Search tools (Loan, SIP, Tax, Algo, IPO)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
                 color: '#fff',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 width: '100%',
                 outline: 'none'
               }}
@@ -2308,17 +2481,17 @@ export default function LandingHomeView({
             alignItems: 'center',
             gap: '8px',
             overflowX: 'auto',
-            paddingBottom: '14px',
-            marginBottom: '18px',
+            paddingBottom: '12px',
+            marginBottom: '16px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
           }}
         >
           {[
             { id: 'ALL', label: `All Hubs (${HUBS.length})` },
             { id: 'TRADING', label: `📈 Trading & Algo (${HUBS.filter(h => h.category === 'TRADING').length})` },
-            { id: 'MARKETS', label: `🏛️ Primary Markets & IPO (${HUBS.filter(h => h.category === 'MARKETS').length})` },
-            { id: 'CALCULATORS', label: `🧮 Financial & Loan Calculators (${HUBS.filter(h => h.category === 'CALCULATORS').length})` },
-            { id: 'WEALTH', label: `💰 Wealth OS & Tax Hub (${HUBS.filter(h => h.category === 'WEALTH').length})` }
+            { id: 'MARKETS', label: `🏛️ Primary Markets (${HUBS.filter(h => h.category === 'MARKETS').length})` },
+            { id: 'CALCULATORS', label: `🧮 Calculators (${HUBS.filter(h => h.category === 'CALCULATORS').length})` },
+            { id: 'WEALTH', label: `💰 Wealth & Tax (${HUBS.filter(h => h.category === 'WEALTH').length})` }
           ].map(cat => {
             const isActive = selectedCategory === cat.id;
             return (
@@ -2326,16 +2499,16 @@ export default function LandingHomeView({
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 style={{
-                  padding: '8px 15px',
+                  padding: '7px 13px',
                   borderRadius: '20px',
                   border: isActive ? '1px solid rgba(125,211,252,0.5)' : '1px solid rgba(255,255,255,0.07)',
                   background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.04)',
                   color: isActive ? '#fff' : '#94a3b8',
-                  fontSize: '12.5px',
+                  fontSize: '12px',
                   fontWeight: isActive ? '800' : '600',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
+                  flexShrink: 0
                 }}
               >
                 {cat.label}
@@ -2346,15 +2519,11 @@ export default function LandingHomeView({
 
         {/* 6-Hub Bento Grid Cards */}
         {filteredHubs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
             No tools found matching &ldquo;{searchQuery}&rdquo;. Try searching for &ldquo;SIP&rdquo;, &ldquo;Loan&rdquo;, &ldquo;IPO&rdquo;, &ldquo;Option&rdquo;, or &ldquo;Tax&rdquo;.
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(370px, 1fr))',
-            gap: '20px'
-          }}>
+          <div className="skx-hubs-grid">
             {filteredHubs.map(hub => {
               const Icon = hub.icon;
               return (
@@ -2366,7 +2535,7 @@ export default function LandingHomeView({
                     background: hub.gradient,
                     border: `1px solid ${hub.border}`,
                     borderRadius: '18px',
-                    padding: '22px',
+                    padding: '18px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -2381,7 +2550,7 @@ export default function LandingHomeView({
                     position: 'absolute',
                     top: '8px',
                     right: '14px',
-                    fontSize: '48px',
+                    fontSize: '44px',
                     fontWeight: '900',
                     color: 'rgba(255, 255, 255, 0.03)',
                     userSelect: 'none',
@@ -2390,14 +2559,14 @@ export default function LandingHomeView({
                     {hub.hubNum}
                   </div>
 
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     {/* Header: Icon, Number & Badge */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                         <div style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '12px',
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '11px',
                           background: `${hub.color}24`,
                           border: `1px solid ${hub.color}55`,
                           display: 'flex',
@@ -2406,34 +2575,35 @@ export default function LandingHomeView({
                           color: hub.color,
                           flexShrink: 0
                         }}>
-                          <Icon size={22} />
+                          <Icon size={20} />
                         </div>
-                        <div>
-                          <span style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '800', letterSpacing: '0.8px' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '800', letterSpacing: '0.8px' }}>
                             HUB {hub.hubNum}
                           </span>
-                          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.22' }}>
+                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.22' }}>
                             {hub.title}
                           </h3>
                         </div>
                       </div>
 
                       <span style={{
-                        fontSize: '10.5px',
+                        fontSize: '10px',
                         fontWeight: '800',
                         color: hub.badgeColor,
                         background: `${hub.color}1f`,
                         border: `1px solid ${hub.color}40`,
-                        padding: '3px 9px',
+                        padding: '3px 8px',
                         borderRadius: '6px',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
                       }}>
                         {hub.badge}
                       </span>
                     </div>
 
                     {/* Description */}
-                    <p style={{ margin: '0 0 12px', fontSize: '12.5px', color: '#cbd5e1', lineHeight: '1.5' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5' }}>
                       {hub.shortDesc}
                     </p>
 
@@ -2441,21 +2611,21 @@ export default function LandingHomeView({
                     {hub.kpiLeft && hub.kpiRight && (
                       <div style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
+                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                         gap: '8px',
                         marginBottom: '12px',
-                        padding: '9px 11px',
+                        padding: '8px 10px',
                         borderRadius: '10px',
                         background: 'rgba(0, 0, 0, 0.34)',
                         border: '1px solid rgba(255, 255, 255, 0.06)'
                       }}>
-                        <div>
-                          <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiLeft.label}</div>
-                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{hub.kpiLeft.value}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiLeft.label}</div>
+                          <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hub.kpiLeft.value}</div>
                         </div>
-                        <div>
-                          <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiRight.label}</div>
-                          <div style={{ fontSize: '13px', fontWeight: '800', color: hub.badgeColor, marginTop: '2px' }}>{hub.kpiRight.value}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiRight.label}</div>
+                          <div style={{ fontSize: '12.5px', fontWeight: '800', color: hub.badgeColor, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hub.kpiRight.value}</div>
                         </div>
                       </div>
                     )}
@@ -2463,9 +2633,9 @@ export default function LandingHomeView({
                     {/* Interactive Deep-Linked Tag Pills */}
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                       gap: '6px',
-                      marginBottom: '8px'
+                      marginBottom: '6px'
                     }}>
                       {hub.tags.slice(0, 6).map((tag, tIdx) => (
                         <button
@@ -2482,18 +2652,19 @@ export default function LandingHomeView({
                             background: 'rgba(255, 255, 255, 0.045)',
                             border: '1px solid rgba(255, 255, 255, 0.11)',
                             color: '#e2e8f0',
-                            padding: '6px 9px',
+                            padding: '6px 8px',
                             borderRadius: '7px',
                             cursor: 'pointer',
                             fontWeight: '600',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            textAlign: 'left'
+                            textAlign: 'left',
+                            minWidth: 0
                           }}
                         >
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag}</span>
-                          <span style={{ color: hub.badgeColor, marginLeft: '4px' }}>↗</span>
+                          <span style={{ color: hub.badgeColor, marginLeft: '4px', flexShrink: 0 }}>↗</span>
                         </button>
                       ))}
                     </div>
@@ -2505,7 +2676,7 @@ export default function LandingHomeView({
                     onClick={hub.primaryAction}
                     style={{
                       width: '100%',
-                      padding: '11px 16px',
+                      padding: '11px 14px',
                       background: `linear-gradient(135deg, ${hub.color}, ${hub.color}cc)`,
                       border: 'none',
                       borderRadius: '10px',
@@ -2531,26 +2702,26 @@ export default function LandingHomeView({
       </section>
 
       {/* 6. High-Concurrency & Enterprise Performance Guarantee Banner */}
-      <section style={{
+      <section className="skx-section-pad" style={{
         background: 'rgba(15, 23, 42, 0.72)',
         borderTop: '1px solid rgba(255, 255, 255, 0.06)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-        padding: '28px 22px',
+        padding: '24px 22px',
         width: '100%'
       }}>
         <div style={{
           maxWidth: '1320px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '20px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))',
+          gap: '18px'
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
               <Zap size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
                 1 Lakh+ User Multi-Core Cluster
               </h4>
               <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
@@ -2560,11 +2731,11 @@ export default function LandingHomeView({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
               <ShieldCheck size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
                 Sub-Millisecond RAM Edge Cache
               </h4>
               <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
@@ -2574,11 +2745,11 @@ export default function LandingHomeView({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(129, 140, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(129, 140, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', flexShrink: 0 }}>
               <Cpu size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
                 0ms Hover Chunk Prefetching
               </h4>
               <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
@@ -2590,10 +2761,10 @@ export default function LandingHomeView({
       </section>
 
       {/* 7. Crawlable SEO Deep-Link Footer for Google Search Indexing */}
-      <footer style={{
+      <footer className="skx-section-pad" style={{
         marginTop: 'auto',
         background: 'rgba(0, 0, 0, 0.65)',
-        padding: '28px 24px',
+        padding: '24px 22px',
         fontSize: '12px',
         color: '#94a3b8'
       }}>
@@ -2602,15 +2773,15 @@ export default function LandingHomeView({
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '18px'
+          gap: '16px'
         }}>
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '12px',
-            paddingBottom: '16px',
+            gap: '10px',
+            paddingBottom: '14px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            fontSize: '11.5px'
+            fontSize: '11px'
           }}>
             <span style={{ color: '#64748b', fontWeight: '700' }}>Direct Tools &amp; Calculators:</span>
             <a href="/paper-trading" onClick={(e) => { e.preventDefault(); onOpenPaperTrading(); }} style={{ color: '#38bdf8', textDecoration: 'none' }}>SkandX Paper Trade</a>
@@ -2642,14 +2813,14 @@ export default function LandingHomeView({
             gap: '12px'
           }}>
             <div>
-              <div style={{ fontWeight: '800', color: '#f8fafc', fontSize: '13px', marginBottom: '2px' }}>
+              <div style={{ fontWeight: '800', color: '#f8fafc', fontSize: '12.5px', marginBottom: '2px' }}>
                 SKANDX PRO • High-Concurrency Trading &amp; Wealth Operating System
               </div>
               <div style={{ fontSize: '11px', color: '#64748b' }}>
                 Paper trading simulator uses virtual currency for educational purposes. Fully compliant with Indian regulatory guidelines.
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '14px', fontSize: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '11.5px', flexWrap: 'wrap' }}>
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={onOpenPaperTrading}>Paper Trading</span>
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenTradeDiary('CHECKLIST')}>Trade Diary</span>
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}>Bhavcopy &amp; Deals</span>
@@ -2664,16 +2835,15 @@ export default function LandingHomeView({
             flexWrap: 'wrap',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '12px',
-            marginTop: '8px',
-            paddingTop: '12px',
+            gap: '10px',
+            paddingTop: '10px',
             borderTop: '1px solid rgba(148, 163, 184, 0.08)',
-            fontSize: '11.5px'
+            fontSize: '11px'
           }}>
             <div style={{ color: '#64748b' }}>
               &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari • <a href="mailto:skandx.in@gmail.com" style={{ color: '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
             </div>
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <a href="/aboutus" style={{ color: '#94a3b8', textDecoration: 'none' }}>About Us</a>
               <a href="/pricing" style={{ color: '#94a3b8', textDecoration: 'none' }}>Pricing</a>
               <a href="/privacy-policy" style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
