@@ -59,7 +59,7 @@ export default function ChartWidget({
   const { selectedSymbol, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
 
   const price   = useStore(state => state.prices[state.selectedSymbol]);
-  const candles = candleData[selectedSymbol] || [];
+  const candles = candleData[`${selectedSymbol}_${chartInterval}`] || candleData[selectedSymbol] || [];
   const isLight = theme === 'light';
 
   // ── Build chart instance ────────────────────────────────────────────────────
@@ -196,8 +196,17 @@ export default function ChartWidget({
   useEffect(() => {
     mountedRef.current = true;
     const cleanup = buildChart();
-    loadCandleData(selectedSymbol, chartInterval);
+    const cacheKey = `${selectedSymbol}_${chartInterval}`;
+    const hasCached = Array.isArray(useStore.getState().candleData?.[cacheKey]) && useStore.getState().candleData[cacheKey].length > 0;
+    // If already cached on client, resolve immediately; otherwise debounce 250ms so rapid watchlist clicking doesn't spam the backend
+    const debounceTimer = setTimeout(() => {
+      if (mountedRef.current && selectedSymbol) {
+        loadCandleData(selectedSymbol, chartInterval);
+      }
+    }, hasCached ? 0 : 250);
+
     return () => {
+      clearTimeout(debounceTimer);
       mountedRef.current = false;
       if (cleanup) cleanup();
       if (chartRef.current) {

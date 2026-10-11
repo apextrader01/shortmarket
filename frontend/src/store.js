@@ -967,8 +967,17 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  // ── Chart / Candle State (used by ChartWidget.jsx) ──────────────────────────
-  candleData:       {},   // { [symbol]: CandleBar[] }
+  // ── Chart / Candle State (used by ChartWidget.jsx & MobileStockOverviewModal.jsx) ──
+  candleData:       (() => {
+    try {
+      const raw = sessionStorage.getItem('skandx_candle_cache_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  })(),   // { [symbol]: CandleBar[], [`${symbol}_${interval}`]: CandleBar[] }
+  _candleCacheMeta: {},   // { [`${symbol}_${interval}`]: timestampMs }
+  _inflightCandleRequests: {}, // { [`${symbol}_${interval}`]: Promise<CandleBar[]> }
   isLoadingCandles: false,
   candleError:      null,
   chartInterval:    'ONE_DAY',
@@ -977,32 +986,99 @@ export const useStore = create(persist((set, get) => ({
     set({ chartInterval: interval });
   },
 
-  loadCandleData: async (symbol, interval) => {
-    if (!symbol) return;
-    const resolvedInterval = interval || get().chartInterval;
-    set({ isLoadingCandles: true, candleError: null });
-    try {
-      const res = await fetch(
-        `${API}/api/candles/${encodeURIComponent(symbol)}?interval=${resolvedInterval}`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const candles = await res.json();
-      if (!Array.isArray(candles)) throw new Error('Invalid candle data');
-      set((state) => {
-        const nextCandleData = { ...state.candleData, [symbol]: candles };
-        const keys = Object.keys(nextCandleData);
-        if (keys.length > 5) {
-          delete nextCandleData[keys[0]];
-        }
-        return {
-          candleData:       nextCandleData,
+  loadCandleData: async (symbol, interval, options = {}) => {
+    if (!symbol) return [];
+    const resolvedInterval = interval || get().chartInterval || 'ONE_DAY';
+    const cacheKey = `${symbol}_${resolvedInterval}`;
+    const now = Date.now();
+    // Intraday caches stay fresh on client for 45s (live ticks update the tip in real time); daily/historical for 5 min
+    const ttlMs = resolvedInterval === 'ONE_DAY' ? 5 * 60 * 1000 : 45 * 1000;
+
+    const stateSnapshot = get();
+    const cached = stateSnapshot.candleData[cacheKey];
+    const cachedAt = stateSnapshot._candleCacheMeta?.[cacheKey] || 0;
+
+    if (!options.force && Array.isArray(cached) && cached.length > 0 && (now - cachedAt) < ttlMs) {
+      if (stateSnapshot.candleData[symbol] !== cached || stateSnapshot.isLoadingCandles) {
+        set((s) => ({
+          candleData: { ...s.candleData, [symbol]: cached },
           isLoadingCandles: false,
-          candleError:      null,
-        };
-      });
-    } catch (err) {
-      set({ isLoadingCandles: false, candleError: err.message });
+          candleError: null,
+        }));
+      }
+      return cached;
     }
+
+    // Single-flight deduplication on client: reuse in-flight request if already fetching same symbol + interval
+    const existingPromise = stateSnapshot._inflightCandleRequests?.[cacheKey];
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    if (!Array.isArray(cached) || cached.length === 0) {
+      set({ isLoadingCandles: true, candleError: null });
+    }
+
+    const requestPromise = (async () => {
+      try {
+        const res = await fetch(
+          `${API}/api/candles/${encodeURIComponent(symbol)}?interval=${encodeURIComponent(resolvedInterval)}`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const candles = await res.json();
+        if (!Array.isArray(candles)) throw new Error('Invalid candle data');
+        set((state) => {
+          const nextCandleData = {
+            ...state.candleData,
+            [symbol]: candles,
+            [cacheKey]: candles,
+          };
+          const nextMeta = {
+            ...(state._candleCacheMeta || {}),
+            [cacheKey]: Date.now(),
+          };
+          const keys = Object.keys(nextCandleData);
+          if (keys.length > 60) {
+            const oldestKey = keys.find((k) => k !== symbol && k !== cacheKey);
+            if (oldestKey) {
+              delete nextCandleData[oldestKey];
+              delete nextMeta[oldestKey];
+            }
+          }
+          try {
+            // Persist up to 15 most recent symbol-interval datasets in sessionStorage for instant reload
+            const compactEntries = Object.entries(nextCandleData).slice(-15);
+            sessionStorage.setItem('skandx_candle_cache_v1', JSON.stringify(Object.fromEntries(compactEntries)));
+          } catch (_) {}
+          return {
+            candleData:       nextCandleData,
+            _candleCacheMeta: nextMeta,
+            isLoadingCandles: false,
+            candleError:      null,
+          };
+        });
+        return candles;
+      } catch (err) {
+        set({ isLoadingCandles: false, candleError: err.message });
+        return Array.isArray(cached) ? cached : [];
+      } finally {
+        const currentInflight = get()._inflightCandleRequests;
+        if (currentInflight && currentInflight[cacheKey]) {
+          const nextInflight = { ...currentInflight };
+          delete nextInflight[cacheKey];
+          set({ _inflightCandleRequests: nextInflight });
+        }
+      }
+    })();
+
+    set((s) => ({
+      _inflightCandleRequests: {
+        ...(s._inflightCandleRequests || {}),
+        [cacheKey]: requestPromise,
+      },
+    }));
+
+    return requestPromise;
   },
 
   // ── Socket ──────────────────────────────────────────────────────────────────

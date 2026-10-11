@@ -300,6 +300,12 @@ function App() {
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [hotkeyToast, setHotkeyToast] = useState(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1200);
+  useEffect(() => {
+    const handleViewportResize = () => setIsCompactViewport(window.innerWidth <= 1200);
+    window.addEventListener('resize', handleViewportResize);
+    return () => window.removeEventListener('resize', handleViewportResize);
+  }, []);
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
     return localStorage.getItem('last_dismissed_announcement') || '';
   });
@@ -1646,10 +1652,10 @@ function App() {
                 }}
               />
             )}
-            <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
+            <div className={`main-content ${(activeTab === 'Watchlist' || activeTab === 'Markets') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
               <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-              {(activeTab === 'Markets' || activeTab === 'Chart') && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
+              {(activeTab === 'Chart' || (activeTab === 'Markets' && !isCompactViewport)) && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: isCompactViewport ? '0' : '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
                     <Suspense fallback={<TabLoader />}>
                       <ChartWidget />

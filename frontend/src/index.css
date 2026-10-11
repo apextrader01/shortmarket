@@ -1384,13 +1384,15 @@ input:checked + .slider:before {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.watchlist-item:hover .watchlist-hover-actions {
-  display: flex !important;
-}
+@media (hover: hover) and (pointer: fine) {
+  .watchlist-item:hover .watchlist-hover-actions {
+    display: flex !important;
+  }
 
-.watchlist-item:hover .watchlist-price-container {
-  opacity: 0;
-  visibility: hidden;
+  .watchlist-item:hover .watchlist-price-container {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 
 [data-theme='light'] .watchlist-hover-actions {

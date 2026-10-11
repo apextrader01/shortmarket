@@ -1250,7 +1250,7 @@ async function fetchBatchLTPs(symbols) {
     return mfResults;
 }
 
-// Fyers interval mapping
+// Fyers interval mapping (supports both verbose names and short codes)
 const INTERVAL_MAP = {
     'ONE_MINUTE': '1',
     'THREE_MINUTE': '3',
@@ -1259,90 +1259,229 @@ const INTERVAL_MAP = {
     'FIFTEEN_MINUTE': '15',
     'THIRTY_MINUTE': '30',
     'ONE_HOUR': '60',
-    'ONE_DAY': '1D'
+    'ONE_DAY': '1D',
+    '1': '1',
+    '2': '2',
+    '3': '3',
+    '5': '5',
+    '10': '10',
+    '15': '15',
+    '30': '30',
+    '60': '60',
+    '1H': '60',
+    '1D': '1D',
+    'D': '1D'
 };
 
 const { generalClient } = require('./redisClient');
+const inflightCandleFetches = new Map(); // Single-flight request coalescing for 100k concurrent users
+
+async function fetchYahooFallbackCandles(rawSymbol, fSym, res) {
+    try {
+        const clean = String(rawSymbol || fSym || '').trim();
+        if (!clean || clean.toUpperCase().includes('MCX')) return [];
+
+        let yahooTicker = null;
+        const upper = clean.toUpperCase();
+        if (upper.includes('NIFTY 50') || upper.includes('NIFTY50')) yahooTicker = '^NSEI';
+        else if (upper.includes('NIFTY BANK') || upper.includes('BANKNIFTY') || upper.includes('NIFTYBANK')) yahooTicker = '^NSEBANK';
+        else if (upper.includes('SENSEX')) yahooTicker = '^BSESN';
+        else if (upper.includes('INDIA VIX') || upper.includes('INDIAVIX')) yahooTicker = '^INDIAVIX';
+        else if (fSym && (fSym.startsWith('NSE:') || fSym.startsWith('BSE:')) && fSym.endsWith('-EQ')) {
+            const exch = fSym.startsWith('BSE:') ? 'BO' : 'NS';
+            const tickerCore = fSym.split(':')[1].replace(/-EQ$/i, '');
+            if (/^[A-Z0-9&-]+$/i.test(tickerCore)) {
+                yahooTicker = `${tickerCore}.${exch}`;
+            }
+        }
+        if (!yahooTicker) return [];
+
+        const yIntervalMap = {
+            '1': '1m',
+            '2': '2m',
+            '3': '5m',
+            '5': '5m',
+            '10': '15m',
+            '15': '15m',
+            '30': '30m',
+            '60': '60m',
+            '1D': '1d'
+        };
+        const yInterval = yIntervalMap[res] || '1d';
+        const yRange = res === '1D' ? '1y' : (res === '1' || res === '2' ? '5d' : '1mo');
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker)}?interval=${yInterval}&range=${yRange}`;
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const resp = await fetch(url, {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        });
+        clearTimeout(timer);
+        if (!resp.ok) return [];
+
+        const json = await resp.json();
+        const result = json?.chart?.result?.[0];
+        const timestamps = result?.timestamp;
+        const quote = result?.indicators?.quote?.[0];
+        if (!Array.isArray(timestamps) || !quote) return [];
+
+        const candles = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            const t = Number(timestamps[i]);
+            const o = Number(quote.open?.[i]);
+            const h = Number(quote.high?.[i]);
+            const l = Number(quote.low?.[i]);
+            const c = Number(quote.close?.[i]);
+            const v = Number(quote.volume?.[i] || 0);
+            if (Number.isFinite(t) && Number.isFinite(o) && Number.isFinite(h) && Number.isFinite(l) && Number.isFinite(c)) {
+                candles.push({
+                    time: t + 19800,
+                    open: o,
+                    high: h,
+                    low: l,
+                    close: c,
+                    volume: Number.isFinite(v) ? v : 0
+                });
+            }
+        }
+        return candles;
+    } catch (_) {
+        return [];
+    }
+}
 
 async function fetchCandleData(symbol, interval = 'ONE_DAY') {
-    if (!activeAccessToken || !symbol) return [];
+    if (!symbol) return [];
     
     const fSym = toFyersSymbol(symbol);
-    if (!fSym) return [];
-
     const res = INTERVAL_MAP[interval] || '1D';
-    
-    // Check Redis cache first
-    const cacheKey = `chart:${fSym}:${res}`;
+    const cacheKey = `chart:${fSym || symbol}:${res}`;
+    const backupCacheKey = `chart_backup:${fSym || symbol}:${res}`;
+
+    // 1. Check primary Redis cache first
     try {
-        const cached = await generalClient.get(cacheKey);
-        if (cached) {
-            return JSON.parse(cached);
+        if (generalClient?.isReady) {
+            const cached = await generalClient.get(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
         }
     } catch (err) {
         console.error("Redis get error in fetchCandleData", err);
     }
-    
-    // Fyers expects range in yyyy-mm-dd
-    const formatDate = (d) => {
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    };
 
-    let range_to = new Date();
-    let range_from = new Date();
-    
-    // 30 days for intraday, 1 year for daily
-    if (res === '1D') {
-        range_from.setFullYear(range_from.getFullYear() - 1);
-    } else {
-        range_from.setDate(range_from.getDate() - 30);
+    // 2. Single-flight request deduplication: if 10,000 users request the same uncached chart simultaneously,
+    // coalesce all of them onto a single upstream promise so only 1 API call is made.
+    if (inflightCandleFetches.has(cacheKey)) {
+        return inflightCandleFetches.get(cacheKey);
     }
 
-    try {
-        const fetchPromise = fyers.getHistory({
-            symbol: fSym,
-            resolution: res,
-            date_format: 1,
-            range_from: formatDate(range_from),
-            range_to: formatDate(range_to),
-            cont_flag: 1
-        });
-        
-        // 10 second timeout to prevent hanging the route
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Fyers API Timeout')), 10000));
-        
-        const response = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        if (response && response.s === 'ok' && response.candles) {
-            const formattedCandles = response.candles.map(c => ({
-                time: c[0] + 19800,
-                open: c[1],
-                high: c[2],
-                low: c[3],
-                close: c[4],
-                volume: c[5]
-            }));
-            
-            // Save to Redis for 60 seconds (1 minute caching)
-            try {
-                await generalClient.setEx(cacheKey, 60, JSON.stringify(formattedCandles));
-            } catch (err) {
-                console.error("Redis set error in fetchCandleData", err);
+    const workPromise = (async () => {
+        try {
+            if (activeAccessToken && fSym) {
+                const formatDate = (d) => {
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
+                const range_to = new Date();
+                const range_from = new Date();
+                if (res === '1D') {
+                    range_from.setFullYear(range_from.getFullYear() - 1);
+                } else {
+                    range_from.setDate(range_from.getDate() - 30);
+                }
+
+                try {
+                    const fetchPromise = fyers.getHistory({
+                        symbol: fSym,
+                        resolution: res,
+                        date_format: 1,
+                        range_from: formatDate(range_from),
+                        range_to: formatDate(range_to),
+                        cont_flag: 1
+                    });
+
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Fyers API Timeout')), 10000)
+                    );
+
+                    const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+                    if (response && response.s === 'ok' && Array.isArray(response.candles) && response.candles.length > 0) {
+                        const formattedCandles = response.candles.map(c => ({
+                            time: c[0] + 19800,
+                            open: c[1],
+                            high: c[2],
+                            low: c[3],
+                            close: c[4],
+                            volume: c[5]
+                        }));
+
+                        // Save to Redis: 1 hour for 1D, 10 minutes for intraday (live ticks update the tip in RAM)
+                        // Also store a 24h stale backup key to survive rate limits / quota exhaustion
+                        const primaryTtlSec = res === '1D' ? 3600 : 600;
+                        try {
+                            if (generalClient?.isReady) {
+                                const serialized = JSON.stringify(formattedCandles);
+                                await Promise.all([
+                                    generalClient.setEx(cacheKey, primaryTtlSec, serialized),
+                                    generalClient.setEx(backupCacheKey, 86400, serialized)
+                                ]);
+                            }
+                        } catch (err) {
+                            console.error("Redis set error in fetchCandleData", err);
+                        }
+
+                        return formattedCandles;
+                    } else if (response && (response.code === -15 || response.code === -17) && isTokenExpired(activeAccessToken)) {
+                        lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+                        isFyersConnected = false;
+                    }
+                } catch (e) {
+                    if (e && (e.code === -15 || e.code === -17) && isTokenExpired(activeAccessToken)) {
+                        lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
+                        isFyersConnected = false;
+                    }
+                    console.error("Fyers fetchCandleData error:", e?.message || e);
+                }
             }
-            
-            return formattedCandles;
-        } else if (response && (response.code === -15 || response.code === -17) && isTokenExpired(activeAccessToken)) {
-            lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
-            isFyersConnected = false;
+
+            // 3. Fallback A: Check 24-hour Redis stale backup if Fyers hit daily quota / rate limit / timeout
+            try {
+                if (generalClient?.isReady) {
+                    const backup = await generalClient.get(backupCacheKey);
+                    if (backup) {
+                        const parsed = JSON.parse(backup);
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    }
+                }
+            } catch (_) {}
+
+            // 4. Fallback B: Public Yahoo Finance chart fallback (for NSE/BSE equities & indices)
+            const yahooCandles = await fetchYahooFallbackCandles(symbol, fSym, res);
+            if (Array.isArray(yahooCandles) && yahooCandles.length > 0) {
+                try {
+                    if (generalClient?.isReady) {
+                        const serialized = JSON.stringify(yahooCandles);
+                        await Promise.all([
+                            generalClient.setEx(cacheKey, 300, serialized),
+                            generalClient.setEx(backupCacheKey, 86400, serialized)
+                        ]);
+                    }
+                } catch (_) {}
+                return yahooCandles;
+            }
+
+            return [];
+        } finally {
+            inflightCandleFetches.delete(cacheKey);
         }
-    } catch (e) {
-        if (e && (e.code === -15 || e.code === -17) && isTokenExpired(activeAccessToken)) {
-            lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
-            isFyersConnected = false;
-        }
-        console.error("Fyers fetchCandleData error:", e);
-    }
-    return [];
+    })();
+
+    inflightCandleFetches.set(cacheKey, workPromise);
+    return workPromise;
 }
 
 function setPriceCache(pc) { sharedPriceCache = pc; }

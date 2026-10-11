@@ -11319,13 +11319,123 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 });
 
 
-// ─── Historical Chart Data (Candles) ──────────────────────────────────────────────────
-const candleCache = {}; // Cache to protect Fyers from rate limits (capped at 200 items)
-const MAX_CANDLE_CACHE_ITEMS = 200;
+// ─── Historical Chart Data (Candles) — 1-Lakh User High-Throughput Engine ───────────
+const candleCache = {}; // RAM cache (capped at 2,500 symbol-interval pairs ≈ 15 MB RAM)
+const MAX_CANDLE_CACHE_ITEMS = 2500;
+const inflightRouteCandleRequests = new Map(); // Single-flight lock at route level
 
-function setCandleCache(key, data, now) {
+// Ensure persistent PostgreSQL candle cache table exists so server restarts never re-burn Fyers 500 daily quota
+let isCandleDbReady = false;
+(async function initMarketCandleCacheTable() {
+  try {
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS market_candle_cache (
+        cache_key VARCHAR(160) PRIMARY KEY,
+        symbol VARCHAR(80) NOT NULL,
+        interval VARCHAR(32) NOT NULL,
+        candles_json JSONB NOT NULL,
+        updated_at BIGINT NOT NULL
+      )
+    `);
+    isCandleDbReady = true;
+  } catch (err) {
+    console.error('[CandleCache] DB table init warning:', err.message);
+  }
+})();
+
+function getIntervalSeconds(interval) {
+  const map = {
+    ONE_MINUTE: 60, '1': 60,
+     '2': 120,
+    THREE_MINUTE: 180, '3': 180,
+    FIVE_MINUTE: 300, '5': 300,
+    TEN_MINUTE: 600, '10': 600,
+    FIFTEEN_MINUTE: 900, '15': 900,
+    THIRTY_MINUTE: 1800, '30': 1800,
+    ONE_HOUR: 3600, '60': 3600, '1H': 3600,
+    ONE_DAY: 86400, '1D': 86400, D: 86400,
+  };
+  return map[interval] || 86400;
+}
+
+function resolveLivePriceForSymbol(cleanSymbol) {
+  if (!cleanSymbol || typeof priceCache !== 'object') return null;
+  if (priceCache[cleanSymbol]) return priceCache[cleanSymbol];
+  if (cleanSymbol.includes(':')) {
+    const stripped = cleanSymbol.split(':')[1];
+    if (priceCache[stripped]) return priceCache[stripped];
+  } else {
+    if (priceCache[`NSE:${cleanSymbol}`]) return priceCache[`NSE:${cleanSymbol}`];
+    if (priceCache[`BSE:${cleanSymbol}`]) return priceCache[`BSE:${cleanSymbol}`];
+    if (priceCache[`MCX:${cleanSymbol}`]) return priceCache[`MCX:${cleanSymbol}`];
+  }
+  return null;
+}
+
+// Live Tick-to-Candle Aggregator: merges real-time WebSocket LTP into cached candles in RAM
+// so cached charts stay 100% live for hours without re-fetching from Fyers every 60 seconds.
+function mergeLiveTickIntoCandles(candles, cleanSymbol, interval) {
+  if (!Array.isArray(candles) || candles.length === 0) return candles;
+  const livePrice = resolveLivePriceForSymbol(cleanSymbol);
+  const ltp = Number(livePrice?.ltp);
+  if (!Number.isFinite(ltp) || ltp <= 0) return candles;
+
+  const lastIdx = candles.length - 1;
+  const last = candles[lastIdx];
+  if (!last || !Number.isFinite(Number(last.time))) return candles;
+
+  const bucketSec = getIntervalSeconds(interval);
+  const rawTsSec = livePrice.timestamp
+    ? Math.floor(new Date(livePrice.timestamp).getTime() / 1000)
+    : Math.floor(Date.now() / 1000);
+  const tickSec = (rawTsSec > 0 ? rawTsSec : Math.floor(Date.now() / 1000)) + 19800;
+  const currentBucketTime = Math.floor(tickSec / bucketSec) * bucketSec;
+
+  // Only roll over into a new bar if the live tick timestamp is newer than the last candle
+  if (currentBucketTime > last.time && (tickSec - last.time) < 7 * 86400) {
+    // Check if market is open for this symbol before creating new intraday bars after hours
+    const isCommodity = cleanSymbol.toUpperCase().includes('MCX');
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const day = istNow.getDay();
+    const mins = istNow.getHours() * 60 + istNow.getMinutes();
+    const isWithinSession = day >= 1 && day <= 5 && (
+      isCommodity ? (mins >= 540 && mins <= 1435) : (mins >= 555 && mins <= 935)
+    );
+
+    if (isWithinSession) {
+      candles.push({
+        time: currentBucketTime,
+        open: ltp,
+        high: ltp,
+        low: ltp,
+        close: ltp,
+        volume: 0,
+      });
+      if (candles.length > 1500) candles.shift();
+      return candles;
+    }
+  }
+
+  // Update current (last) candle OHLC in-place
+  last.close = ltp;
+  if (ltp > last.high) last.high = ltp;
+  if (ltp < last.low) last.low = ltp;
+  return candles;
+}
+
+// Continuous 2-second RAM candle updater: keeps all active cached symbol-interval series
+// building live bars in the background using the single Fyers WebSocket priceCache (<0.2ms CPU)
+setInterval(() => {
+  for (const item of Object.values(candleCache)) {
+    if (item && Array.isArray(item.data) && item.symbol && item.interval) {
+      mergeLiveTickIntoCandles(item.data, item.symbol, item.interval);
+    }
+  }
+}, 2000).unref();
+
+function setCandleCache(key, data, now, symbol = '', interval = 'ONE_DAY', persistDb = true) {
   const keys = Object.keys(candleCache);
-  if (keys.length >= MAX_CANDLE_CACHE_ITEMS) {
+  if (!candleCache[key] && keys.length >= MAX_CANDLE_CACHE_ITEMS) {
     let oldestKey = keys[0];
     let oldestTs = Infinity;
     for (const k of keys) {
@@ -11336,7 +11446,18 @@ function setCandleCache(key, data, now) {
     }
     delete candleCache[oldestKey];
   }
-  candleCache[key] = { timestamp: now, data };
+  candleCache[key] = { timestamp: now, data, symbol, interval };
+
+  if (persistDb && isCandleDbReady && Array.isArray(data) && data.length > 0) {
+    db.raw(
+      `INSERT INTO market_candle_cache (cache_key, symbol, interval, candles_json, updated_at)
+       VALUES (?, ?, ?, ?::jsonb, ?)
+       ON CONFLICT (cache_key) DO UPDATE SET
+         candles_json = EXCLUDED.candles_json,
+         updated_at = EXCLUDED.updated_at`,
+      [key, symbol, interval, JSON.stringify(data), now]
+    ).catch(() => {});
+  }
 }
 
 // Hourly Background cleanup: Prune expired candles older than 12h to stop RAM leaks
@@ -11349,39 +11470,37 @@ setInterval(() => {
   }
 }, 3600000).unref();
 
-// Smart Timeframe Cache: Determine cache limit based on requested resolution and Market Hours
+// Smart Timeframe Cache: Since live WebSocket ticks continuously roll & update candles in RAM,
+// base historical candles stay valid for 30m–60m (intraday) or 12h (daily/after-hours),
+// protecting Fyers' 500 daily chart limit even at 1,00,000 concurrent users.
 function getCacheDuration(interval, symbol) {
-  // 1. After-Hours Mega Cache Logic (Exclude MCX Commodities)
   const isCommodity = symbol && symbol.toUpperCase().includes('MCX');
-  
+
   if (!isCommodity) {
-      const now = new Date();
-      const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      const hours = istTime.getHours();
-      
-      // If market is closed (4:00 PM to 8:59 AM IST)
-      if (hours >= 16 || hours < 9) {
-          // Calculate exact milliseconds until 9:00 AM IST tomorrow morning
-          const next9AM = new Date(istTime);
-          if (hours >= 16) {
-              next9AM.setDate(next9AM.getDate() + 1);
-          }
-          next9AM.setHours(9, 0, 0, 0);
-          return next9AM.getTime() - istTime.getTime(); // Cache expires exactly at 9:00 AM!
+    const now = new Date();
+    const istTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const hours = istTime.getHours();
+
+    // If market is closed (4:00 PM to 8:59 AM IST), cache until 9:00 AM IST next morning
+    if (hours >= 16 || hours < 9) {
+      const next9AM = new Date(istTime);
+      if (hours >= 16) {
+        next9AM.setDate(next9AM.getDate() + 1);
       }
+      next9AM.setHours(9, 0, 0, 0);
+      return Math.max(30 * 60 * 1000, next9AM.getTime() - istTime.getTime());
+    }
   }
 
-  // 2. Standard Market-Hours Smart Timeframe Logic
-  if (interval === '1') return 60 * 1000; // 1 min
-  if (interval === '2') return 2 * 60 * 1000;
-  if (interval === '3') return 3 * 60 * 1000;
-  if (interval === '5') return 5 * 60 * 1000;
-  if (interval === '10') return 10 * 60 * 1000;
-  if (interval === '15') return 15 * 60 * 1000;
-  if (interval === '30') return 30 * 60 * 1000;
-  if (interval === '60' || interval === '1H') return 60 * 60 * 1000; // 1 hr
+  // Market-Hours Smart TTLs (live ticks keep the latest bars updated in real time in RAM)
   if (interval === 'D' || interval === '1D' || interval === 'ONE_DAY') return 12 * 60 * 60 * 1000; // 12 hours
-  return 60 * 1000; // fallback 1 min
+  if (interval === '60' || interval === '1H' || interval === 'ONE_HOUR') return 60 * 60 * 1000;   // 1 hour
+  if (interval === '30' || interval === 'THIRTY_MINUTE') return 45 * 60 * 1000;                   // 45 mins
+  if (interval === '15' || interval === 'FIFTEEN_MINUTE') return 30 * 60 * 1000;                  // 30 mins
+  if (interval === '10' || interval === 'TEN_MINUTE') return 30 * 60 * 1000;                      // 30 mins
+  if (interval === '5' || interval === 'FIVE_MINUTE') return 20 * 60 * 1000;                      // 20 mins
+  if (interval === '3' || interval === 'THREE_MINUTE') return 15 * 60 * 1000;                     // 15 mins
+  return 10 * 60 * 1000; // 1-min / 2-min base history cached for 10 mins while live ticks build 1m bars in RAM
 }
 
 app.get('/api/candles/:symbol', async (req, res) => {
@@ -11390,36 +11509,82 @@ app.get('/api/candles/:symbol', async (req, res) => {
     const interval = req.query.interval || 'ONE_DAY';
     let cleanSymbol = req.params.symbol;
     if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
-        cleanSymbol = cleanSymbol.replace(/\s+/g, '');
+      cleanSymbol = cleanSymbol.replace(/\s+/g, '');
     }
     const cacheKey = `${cleanSymbol}_${interval}`;
     const now = Date.now();
-    
-    // Serve from cache if valid
     const maxAgeMs = getCacheDuration(interval, cleanSymbol);
-      if (candleCache[cacheKey] && (now - candleCache[cacheKey].timestamp < maxAgeMs)) {
-      return res.json(candleCache[cacheKey].data);
+
+    // Allow Cloudflare / browser edge caching to absorb burst traffic across 1 Lakh users
+    res.set('Cache-Control', 'public, max-age=5, s-maxage=10, stale-while-revalidate=30');
+
+    // 1. Serve from ultra-fast RAM cache if valid (with live WebSocket tick merged in)
+    const cachedItem = candleCache[cacheKey];
+    if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0 && (now - cachedItem.timestamp < maxAgeMs)) {
+      const liveMerged = mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
+      return res.json(liveMerged);
     }
 
-    const candles = await fetchCandleData(cleanSymbol, interval);
+    // 2. Single-flight lock: coalesce concurrent requests for the same symbol + interval
+    let fetchTask = inflightRouteCandleRequests.get(cacheKey);
+    if (!fetchTask) {
+      fetchTask = (async () => {
+        try {
+          // 2a. Check PostgreSQL persistent cache if fresh enough (survives PM2 reloads / restarts)
+          if (isCandleDbReady) {
+            try {
+              const dbRow = await db('market_candle_cache').where({ cache_key: cacheKey }).first();
+              if (dbRow && Array.isArray(dbRow.candles_json) && dbRow.candles_json.length > 0) {
+                const dbUpdatedAt = Number(dbRow.updated_at) || 0;
+                if (now - dbUpdatedAt < maxAgeMs) {
+                  const hydrated = mergeLiveTickIntoCandles(dbRow.candles_json, cleanSymbol, interval);
+                  setCandleCache(cacheKey, hydrated, dbUpdatedAt, cleanSymbol, interval, false);
+                  return hydrated;
+                }
+              }
+            } catch (_) {}
+          }
 
-    // Retry once if empty — the Fyers token may still be initializing at boot
-    // (login is async; the first candle request can arrive before setAccessToken finishes)
-    if ((!candles || candles.length === 0)) {
-      await new Promise(r => setTimeout(r, 500));
-      const retryCandles = await fetchCandleData(cleanSymbol, interval);
-      if (retryCandles && retryCandles.length > 0) {
-        setCandleCache(cacheKey, retryCandles, now);
-        return res.json(retryCandles);
-      }
+          // 2b. Fetch from Fyers / Redis / Yahoo fallback via fetchCandleData
+          let candles = await fetchCandleData(cleanSymbol, interval);
+
+          if (!candles || candles.length === 0) {
+            await new Promise(r => setTimeout(r, 400));
+            candles = await fetchCandleData(cleanSymbol, interval);
+          }
+
+          if (Array.isArray(candles) && candles.length > 0) {
+            const liveMerged = mergeLiveTickIntoCandles(candles, cleanSymbol, interval);
+            setCandleCache(cacheKey, liveMerged, Date.now(), cleanSymbol, interval, true);
+            return liveMerged;
+          }
+
+          // 2c. Stale-if-error fallback: if upstream returned empty (e.g. 500 daily quota reached),
+          // serve stale RAM or PostgreSQL cached candles merged with live ticks rather than failing!
+          if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0) {
+            return mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
+          }
+          if (isCandleDbReady) {
+            try {
+              const staleDbRow = await db('market_candle_cache').where({ cache_key: cacheKey }).first();
+              if (staleDbRow && Array.isArray(staleDbRow.candles_json) && staleDbRow.candles_json.length > 0) {
+                const hydrated = mergeLiveTickIntoCandles(staleDbRow.candles_json, cleanSymbol, interval);
+                setCandleCache(cacheKey, hydrated, Date.now(), cleanSymbol, interval, false);
+                return hydrated;
+              }
+            } catch (_) {}
+          }
+
+          return [];
+        } finally {
+          inflightRouteCandleRequests.delete(cacheKey);
+        }
+      })();
+      inflightRouteCandleRequests.set(cacheKey, fetchTask);
     }
 
-    // Save to cache only if valid data is returned
-    if (candles && candles.length > 0) {
-      setCandleCache(cacheKey, candles, now);
-    }
-    
-    res.json(candles);
+    const resultCandles = await fetchTask;
+    return res.json(resultCandles);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

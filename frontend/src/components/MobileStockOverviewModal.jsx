@@ -116,7 +116,7 @@ export default function MobileStockOverviewModal() {
     return () => { isMounted = false; };
   }, [symbol]);
 
-  // Fetch candle data for mini chart based on selected timeframe
+  // Fetch candle data for mini chart based on selected timeframe (via shared store cache + deduplication)
   useEffect(() => {
     if (!symbol) return;
     let isMounted = true;
@@ -124,28 +124,33 @@ export default function MobileStockOverviewModal() {
     setHoveredPoint(null);
 
     const tf = TIMEFRAMES.find(t => t.label === selectedTimeframe) || TIMEFRAMES[0];
-    fetch(`${API}/api/candles/${encodeURIComponent(symbol)}?interval=${tf.value}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
-        if (!isMounted) return;
-        if (Array.isArray(data) && data.length > 0) {
-          // Limit points for smooth rendering
-          const sliceCount = tf.label === '1D' ? 75 : (tf.label === '1W' ? 60 : 90);
-          setCandles(data.slice(-sliceCount));
-        } else {
-          // Generate realistic placeholder curve if candle history is unavailable
-          setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
-        }
-        setLoadingCandles(false);
-      })
-      .catch(() => {
-        if (isMounted) {
-          setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
-          setLoadingCandles(false);
-        }
-      });
+    const cacheKey = `${symbol}_${tf.value}`;
+    const existing = useStore.getState().candleData?.[cacheKey];
 
-    return () => { isMounted = false; };
+    const timer = setTimeout(() => {
+      useStore.getState().loadCandleData(symbol, tf.value)
+        .then(data => {
+          if (!isMounted) return;
+          if (Array.isArray(data) && data.length > 0) {
+            const sliceCount = tf.label === '1D' ? 75 : (tf.label === '1W' ? 60 : 90);
+            setCandles(data.slice(-sliceCount));
+          } else {
+            setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
+          }
+          setLoadingCandles(false);
+        })
+        .catch(() => {
+          if (isMounted) {
+            setCandles(generateFallbackCandles(currentLtpRef.current, tf.days));
+            setLoadingCandles(false);
+          }
+        });
+    }, Array.isArray(existing) && existing.length > 0 ? 0 : 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [symbol, selectedTimeframe]);
 
   // Chart SVG Calculations - strictly unconditional to preserve Rules of Hooks
