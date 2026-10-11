@@ -3,21 +3,21 @@
 
 export const SEO_ROUTES = {
   '/': {
-    title: "SkandX | India's #1 Real-Time Paper Trading, Financial Calculators & Algo Terminal",
-    description: 'Practice NSE, BSE & MCX Options, Futures & Equity paper trading with ₹10,00,000 virtual capital. Includes SIP, Loan EMI, MTF, Brokerage calculators, Wealth OS & Tax Hub, and SkandX Algo Bridge.',
-    keywords: 'paper trading india, virtual trading nse, sip calculator, reducing loan emi calculator, algo trading india, option chain simulator, skandx',
+    title: 'SkandX — Free Paper Trading India, Live NSE/BSE/MCX Options Simulator & Algo Terminal (skandx.in)',
+    description: "SkandX (skandx.in) is India's #1 real-time paper trade and virtual stock market simulator for NSE, BSE & MCX. Practice Nifty 50, Bank Nifty options with Greeks, bracket orders, 10 financial calculators (SIP, Loan EMI, MTF, Brokerage), and algorithmic trading with ₹10 Lakh to ₹10 Crore risk-free demo capital.",
+    keywords: 'SkandX, skandx paper trade, skandx paper trading, skandx.in, paper trading india, virtual trading nse, sip calculator, reducing loan emi calculator, algo trading india, option chain simulator',
     category: 'FinanceApplication'
   },
   '/paper-trading': {
-    title: 'Free Paper Trading India — Live NSE, BSE & MCX Options & Futures Simulator | SkandX',
-    description: 'Trade NSE Nifty, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 virtual capital and real-time WebSocket ticks on SkandX.',
-    keywords: 'paper trading india, free option trading simulator, nifty paper trading app, virtual stock trading india, live option chain paper trade',
+    title: 'SkandX Paper Trade — Free Paper Trading India, Live NSE, BSE & MCX Options Simulator | SkandX',
+    description: 'SkandX Paper Trade (skandx.in/paper-trading): Trade NSE Nifty 50, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 to ₹10,00,00,000 virtual capital and real-time WebSocket ticks.',
+    keywords: 'skandx paper trade, skandx paper trading, paper trading india, free option trading simulator, nifty paper trading app, virtual stock trading india, live option chain paper trade',
     category: 'FinanceApplication'
   },
   '/markets': {
-    title: 'Live NSE/BSE Markets & Paper Trading Terminal | SkandX',
-    description: 'Real-time NSE, BSE & MCX paper trading terminal with ₹10L virtual capital, option chain Greeks, bracket orders, and instant execution.',
-    keywords: 'live paper trading terminal, nse virtual trading, nifty option paper trading, skandx markets',
+    title: 'Live NSE/BSE Markets & SkandX Paper Trade Terminal | SkandX',
+    description: 'Real-time NSE, BSE & MCX paper trading terminal with ₹10L virtual capital, option chain Greeks, bracket orders, and instant execution on SkandX.',
+    keywords: 'skandx paper trade, live paper trading terminal, nse virtual trading, nifty option paper trading, skandx markets',
     category: 'FinanceApplication'
   },
   '/calculators': {

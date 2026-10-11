@@ -982,9 +982,17 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('skx-authed', Boolean(user));
+    }
+  }, [user]);
+
   // ── Guard & Route Detection ──────────────────────────────────────────────────
   const currentPath = (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '');
   const cleanFirstSegment = (currentPath.split('/')[1] || '').split('?')[0];
+  const isSearchOrAdCrawler = typeof navigator !== 'undefined' &&
+    /Mediapartners-Google|AdsBot-Google|Googlebot|Google-InspectionTool|GoogleOther|Google-Extended|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|ia_archiver|GPTBot|OAI-SearchBot|ClaudeBot|PerplexityBot|Applebot|Lighthouse|Chrome-Lighthouse|PageSpeed/i.test(navigator.userAgent || '');
 
   const knownAppRoutes = new Set([
     '', 'home', 'login', 'register', 'signup', 'forgot', 'reset',
@@ -1218,7 +1226,7 @@ function App() {
     );
   }
 
-  if (!user && ['tradediary', 'trade-diary'].includes(cleanFirstSegment)) {
+  if (!user && ['tradediary', 'trade-diary', 'trading-journal', 'tradingjournal', 'journal'].includes(cleanFirstSegment)) {
     return (
       <Suspense fallback={<TabLoader />}>
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
@@ -1228,6 +1236,31 @@ function App() {
             onOpenPaperTrading={() => { window.location.href = '/login'; }}
             onOpenProfile={() => { window.location.href = '/login'; }}
             onNavigate={() => { window.location.href = '/login'; }}
+          />
+          <Suspense fallback={null}>
+            <ConsentBanner />
+          </Suspense>
+        </div>
+      </Suspense>
+    );
+  }
+
+  if (!user && (['home', 'paper-trading', 'papertrading', 'markets'].includes(cleanFirstSegment) || (isSearchOrAdCrawler && cleanFirstSegment === ''))) {
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
+          <LandingHomeView
+            onOpenPaperTrading={() => { window.location.href = '/login'; }}
+            onOpenCommunity={() => { window.location.href = '/community'; }}
+            onOpenOptionChain={() => { window.location.href = '/login'; }}
+            onOpenTradeDiary={() => { window.location.href = '/trade-diary'; }}
+            onOpenPrimaryMarkets={() => { window.location.href = '/primary-markets'; }}
+            onOpenCalculators={(t) => { window.location.href = t && t !== 'all' ? `/calculators/${t}` : '/calculators'; }}
+            onOpenBrokerConnect={() => { window.location.href = '/algo-trading'; }}
+            onOpenWealthFinance={() => { window.location.href = '/wealth-hub'; }}
+            onOpenMutualFunds={() => { window.location.href = '/calculators/mutual-funds'; }}
+            onOpenLeaderboard={() => { window.location.href = '/login'; }}
+            onOpenAlgoBridge={() => { window.location.href = '/algo-trading'; }}
           />
           <Suspense fallback={null}>
             <ConsentBanner />

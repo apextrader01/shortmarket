@@ -1968,13 +1968,31 @@ export default function LoginView() {
             </>
           )}
           
-          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: '#6b7280' }}>
-            By continuing, you agree to SkandX's{' '}
-            <a href="/terms" style={{ color: '#10b981', textDecoration: 'none' }}>Terms</a>
-            {' '}&bull;{' '}
-            <a href="/privacy-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Privacy Policy</a>
-            {' '}&bull;{' '}
-            <a href="/risk-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Risk Disclosure</a>
+          <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.8' }}>
+            <div style={{ marginBottom: '6px' }}>
+              <span style={{ color: '#64748b', fontWeight: '600' }}>Explore Free Hubs: </span>
+              <a href="/paper-trading" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Paper Trading</a>
+              {' '}&bull;{' '}
+              <a href="/calculators" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Calculators</a>
+              {' '}&bull;{' '}
+              <a href="/primary-markets" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Bhavcopy &amp; IPO</a>
+              {' '}&bull;{' '}
+              <a href="/wealth-hub" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Wealth &amp; Tax</a>
+              {' '}&bull;{' '}
+              <a href="/algo-trading" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Algo</a>
+              {' '}&bull;{' '}
+              <a href="/community" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>Community</a>
+            </div>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+              By continuing, you agree to SkandX's{' '}
+              <a href="/terms" style={{ color: '#10b981', textDecoration: 'none' }}>Terms</a>
+              {' '}&bull;{' '}
+              <a href="/privacy-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Privacy Policy</a>
+              {' '}&bull;{' '}
+              <a href="/risk-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Risk Disclosure</a>
+              {' '}&bull;{' '}
+              <a href="/aboutus" style={{ color: '#10b981', textDecoration: 'none' }}>About Us</a>
+            </div>
           </div>
         </div>
       </div>

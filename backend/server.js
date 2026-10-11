@@ -15122,9 +15122,21 @@ let _cachedIndexHtml = null;
 let _cachedIndexMtime = 0;
 
 const SERVER_SEO_MAP = {
+  '/': {
+    title: 'SkandX — Free Paper Trading India, Live NSE/BSE/MCX Options Simulator & Algo Terminal (skandx.in)',
+    desc: 'SkandX (skandx.in) is India\'s #1 real-time paper trade and virtual stock market simulator for NSE, BSE & MCX. Practice Nifty 50, Bank Nifty options with Greeks, bracket orders, 10 financial calculators (SIP, Loan EMI, MTF, Brokerage), and algorithmic trading with ₹10 Lakh to ₹10 Crore risk-free demo capital.'
+  },
+  '/home': {
+    title: 'SkandX — India\'s #1 Real-Time Paper Trade, Financial Calculators & Algo Hub',
+    desc: 'Explore all 6 SkandX institutional hubs: Real-Time NSE/BSE/MCX Paper Trading Terminal, 10 Financial Calculators, Bhavcopy & IPO Screener, 8-Pillar Trade Diary, Wealth & Tax Hub, and SkandX Algo Bridge.'
+  },
   '/paper-trading': {
-    title: 'Free Paper Trading India — Live NSE, BSE & MCX Options & Futures Simulator | SkandX',
-    desc: 'Trade NSE Nifty, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 virtual capital and real-time WebSocket ticks on SkandX.'
+    title: 'SkandX Paper Trade — Free Paper Trading India, Live NSE, BSE & MCX Options Simulator | SkandX',
+    desc: 'SkandX Paper Trade (skandx.in/paper-trading): Trade NSE Nifty 50, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 to ₹10,00,00,000 virtual capital and real-time WebSocket ticks.'
+  },
+  '/markets': {
+    title: 'Live NSE/BSE Markets & SkandX Paper Trade Terminal | SkandX',
+    desc: 'Real-time NSE, BSE & MCX paper trading terminal with ₹10L virtual capital, option chain Greeks, bracket orders, and instant execution on SkandX.'
   },
   '/calculators': {
     title: 'Financial Calculators Suite — SIP, Loan EMI, MTF, Brokerage & Options Greeks | SkandX',
@@ -15676,13 +15688,14 @@ app.use((req, res) => {
   }
 
   const cleanPath = (req.path || '/').toLowerCase().replace(/\/+$/, '') || '/';
-  const ua = String(req.headers['user-agent'] || '');
-  const isCrawlerRequest = /Mediapartners-Google|AdsBot-Google|Googlebot|Google-InspectionTool|GoogleOther|Google-Extended|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|ia_archiver|GPTBot|OAI-SearchBot|ClaudeBot|PerplexityBot|Applebot|Lighthouse|Chrome-Lighthouse|PageSpeed/i.test(ua);
 
   // Google AdSense Policy Compliance: Never load adsbygoogle.js on login, account deletion, admin, or auth utility pages
   const isNoAdsUtilityRoute = [
     '/login',
     '/register',
+    '/signup',
+    '/forgot',
+    '/reset',
     '/delete-account',
     '/delete',
     '/data-rights',
@@ -15691,19 +15704,15 @@ app.use((req, res) => {
 
   let baseHtml = rawHtml;
   if (isNoAdsUtilityRoute) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     baseHtml = baseHtml
       .replace(/<meta\s+name="google-adsense-account"[^>]*>/gi, '')
       .replace(/<script[^>]*pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js[^>]*><\/script>/gi, '')
-      .replace('</head>', '<meta name="robots" content="noindex, nofollow" /></head>');
-  }
-
-  // For AdSense & Search Crawlers, move the rich publisher article directly into <div id="root"> so it is visible in the main DOM body.
-  // For human browsers, keep <div id="root"></div> empty so there is zero text flash before React mounts.
-  if (isCrawlerRequest && !isNoAdsUtilityRoute) {
-    baseHtml = baseHtml.replace(
-      /<div id="root"><\/div>\s*<noscript>\s*([\s\S]*?)\s*<\/noscript>/i,
-      '<div id="root">$1</div>'
-    );
+      .replace(/<meta\s+name="robots"[^>]*>/gi, '<meta name="robots" content="noindex, nofollow" />')
+      .replace(/<meta\s+name="googlebot"[^>]*>/gi, '<meta name="googlebot" content="noindex, nofollow" />')
+      .replace('</head>', '<style>#skandx-ssr-content{display:none!important}</style></head>');
+  } else {
+    res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
   }
 
   const seoEntry = SERVER_SEO_MAP[cleanPath];
@@ -15720,7 +15729,9 @@ app.use((req, res) => {
     description: seoEntry.desc,
     isPartOf: {
       '@type': 'WebSite',
+      '@id': 'https://skandx.in/#website',
       name: 'SkandX',
+      alternateName: ['SkandX Paper Trade', 'SkandX Paper Trading', 'skandx.in'],
       url: 'https://skandx.in/'
     }
   })}</script>`;
