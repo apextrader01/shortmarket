@@ -1147,17 +1147,19 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('skx-authed', Boolean(user));
-    }
-  }, [user]);
-
   // ── Guard & Route Detection ──────────────────────────────────────────────────
   const currentPath = (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '');
   const cleanFirstSegment = (currentPath.split('/')[1] || '').split('?')[0];
   const isSearchOrAdCrawler = typeof navigator !== 'undefined' &&
     /Mediapartners-Google|AdsBot-Google|Googlebot|Google-InspectionTool|GoogleOther|Google-Extended|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|ia_archiver|GPTBot|OAI-SearchBot|ClaudeBot|PerplexityBot|Applebot|Lighthouse|Chrome-Lighthouse|PageSpeed/i.test(navigator.userAgent || '');
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const isAuthEntryRoute = !cleanFirstSegment || ['login', 'register', 'signup', 'forgot', 'reset'].includes(cleanFirstSegment);
+      const shouldHideSsr = Boolean(user) || (!isAuthEntryRoute && !isSearchOrAdCrawler);
+      document.documentElement.classList.toggle('skx-authed', shouldHideSsr);
+    }
+  }, [user, cleanFirstSegment, isSearchOrAdCrawler]);
 
   const knownAppRoutes = new Set([
     '', 'home', 'login', 'register', 'signup', 'forgot', 'reset',
@@ -1586,6 +1588,7 @@ function App() {
           <LandingHomeView 
             onOpenPaperTrading={() => setActiveTab('Markets')} 
             onOpenCommunity={() => setActiveTab('Community')}
+            onOpenOptionChain={() => setActiveTab('Options')}
             onOpenTradeDiary={(tab) => {
               setTradeDiaryInitialTab(tab || 'DASHBOARD');
               setActiveTab('TradeDiary');
@@ -1752,6 +1755,7 @@ function App() {
                   {[
                     { key: 'Home', label: 'Home' },
                     { key: 'Markets', label: 'Paper Trading' },
+                    { key: 'Algo', label: 'SkandX Algo' },
                     { key: 'Community', label: 'Community' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Positions', label: 'Positions' },
@@ -2135,6 +2139,10 @@ function App() {
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
             { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
+            { label: 'SkandX Algo Hub', key: 'Algo', icon: Cpu },
+            { label: 'Financial Calculators', key: 'Calculators', icon: Calculator },
+            { label: 'Primary Markets & IPOs', key: 'PrimaryMarkets', icon: Building2 },
+            { label: 'Wealth & Tax Hub', key: 'WealthOS', icon: Sparkles },
             { label: 'Traders Community & Clubs', key: 'Community', icon: Users },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Positions', key: 'Positions', icon: Briefcase },

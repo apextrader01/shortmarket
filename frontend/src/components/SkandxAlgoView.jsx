@@ -108,9 +108,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [staticIps, setStaticIps] = useState([]);
   const [linkedUsers, setLinkedUsers] = useState([]);
   const [watchlist, setWatchlist] = useState([
-    { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend Scalper', algoActive: true, mode: 'PAPER', status: 'WAITING_TRIGGER', lots: 1, qty: 75, targetPts: 60, slPts: 25, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
-    { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3 Breakout', algoActive: true, mode: 'PAPER', status: 'WAITING_TRIGGER', lots: 1, qty: 15, targetPts: 80, slPts: 35, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
-    { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Mean Reversion', algoActive: false, mode: 'PAPER', status: 'PAUSED', lots: 1, qty: 10, targetPts: 25, slPts: 12, trailingSl: false, autoSquareOff: '15:15', realizedPnl: 0 }
+    { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend Scalper', algoActive: true, mode: 'SANDBOX', status: 'WAITING_TRIGGER', lots: 1, qty: 75, targetPts: 60, slPts: 25, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
+    { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3 Breakout', algoActive: true, mode: 'SANDBOX', status: 'WAITING_TRIGGER', lots: 1, qty: 15, targetPts: 80, slPts: 35, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
+    { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Mean Reversion', algoActive: false, mode: 'SANDBOX', status: 'PAUSED', lots: 1, qty: 10, targetPts: 25, slPts: 12, trailingSl: false, autoSquareOff: '15:15', realizedPnl: 0 }
   ]);
   const [copyGroup, setCopyGroup] = useState({
     groupName: 'SkandX High-Alpha Mirror Group',
@@ -641,7 +641,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       low: 2420.00,
       algoStrategy: 'EMA 9/21 Trend Scalper',
       algoActive: true,
-      mode: 'PAPER',
+      mode: 'SANDBOX',
       status: 'WAITING_TRIGGER',
       lots: 1,
       qty: 50,

@@ -206,21 +206,32 @@ export default function AlgoPaymentGatewayModal({
             setIsProcessing(true);
             setProcessStepText('Verifying Razorpay signature & provisioning service...');
 
-            const verifyRes = await fetch(`${API}/api/v1/bridge/razorpay/verify`, {
+            const verifyPayload = {
+              razorpay_order_id: response.razorpay_order_id || resolvedOrderId,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan: item?.type || 'STATIC_IP',
+              itemType: item?.type || 'STATIC_IP',
+              itemId: item?.id || item?.type || 'STATIC_IP',
+              amount: effectiveAmount,
+              title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+            };
+
+            let verifyRes = await fetch(`${API}/api/v1/bridge/razorpay/verify`, {
               method: 'POST',
               headers: getAuthHeaders(),
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || resolvedOrderId,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                itemType: item?.type || 'STATIC_IP',
-                itemId: item?.id || item?.type || 'STATIC_IP',
-                amount: effectiveAmount,
-                title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
-              })
+              body: JSON.stringify(verifyPayload)
             });
 
-            const verifyData = await verifyRes.json();
+            if (verifyRes.status === 404) {
+              verifyRes = await fetch(`${API}/api/payment/verify`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(verifyPayload)
+              });
+            }
+
+            const verifyData = await verifyRes.json().catch(() => ({}));
             if (!verifyRes.ok || !verifyData.success) {
               throw new Error(verifyData.error || 'Payment signature verification failed.');
             }

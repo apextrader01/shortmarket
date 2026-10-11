@@ -535,10 +535,10 @@ export default function LandingHomeView({
         'Static IPs': () => onOpenAlgoBridge('STATIC_IP'),
         'JSON Webhook Bridge': () => onOpenAlgoBridge('WEBHOOK'),
         'TradingView Alerts': () => onOpenAlgoBridge('WEBHOOK'),
-        'Copy Trading': () => onOpenAlgoBridge('SHARE_LINK')
+        'Copy Trading': () => onOpenAlgoBridge('GROUPCOPY')
       },
       actionLabel: 'Launch SkandX Algo Console',
-      primaryAction: () => (onOpenAlgoBridge ? onOpenAlgoBridge('SHARE_LINK') : onOpenPaperTrading()),
+      primaryAction: () => (onOpenAlgoBridge ? onOpenAlgoBridge('Dashboard') : onOpenPaperTrading()),
       quickLinks: [
         { label: 'Share Demat Link', action: () => onOpenAlgoBridge('SHARE_LINK') },
         { label: 'Demat API Keys & Credentials', action: () => onOpenAlgoBridge('API_KEYS') },
@@ -819,7 +819,7 @@ export default function LandingHomeView({
               <PieChart size={13} /> Wealth &amp; Tax
             </button>
             <button
-              onClick={() => onOpenAlgoBridge('SHARE_LINK')}
+              onClick={() => onOpenAlgoBridge('Dashboard')}
               onMouseEnter={() => prefetchHubChunk(6)}
               style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
             >
@@ -944,7 +944,7 @@ export default function LandingHomeView({
             { label: '📓 Trade Diary', action: () => onOpenTradeDiary('CHECKLIST'), color: '#c084fc' },
             { label: '🏛️ IPO & Bhavcopy', action: () => onOpenPrimaryMarkets('BHAVCOPY'), color: '#34d399' },
             { label: '💰 Wealth & Tax', action: () => onOpenWealthFinance('NET_WORTH'), color: '#10b981' },
-            { label: '🤖 SkandX Algo', action: () => onOpenAlgoBridge('SHARE_LINK'), color: '#38bdf8' }
+            { label: '🤖 SkandX Algo', action: () => onOpenAlgoBridge('Dashboard'), color: '#38bdf8' }
           ].map((item, i) => (
             <button
               key={i}
@@ -2800,7 +2800,7 @@ export default function LandingHomeView({
             <span>•</span>
             <a href="/wealth-hub" onClick={(e) => { e.preventDefault(); onOpenWealthFinance('NET_WORTH'); }} style={{ color: '#10b981', textDecoration: 'none' }}>Wealth OS &amp; Tax Hub</a>
             <span>•</span>
-            <a href="/algo-trading" onClick={(e) => { e.preventDefault(); onOpenAlgoBridge('SHARE_LINK'); }} style={{ color: '#38bdf8', textDecoration: 'none' }}>SkandX Algo Webhook Bridge</a>
+            <a href="/algo-trading" onClick={(e) => { e.preventDefault(); onOpenAlgoBridge('WEBHOOK'); }} style={{ color: '#38bdf8', textDecoration: 'none' }}>SkandX Algo Webhook Bridge</a>
             <span>•</span>
             <a href="/primary-markets" onClick={(e) => { e.preventDefault(); onOpenPrimaryMarkets('BHAVCOPY'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>Bhavcopy &amp; IPO GMP</a>
           </div>
@@ -2826,7 +2826,7 @@ export default function LandingHomeView({
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}>Bhavcopy &amp; Deals</span>
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenCalculators('all')}>Calculators</span>
               <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onOpenWealthFinance('NET_WORTH')}>Wealth OS &amp; Tax</span>
-              <span style={{ cursor: 'pointer', color: '#38bdf8' }} onClick={() => onOpenAlgoBridge('SHARE_LINK')}>SkandX Algo</span>
+              <span style={{ cursor: 'pointer', color: '#38bdf8' }} onClick={() => onOpenAlgoBridge('Dashboard')}>SkandX Algo</span>
             </div>
           </div>
 

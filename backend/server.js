@@ -3744,8 +3744,9 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
 
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
-    const meta = resolvePlanMeta(plan);
+    const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan, itemType, amount, title } = req.body || {};
+    const meta = resolvePlanMeta(plan || itemType);
+    const isAlgoPayment = Boolean(itemType) || String(meta.tier || '').startsWith('ALGO_');
     const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
     
     const { key_secret: secret } = await getRazorpayConfig();
@@ -3757,7 +3758,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: meta.tier,
-        amount: meta.amountInr,
+        amount: (amount && Number(amount) >= 1) ? Math.round(Number(amount)) : meta.amountInr,
         paymentType,
         status: 'FAILED',
         razorpayOrderId: razorpay_order_id || null,
@@ -3783,6 +3784,42 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
     const isAuthentic = expectedSignature.length === razorpay_signature.length &&
       crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
     if (isAuthentic) {
+      if (isAlgoPayment) {
+        const resolved = resolveAlgoPaymentItem({ itemType: itemType || plan, amount, title });
+        const userObj = await resolveBridgeUser(req);
+        const state = await getUserBridgeState(userObj);
+        const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified', razorpay_order_id);
+        await saveUserBridgeState(userObj, state);
+
+        await logSubscriptionAttempt({
+          userId: req.user.id,
+          plan: resolved.planKey,
+          amount: resolved.amountInr,
+          paymentType: 'ONE_TIME',
+          status: 'SUCCESS',
+          razorpayOrderId: razorpay_order_id || null,
+          razorpayPaymentId: razorpay_payment_id || null,
+          failureReason: null
+        });
+
+        appendAlgoAuditLog(`[RAZORPAY_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${razorpay_payment_id}]`, true);
+
+        return res.json({
+          success: true,
+          transactionId: razorpay_payment_id,
+          txRecord,
+          provisionedData,
+          newBalance: state.config.availableCredit,
+          activePlan: state.config.activePlan || state.config.currentPlan || 'STARTER',
+          newIp: provisionedData.newIp || null,
+          newLinkUserSlots: state.config.totalLinkSlots,
+          stats: state.config,
+          staticIps: state.staticIps,
+          linkedUsers: state.linkedUsers,
+          transactions: state.transactions
+        });
+      }
+
       let computedExpires = null;
       await db.transaction(async (trx) => {
         const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
@@ -14744,7 +14781,7 @@ function createDefaultUserBridgeState(userObj) {
         low: 24920.00,
         algoStrategy: 'EMA 9/21 Trend Scalper',
         algoActive: true,
-        mode: 'PAPER',
+        mode: 'SANDBOX',
         status: 'WAITING_TRIGGER',
         lots: 1,
         qty: 75,
@@ -14764,7 +14801,7 @@ function createDefaultUserBridgeState(userObj) {
         low: 260.00,
         algoStrategy: '9:20 AM Short Straddle',
         algoActive: false,
-        mode: 'PAPER',
+        mode: 'SANDBOX',
         status: 'PAUSED',
         lots: 1,
         qty: 30,
@@ -14784,7 +14821,7 @@ function createDefaultUserBridgeState(userObj) {
         low: 2975.00,
         algoStrategy: 'VWAP Mean Reversion',
         algoActive: false,
-        mode: 'PAPER',
+        mode: 'SANDBOX',
         status: 'PAUSED',
         lots: 1,
         qty: 50,
@@ -14818,6 +14855,7 @@ function recalculateBridgeStats(state) {
 
   // Refresh watchlist LTP from live priceCache when available
   state.watchlist.forEach(w => {
+    if (w.mode === 'PAPER') w.mode = 'SANDBOX';
     const cleanSym = String(w.symbol || '').toUpperCase();
     const cachedTick = priceCache[cleanSym] || (cleanSym.includes('NIFTY') && !cleanSym.includes('BANK') && !cleanSym.includes('FIN') ? priceCache['NSE:NIFTY50-INDEX'] : null);
     if (cachedTick && Number(cachedTick.ltp) > 0 && !cleanSym.endsWith('CE') && !cleanSym.endsWith('PE')) {
@@ -15315,7 +15353,7 @@ app.post('/api/v1/bridge/watchlist/add', async (req, res) => {
       low: Number(body.low) || Number((resolvedLtp * 0.99).toFixed(2)),
       algoStrategy: String(body.algoStrategy || 'EMA 9/21 Trend Scalper').slice(0, 48),
       algoActive: body.algoActive !== undefined ? Boolean(body.algoActive) : true,
-      mode: body.mode === 'PAPER' ? 'PAPER' : 'LIVE',
+      mode: (body.mode === 'SANDBOX' || body.mode === 'PAPER') ? 'SANDBOX' : 'LIVE',
       status: body.status || (body.algoActive === false ? 'PAUSED' : 'WAITING_TRIGGER'),
       lots: Math.max(1, Number(body.lots) || 1),
       qty: Math.max(1, Number(body.qty) || 50),

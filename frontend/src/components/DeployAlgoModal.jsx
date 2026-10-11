@@ -35,7 +35,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
     if (activeEditing) {
       setSymbol(activeEditing.symbol || 'NSE:NIFTY24OCTFUT');
       setStrategy(activeEditing.algoStrategy || 'EMA 9/21 Trend Scalper');
-      setMode(activeEditing.mode || 'LIVE');
+      setMode(activeEditing.mode === 'PAPER' ? 'SANDBOX' : (activeEditing.mode || 'LIVE'));
       setLots(activeEditing.lots || 1);
       setTargetPts(activeEditing.targetPts || 60);
       setSlPts(activeEditing.slPts || 25);
@@ -234,13 +234,13 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
               {/* Execution Mode (Sandbox vs Live) */}
               <button
                 type="button"
-                onClick={() => setMode('PAPER')}
+                onClick={() => setMode('SANDBOX')}
                 style={{
                   padding: '10px',
-                  background: mode === 'PAPER' ? 'rgba(56, 189, 248, 0.15)' : '#121826',
-                  border: `1px solid ${mode === 'PAPER' ? '#38bdf8' : '#1e293b'}`,
+                  background: mode === 'SANDBOX' ? 'rgba(56, 189, 248, 0.15)' : '#121826',
+                  border: `1px solid ${mode === 'SANDBOX' ? '#38bdf8' : '#1e293b'}`,
                   borderRadius: '8px',
-                  color: mode === 'PAPER' ? '#38bdf8' : '#94a3b8',
+                  color: mode === 'SANDBOX' ? '#38bdf8' : '#94a3b8',
                   fontSize: '12px',
                   fontWeight: '800',
                   cursor: 'pointer'
