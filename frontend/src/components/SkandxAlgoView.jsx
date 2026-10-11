@@ -1239,6 +1239,29 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </div>
           )}
 
+          {/* Open Trading Terminal Button */}
+          {onOpenPaperTrading && (
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                border: '1px solid rgba(56, 189, 248, 0.45)',
+                color: '#fff',
+                padding: isMobile ? '5px 9px' : '6px 12px',
+                borderRadius: '6px',
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Zap size={12} /> {isMobile ? 'Terminal' : 'Trading Terminal'}
+            </button>
+          )}
+
           {/* Exit / Back to Home Button (Desktop) */}
           {!isMobile && onBack && (
             <button

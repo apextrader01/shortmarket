@@ -2477,7 +2477,35 @@ export default function AdminDashboard() {
         });
         setSubscriptionPayments(cleanPaperPayments);
         setActiveSubscribersList(data.activeSubscribers || []);
-        if (data.summary) setSubscriptionSummary(data.summary);
+        let totalSuccess = 0;
+        let totalFailed = 0;
+        let totalCancelled = 0;
+        let totalInitiated = 0;
+        let totalRevenue = 0;
+        for (const p of cleanPaperPayments) {
+          const st = String(p.status || '').toUpperCase();
+          if (st === 'SUCCESS') {
+            totalSuccess++;
+            if (p.payment_type !== 'ADMIN_GRANT') {
+              totalRevenue += Number(p.amount) || 0;
+            }
+          } else if (st === 'FAILED') {
+            totalFailed++;
+          } else if (st === 'CANCELLED') {
+            totalCancelled++;
+          } else {
+            totalInitiated++;
+          }
+        }
+        setSubscriptionSummary({
+          ...(data.summary || {}),
+          totalSuccess,
+          totalFailed,
+          totalCancelled,
+          totalInitiated,
+          totalRevenue,
+          activeSubscribersCount: (data.activeSubscribers || []).length
+        });
       }
     } catch (err) {
       console.error('Failed to fetch admin subscriptions:', err);

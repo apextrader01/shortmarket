@@ -3549,6 +3549,62 @@ async function healAndSeparateSubscriptionPayments() {
       .where({ amount: 2499 })
       .whereNot('plan', 'ALGO_INSTITUTIONAL')
       .update({ plan: 'ALGO_INSTITUTIONAL' });
+
+    // 3. Auto-resolve any INITIATED rows (both Paper Trading and Algo) older than 2 minutes
+    const pendingRows = await db('subscription_payments')
+      .where({ status: 'INITIATED' })
+      .orderBy('created_at', 'desc')
+      .limit(25)
+      .catch(() => []);
+
+    if (pendingRows.length > 0) {
+      let rzpClient = null;
+      try {
+        const { client, key_id, key_secret } = await getRazorpayClient();
+        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
+          rzpClient = client;
+        }
+      } catch (_) {}
+
+      const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
+      for (const row of pendingRows) {
+        let resolvedViaRzp = false;
+        if (rzpClient && row.razorpay_order_id) {
+          try {
+            const orderPayments = await rzpClient.orders.fetchPayments(row.razorpay_order_id).catch(() => null);
+            const items = Array.isArray(orderPayments?.items) ? orderPayments.items : [];
+            const capturedPay = items.find(ip => ip.status === 'captured' || ip.status === 'authorized');
+            const failedPay = items.find(ip => ip.status === 'failed');
+            if (capturedPay) {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'SUCCESS',
+                razorpay_payment_id: capturedPay.id,
+                failure_reason: null,
+                updated_at: new Date()
+              });
+              resolvedViaRzp = true;
+            } else if (failedPay) {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'FAILED',
+                razorpay_payment_id: failedPay.id,
+                failure_reason: failedPay.error_description || failedPay.error_reason || 'Payment declined at Razorpay gateway',
+                updated_at: new Date()
+              });
+              resolvedViaRzp = true;
+            }
+          } catch (_) {}
+        }
+
+        const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+        if (!resolvedViaRzp && (!createdMs || createdMs < twoMinsAgoMs)) {
+          await db('subscription_payments').where({ id: row.id }).update({
+            status: 'CANCELLED',
+            failure_reason: 'Checkout dismissed or timed out before payment completion',
+            updated_at: new Date()
+          });
+        }
+      }
+    }
   } catch (_) {}
 }
 
