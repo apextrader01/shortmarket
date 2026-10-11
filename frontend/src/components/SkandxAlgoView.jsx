@@ -137,7 +137,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     type: 'STATIC_IP',
     title: 'Dedicated Mumbai BKC Static IP',
     amount: 350,
-    subtitle: '1 Month dedicated IPv4 proxy whitelisted for Zerodha, Angel, Upstox & Fyers'
+    subtitle: '1 Month dedicated IPv4 proxy whitelisted for Angel One SmartAPI'
   });
   const [showDeployAlgoModal, setShowDeployAlgoModal] = useState(false);
   const [editingAlgoItem, setEditingAlgoItem] = useState(null);
@@ -173,7 +173,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [totpCode, setTotpCode] = useState('');
 
   // Add Demat Form State
-  const [newBroker, setNewBroker] = useState('Zerodha Kite Connect');
+  const [newBroker, setNewBroker] = useState('Angel One SmartAPI');
   const [newClientCode, setNewClientCode] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
@@ -184,7 +184,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [showAddLinkUserModal, setShowAddLinkUserModal] = useState(false);
   const [newLinkClientName, setNewLinkClientName] = useState('');
   const [newLinkEmail, setNewLinkEmail] = useState('');
-  const [newLinkBroker, setNewLinkBroker] = useState('Zerodha Kite');
+  const [newLinkBroker, setNewLinkBroker] = useState('Angel One');
   const [newLinkClientCode, setNewLinkClientCode] = useState('');
   const [newLinkCopyRatio, setNewLinkCopyRatio] = useState('1.0x');
 
@@ -414,7 +414,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'STATIC_IP',
       title: 'Dedicated Mumbai BKC Static IP',
       amount: 350,
-      subtitle: '1 Month dedicated IPv4 whitelist for Zerodha, Angel, Upstox & Fyers'
+      subtitle: '1 Month dedicated IPv4 whitelist for Angel One SmartAPI'
     });
   };
 
@@ -1466,9 +1466,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             )}
 
             <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b' }}>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Brokers Gateway</div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Broker Gateway</div>
               <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
-                Zerodha • Angel • Upstox • Fyers
+                Angel One SmartAPI
               </div>
             </div>
           </nav>
@@ -1763,7 +1763,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         No Personal Demat Account Connected Yet
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        Connect Zerodha Kite, Angel One, Upstox, Dhan, or Fyers to route live automated orders, or test strategies in Sandbox Mode.
+                        Connect your Angel One SmartAPI Demat account to route live automated orders, or test strategies in Sandbox Mode.
                       </div>
                     </div>
                   </div>
@@ -2094,7 +2094,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     No Demat Accounts Connected to Your Profile
                   </div>
                   <div style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '480px' }}>
-                    Connect your Zerodha Kite, Angel One SmartAPI, Upstox, Fyers, or DhanHQ account to start routing live orders. Your credentials are isolated to your account.
+                    Connect your Angel One SmartAPI Demat account to start routing live orders. Your credentials are isolated to your account.
                   </div>
                   <button
                     onClick={() => setShowAddDematModal(true)}
@@ -2258,7 +2258,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Dedicated Static IP Addresses ({staticIps.length})
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Dedicated Indian IPv4 proxy addresses whitelisted with Zerodha, Angel One, and NSE colocation servers.
+                    Dedicated Indian IPv4 proxy addresses whitelisted with Angel One SmartAPI and NSE colocation servers.
                   </p>
                 </div>
                 <button
@@ -3559,12 +3559,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {config.activePlan === 'PRO' ? 'ACTIVE PLAN' : 'MOST POPULAR'}
                   </div>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.5px' }}>PRO TRADER</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Live Multi-Broker Algo</h3>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Live Angel One Algo</h3>
                   <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
                     ₹999 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
-                    Automate live orders across Zerodha, Angel One, Upstox, Dhan, Fyers with sub-50ms execution.
+                    Automate live orders on Angel One SmartAPI with sub-50ms execution.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
@@ -3581,7 +3581,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       id: 'PRO',
                       title: 'Pro Algo Trader Plan',
                       amount: 999,
-                      subtitle: '1 Month Pro Multi-Broker Algo Subscription via Razorpay'
+                      subtitle: '1 Month Pro Angel One SmartAPI Algo Subscription via Razorpay'
                     })}
                     style={{
                       width: '100%',
@@ -4409,11 +4409,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           </thead>
                           <tbody>
                             {(adminStats?.brokerGateways || [
-                              { name: 'Zerodha Kite Connect v3', latency: '4.2ms', activeSessions: 1, status: 'OPERATIONAL' },
-                              { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' },
-                              { name: 'Upstox Pro API v2', latency: '8.4ms', activeSessions: 1, status: 'OPERATIONAL' },
-                              { name: 'DhanHQ Open API', latency: '5.1ms', activeSessions: 1, status: 'OPERATIONAL' },
-                              { name: 'Fyers API v3', latency: '7.8ms', activeSessions: 1, status: 'OPERATIONAL' }
+                              { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' }
                             ]).map((bg, idx) => (
                               <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
                                 <td style={{ padding: '12px 14px', fontWeight: '800', color: '#fff' }}>{bg.name}</td>
@@ -4805,15 +4801,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   onChange={e => setNewBroker(e.target.value)}
                   style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                 >
-                  <option value="Zerodha Kite Connect">Zerodha Kite Connect</option>
                   <option value="Angel One SmartAPI">Angel One SmartAPI</option>
-                  <option value="Upstox Pro API v2">Upstox Pro API v2</option>
-                  <option value="Fyers API v3">Fyers API v3</option>
-                  <option value="DhanHQ Open API">DhanHQ Open API</option>
-                  <option value="Alice Blue ANT">Alice Blue ANT</option>
-                  <option value="Kotak Neo API">Kotak Neo API</option>
-                  <option value="Shoonya / Finvasia">Shoonya / Finvasia</option>
-                  <option value="Groww Webhook">Groww Webhook</option>
                 </select>
               </div>
 
@@ -4821,7 +4809,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID / UCC *</label>
                 <input
                   type="text"
-                  placeholder="e.g. ZER6641, AB1234, FY4410"
+                  placeholder="e.g. A123456 (Angel One Client ID)"
                   value={newClientCode}
                   onChange={e => setNewClientCode(e.target.value)}
                   required
@@ -4957,12 +4945,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     onChange={e => setNewLinkBroker(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                   >
-                    <option value="Zerodha Kite">Zerodha Kite</option>
-                    <option value="Angel One">Angel One</option>
-                    <option value="Upstox Pro">Upstox Pro</option>
-                    <option value="Groww Demat">Groww Demat</option>
-                    <option value="DhanHQ">DhanHQ</option>
-                    <option value="Fyers">Fyers</option>
+                    <option value="Angel One">Angel One (SmartAPI)</option>
                   </select>
                 </div>
                 <div>
@@ -4970,7 +4953,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <input
                     type="text"
                     required
-                    placeholder="e.g. ZER9912"
+                    placeholder="e.g. A123456"
                     value={newLinkClientCode}
                     onChange={e => setNewLinkClientCode(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}

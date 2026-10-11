@@ -1193,7 +1193,7 @@ function App() {
       Home: 'SkandX | Next-Gen Paper Trading & Wealth Operating System',
       Calculators: 'Financial Calculators Suite & Amortization Terminal | SkandX',
       WealthOS: 'Wealth OS & Tax Hub — Net Worth, ITR Tax Saving & FIRE Planner | SkandX',
-      Algo: 'SkandX Algo Trading Bridge — TradingView Webhook to Zerodha, Angel, Upstox | SkandX',
+      Algo: 'SkandX Algo Trading Bridge — TradingView Webhook to Angel One SmartAPI | SkandX',
       Markets: 'Live Markets & Paper Trading | SkandX',
       PrimaryMarkets: 'Primary Markets, Bhavcopy & IPO Hub | SkandX',
       Orders: 'Order Book & Executions | SkandX',

@@ -15065,8 +15065,8 @@ app.post('/api/v1/bridge/demats', async (req, res) => {
 
     const newAcc = {
       id: 'ACC-' + Math.floor(100 + Math.random() * 900),
-      broker: String(broker || 'Zerodha Kite Connect').slice(0, 48),
-      brokerKey: String(broker || '').toLowerCase().includes('angel') ? 'angel' : 'zerodha',
+      broker: String(broker || 'Angel One SmartAPI').slice(0, 48),
+      brokerKey: 'angel',
       clientCode: safeClientCode,
       name: String(name || `${safeClientCode} Trading A/C`).slice(0, 48),
       apiKey: maskBrokerApiKey(apiKey),
@@ -15263,7 +15263,7 @@ app.post('/api/v1/bridge/link-users/add', async (req, res) => {
       id: 'LNK-' + Math.floor(100 + Math.random() * 900),
       clientName: String(clientName).trim().slice(0, 48),
       email: String(email || 'client@skandx.in').trim().slice(0, 64),
-      broker: String(broker || 'Zerodha Kite').trim().slice(0, 48),
+      broker: String(broker || 'Angel One').trim().slice(0, 48),
       clientCode: String(clientCode).trim().toUpperCase().slice(0, 24),
       connectedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       status: 'CONNECTED',
@@ -16462,18 +16462,10 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       allLinkedUsers,
       allOrders,
       gateways: [
-        { name: 'Zerodha Kite Connect', api: 'REST API v3 + WebSocket Ticker', latency: '4.2 ms', sessions: activeDematsAcrossPlatform + 12, activeSessions: activeDematsAcrossPlatform + 12, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: 8, activeSessions: 8, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Upstox Pro API v2', api: 'Pro API v2 Protobuf Feed', latency: '8.4 ms', sessions: 6, activeSessions: 6, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'DhanHQ Open API', api: 'DhanHQ v2 Feed & Order API', latency: '5.1 ms', sessions: 4, activeSessions: 4, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Fyers API v3', api: 'Fyers API v3 Multi-Socket', latency: '7.8 ms', sessions: 5, activeSessions: 5, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
+        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: activeDematsAcrossPlatform, activeSessions: activeDematsAcrossPlatform, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
       ],
       brokerGateways: [
-        { name: 'Zerodha Kite Connect v3', latency: '4.2 ms', activeSessions: activeDematsAcrossPlatform + 12, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Angel One SmartAPI v2', latency: '6.1 ms', activeSessions: 8, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Upstox Pro API v2', latency: '8.4 ms', activeSessions: 6, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'DhanHQ Open API', latency: '5.1 ms', activeSessions: 4, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' },
-        { name: 'Fyers API v3', latency: '7.8 ms', activeSessions: 5, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
+        { name: 'Angel One SmartAPI v2', latency: '6.1 ms', activeSessions: activeDematsAcrossPlatform, status: globalAlgoFreezeActive ? 'FROZEN' : 'OPERATIONAL' }
       ],
       auditLogs: algoAdminAuditLogs
     });
@@ -16764,12 +16756,12 @@ const SERVER_SEO_MAP = {
     desc: '360° Personal Finance & Tax Command Center: Multi-asset Net Worth tracker, 50/30/20 Budget Leak Detector, Actuarial Term/Health HLV Gap, and FY25 STCG 20% / LTCG 12.5% Tax-Loss Harvesting.'
   },
   '/algo': {
-    title: 'SkandX Algo — Multi-Broker Demat Bridge, TradingView Webhooks & Copy Trading | SkandX',
-    desc: 'Automate NSE/BSE/MCX trading with TradingView JSON Webhooks, Dedicated Static IPs, Pre-Built Options Strategy Templates, and Multi-Broker Demat API execution.'
+    title: 'SkandX Algo — Angel One SmartAPI Bridge, TradingView Webhooks & Copy Trading | SkandX',
+    desc: 'Automate NSE/BSE/MCX trading with TradingView JSON Webhooks, Dedicated Static IPs, Pre-Built Options Strategy Templates, and Angel One SmartAPI execution.'
   },
   '/algo-trading': {
-    title: 'Algo Trading India — TradingView Webhook Bridge & Multi-Broker Execution | SkandX',
-    desc: 'Connect Zerodha, Fyers, AngelOne, Dhan & Upstox with TradingView alerts, static IP compliance, and 1-click algorithmic strategy templates.'
+    title: 'Algo Trading India — TradingView Webhook Bridge & Angel One SmartAPI Execution | SkandX',
+    desc: 'Connect Angel One SmartAPI with TradingView alerts, static IP compliance, and 1-click algorithmic strategy templates.'
   },
   '/primary-markets': {
     title: 'NSE Bhavcopy Delivery Screener (>60%), Bulk Deals & Live IPO GMP Hub | SkandX',
