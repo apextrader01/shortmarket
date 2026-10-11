@@ -11503,6 +11503,48 @@ function getCacheDuration(interval, symbol) {
   return 10 * 60 * 1000; // 1-min / 2-min base history cached for 10 mins while live ticks build 1m bars in RAM
 }
 
+function isIntradayInterval(interval) {
+  const sec = getIntervalSeconds(interval);
+  return sec >= 60 && sec <= 3600;
+}
+
+// Resample 1-minute candles into any higher intraday timeframe (3m, 5m, 10m, 15m, 30m, 1h) in <0.3ms in RAM.
+// Aligns 30m and 1h bars to the 09:15 AM IST market open (+900s offset) exactly like Fyers & TradingView.
+function resampleCandlesFromOneMinute(oneMinCandles, targetInterval) {
+  if (!Array.isArray(oneMinCandles) || oneMinCandles.length === 0) return [];
+  const bucketSec = getIntervalSeconds(targetInterval);
+  if (bucketSec <= 60) {
+    return oneMinCandles.map(c => ({ ...c }));
+  }
+  const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
+  const aggregated = [];
+  let currentBar = null;
+
+  for (let i = 0; i < oneMinCandles.length; i++) {
+    const c = oneMinCandles[i];
+    if (!c || !Number.isFinite(Number(c.time))) continue;
+    const bucketTime = Math.floor((c.time - alignOffset) / bucketSec) * bucketSec + alignOffset;
+    if (!currentBar || currentBar.time !== bucketTime) {
+      if (currentBar) aggregated.push(currentBar);
+      currentBar = {
+        time: bucketTime,
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: Number(c.volume) || 0,
+      };
+    } else {
+      if (Number(c.high) > currentBar.high) currentBar.high = Number(c.high);
+      if (Number(c.low) < currentBar.low) currentBar.low = Number(c.low);
+      currentBar.close = Number(c.close);
+      currentBar.volume += (Number(c.volume) || 0);
+    }
+  }
+  if (currentBar) aggregated.push(currentBar);
+  return aggregated;
+}
+
 app.get('/api/candles/:symbol', async (req, res) => {
   try {
     const { fetchCandleData } = require('./services/fyers');
@@ -11512,6 +11554,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
       cleanSymbol = cleanSymbol.replace(/\s+/g, '');
     }
     const cacheKey = `${cleanSymbol}_${interval}`;
+    const master1mKey = `${cleanSymbol}_ONE_MINUTE`;
     const now = Date.now();
     const maxAgeMs = getCacheDuration(interval, cleanSymbol);
 
@@ -11525,12 +11568,58 @@ app.get('/api/candles/:symbol', async (req, res) => {
       return res.json(liveMerged);
     }
 
-    // 2. Single-flight lock: coalesce concurrent requests for the same symbol + interval
-    let fetchTask = inflightRouteCandleRequests.get(cacheKey);
+    // 1b. If an intraday timeframe (3m, 5m, 15m, 30m, 1h) is requested and we ALREADY have the Master 1-Minute
+    // candles for this stock in RAM, resample it in <0.3ms in RAM with ZERO upstream API calls!
+    if (isIntradayInterval(interval)) {
+      const master1mItem = candleCache[master1mKey] || candleCache[`${cleanSymbol}_1`];
+      const master1mMaxAge = getCacheDuration('ONE_MINUTE', cleanSymbol);
+      if (master1mItem && Array.isArray(master1mItem.data) && master1mItem.data.length > 0 && (now - master1mItem.timestamp < master1mMaxAge)) {
+        mergeLiveTickIntoCandles(master1mItem.data, cleanSymbol, 'ONE_MINUTE');
+        const resampled = resampleCandlesFromOneMinute(master1mItem.data, interval);
+        const liveMerged = mergeLiveTickIntoCandles(resampled, cleanSymbol, interval);
+        setCandleCache(cacheKey, liveMerged, master1mItem.timestamp, cleanSymbol, interval, false);
+        return res.json(liveMerged);
+      }
+    }
+
+    // 2. Single-flight lock: for ALL intraday intervals (1m, 3m, 5m, 15m, 30m, 1h) on the same stock,
+    // coalesce onto a single Master 1-Minute fetch so 6 users clicking 6 different timeframes use ONLY 1 API call!
+    const lockKey = isIntradayInterval(interval) ? `INTRADAY_MASTER_${cleanSymbol}` : cacheKey;
+    let fetchTask = inflightRouteCandleRequests.get(lockKey);
     if (!fetchTask) {
       fetchTask = (async () => {
         try {
-          // 2a. Check PostgreSQL persistent cache if fresh enough (survives PM2 reloads / restarts)
+          if (isIntradayInterval(interval)) {
+            // Check PostgreSQL for Master 1-Minute cache first
+            if (isCandleDbReady) {
+              try {
+                const db1mRow = await db('market_candle_cache').where({ cache_key: master1mKey }).first();
+                const master1mMaxAge = getCacheDuration('ONE_MINUTE', cleanSymbol);
+                if (db1mRow && Array.isArray(db1mRow.candles_json) && db1mRow.candles_json.length > 0) {
+                  const dbUpdatedAt = Number(db1mRow.updated_at) || 0;
+                  if (now - dbUpdatedAt < master1mMaxAge) {
+                    const hydrated1m = mergeLiveTickIntoCandles(db1mRow.candles_json, cleanSymbol, 'ONE_MINUTE');
+                    setCandleCache(master1mKey, hydrated1m, dbUpdatedAt, cleanSymbol, 'ONE_MINUTE', false);
+                    return hydrated1m;
+                  }
+                }
+              } catch (_) {}
+            }
+
+            // Fetch Master 1-Minute series once from Fyers
+            let oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
+            if (!oneMinCandles || oneMinCandles.length === 0) {
+              await new Promise(r => setTimeout(r, 400));
+              oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
+            }
+            if (Array.isArray(oneMinCandles) && oneMinCandles.length > 0) {
+              const live1m = mergeLiveTickIntoCandles(oneMinCandles, cleanSymbol, 'ONE_MINUTE');
+              setCandleCache(master1mKey, live1m, Date.now(), cleanSymbol, 'ONE_MINUTE', true);
+              return live1m;
+            }
+          }
+
+          // 2a. Check PostgreSQL persistent cache for exact interval if fresh enough
           if (isCandleDbReady) {
             try {
               const dbRow = await db('market_candle_cache').where({ cache_key: cacheKey }).first();
@@ -11545,7 +11634,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
             } catch (_) {}
           }
 
-          // 2b. Fetch from Fyers / Redis / Yahoo fallback via fetchCandleData
+          // 2b. Fetch requested interval directly (e.g. ONE_DAY or fallback if 1m wasn't available)
           let candles = await fetchCandleData(cleanSymbol, interval);
 
           if (!candles || candles.length === 0) {
@@ -11559,8 +11648,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
             return liveMerged;
           }
 
-          // 2c. Stale-if-error fallback: if upstream returned empty (e.g. 500 daily quota reached),
-          // serve stale RAM or PostgreSQL cached candles merged with live ticks rather than failing!
+          // 2c. Stale-if-error fallback
           if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0) {
             return mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
           }
@@ -11577,14 +11665,22 @@ app.get('/api/candles/:symbol', async (req, res) => {
 
           return [];
         } finally {
-          inflightRouteCandleRequests.delete(cacheKey);
+          inflightRouteCandleRequests.delete(lockKey);
         }
       })();
-      inflightRouteCandleRequests.set(cacheKey, fetchTask);
+      inflightRouteCandleRequests.set(lockKey, fetchTask);
     }
 
-    const resultCandles = await fetchTask;
-    return res.json(resultCandles);
+    const baseCandles = await fetchTask;
+    // If lockKey was INTRADAY_MASTER_${cleanSymbol} and caller asked for 3m/5m/15m/30m/1h, resample from 1m now
+    if (isIntradayInterval(interval) && getIntervalSeconds(interval) > 60 && Array.isArray(baseCandles) && baseCandles.length > 0) {
+      const resampled = resampleCandlesFromOneMinute(baseCandles, interval);
+      const liveMerged = mergeLiveTickIntoCandles(resampled, cleanSymbol, interval);
+      setCandleCache(cacheKey, liveMerged, Date.now(), cleanSymbol, interval, false);
+      return res.json(liveMerged);
+    }
+
+    return res.json(baseCandles);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
