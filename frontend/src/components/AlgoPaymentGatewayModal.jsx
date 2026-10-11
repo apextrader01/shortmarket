@@ -3,7 +3,7 @@ import {
   X, ShieldCheck, CheckCircle2, CreditCard, Wallet, Lock,
   ArrowRight, AlertCircle, Sparkles, Zap, Building2, Smartphone
 } from 'lucide-react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -109,20 +109,32 @@ export default function AlgoPaymentGatewayModal({
 
     try {
       setProcessStepText('Creating encrypted Razorpay order...');
-      const orderRes = await fetch('/api/v1/bridge/razorpay/create-order', {
+      const orderPayload = {
+        plan: item?.type || 'STATIC_IP',
+        itemType: item?.type || 'STATIC_IP',
+        itemId: item?.id || item?.type || 'STATIC_IP',
+        amount: effectiveAmount,
+        title: isWalletRecharge ? `SkandX Algo Wallet Recharge (₹${effectiveAmount})` : (item?.title || 'SkandX Algo Service')
+      };
+
+      let orderRes = await fetch(`${API}/api/v1/bridge/razorpay/create-order`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          itemType: item?.type || 'STATIC_IP',
-          itemId: item?.id || item?.type || 'STATIC_IP',
-          amount: effectiveAmount,
-          title: isWalletRecharge ? `SkandX Algo Wallet Recharge (₹${effectiveAmount})` : (item?.title || 'SkandX Algo Service')
-        })
+        body: JSON.stringify(orderPayload)
       });
 
-      const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.success) {
-        throw new Error(orderData.error || 'Could not initialize Razorpay order.');
+      if (orderRes.status === 404) {
+        orderRes = await fetch(`${API}/api/payment/create-order`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(orderPayload)
+        });
+      }
+
+      const orderData = await orderRes.json().catch(() => ({}));
+      const resolvedOrderId = orderData?.order_id || orderData?.id;
+      if (!orderRes.ok || !resolvedOrderId || !orderData?.key_id) {
+        throw new Error(orderData?.error || 'Could not initialize Razorpay order.');
       }
 
       setProcessStepText('Awaiting payment confirmation in Razorpay...');
@@ -135,9 +147,10 @@ export default function AlgoPaymentGatewayModal({
         description: isWalletRecharge
           ? `Algo Wallet Top-Up • ₹${effectiveAmount}`
           : (item?.title || 'SkandX Algo Multi-Broker Service'),
-        order_id: orderData.order_id,
+        image: 'https://www.skandx.in/skandx-playstore-icon.png',
+        order_id: resolvedOrderId,
         prefill: {
-          name: user?.full_name || user?.username || '',
+          name: user?.full_name || user?.name || user?.username || '',
           email: user?.email || '',
           contact: user?.mobile || user?.phone || ''
         },
@@ -159,11 +172,11 @@ export default function AlgoPaymentGatewayModal({
             setIsProcessing(true);
             setProcessStepText('Verifying Razorpay signature & provisioning service...');
 
-            const verifyRes = await fetch('/api/v1/bridge/razorpay/verify', {
+            const verifyRes = await fetch(`${API}/api/v1/bridge/razorpay/verify`, {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
+                razorpay_order_id: response.razorpay_order_id || resolvedOrderId,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 itemType: item?.type || 'STATIC_IP',
@@ -221,7 +234,7 @@ export default function AlgoPaymentGatewayModal({
     setProcessStepText('Deducting from SkandX Algo Wallet & provisioning service...');
 
     try {
-      const res = await fetch('/api/v1/bridge/wallet/pay', {
+      const res = await fetch(`${API}/api/v1/bridge/wallet/pay`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({

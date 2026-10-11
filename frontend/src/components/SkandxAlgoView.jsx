@@ -2,7 +2,7 @@
 // 🌟 SkandX Algo Multi-Broker Demat & Bridge Suite (Per-User Authenticated + Official Razorpay Gateway)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import AlgoPaymentGatewayModal from './AlgoPaymentGatewayModal';
 import DeployAlgoModal from './DeployAlgoModal';
 import {
@@ -74,7 +74,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     };
-    const res = await fetch(url, { ...options, headers });
+    const finalUrl = url.startsWith('http') ? url : `${API}${url}`;
+    const res = await fetch(finalUrl, { ...options, headers });
     return res.json();
   }, []);
 
@@ -415,6 +416,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   const handlePaymentSuccess = (result) => {
+    if (result.stats) {
+      setConfig(prev => ({ ...prev, ...result.stats }));
+    }
     if (typeof result.newBalance === 'number') {
       setConfig(prev => ({ ...prev, availableCredit: result.newBalance }));
     } else if (result.item?.type === 'WALLET_RECHARGE') {
@@ -425,13 +429,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       setConfig(prev => ({ ...prev, activePlan: result.activePlan }));
     }
 
-    if (result.newIp) {
+    if (Array.isArray(result.staticIps)) {
+      setStaticIps(result.staticIps);
+    } else if (result.newIp) {
       setStaticIps(prev => [result.newIp, ...prev.filter(ip => ip.id !== result.newIp.id)]);
       setConfig(prev => ({
         ...prev,
         totalStaticIp: prev.totalStaticIp + 1,
         availableStaticIp: prev.availableStaticIp + 1
       }));
+    }
+
+    if (Array.isArray(result.linkedUsers)) {
+      setLinkedUsers(result.linkedUsers);
     }
 
     if (typeof result.newLinkUserSlots === 'number') {
