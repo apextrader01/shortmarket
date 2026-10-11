@@ -468,7 +468,13 @@ async function initFyers(io, pc, isMaster = true) {
     
     if (loadTokenFromDisk()) {
         if (isMaster) {
-            startLiveWebSocket();
+            // Delay initial WebSocket connect by 1200ms on PM2 startup/reload so any retiring
+            // old Master worker finishes SIGINT cleanupDataSocketInstance() before the new socket opens.
+            setTimeout(() => {
+                if (isMasterNode && !isMarketFeedPaused) {
+                    startLiveWebSocket();
+                }
+            }, 1200);
         } else {
             console.log("🔌 Loaded Fyers token for Worker instance. REST API enabled.");
         }
@@ -1690,7 +1696,8 @@ module.exports = {
     toFyersSymbol,
     fromFyersSymbol,
     purgeExpiredSubscriptions,
-    isExpiredContract
+    isExpiredContract,
+    cleanupDataSocketInstance
 };
 
 // Background task to poll mutual fund NAVs from mfapi.in

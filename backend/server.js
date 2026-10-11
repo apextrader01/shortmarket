@@ -16047,9 +16047,13 @@ server.listen(PORT, async () => {
   }
 });
 
-// Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
+// Clean shutdown handlers to instantly release port and Fyers WebSocket when PM2 restarts/stops the process
 const cleanupAndExit = () => {
   console.log('Stopping server and releasing port...');
+  try {
+    const { cleanupDataSocketInstance } = require('./services/fyers');
+    if (cleanupDataSocketInstance) cleanupDataSocketInstance();
+  } catch (e) {}
   if (server && typeof server.closeAllConnections === 'function') {
     try { server.closeAllConnections(); } catch (e) {}
   }
@@ -16060,7 +16064,7 @@ const cleanupAndExit = () => {
   setTimeout(() => {
     console.log('Forced exit.');
     process.exit(0);
-  }, 1000);
+  }, 800);
 };
 
 // Gentle periodic memory cleanup (every 10 minutes) when garbage collection is enabled
