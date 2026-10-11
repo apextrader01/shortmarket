@@ -3436,9 +3436,20 @@ async function logSubscriptionAttempt({
         if (existing.status === 'FAILED' && (status === 'CANCELLED' || status === 'INITIATED')) {
           return existing;
         }
+        const hasExplicitPlan = Boolean(plan && String(plan).trim());
+        const existingPlanUpper = String(existing.plan || '').toUpperCase();
+        const resolvedPlanToSave =
+          (existingPlanUpper.startsWith('ALGO_') && !finalPlan.startsWith('ALGO_'))
+            ? existing.plan
+            : (hasExplicitPlan ? finalPlan : (existing.plan || finalPlan));
+        const resolvedAmountToSave =
+          (amount !== undefined && amount !== null && Number(amount) > 0)
+            ? finalAmount
+            : (existing.amount !== undefined && existing.amount !== null ? Number(existing.amount) : finalAmount);
+
         const updatePayload = {
-          plan: finalPlan,
-          amount: finalAmount,
+          plan: resolvedPlanToSave,
+          amount: resolvedAmountToSave,
           status,
           updated_at: new Date()
         };
@@ -3483,9 +3494,8 @@ async function healAndSeparateSubscriptionPayments() {
       .select('id', 'plan', 'amount', 'payment_type', 'razorpay_subscription_id', 'failure_reason', 'created_at')
       .catch(() => []);
 
-    const algoLaunchCutoffMs = new Date('2026-10-11T15:50:00.000Z').getTime(); // ~9:20 PM IST on Oct 11, 2026
+    const algoLaunchCutoffMs = new Date('2026-10-11T16:00:00.000Z').getTime(); // ~9:30 PM IST on Oct 11, 2026 (when SkandX Algo Razorpay launched)
     const paperStandardAmounts = new Set([199, 1999, 2999, 9999, 24999]);
-    const algoStandardAmounts = new Set([250, 350, 500, 999, 1000, 2499, 2500, 5000]);
 
     for (const r of algoRows) {
       const amt = Math.round(Number(r.amount || 0));
@@ -3506,9 +3516,7 @@ async function healAndSeparateSubscriptionPayments() {
           pType === 'ACTIVE_SUBSCRIPTION' ||
           Boolean(r.razorpay_subscription_id) ||
           paperStandardAmounts.has(amt) ||
-          (amt > 0 && amt < 100) ||
-          (amt === 0 && pType === 'ADMIN_GRANT') ||
-          (!algoStandardAmounts.has(amt) && String(r.plan).toUpperCase() === 'ALGO_WALLET')
+          (amt === 0 && pType === 'ADMIN_GRANT')
         );
 
       if (shouldRestoreToPaper) {
@@ -3893,23 +3901,27 @@ app.post('/api/payment/report-failure', authenticateToken, async (req, res) => {
       razorpay_subscription_id,
       razorpay_payment_id,
       plan,
+      itemType,
+      amount: customAmount,
       status,
-      failure_reason
+      failure_reason,
+      error_description
     } = req.body || {};
-    const meta = resolvePlanMeta(plan);
+    const meta = resolvePlanMeta(plan || itemType);
+    const finalAmount = (customAmount && Number(customAmount) >= 1) ? Math.round(Number(customAmount)) : meta.amountInr;
     const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
     const normalizedStatus = String(status || 'FAILED').toUpperCase() === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
 
     await logSubscriptionAttempt({
       userId: req.user.id,
       plan: meta.tier,
-      amount: meta.amountInr,
+      amount: finalAmount,
       paymentType,
       status: normalizedStatus,
       razorpayOrderId: razorpay_order_id || null,
       razorpaySubscriptionId: razorpay_subscription_id || null,
       razorpayPaymentId: razorpay_payment_id || null,
-      failureReason: failure_reason || (normalizedStatus === 'CANCELLED' ? 'Checkout closed by user before completing payment' : 'Payment failed at gateway')
+      failureReason: failure_reason || error_description || (normalizedStatus === 'CANCELLED' ? 'Checkout closed by user before completing payment' : 'Payment failed at gateway')
     });
 
     res.json({ success: true });
@@ -15373,8 +15385,8 @@ app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
         id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
         time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
         timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        broker: primaryDemat ? primaryDemat.broker : (item.mode === 'PAPER' ? 'SkandX Paper OMS' : 'Primary Broker'),
-        account: primaryDemat ? primaryDemat.clientCode : (item.mode === 'PAPER' ? 'PAPER-SIM' : 'MASTER'),
+        broker: primaryDemat ? primaryDemat.broker : (item.mode === 'PAPER' ? 'SkandX Algo Simulator' : 'Primary Broker'),
+        account: primaryDemat ? primaryDemat.clientCode : (item.mode === 'PAPER' ? 'ALGO-SIM' : 'MASTER'),
         symbol: item.symbol,
         side: 'SQUARE_OFF',
         qty: item.qty || 50,
@@ -15532,8 +15544,8 @@ app.post('/api/v1/bridge/order', async (req, res) => {
       id: orderId,
       time: nowTime,
       timestamp: nowTime,
-      broker: String(payload.broker || state.demats[0]?.broker || 'SkandX Paper OMS').slice(0, 36),
-      account: String(payload.account || state.demats[0]?.clientCode || 'PAPER-SIM').slice(0, 24),
+      broker: String(payload.broker || state.demats[0]?.broker || 'SkandX Algo Simulator').slice(0, 36),
+      account: String(payload.account || state.demats[0]?.clientCode || 'ALGO-SIM').slice(0, 24),
       symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 36),
       side: String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase(),
       qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
@@ -15591,8 +15603,8 @@ app.post('/api/v1/bridge/webhook', async (req, res) => {
       id: orderId,
       time: nowTime,
       timestamp: nowTime,
-      broker: String(payload.broker || primaryDemat?.broker || 'SkandX Paper OMS').slice(0, 36),
-      account: String(payload.account || primaryDemat?.clientCode || 'PAPER-SIM').slice(0, 24),
+      broker: String(payload.broker || primaryDemat?.broker || 'SkandX Algo Simulator').slice(0, 36),
+      account: String(payload.account || primaryDemat?.clientCode || 'ALGO-SIM').slice(0, 24),
       symbol: sym,
       side: String(payload.action || payload.side || 'BUY').slice(0, 12).toUpperCase(),
       qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
@@ -16208,9 +16220,11 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       if (st && Array.isArray(st.transactions)) {
         const clientIdStr = u.client_id || `SKX-${String(u.id).padStart(4, '0')}`;
         for (const tx of st.transactions) {
-          const isSeen = (tx?.id && seenRefs.has(String(tx.id))) || (tx?.orderId && seenRefs.has(String(tx.orderId)));
-          if (tx && tx.id && !isSeen) {
-            seenRefs.add(String(tx.id));
+          const txIdStr = String(tx?.id || '');
+          const isWalletOrAdminTx = txIdStr.startsWith('WAL_') || txIdStr.startsWith('ADM_');
+          const isSeen = (txIdStr && seenRefs.has(txIdStr)) || (tx?.orderId && seenRefs.has(String(tx.orderId)));
+          if (tx && txIdStr && isWalletOrAdminTx && !isSeen) {
+            seenRefs.add(txIdStr);
             if (tx.orderId) seenRefs.add(String(tx.orderId));
             const txStatus = String(tx.status || 'SUCCESS').toUpperCase();
             payments.push({
@@ -16225,7 +16239,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
               clientId: clientIdStr,
               plan: tx.planKey || tx.itemTitle || tx.type || 'ALGO_WALLET',
               amount: Number(tx.amount || 0),
-              paymentType: String(tx.id).startsWith('WAL_') ? 'ALGO_WALLET' : (String(tx.id).startsWith('ADM_') ? 'ADMIN_GRANT' : 'RAZORPAY'),
+              paymentType: txIdStr.startsWith('WAL_') ? 'ALGO_WALLET' : 'ADMIN_GRANT',
               status: txStatus === 'REJECTED' ? 'FAILED' : txStatus,
               failureReason: tx.failureReason || (tx.method && txStatus !== 'SUCCESS' ? tx.method : null),
               createdAt: tx.createdAtIso || tx.date || new Date().toISOString()

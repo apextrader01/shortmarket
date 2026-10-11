@@ -1239,29 +1239,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </div>
           )}
 
-          {/* Open Trading Terminal Button */}
-          {onOpenPaperTrading && (
-            <button
-              onClick={onOpenPaperTrading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                border: '1px solid rgba(56, 189, 248, 0.45)',
-                color: '#fff',
-                padding: isMobile ? '5px 9px' : '6px 12px',
-                borderRadius: '6px',
-                fontSize: isMobile ? '11px' : '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Zap size={12} /> {isMobile ? 'Terminal' : 'Trading Terminal'}
-            </button>
-          )}
-
           {/* Exit / Back to Home Button (Desktop) */}
           {!isMobile && onBack && (
             <button
@@ -3779,7 +3756,38 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'AlgoAdmin' && isAdmin && (() => {
             const allAccounts = Array.isArray(adminStats?.accounts) ? adminStats.accounts : [];
-            const allPayments = Array.isArray(adminStats?.payments) ? adminStats.payments : [];
+            const paperPlans = ['MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'ELITE', 'MASTERCLASS', 'LIFETIME', 'BASIC', 'FREE', 'PRO'];
+            const paperStandardAmounts = [199, 1999, 2999, 9999, 24999];
+            const algoPlans = ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'];
+            const allPayments = (Array.isArray(adminStats?.payments) ? adminStats.payments : []).filter(item => {
+              const p = String(item.plan || '').toUpperCase().trim();
+              const amt = Math.round(Number(item.amount || 0));
+              const pType = String(item.paymentType || '').toUpperCase();
+              if (pType === 'AUTOPAY' || pType === 'ACTIVE_SUBSCRIPTION') return false;
+              if (paperStandardAmounts.includes(amt)) return false;
+              if (p.startsWith('ALGO_') || algoPlans.includes(p)) return true;
+              if (paperPlans.includes(p)) return false;
+              return true;
+            });
+
+            let algoSuccessCount = 0;
+            let algoFailedCount = 0;
+            let algoInitiatedCount = 0;
+            let algoTotalRevenue = 0;
+            for (const p of allPayments) {
+              const st = String(p.status || 'INITIATED').toUpperCase();
+              if (st === 'SUCCESS') {
+                algoSuccessCount++;
+                if (p.paymentType !== 'ADMIN_GRANT') {
+                  algoTotalRevenue += Number(p.amount || 0);
+                }
+              } else if (st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED') {
+                algoFailedCount++;
+              } else {
+                algoInitiatedCount++;
+              }
+            }
+
             const allDematsList = Array.isArray(adminStats?.allDemats) ? adminStats.allDemats : demats;
             const allIpsList = Array.isArray(adminStats?.allStaticIps) ? adminStats.allStaticIps : staticIps;
             const allOrdersList = Array.isArray(adminStats?.allOrders) ? adminStats.allOrders : orders;
@@ -3944,7 +3952,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('SUCCESS'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'SUCCESS' ? '1px solid #22c55e' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>SUCCESSFUL ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#22c55e', marginTop: '5px' }}>
-                      {adminStats?.summary?.successPaymentsCount ?? 0} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(adminStats?.summary?.algoRevenue ?? adminStats?.summary?.totalRevenue ?? 0).toLocaleString('en-IN')})</span>
+                      {algoSuccessCount} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(algoTotalRevenue).toLocaleString('en-IN')})</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '3px' }}>
                       ● Verified Algo Plans, IPs, Slots & Wallet
@@ -3954,10 +3962,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('FAILED'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'FAILED' ? '1px solid #ef4444' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>REJECTED / CANCELLED ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#ef4444', marginTop: '5px' }}>
-                      {adminStats?.summary?.failedPaymentsCount ?? 0}
+                      {algoFailedCount}
                     </div>
                     <div style={{ fontSize: '11px', color: '#f87171', marginTop: '3px' }}>
-                      ● {adminStats?.summary?.initiatedPaymentsCount ?? 0} Active Checkout Pending
+                      ● {algoInitiatedCount} Active Checkout Pending
                     </div>
                   </div>
 
@@ -4264,9 +4272,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                         {[
                           { id: 'ALL', label: `All Algo (${allPayments.length})`, color: '#38bdf8' },
-                          { id: 'SUCCESS', label: `✅ Successful (${adminStats?.summary?.successPaymentsCount ?? 0})`, color: '#22c55e' },
-                          { id: 'FAILED', label: `❌ Rejected / Cancelled (${adminStats?.summary?.failedPaymentsCount ?? 0})`, color: '#ef4444' },
-                          { id: 'INITIATED', label: `⏳ Active Checkout (${adminStats?.summary?.initiatedPaymentsCount ?? 0})`, color: '#f59e0b' }
+                          { id: 'SUCCESS', label: `✅ Successful (${algoSuccessCount})`, color: '#22c55e' },
+                          { id: 'FAILED', label: `❌ Rejected / Cancelled (${algoFailedCount})`, color: '#ef4444' },
+                          { id: 'INITIATED', label: `⏳ Active Checkout (${algoInitiatedCount})`, color: '#f59e0b' }
                         ].map(f => (
                           <button
                             key={f.id}

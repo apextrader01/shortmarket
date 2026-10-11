@@ -231,6 +231,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
               >
                 ⚡ Live Multi-Broker (Real Demat)
               </button>
+              {/* Execution Mode (Sandbox vs Live) */}
               <button
                 type="button"
                 onClick={() => setMode('PAPER')}
@@ -245,7 +246,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                   cursor: 'pointer'
                 }}
               >
-                📝 Paper Simulator (Risk-Free)
+                🧪 Sandbox Simulator (Risk-Free)
               </button>
             </div>
           </div>

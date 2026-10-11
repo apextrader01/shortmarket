@@ -2452,7 +2452,7 @@ export default function AdminDashboard() {
   const fetchAdminSubscriptions = async (syncRazorpay = false) => {
     if (syncRazorpay) setSubSyncing(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '';
+      const API_URL = API || import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
       const { startDate, endDate } = calculateDateBounds(subDatePreset, subCustomStart, subCustomEnd);
       const params = new URLSearchParams();
