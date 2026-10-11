@@ -15096,6 +15096,10 @@ app.get('/__/auth/handler', (req, res, next) => {
       } catch (e) {}
 
       // 2. Store token in same-origin storage & broadcast to any same-engine windows
+      if (state) {
+        try { sessionStorage.setItem('skandx_pending_oauth_state', state); } catch (e) {}
+        try { localStorage.setItem('skandx_pending_oauth_state', state); } catch (e) {}
+      }
       if (idToken) {
         try { sessionStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
         try { localStorage.setItem('skandx_google_id_token', idToken); } catch (e) {}
@@ -15119,7 +15123,6 @@ app.get('/__/auth/handler', (req, res, next) => {
         }
       } catch (e) {}
 
-      var isAppPrefix = state.indexOf('skx_app_') === 0 || state.indexOf('skx_pwa_') === 0 || state.indexOf('skx_cap_') === 0;
       var isCapMode = state.indexOf('skx_cap_') === 0;
       var isCurrentlyStandalone = Boolean(
         (window.matchMedia && (
@@ -15128,16 +15131,15 @@ app.get('/__/auth/handler', (req, res, next) => {
           window.matchMedia('(display-mode: minimal-ui)').matches
         )) ||
         window.navigator.standalone === true ||
-        /; wv\)|WebView|SkandXApp/i.test(navigator.userAgent || '')
+        /(; wv|WebView|SkandXApp)/i.test(navigator.userAgent || '')
       );
-      var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '');
+      var targetUrl = '/?google_oauth=1' + (idToken ? ('&id_token=' + encodeURIComponent(idToken)) : '') + (state ? ('&state=' + encodeURIComponent(state)) : '') + (oauthErr ? ('&error=' + encodeURIComponent(oauthErr)) : '');
 
       function tryCloseOrReturnToApp(mode, fromUserClick) {
-        // Always attempt to close the OAuth popup / custom tab first
-        try { window.close(); } catch (e) {}
-        try { window.open('', '_self'); window.close(); } catch (e) {}
+        if (window.opener && !window.opener.closed) {
+          try { window.close(); } catch (e) {}
+        }
 
-        // If we are ALREADY inside the standalone PWA / WebView window, navigate directly!
         if (isCurrentlyStandalone) {
           window.location.replace(targetUrl);
           return;
@@ -15159,12 +15161,7 @@ app.get('/__/auth/handler', (req, res, next) => {
           return;
         }
 
-        // External Chrome tab for an installed PWA/TWA: trigger Android Browsable Intent synchronously on user click
-        try {
-          window.location.href = 'intent://' + window.location.host + appReturnPath + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=' + encodeURIComponent(fullReturnUrl) + ';end';
-        } catch (e) {
-          window.location.replace(targetUrl);
-        }
+        window.location.replace(targetUrl);
       }
 
       function showInAppHandoverUI(mode) {
@@ -15197,17 +15194,32 @@ app.get('/__/auth/handler', (req, res, next) => {
         }
       }
 
-      if (alreadyDone && !idToken) {
-        if (isCurrentlyStandalone) {
-          window.location.replace(targetUrl);
-          return;
+      var handled = false;
+      function completeHandlerFlow(mode) {
+        if (handled) return;
+        handled = true;
+        if (window.opener && !window.opener.closed) {
+          try { window.close(); } catch (e) {}
         }
-        showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-        try { window.close(); } catch (e) {}
+        if (mode === 'cap' && !isCurrentlyStandalone) {
+          tryCloseOrReturnToApp('cap', false);
+          showInAppHandoverUI('cap');
+        } else {
+          window.location.replace(targetUrl);
+        }
+      }
+
+      if (alreadyDone && !idToken) {
+        completeHandlerFlow(isCapMode ? 'cap' : 'web');
         return;
       }
 
-      // 3. Relay id_token to backend Redis/Memory store so the waiting in-app window receives it immediately
+      // Safety fallback so the page NEVER stays stuck on "Completing Google Sign-In..." if network is slow
+      setTimeout(function() {
+        completeHandlerFlow(isCapMode ? 'cap' : 'web');
+      }, 900);
+
+      // 3. Relay id_token to backend Redis/Memory store so any waiting in-app window receives it immediately
       if (state && (idToken || oauthErr)) {
         fetch('/api/auth/google-oauth-relay', {
           method: 'POST',
@@ -15217,30 +15229,14 @@ app.get('/__/auth/handler', (req, res, next) => {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          var isInApp = Boolean(isAppPrefix || (data && data.isInApp));
-          var mode = (data && data.appMode) || (isCapMode ? 'cap' : (isInApp ? 'pwa' : 'web'));
-          if (isCurrentlyStandalone || !isInApp) {
-            window.location.replace(targetUrl);
-          } else {
-            tryCloseOrReturnToApp(mode, false);
-            showInAppHandoverUI(mode);
-          }
+          var mode = (data && data.appMode) || (isCapMode ? 'cap' : 'web');
+          completeHandlerFlow(mode);
         })
         .catch(function() {
-          if (isCurrentlyStandalone || !isAppPrefix) {
-            window.location.replace(targetUrl);
-          } else {
-            tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
-            showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-          }
+          completeHandlerFlow(isCapMode ? 'cap' : 'web');
         });
       } else {
-        if (isCurrentlyStandalone || !isAppPrefix) {
-          window.location.replace(targetUrl);
-        } else {
-          tryCloseOrReturnToApp(isCapMode ? 'cap' : 'pwa', false);
-          showInAppHandoverUI(isCapMode ? 'cap' : 'pwa');
-        }
+        completeHandlerFlow(isCapMode ? 'cap' : 'web');
       }
     })();
   </script>
