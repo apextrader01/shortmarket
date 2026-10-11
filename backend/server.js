@@ -3381,7 +3381,7 @@ function resolvePlanMeta(plan) {
   if (p === 'algo_static_ip' || p === 'static_ip') {
     return { tier: 'ALGO_STATIC_IP', amountInr: 350, label: 'Dedicated BKC Static IP (₹350/mo)' };
   }
-  if (p === 'algo_link_user' || p === 'link_user') {
+  if (p === 'algo_link_user' || p === 'algo_link_slot' || p === 'link_user') {
     return { tier: 'ALGO_LINK_USER', amountInr: 250, label: 'Linked Client Demat Slot (₹250/mo)' };
   }
   if (p === 'algo_pro' || p === 'plan_pro') {
@@ -3392,6 +3392,9 @@ function resolvePlanMeta(plan) {
   }
   if (p === 'algo_wallet' || p === 'wallet_recharge') {
     return { tier: 'ALGO_WALLET', amountInr: 500, label: 'SkandX Algo Wallet Top-Up' };
+  }
+  if (p === 'algo_addon' || p.startsWith('algo_')) {
+    return { tier: p.toUpperCase(), amountInr: 350, label: 'SkandX Algo Service' };
   }
   return { tier: 'MONTHLY', amountInr: 199, label: 'Pro Monthly (₹199/mo)' };
 }
@@ -3429,7 +3432,13 @@ async function logSubscriptionAttempt({
         if (existing.status === 'SUCCESS' && status !== 'SUCCESS') {
           return existing;
         }
+        // Do not overwrite a FAILED record with CANCELLED or INITIATED
+        if (existing.status === 'FAILED' && (status === 'CANCELLED' || status === 'INITIATED')) {
+          return existing;
+        }
         const updatePayload = {
+          plan: finalPlan,
+          amount: finalAmount,
           status,
           updated_at: new Date()
         };
@@ -15501,7 +15510,7 @@ function resolveAlgoPaymentItem(body = {}) {
     return { itemType: 'STATIC_IP', planKey: 'ALGO_STATIC_IP', amountInr: 350, title: 'Dedicated Mumbai BKC Static IP (1 Month)' };
   }
   if (itemType === 'LINK_USER') {
-    return { itemType: 'LINK_USER', planKey: 'ALGO_LINK_SLOT', amountInr: 250, title: '1 Linked Client Demat Slot (1 Month)' };
+    return { itemType: 'LINK_USER', planKey: 'ALGO_LINK_USER', amountInr: 250, title: '1 Linked Client Demat Slot (1 Month)' };
   }
   if (itemType === 'PLAN_INSTITUTIONAL' || (itemType === 'PLAN' && Number(body.amount) >= 2000)) {
     return { itemType: 'PLAN_INSTITUTIONAL', planKey: 'ALGO_INSTITUTIONAL', amountInr: 2499, title: 'Institutional Copy Trading Master Suite (1 Month)' };
@@ -15517,7 +15526,7 @@ function resolveAlgoPaymentItem(body = {}) {
   return { itemType, planKey: 'ALGO_ADDON', amountInr: fallbackAmt, title: String(body.title || 'SkandX Algo Service') };
 }
 
-function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Razorpay Secure Checkout') {
+function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Razorpay Secure Checkout', orderId = null) {
   const { itemType, amountInr, title } = resolvedItem;
   let provisionedData = {};
 
@@ -15584,11 +15593,18 @@ function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Ra
     provisionedData.activePlan = 'INSTITUTIONAL';
   }
 
+  if (orderId && Array.isArray(state.transactions)) {
+    state.transactions = state.transactions.filter(t => t && t.id !== orderId && t.orderId !== orderId);
+  }
+
   const txRecord = {
     id: txId,
+    orderId: orderId || null,
     date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    createdAtIso: new Date().toISOString(),
     type: itemType === 'WALLET_RECHARGE' ? 'CREDIT' : 'DEBIT',
     itemTitle: title,
+    planKey: resolvedItem.planKey,
     amount: amountInr,
     method: `${methodLabel} • ${title}`,
     status: 'SUCCESS'
@@ -15699,7 +15715,7 @@ app.post('/api/v1/bridge/razorpay/verify', authenticateToken, async (req, res) =
 
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified');
+    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified', razorpay_order_id);
     await saveUserBridgeState(userObj, state);
 
     await logSubscriptionAttempt({
@@ -15797,18 +15813,37 @@ app.post('/api/v1/bridge/razorpay/fail', authenticateToken, async (req, res) => 
 
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
+    const txId = razorpay_payment_id || razorpay_order_id || ('REJ_' + Math.floor(100000 + Math.random() * 900000));
     const txRecord = {
-      id: razorpay_payment_id || razorpay_order_id || ('REJ_' + Math.floor(100000 + Math.random() * 900000)),
+      id: txId,
+      orderId: razorpay_order_id || null,
       date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      createdAtIso: new Date().toISOString(),
       type: 'REJECTED',
       itemTitle: resolved.title,
+      planKey: resolved.planKey,
       amount: resolved.amountInr,
       method: `Razorpay (${finalStatus}) • ${resolved.title} — ${failReason}`,
       status: finalStatus,
       failureReason: failReason
     };
-    state.transactions.unshift(txRecord);
-    if (state.transactions.length > 50) state.transactions.pop();
+
+    const existingIdx = (state.transactions || []).findIndex(t =>
+      t && (
+        (razorpay_order_id && (t.id === razorpay_order_id || t.orderId === razorpay_order_id)) ||
+        (razorpay_payment_id && t.id === razorpay_payment_id)
+      )
+    );
+    if (existingIdx !== -1) {
+      const prevTx = state.transactions[existingIdx];
+      // Do not overwrite a FAILED or SUCCESS transaction with CANCELLED
+      if (prevTx.status !== 'SUCCESS' && !(prevTx.status === 'FAILED' && finalStatus === 'CANCELLED')) {
+        state.transactions[existingIdx] = { ...prevTx, ...txRecord };
+      }
+    } else {
+      state.transactions.unshift(txRecord);
+      if (state.transactions.length > 50) state.transactions.pop();
+    }
     await saveUserBridgeState(userObj, state);
 
     appendAlgoAuditLog(`[PAYMENT_${finalStatus}] ${userObj.email || userObj.username} • ${resolved.title} (₹${resolved.amountInr}): ${failReason}`, false);
@@ -15846,7 +15881,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     } catch (_) {}
 
     // 1b. Heal any legacy Algo orders that were logged with plan='MONTHLY' before plan separation,
-    // and auto-expire abandoned INITIATED Algo orders older than 10 minutes as CANCELLED.
+    // and resolve any INITIATED Algo orders by checking Razorpay or auto-cancelling after 2 minutes.
     try {
       await db('subscription_payments').where({ plan: 'MONTHLY', amount: 500 }).update({ plan: 'ALGO_WALLET' });
       await db('subscription_payments').where({ plan: 'MONTHLY', amount: 350 }).update({ plan: 'ALGO_STATIC_IP' });
@@ -15854,20 +15889,64 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       await db('subscription_payments').where({ plan: 'MONTHLY', amount: 999 }).update({ plan: 'ALGO_PRO' });
       await db('subscription_payments').where({ plan: 'MONTHLY', amount: 2499 }).update({ plan: 'ALGO_INSTITUTIONAL' });
 
-      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
-      await db('subscription_payments')
+      const pendingAlgoRows = await db('subscription_payments')
         .where({ status: 'INITIATED' })
-        .whereNull('razorpay_payment_id')
-        .where('created_at', '<', tenMinsAgo)
         .andWhere(builder => {
           builder.whereRaw("UPPER(COALESCE(plan, '')) LIKE 'ALGO_%'")
             .orWhereIn('plan', ['STATIC_IP', 'LINK_USER', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE']);
         })
-        .update({
-          status: 'CANCELLED',
-          failure_reason: 'Checkout dismissed or timed out before payment completion',
-          updated_at: new Date()
-        });
+        .select('*')
+        .limit(20)
+        .catch(() => []);
+
+      if (pendingAlgoRows.length > 0) {
+        let rzpClient = null;
+        try {
+          const { client, key_id, key_secret } = await getRazorpayClient();
+          if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
+            rzpClient = client;
+          }
+        } catch (_) {}
+
+        const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
+        for (const row of pendingAlgoRows) {
+          let resolvedViaRzp = false;
+          if (rzpClient && row.razorpay_order_id) {
+            try {
+              const orderPayments = await rzpClient.orders.fetchPayments(row.razorpay_order_id).catch(() => null);
+              const items = Array.isArray(orderPayments?.items) ? orderPayments.items : [];
+              const capturedPay = items.find(ip => ip.status === 'captured' || ip.status === 'authorized');
+              const failedPay = items.find(ip => ip.status === 'failed');
+              if (capturedPay) {
+                await db('subscription_payments').where({ id: row.id }).update({
+                  status: 'SUCCESS',
+                  razorpay_payment_id: capturedPay.id,
+                  failure_reason: null,
+                  updated_at: new Date()
+                });
+                resolvedViaRzp = true;
+              } else if (failedPay) {
+                await db('subscription_payments').where({ id: row.id }).update({
+                  status: 'FAILED',
+                  razorpay_payment_id: failedPay.id,
+                  failure_reason: failedPay.error_description || failedPay.error_reason || 'Payment declined at Razorpay gateway',
+                  updated_at: new Date()
+                });
+                resolvedViaRzp = true;
+              }
+            } catch (_) {}
+          }
+
+          const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+          if (!resolvedViaRzp && (!createdMs || createdMs < twoMinsAgoMs)) {
+            await db('subscription_payments').where({ id: row.id }).update({
+              status: 'CANCELLED',
+              failure_reason: 'Checkout dismissed or timed out before payment completion',
+              updated_at: new Date()
+            });
+          }
+        }
+      }
     } catch (_) {}
 
     // 2. Optional live Razorpay sync (?syncRazorpay=true)
@@ -15984,25 +16063,27 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       if (st && Array.isArray(st.transactions)) {
         const clientIdStr = u.client_id || `SKX-${String(u.id).padStart(4, '0')}`;
         for (const tx of st.transactions) {
-          if (tx && tx.id && !seenRefs.has(String(tx.id))) {
+          const isSeen = (tx?.id && seenRefs.has(String(tx.id))) || (tx?.orderId && seenRefs.has(String(tx.orderId)));
+          if (tx && tx.id && !isSeen) {
             seenRefs.add(String(tx.id));
+            if (tx.orderId) seenRefs.add(String(tx.orderId));
             const txStatus = String(tx.status || 'SUCCESS').toUpperCase();
             payments.push({
               id: tx.id,
               txRef: tx.id,
-              orderId: null,
+              orderId: tx.orderId || null,
               paymentId: tx.id,
               userId: u.id,
               username: u.username || (u.email ? u.email.split('@')[0] : `User #${u.id}`),
               email: u.email || '—',
               phone: u.phone || '—',
               clientId: clientIdStr,
-              plan: tx.itemTitle || tx.type || 'ALGO_WALLET',
+              plan: tx.planKey || tx.itemTitle || tx.type || 'ALGO_WALLET',
               amount: Number(tx.amount || 0),
               paymentType: String(tx.id).startsWith('WAL_') ? 'ALGO_WALLET' : (String(tx.id).startsWith('ADM_') ? 'ADMIN_GRANT' : 'RAZORPAY'),
               status: txStatus === 'REJECTED' ? 'FAILED' : txStatus,
               failureReason: tx.failureReason || (tx.method && txStatus !== 'SUCCESS' ? tx.method : null),
-              createdAt: tx.date || new Date().toISOString()
+              createdAt: tx.createdAtIso || tx.date || new Date().toISOString()
             });
           }
         }

@@ -432,6 +432,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       if (Array.isArray(result.transactions)) {
         setTransactions(result.transactions);
       }
+      if (isAdmin) {
+        fetchAdminStats(false);
+      }
       return;
     }
     if (result.stats) {
@@ -468,6 +471,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
     if (Array.isArray(result.transactions)) {
       setTransactions(result.transactions);
+    }
+
+    if (isAdmin) {
+      fetchAdminStats(false);
     }
 
     if (result.item?.type === 'STATIC_IP') {
@@ -3782,10 +3789,20 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               const code = String(rawPlan || '').toUpperCase().trim();
               if (code === 'ALGO_WALLET' || code === 'WALLET_RECHARGE') return 'Algo Wallet Credit Top-Up';
               if (code === 'ALGO_STATIC_IP' || code === 'STATIC_IP') return 'Dedicated BKC Static IP (₹350/mo)';
-              if (code === 'ALGO_LINK_USER' || code === 'LINK_USER') return 'Client Demat Link Slot (₹250/mo)';
+              if (code === 'ALGO_LINK_USER' || code === 'ALGO_LINK_SLOT' || code === 'LINK_USER') return 'Client Demat Link Slot (₹250/mo)';
               if (code === 'ALGO_PRO' || code === 'PLAN_PRO') return 'Pro Algo Trader Plan (₹999/mo)';
               if (code === 'ALGO_INSTITUTIONAL' || code === 'PLAN_INSTITUTIONAL') return 'Institutional Copy Master (₹2,499/mo)';
+              if (code === 'ALGO_ADDON') return 'SkandX Algo Add-On Service';
               return rawPlan || 'SkandX Algo Service';
+            };
+
+            const formatAlgoPaymentDate = (val) => {
+              if (!val) return '—';
+              const d = new Date(val);
+              if (!isNaN(d.getTime())) {
+                return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+              }
+              return String(val);
             };
 
             const filteredAccounts = allAccounts.filter(acc => {
@@ -4352,7 +4369,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     {p.failureReason || (isSuccess ? 'Razorpay Signature Verified & Algo Service Provisioned' : 'Awaiting gateway completion')}
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                                    {p.createdAt ? new Date(p.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                    {formatAlgoPaymentDate(p.createdAt)}
                                   </td>
                                 </tr>
                               );

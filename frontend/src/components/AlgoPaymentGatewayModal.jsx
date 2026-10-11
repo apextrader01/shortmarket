@@ -141,6 +141,7 @@ export default function AlgoPaymentGatewayModal({
       setProcessStepText('Awaiting payment confirmation in Razorpay...');
 
       let paymentCompleted = false;
+      let paymentFailedReported = false;
 
       const options = {
         key: orderData.key_id,
@@ -168,7 +169,7 @@ export default function AlgoPaymentGatewayModal({
           ondismiss: async () => {
             setIsProcessing(false);
             setProcessStepText('');
-            if (!paymentCompleted) {
+            if (!paymentCompleted && !paymentFailedReported) {
               try {
                 const failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
                   method: 'POST',
@@ -238,6 +239,7 @@ export default function AlgoPaymentGatewayModal({
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', async (resp) => {
+        paymentFailedReported = true;
         setIsProcessing(false);
         const failDesc = resp?.error?.description || resp?.error?.reason || 'Payment failed or was declined by the bank.';
         setErrorMsg(failDesc);
