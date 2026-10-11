@@ -11385,11 +11385,12 @@ function mergeLiveTickIntoCandles(candles, cleanSymbol, interval) {
   if (!last || !Number.isFinite(Number(last.time))) return candles;
 
   const bucketSec = getIntervalSeconds(interval);
+  const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
   const rawTsSec = livePrice.timestamp
     ? Math.floor(new Date(livePrice.timestamp).getTime() / 1000)
     : Math.floor(Date.now() / 1000);
   const tickSec = (rawTsSec > 0 ? rawTsSec : Math.floor(Date.now() / 1000)) + 19800;
-  const currentBucketTime = Math.floor(tickSec / bucketSec) * bucketSec;
+  const currentBucketTime = Math.floor((tickSec - alignOffset) / bucketSec) * bucketSec + alignOffset;
 
   // Only roll over into a new bar if the live tick timestamp is newer than the last candle
   if (currentBucketTime > last.time && (tickSec - last.time) < 7 * 86400) {
@@ -11470,9 +11471,9 @@ setInterval(() => {
   }
 }, 3600000).unref();
 
-// Smart Timeframe Cache: Since live WebSocket ticks continuously roll & update candles in RAM,
-// base historical candles stay valid for 30m–60m (intraday) or 12h (daily/after-hours),
-// protecting Fyers' 500 daily chart limit even at 1,00,000 concurrent users.
+// Smart Timeframe Cache: Since live WebSocket ticks continuously roll & update every 1m/3m/5m/15m/30m/1h
+// candle bar in RAM every 2 seconds, base historical candles stay valid for the full 6-hour trading session
+// (or 12h for daily), so clicking at a 2-minute, 15-minute, or 3-hour gap uses ZERO additional Fyers API calls!
 function getCacheDuration(interval, symbol) {
   const isCommodity = symbol && symbol.toUpperCase().includes('MCX');
 
@@ -11488,19 +11489,13 @@ function getCacheDuration(interval, symbol) {
         next9AM.setDate(next9AM.getDate() + 1);
       }
       next9AM.setHours(9, 0, 0, 0);
-      return Math.max(30 * 60 * 1000, next9AM.getTime() - istTime.getTime());
+      return Math.max(6 * 60 * 60 * 1000, next9AM.getTime() - istTime.getTime());
     }
   }
 
-  // Market-Hours Smart TTLs (live ticks keep the latest bars updated in real time in RAM)
+  // Market-Hours Smart TTLs (live WebSocket ticks continuously build & roll over new bars in RAM)
   if (interval === 'D' || interval === '1D' || interval === 'ONE_DAY') return 12 * 60 * 60 * 1000; // 12 hours
-  if (interval === '60' || interval === '1H' || interval === 'ONE_HOUR') return 60 * 60 * 1000;   // 1 hour
-  if (interval === '30' || interval === 'THIRTY_MINUTE') return 45 * 60 * 1000;                   // 45 mins
-  if (interval === '15' || interval === 'FIFTEEN_MINUTE') return 30 * 60 * 1000;                  // 30 mins
-  if (interval === '10' || interval === 'TEN_MINUTE') return 30 * 60 * 1000;                      // 30 mins
-  if (interval === '5' || interval === 'FIVE_MINUTE') return 20 * 60 * 1000;                      // 20 mins
-  if (interval === '3' || interval === 'THREE_MINUTE') return 15 * 60 * 1000;                     // 15 mins
-  return 10 * 60 * 1000; // 1-min / 2-min base history cached for 10 mins while live ticks build 1m bars in RAM
+  return 6 * 60 * 60 * 1000; // 6 hours (full trading session) — new 1m/3m/5m/15m/30m/1h bars are built in RAM from WebSocket!
 }
 
 function isIntradayInterval(interval) {
@@ -11547,11 +11542,15 @@ function resampleCandlesFromOneMinute(oneMinCandles, targetInterval) {
 
 app.get('/api/candles/:symbol', async (req, res) => {
   try {
-    const { fetchCandleData } = require('./services/fyers');
+    const { fetchCandleData, addSubscription } = require('./services/fyers');
     const interval = req.query.interval || 'ONE_DAY';
     let cleanSymbol = req.params.symbol;
     if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
       cleanSymbol = cleanSymbol.replace(/\s+/g, '');
+    }
+    // Ensure this symbol is subscribed to the Fyers WebSocket so its 1-minute candles keep building in RAM all day
+    if (typeof addSubscription === 'function') {
+      try { addSubscription(cleanSymbol); } catch (_) {}
     }
     const cacheKey = `${cleanSymbol}_${interval}`;
     const master1mKey = `${cleanSymbol}_ONE_MINUTE`;
