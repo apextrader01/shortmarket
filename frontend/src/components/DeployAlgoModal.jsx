@@ -20,7 +20,8 @@ const STRATEGY_TEMPLATES = [
   { id: 'Delta-Neutral Seller', name: 'Delta-Neutral Seller', desc: 'Theta decay harvester with automatic Greek adjustments', target: 150, sl: 60 }
 ];
 
-export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem = null }) {
+export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem = null, editingAlgo = null }) {
+  const activeEditing = editingItem || editingAlgo;
   const [symbol, setSymbol] = useState('NSE:NIFTY24OCTFUT');
   const [strategy, setStrategy] = useState('EMA 9/21 Trend Scalper');
   const [mode, setMode] = useState('LIVE');
@@ -31,15 +32,15 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
   const [autoSquareOff, setAutoSquareOff] = useState('15:15');
 
   useEffect(() => {
-    if (editingItem) {
-      setSymbol(editingItem.symbol || 'NSE:NIFTY24OCTFUT');
-      setStrategy(editingItem.algoStrategy || 'EMA 9/21 Trend Scalper');
-      setMode(editingItem.mode || 'LIVE');
-      setLots(editingItem.lots || 1);
-      setTargetPts(editingItem.targetPts || 60);
-      setSlPts(editingItem.slPts || 25);
-      setTrailingSl(editingItem.trailingSl !== false);
-      setAutoSquareOff(editingItem.autoSquareOff || '15:15');
+    if (activeEditing) {
+      setSymbol(activeEditing.symbol || 'NSE:NIFTY24OCTFUT');
+      setStrategy(activeEditing.algoStrategy || 'EMA 9/21 Trend Scalper');
+      setMode(activeEditing.mode || 'LIVE');
+      setLots(activeEditing.lots || 1);
+      setTargetPts(activeEditing.targetPts || 60);
+      setSlPts(activeEditing.slPts || 25);
+      setTrailingSl(activeEditing.trailingSl !== false);
+      setAutoSquareOff(activeEditing.autoSquareOff || '15:15');
     } else {
       setSymbol('NSE:NIFTY24OCTFUT');
       setStrategy('EMA 9/21 Trend Scalper');
@@ -50,7 +51,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
       setTrailingSl(true);
       setAutoSquareOff('15:15');
     }
-  }, [editingItem, isOpen]);
+  }, [activeEditing, isOpen]);
 
   const handleStrategyChange = (stName) => {
     setStrategy(stName);
@@ -65,13 +66,13 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
     e.preventDefault();
     const inst = POPULAR_INSTRUMENTS.find(i => i.symbol === symbol) || { ltp: 25000, lotSize: 50 };
     const newAlgo = {
-      id: editingItem?.id || ('WL-' + Math.floor(10 + Math.random() * 90)),
+      id: activeEditing?.id || ('WL-' + Math.floor(10 + Math.random() * 90)),
       symbol,
-      ltp: inst.ltp,
-      change: '+1.15%',
-      isUp: true,
-      high: inst.ltp * 1.01,
-      low: inst.ltp * 0.99,
+      ltp: activeEditing?.ltp || inst.ltp,
+      change: activeEditing?.change || '+0.42%',
+      isUp: activeEditing?.isUp !== undefined ? activeEditing.isUp : true,
+      high: activeEditing?.high || inst.ltp * 1.01,
+      low: activeEditing?.low || inst.ltp * 0.99,
       algoStrategy: strategy,
       algoActive: true,
       mode,
@@ -82,7 +83,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
       slPts: Number(slPts) || 25,
       trailingSl,
       autoSquareOff,
-      realizedPnl: editingItem?.realizedPnl || 0
+      realizedPnl: activeEditing?.realizedPnl || 0
     };
 
     onDeploy(newAlgo);
@@ -137,7 +138,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
             </div>
             <div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
-                {editingItem ? 'Configure Algo Parameters' : 'Deploy New Algo Strategy'}
+                {activeEditing ? 'Configure Algo Parameters' : 'Deploy New Algo Strategy'}
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                 Multi-Broker Execution Engine • Sub-15ms Route
@@ -328,7 +329,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 boxShadow: '0 4px 16px rgba(2, 132, 199, 0.35)'
               }}
             >
-              {editingItem ? 'Save Strategy Settings' : 'Deploy to Algo Watchlist ⚡'}
+              {activeEditing ? 'Save Strategy Settings' : 'Deploy to Algo Watchlist ⚡'}
             </button>
           </div>
         </form>

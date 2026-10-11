@@ -1,118 +1,258 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, ShieldCheck, CheckCircle2, QrCode, Smartphone, CreditCard, 
-  Wallet, Building, Lock, ArrowRight, Copy, Check, Clock, RefreshCw, AlertCircle
+import {
+  X, ShieldCheck, CheckCircle2, CreditCard, Wallet, Lock,
+  ArrowRight, AlertCircle, Sparkles, Zap, Building2, Smartphone
 } from 'lucide-react';
+import { useStore } from '../store';
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true));
+      existing.addEventListener('error', () => resolve(false));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 export default function AlgoPaymentGatewayModal({
   isOpen,
   onClose,
-  item = { type: 'STATIC_IP', title: 'Dedicated Mumbai BKC Static IP', amount: 350, subtitle: '1 Month dedicated IPv4 whitelist' },
+  item = {
+    type: 'STATIC_IP',
+    title: 'Dedicated Mumbai BKC Static IP',
+    amount: 350,
+    subtitle: '1 Month dedicated IPv4 whitelist'
+  },
   walletBalance = 0,
-  onPaymentSuccess
+  onPaymentSuccess,
+  onSuccess
 }) {
-  const [method, setMethod] = useState('UPI_QR');
-  const [upiIdInput, setUpiIdInput] = useState('');
-  const [selectedBank, setSelectedBank] = useState('HDFC');
-  const [cardData, setCardData] = useState({ number: '', expiry: '', cvv: '', name: '' });
-  const [copiedUpi, setCopiedUpi] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(599); // 10 minutes countdown
+  const user = useStore(s => s.user);
+  const isWalletRecharge = item?.type === 'WALLET_RECHARGE';
+
+  const [paymentTab, setPaymentTab] = useState('RAZORPAY'); // 'RAZORPAY' | 'WALLET'
+  const [customAmount, setCustomAmount] = useState(Number(item?.amount || 500));
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStepText, setProcessStepText] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [successTxId, setSuccessTxId] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const amount = Number(item?.amount || 0);
-  const upiAddress = 'pay@skandx.in';
-
-  // Timer countdown
-  useEffect(() => {
-    if (!isOpen || isSuccess || isProcessing) return;
-    const interval = setInterval(() => {
-      setTimeLeft(prev => (prev > 1 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isOpen, isSuccess, isProcessing]);
-
-  // Reset states on open
   useEffect(() => {
     if (isOpen) {
       setIsProcessing(false);
       setIsSuccess(false);
       setErrorMsg('');
-      setTimeLeft(599);
-      setMethod('UPI_QR');
+      setPaymentTab('RAZORPAY');
+      setCustomAmount(Number(item?.amount || 500));
+      loadRazorpayScript();
     }
-  }, [isOpen]);
+  }, [isOpen, item]);
 
   if (!isOpen) return null;
 
-  const formatTimer = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  const effectiveAmount = isWalletRecharge
+    ? Math.max(1, Number(customAmount || 0))
+    : Number(item?.amount || 0);
+
+  const notifyParent = (payload) => {
+    if (typeof onPaymentSuccess === 'function') {
+      onPaymentSuccess(payload);
+    }
+    if (typeof onSuccess === 'function' && onSuccess !== onPaymentSuccess) {
+      onSuccess(payload);
+    }
   };
 
-  const handleCopyUpi = () => {
-    navigator.clipboard.writeText(upiAddress);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 2500);
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
   };
 
-  const executePayment = async (customTxId = null) => {
+  const handleRazorpayPayment = async () => {
     setErrorMsg('');
+    if (!effectiveAmount || effectiveAmount < 1) {
+      setErrorMsg('Please enter a valid amount (minimum ₹1).');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setErrorMsg('Please sign in to your SkandX account to complete payment.');
+      return;
+    }
+
     setIsProcessing(true);
-    setProcessStepText('Connecting to Banking Payment Gateway (256-Bit SSL)...');
+    setProcessStepText('Loading Razorpay Secure Gateway...');
 
-    const generatedTxId = customTxId || ('TXN_UPI_' + Math.floor(10000000 + Math.random() * 90000000));
-
-    await new Promise(r => setTimeout(r, 1200));
-    setProcessStepText('Authorizing transaction with NPCI / Gateway...');
-
-    await new Promise(r => setTimeout(r, 1000));
-    setProcessStepText('Provisioning Algo Service & Updating Whitelist...');
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded || !window.Razorpay) {
+      setIsProcessing(false);
+      setErrorMsg('Unable to load Razorpay Checkout SDK. Please check your internet connection.');
+      return;
+    }
 
     try {
-      const res = await fetch('/api/v1/bridge/checkout', {
+      setProcessStepText('Creating encrypted Razorpay order...');
+      const orderRes = await fetch('/api/v1/bridge/razorpay/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          itemType: item.type,
-          itemId: item.id || item.type,
-          amount: amount,
-          paymentMethod: method,
-          transactionRef: generatedTxId
+          itemType: item?.type || 'STATIC_IP',
+          itemId: item?.id || item?.type || 'STATIC_IP',
+          amount: effectiveAmount,
+          title: isWalletRecharge ? `SkandX Algo Wallet Recharge (₹${effectiveAmount})` : (item?.title || 'SkandX Algo Service')
         })
       });
-      const data = await res.json();
-      
-      await new Promise(r => setTimeout(r, 800));
-      setIsProcessing(false);
-      setIsSuccess(true);
-      setSuccessTxId(generatedTxId);
 
-      if (onPaymentSuccess) {
-        onPaymentSuccess({
-          ...data,
-          transactionId: generatedTxId,
-          amount,
-          item
-        });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Could not initialize Razorpay order.');
       }
+
+      setProcessStepText('Awaiting payment confirmation in Razorpay...');
+
+      const options = {
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: orderData.currency || 'INR',
+        name: 'SkandX Algo Hub',
+        description: isWalletRecharge
+          ? `Algo Wallet Top-Up • ₹${effectiveAmount}`
+          : (item?.title || 'SkandX Algo Multi-Broker Service'),
+        order_id: orderData.order_id,
+        prefill: {
+          name: user?.full_name || user?.username || '',
+          email: user?.email || '',
+          contact: user?.mobile || user?.phone || ''
+        },
+        notes: {
+          item_type: item?.type || 'STATIC_IP',
+          client_id: user?.client_id || ''
+        },
+        theme: {
+          color: '#0284c7'
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
+            setProcessStepText('');
+          }
+        },
+        handler: async (response) => {
+          try {
+            setIsProcessing(true);
+            setProcessStepText('Verifying Razorpay signature & provisioning service...');
+
+            const verifyRes = await fetch('/api/v1/bridge/razorpay/verify', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                itemType: item?.type || 'STATIC_IP',
+                itemId: item?.id || item?.type || 'STATIC_IP',
+                amount: effectiveAmount,
+                title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.success) {
+              throw new Error(verifyData.error || 'Payment signature verification failed.');
+            }
+
+            setIsProcessing(false);
+            setIsSuccess(true);
+            setSuccessTxId(response.razorpay_payment_id || verifyData.transactionId);
+
+            notifyParent({
+              ...verifyData,
+              transactionId: response.razorpay_payment_id || verifyData.transactionId,
+              amount: effectiveAmount,
+              item: {
+                ...item,
+                amount: effectiveAmount
+              }
+            });
+          } catch (verifyErr) {
+            setIsProcessing(false);
+            setErrorMsg(verifyErr.message || 'Verification failed. Contact support with your payment ID.');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (resp) => {
+        setIsProcessing(false);
+        setErrorMsg(resp?.error?.description || 'Payment failed or was declined by the bank.');
+      });
+      rzp.open();
     } catch (err) {
       setIsProcessing(false);
-      // Fallback local success simulation so user experience is smooth even in offline dev mode
-      setIsSuccess(true);
-      setSuccessTxId(generatedTxId);
-      if (onPaymentSuccess) {
-        onPaymentSuccess({
-          success: true,
-          transactionId: generatedTxId,
-          amount,
-          item
-        });
+      setErrorMsg(err.message || 'Unable to connect to Razorpay gateway.');
+    }
+  };
+
+  const handleWalletPayment = async () => {
+    setErrorMsg('');
+    if (walletBalance < effectiveAmount) {
+      setErrorMsg(`Insufficient Algo Wallet credit. Please recharge or pay via Razorpay.`);
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessStepText('Deducting from SkandX Algo Wallet & provisioning service...');
+
+    try {
+      const res = await fetch('/api/v1/bridge/wallet/pay', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          itemType: item?.type,
+          itemId: item?.id || item?.type,
+          amount: effectiveAmount,
+          title: item?.title
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Wallet payment could not be completed.');
       }
+
+      setIsProcessing(false);
+      setIsSuccess(true);
+      setSuccessTxId(data.transactionId);
+
+      notifyParent({
+        ...data,
+        transactionId: data.transactionId,
+        amount: effectiveAmount,
+        item: {
+          ...item,
+          amount: effectiveAmount
+        }
+      });
+    } catch (err) {
+      setIsProcessing(false);
+      setErrorMsg(err.message || 'Wallet payment failed.');
     }
   };
 
@@ -131,12 +271,12 @@ export default function AlgoPaymentGatewayModal({
     }}>
       <div style={{
         background: '#0d1322',
-        border: '1px solid rgba(56, 189, 248, 0.25)',
+        border: '1px solid rgba(56, 189, 248, 0.28)',
         borderRadius: '18px',
         width: '100%',
-        maxWidth: '540px',
+        maxWidth: '520px',
         color: '#f8fafc',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.1)',
+        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.12)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column'
@@ -152,8 +292,8 @@ export default function AlgoPaymentGatewayModal({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '34px',
+              height: '34px',
               borderRadius: '8px',
               background: 'linear-gradient(135deg, #0284c7, #2563eb)',
               display: 'flex',
@@ -164,16 +304,19 @@ export default function AlgoPaymentGatewayModal({
               <ShieldCheck size={18} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', letterSpacing: '0.3px' }}>
-                SkandX Algo Secure Gateway
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>SkandX × Razorpay Checkout</span>
+                <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
+                  LIVE GATEWAY
+                </span>
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Lock size={10} color="#10b981" /> 256-Bit SSL Encrypted • Instant Provisioning
+                <Lock size={10} color="#10b981" /> Official Razorpay 256-Bit PCI-DSS • Instant Activation
               </div>
             </div>
           </div>
 
-          {!isProcessing && !isSuccess && (
+          {!isProcessing && (
             <button
               onClick={onClose}
               style={{
@@ -197,7 +340,7 @@ export default function AlgoPaymentGatewayModal({
         {/* Content Body */}
         {isSuccess ? (
           /* ── SUCCESS STATE ── */
-          <div style={{ padding: '36px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
             <div style={{
               width: '68px',
               height: '68px',
@@ -208,18 +351,17 @@ export default function AlgoPaymentGatewayModal({
               alignItems: 'center',
               justifyContent: 'center',
               color: '#22c55e',
-              boxShadow: '0 0 25px rgba(34, 197, 94, 0.35)',
-              animation: 'bounce 0.5s ease'
+              boxShadow: '0 0 25px rgba(34, 197, 94, 0.35)'
             }}>
               <CheckCircle2 size={38} />
             </div>
 
             <div>
               <h3 style={{ margin: '0 0 6px', fontSize: '20px', fontWeight: '900', color: '#fff' }}>
-                Payment Successful!
+                Payment Verified & Activated!
               </h3>
               <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>
-                Your order has been verified and provisioned immediately.
+                Your transaction has been verified via Razorpay and provisioned on your account.
               </p>
             </div>
 
@@ -237,20 +379,20 @@ export default function AlgoPaymentGatewayModal({
               gap: '8px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Item Provisioned:</span>
-                <span style={{ color: '#f8fafc', fontWeight: '700' }}>{item.title}</span>
+                <span style={{ color: '#64748b' }}>Service Provisioned:</span>
+                <span style={{ color: '#f8fafc', fontWeight: '700' }}>{item?.title}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Amount Paid:</span>
-                <span style={{ color: '#22c55e', fontWeight: '800' }}>₹{amount.toLocaleString('en-IN')}</span>
+                <span style={{ color: '#22c55e', fontWeight: '800' }}>₹{effectiveAmount.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Transaction Ref:</span>
+                <span style={{ color: '#64748b' }}>Payment Reference:</span>
                 <span style={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: '700' }}>{successTxId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Status:</span>
-                <span style={{ color: '#10b981', fontWeight: '800' }}>ACTIVATED (LIVE)</span>
+                <span style={{ color: '#10b981', fontWeight: '800' }}>VERIFIED & ACTIVE</span>
               </div>
             </div>
 
@@ -269,15 +411,15 @@ export default function AlgoPaymentGatewayModal({
                 boxShadow: '0 4px 16px rgba(34, 197, 94, 0.3)'
               }}
             >
-              Done & Return to Terminal
+              Done & Return to Algo Hub
             </button>
           </div>
         ) : isProcessing ? (
           /* ── PROCESSING STATE ── */
-          <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <div style={{ padding: '44px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '54px',
+              height: '54px',
               borderRadius: '50%',
               border: '3px solid rgba(56, 189, 248, 0.2)',
               borderTopColor: '#38bdf8',
@@ -285,13 +427,13 @@ export default function AlgoPaymentGatewayModal({
             }} />
             <div>
               <h4 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: '800', color: '#fff' }}>
-                Processing Secure Payment
+                Connecting to Razorpay Gateway
               </h4>
               <p style={{ margin: 0, fontSize: '13px', color: '#38bdf8' }}>
                 {processStepText}
               </p>
               <div style={{ fontSize: '11px', color: '#64748b', marginTop: '12px' }}>
-                Please do not close this window or hit back...
+                Complete the payment inside the official Razorpay window...
               </div>
             </div>
           </div>
@@ -300,7 +442,7 @@ export default function AlgoPaymentGatewayModal({
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Item Order Summary Card */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(15, 23, 42, 0.8))',
+              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(15, 23, 42, 0.85))',
               border: '1px solid rgba(56, 189, 248, 0.25)',
               borderRadius: '12px',
               padding: '14px 16px',
@@ -311,365 +453,230 @@ export default function AlgoPaymentGatewayModal({
             }}>
               <div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>
-                  {item.title}
+                  {item?.title}
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
-                  {item.subtitle || 'Algo Multi-Broker Suite Service'}
+                  {item?.subtitle || 'SkandX Algo Multi-Broker Suite Service'}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '18px', fontWeight: '900', color: '#38bdf8' }}>
-                  ₹{amount.toLocaleString('en-IN')}
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#38bdf8' }}>
+                  ₹{effectiveAmount.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#64748b' }}>Incl. All Taxes & GST</div>
+                <div style={{ fontSize: '10.5px', color: '#64748b' }}>Incl. GST</div>
               </div>
             </div>
 
-            {/* Payment Method Selector Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-              {[
-                { id: 'UPI_QR', label: 'UPI QR', icon: QrCode },
-                { id: 'UPI_ID', label: 'UPI App', icon: Smartphone },
-                { id: 'NETBANKING', label: 'NetBank', icon: Building },
-                { id: 'CARDS', label: 'Cards', icon: CreditCard },
-                { id: 'WALLET', label: 'Wallet', icon: Wallet }
-              ].map(tab => {
-                const Icon = tab.icon;
-                const isActive = method === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setMethod(tab.id)}
-                    style={{
-                      background: isActive ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isActive ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '8px',
-                      padding: '8px 4px',
-                      color: isActive ? '#38bdf8' : '#94a3b8',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: isActive ? '800' : '600'
-                    }}
-                  >
-                    <Icon size={16} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Method Details Pane */}
-            <div style={{
-              background: '#090d16',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '12px',
-              padding: '16px'
-            }}>
-              {/* TAB 1: UPI QR SCAN */}
-              {method === 'UPI_QR' && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '4px 10px', borderRadius: '20px' }}>
-                    <Clock size={12} /> QR Valid for: <b>{formatTimer(timeLeft)}</b>
-                  </div>
-
-                  {/* QR Code Container */}
-                  <div style={{
-                    background: '#ffffff',
-                    padding: '12px',
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}>
-                    {/* SVG generated dynamic UPI QR code */}
-                    <svg width="160" height="160" viewBox="0 0 200 200" style={{ display: 'block' }}>
-                      <rect width="200" height="200" fill="#ffffff" />
-                      {/* Top Left Marker */}
-                      <rect x="20" y="20" width="45" height="45" fill="#0f172a" rx="4" />
-                      <rect x="27" y="27" width="31" height="31" fill="#ffffff" rx="2" />
-                      <rect x="34" y="34" width="17" height="17" fill="#0284c7" rx="2" />
-                      {/* Top Right Marker */}
-                      <rect x="135" y="20" width="45" height="45" fill="#0f172a" rx="4" />
-                      <rect x="142" y="27" width="31" height="31" fill="#ffffff" rx="2" />
-                      <rect x="149" y="34" width="17" height="17" fill="#0284c7" rx="2" />
-                      {/* Bottom Left Marker */}
-                      <rect x="20" y="135" width="45" height="45" fill="#0f172a" rx="4" />
-                      <rect x="27" y="142" width="31" height="31" fill="#ffffff" rx="2" />
-                      <rect x="34" y="149" width="17" height="17" fill="#0284c7" rx="2" />
-                      {/* Center Decorative Grid pattern */}
-                      <rect x="75" y="25" width="10" height="10" fill="#0f172a" />
-                      <rect x="95" y="35" width="12" height="12" fill="#0f172a" />
-                      <rect x="115" y="25" width="10" height="10" fill="#0f172a" />
-                      <rect x="85" y="65" width="30" height="30" fill="#0284c7" rx="6" />
-                      <rect x="35" y="75" width="10" height="10" fill="#0f172a" />
-                      <rect x="55" y="95" width="10" height="10" fill="#0f172a" />
-                      <rect x="135" y="75" width="10" height="10" fill="#0f172a" />
-                      <rect x="155" y="95" width="10" height="10" fill="#0f172a" />
-                      <rect x="75" y="115" width="12" height="12" fill="#0f172a" />
-                      <rect x="95" y="115" width="12" height="12" fill="#0f172a" />
-                      <rect x="115" y="115" width="12" height="12" fill="#0f172a" />
-                      <rect x="75" y="145" width="15" height="15" fill="#0f172a" />
-                      <rect x="105" y="145" width="15" height="15" fill="#0f172a" />
-                      <rect x="135" y="145" width="15" height="15" fill="#0f172a" />
-                      <rect x="165" y="145" width="15" height="15" fill="#0f172a" />
-                      <text x="100" y="85" fontSize="11" fontWeight="bold" fill="#ffffff" textAnchor="middle" dominantBaseline="middle">₹</text>
-                    </svg>
-                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a', marginTop: '6px' }}>
-                      Scan with Any UPI App
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#94a3b8' }}>
-                    <span>UPI ID: <b>{upiAddress}</b></span>
+            {/* If Wallet Recharge, allow quick amount presets or custom input */}
+            {isWalletRecharge && (
+              <div style={{
+                background: '#090d16',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '14px'
+              }}>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
+                  Select or Enter Recharge Amount (₹)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                  {[250, 500, 1000, 2500, 5000].map(preset => (
                     <button
-                      onClick={handleCopyUpi}
+                      key={preset}
+                      type="button"
+                      onClick={() => setCustomAmount(preset)}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: 'none',
-                        color: copiedUpi ? '#22c55e' : '#38bdf8',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
+                        padding: '8px 4px',
+                        borderRadius: '8px',
+                        border: Number(customAmount) === preset ? '1px solid #38bdf8' : '1px solid #1e293b',
+                        background: Number(customAmount) === preset ? 'rgba(56, 189, 248, 0.18)' : '#121826',
+                        color: Number(customAmount) === preset ? '#38bdf8' : '#cbd5e1',
+                        fontWeight: '800',
+                        fontSize: '12px',
+                        cursor: 'pointer'
                       }}
                     >
-                      {copiedUpi ? <Check size={12} /> : <Copy size={12} />}
-                      {copiedUpi ? 'Copied' : 'Copy'}
+                      ₹{preset}
                     </button>
-                  </div>
-
-                  <div style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    Supported: Google Pay • PhonePe • Paytm • BHIM • CRED UPI
-                  </div>
-
-                  <button
-                    onClick={() => executePayment()}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13.5px',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 16px rgba(2, 132, 199, 0.35)'
-                    }}
-                  >
-                    I Have Scanned & Paid ₹{amount} <ArrowRight size={16} />
-                  </button>
+                  ))}
                 </div>
-              )}
-
-              {/* TAB 2: UPI ID INPUT */}
-              {method === 'UPI_ID' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <label style={{ fontSize: '12px', color: '#94a3b8' }}>Enter Your VPA / UPI ID</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. yourname@okhdfcbank"
-                    value={upiIdInput}
-                    onChange={e => setUpiIdInput(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      background: '#121826',
-                      border: '1px solid #1e293b',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {['@okhdfcbank', '@okaxis', '@ybl', '@paytm', '@ibl'].map(handle => (
-                      <button
-                        key={handle}
-                        type="button"
-                        onClick={() => {
-                          const base = upiIdInput.split('@')[0] || 'trader';
-                          setUpiIdInput(`${base}${handle}`);
-                        }}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          color: '#cbd5e1',
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {handle}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => executePayment()}
-                    style={{
-                      width: '100%',
-                      marginTop: '8px',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13.5px',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Request Payment to App
-                  </button>
-                </div>
-              )}
-
-              {/* TAB 3: NETBANKING */}
-              {method === 'NETBANKING' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>Select Popular Bank</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    {['HDFC', 'ICICI', 'SBI', 'Axis', 'Kotak', 'Other Banks'].map(bank => (
-                      <button
-                        key={bank}
-                        type="button"
-                        onClick={() => setSelectedBank(bank)}
-                        style={{
-                          padding: '10px',
-                          background: selectedBank === bank ? 'rgba(56, 189, 248, 0.15)' : '#121826',
-                          border: `1px solid ${selectedBank === bank ? '#38bdf8' : '#1e293b'}`,
-                          borderRadius: '8px',
-                          color: selectedBank === bank ? '#38bdf8' : '#cbd5e1',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {bank} Bank
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => executePayment()}
-                    style={{
-                      width: '100%',
-                      marginTop: '8px',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13.5px',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Proceed to {selectedBank} NetBanking
-                  </button>
-                </div>
-              )}
-
-              {/* TAB 4: CARDS */}
-              {method === 'CARDS' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px', color: '#64748b' }}>Card Number</label>
-                    <input
-                      type="text"
-                      placeholder="4111 2222 3333 4444"
-                      value={cardData.number}
-                      onChange={e => setCardData(prev => ({ ...prev, number: e.target.value }))}
-                      style={{ width: '100%', padding: '9px 12px', background: '#121826', border: '1px solid #1e293b', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>Expiry (MM/YY)</label>
-                      <input
-                        type="text"
-                        placeholder="12/28"
-                        value={cardData.expiry}
-                        onChange={e => setCardData(prev => ({ ...prev, expiry: e.target.value }))}
-                        style={{ width: '100%', padding: '9px 12px', background: '#121826', border: '1px solid #1e293b', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>CVV</label>
-                      <input
-                        type="password"
-                        placeholder="•••"
-                        maxLength="4"
-                        value={cardData.cvv}
-                        onChange={e => setCardData(prev => ({ ...prev, cvv: e.target.value }))}
-                        style={{ width: '100%', padding: '9px 12px', background: '#121826', border: '1px solid #1e293b', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => executePayment()}
-                    style={{
-                      width: '100%',
-                      marginTop: '6px',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13.5px',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Pay ₹{amount} via Secure Card
-                  </button>
-                </div>
-              )}
-
-              {/* TAB 5: ALGO WALLET */}
-              {method === 'WALLET' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'center' }}>
-                  <div style={{
+                <input
+                  type="number"
+                  min="1"
+                  max="500000"
+                  value={customAmount}
+                  onChange={e => setCustomAmount(e.target.value)}
+                  placeholder="Enter custom amount in ₹"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
                     background: '#121826',
                     border: '1px solid #1e293b',
-                    borderRadius: '10px',
-                    padding: '14px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Available Wallet Credit:</span>
-                    <span style={{ fontSize: '16px', fontWeight: '900', color: walletBalance >= amount ? '#22c55e' : '#ef4444' }}>
-                      ₹{walletBalance.toFixed(2)}
-                    </span>
-                  </div>
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            )}
 
-                  {walletBalance < amount ? (
-                    <div style={{ fontSize: '12px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px' }}>
-                      Insufficient balance (Short of ₹{(amount - walletBalance).toFixed(2)}). Please choose Instant UPI QR or Card above.
+            {/* Payment Source Selector (Razorpay vs Algo Wallet for non-recharge items) */}
+            {!isWalletRecharge && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setPaymentTab('RAZORPAY'); setErrorMsg(''); }}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: paymentTab === 'RAZORPAY' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.03)',
+                    border: paymentTab === 'RAZORPAY' ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: paymentTab === 'RAZORPAY' ? '#38bdf8' : '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: '800',
+                    fontSize: '12.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <CreditCard size={16} /> Razorpay Gateway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPaymentTab('WALLET'); setErrorMsg(''); }}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: paymentTab === 'WALLET' ? 'rgba(34, 197, 94, 0.16)' : 'rgba(255, 255, 255, 0.03)',
+                    border: paymentTab === 'WALLET' ? '1px solid #22c55e' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: paymentTab === 'WALLET' ? '#22c55e' : '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: '800',
+                    fontSize: '12.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Wallet size={16} /> Algo Wallet (₹{Number(walletBalance || 0).toFixed(0)})
+                </button>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                color: '#f87171',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {/* Payment Details Box */}
+            {paymentTab === 'RAZORPAY' || isWalletRecharge ? (
+              <div style={{
+                background: '#090d16',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  <div style={{ background: '#111827', border: '1px solid #1e293b', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                    <Smartphone size={16} color="#38bdf8" style={{ marginBottom: '4px' }} />
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#e2e8f0' }}>UPI & QR</div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>GPay, PhonePe, Paytm</div>
+                  </div>
+                  <div style={{ background: '#111827', border: '1px solid #1e293b', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                    <CreditCard size={16} color="#818cf8" style={{ marginBottom: '4px' }} />
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#e2e8f0' }}>Cards</div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>Visa, RuPay, Master</div>
+                  </div>
+                  <div style={{ background: '#111827', border: '1px solid #1e293b', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                    <Building2 size={16} color="#10b981" style={{ marginBottom: '4px' }} />
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#e2e8f0' }}>NetBanking</div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>HDFC, ICICI, SBI +50</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRazorpayPayment}
+                  style={{
+                    width: '100%',
+                    padding: '13px 16px',
+                    background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 6px 20px rgba(2, 132, 199, 0.35)'
+                  }}
+                >
+                  <Zap size={16} /> Pay ₹{effectiveAmount.toLocaleString('en-IN')} with Razorpay <ArrowRight size={16} />
+                </button>
+
+                <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
+                  Verified by Razorpay HMAC-SHA256 Signature • Instant Automated Provisioning
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: '#090d16',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{
+                  background: '#111827',
+                  border: '1px solid #1e293b',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Available Algo Wallet Credit:</span>
+                  <span style={{ fontSize: '16px', fontWeight: '900', color: walletBalance >= effectiveAmount ? '#22c55e' : '#ef4444' }}>
+                    ₹{Number(walletBalance || 0).toFixed(2)}
+                  </span>
+                </div>
+
+                {walletBalance < effectiveAmount ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '12px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                      Wallet balance is short by ₹{(effectiveAmount - walletBalance).toFixed(2)}. Pay directly via Razorpay instead.
                     </div>
-                  ) : (
                     <button
-                      onClick={() => executePayment()}
+                      type="button"
+                      onClick={() => setPaymentTab('RAZORPAY')}
                       style={{
                         width: '100%',
                         padding: '12px',
-                        background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                        background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '10px',
@@ -678,12 +685,31 @@ export default function AlgoPaymentGatewayModal({
                         cursor: 'pointer'
                       }}
                     >
-                      Deduct ₹{amount} from Wallet & Activate
+                      Switch to Razorpay Checkout
                     </button>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleWalletPayment}
+                    style={{
+                      width: '100%',
+                      padding: '13px',
+                      background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 16px rgba(34, 197, 94, 0.3)'
+                    }}
+                  >
+                    Deduct ₹{effectiveAmount.toLocaleString('en-IN')} from Wallet & Activate
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

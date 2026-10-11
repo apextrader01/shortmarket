@@ -1,18 +1,17 @@
 // frontend/src/components/SkandxAlgoView.jsx
-// 🌟 SkandX Algo Multi-Broker Demat & Bridge Suite (Full-Page Institutional Platform)
+// 🌟 SkandX Algo Multi-Broker Demat & Bridge Suite (Per-User Authenticated + Official Razorpay Gateway)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import AlgoPaymentGatewayModal from './AlgoPaymentGatewayModal';
 import DeployAlgoModal from './DeployAlgoModal';
-import { 
-  X, Layers, ShieldCheck, Zap, Copy, RefreshCw, Send, CheckCircle2, 
-  AlertTriangle, Users, Cpu, Server, Wifi, ExternalLink, Globe, 
-  Clock, CreditCard, ChevronRight, Check, Sliders, Play, Code, MessageCircle,
-  Folder, Bookmark, ShoppingBag, FileText, ArrowRight, Activity, Plus,
-  Trash2, Power, Eye, EyeOff, Search, Settings, ShieldAlert, ArrowUpRight,
-  ArrowLeft, QrCode, Smartphone, Wallet, Lock, DollarSign, TrendingUp,
-  BarChart2, Award, Terminal
+import {
+  X, Layers, ShieldCheck, Zap, Copy, RefreshCw, Send, CheckCircle2,
+  AlertTriangle, Users, Cpu, Server, Wifi, Globe,
+  Clock, CreditCard, Check, Sliders, Code,
+  Folder, Bookmark, ShoppingBag, Activity, Plus,
+  Trash2, Power, ShieldAlert,
+  ArrowLeft, Wallet, Lock
 } from 'lucide-react';
 
 const resolveAlgoTab = (tab) => {
@@ -31,8 +30,15 @@ const resolveAlgoTab = (tab) => {
 };
 
 export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading }) {
+  const user = useStore(state => state.user);
+  const marketStocks = useStore(state => state.stocks);
+  const isAdmin = Boolean(user?.is_admin);
+
   // Active Navigation Tab
-  const [activeMenu, setActiveMenu] = useState(() => resolveAlgoTab(initialTab));
+  const [activeMenu, setActiveMenu] = useState(() => {
+    const resolved = resolveAlgoTab(initialTab);
+    return resolved === 'AlgoAdmin' && !isAdmin ? 'Dashboard' : resolved;
+  });
   const [toastMsg, setToastMsg] = useState('');
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
 
@@ -44,21 +50,49 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
   useEffect(() => {
     if (initialTab) {
-      setActiveMenu(resolveAlgoTab(initialTab));
+      const resolved = resolveAlgoTab(initialTab);
+      setActiveMenu(resolved === 'AlgoAdmin' && !isAdmin ? 'Dashboard' : resolved);
     }
-  }, [initialTab]);
+  }, [initialTab, isAdmin]);
 
-  // ── Global Bridge State ──────────────────────────────────────────────────
+  // Prevent non-admin users from ever staying on AlgoAdmin
+  useEffect(() => {
+    if (activeMenu === 'AlgoAdmin' && !isAdmin) {
+      setActiveMenu('Dashboard');
+    }
+  }, [activeMenu, isAdmin]);
+
+  const showToast = useCallback((msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3500);
+  }, []);
+
+  const apiFetch = useCallback(async (url, options = {}) => {
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    };
+    const res = await fetch(url, { ...options, headers });
+    return res.json();
+  }, []);
+
+  // ── Per-User Isolated Bridge State ───────────────────────────────────────
+  const defaultTokenSuffix = (user?.client_id || user?.username || 'trader').toLowerCase().replace(/[^a-z0-9]/g, '');
   const [config, setConfig] = useState({
     allowConnectAccount: true,
     allowPurchaseIp: true,
-    connectionToken: 'skandx_broker_demat_9433',
-    availableCredit: 3500.00,
-    totalDemat: 3,
+    connectionToken: `skandx_demat_${defaultTokenSuffix || 'live'}`,
+    webhookSecret: `SKANDX_WH_${(defaultTokenSuffix || 'LIVE').toUpperCase()}`,
+    availableCredit: 0.00,
+    activePlan: 'STARTER',
+    totalLinkSlots: 1,
+    totalDemat: 0,
     disconnectedDemat: 0,
-    expiredDemat: 2,
-    totalStaticIp: 4,
-    availableStaticIp: 2
+    expiredDemat: 0,
+    totalStaticIp: 0,
+    availableStaticIp: 0
   });
 
   const [platformFeatures, setPlatformFeatures] = useState({
@@ -68,190 +102,34 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     customBridge: true
   });
 
-  // Demat Accounts Store
-  const [demats, setDemats] = useState([
-    {
-      id: 'ACC-01',
-      broker: 'Zerodha Kite Connect',
-      brokerKey: 'zerodha',
-      clientCode: 'ZER-6641',
-      name: 'Hari Primary',
-      apiKey: 'kite_live_94a382b',
-      status: 'EXPIRED',
-      tradingActive: true,
-      ip: '103.212.120.45',
-      lastLogin: 'Today, 08:30 AM',
-      expiresIn: 'Expired (Requires Daily TOTP Auth)',
-      segment: 'Equity, F&O, Currency'
-    },
-    {
-      id: 'ACC-02',
-      broker: 'Angel One SmartAPI',
-      brokerKey: 'angel',
-      clientCode: 'ANG-9012',
-      name: 'Hari Alpha Hedge',
-      apiKey: 'smartapi_a89bc2',
-      status: 'EXPIRED',
-      tradingActive: true,
-      ip: '103.212.120.46',
-      lastLogin: 'Yesterday, 03:20 PM',
-      expiresIn: 'Expired (TOTP Re-auth required)',
-      segment: 'Futures & Options'
-    },
-    {
-      id: 'ACC-03',
-      broker: 'Upstox Pro API v2',
-      brokerKey: 'upstox',
-      clientCode: 'UPS-5501',
-      name: 'Momentum Scalper',
-      apiKey: 'upstox_live_7718',
-      status: 'ACTIVE',
-      tradingActive: true,
-      ip: '103.212.120.45',
-      lastLogin: 'Today, 09:15 AM',
-      expiresIn: 'Active (Valid 14h)',
-      segment: 'NSE Equities'
-    }
-  ]);
-
-  // Static IPs Store
-  const [staticIps, setStaticIps] = useState([
-    {
-      id: 'IP-01',
-      ip: '103.212.120.45',
-      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-      status: 'WHITELISTED',
-      latency: '1.8 ms',
-      assignedTo: 'ZER-6641 (Zerodha), UPS-5501 (Upstox)',
-      port: '8080 (SOCKS5/HTTP)',
-      expiresAt: '30 Days Remaining'
-    },
-    {
-      id: 'IP-02',
-      ip: '103.212.120.46',
-      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-      status: 'WHITELISTED',
-      latency: '2.1 ms',
-      assignedTo: 'ANG-9012 (Angel One)',
-      port: '8080 (SOCKS5/HTTP)',
-      expiresAt: '28 Days Remaining'
-    },
-    {
-      id: 'IP-03',
-      ip: '103.212.120.47',
-      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-      status: 'AVAILABLE',
-      latency: '1.9 ms',
-      assignedTo: 'Unassigned (Ready for Demat)',
-      port: '8080 (SOCKS5/HTTP)',
-      expiresAt: 'Dedicated Pool'
-    },
-    {
-      id: 'IP-04',
-      ip: '103.212.120.121',
-      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-      status: 'AVAILABLE',
-      latency: '2.5 ms',
-      assignedTo: 'Unassigned (Dedicated Pool)',
-      port: '8080 (SOCKS5/HTTP)',
-      expiresAt: 'Dedicated Pool'
-    }
-  ]);
-
-  // Linked Users Store
-  const [linkedUsers, setLinkedUsers] = useState([
-    {
-      id: 'LNK-101',
-      clientName: 'Rajesh Kumar',
-      email: 'rajesh.k@gmail.com',
-      broker: 'Zerodha Kite',
-      clientCode: 'RK7821',
-      connectedAt: '02 Oct 2026, 11:40 AM',
-      status: 'CONNECTED',
-      allowTrading: true,
-      copyRatio: '1.0x'
-    },
-    {
-      id: 'LNK-102',
-      clientName: 'Priya Sharma',
-      email: 'priya.invests@outlook.com',
-      broker: 'Groww Demat',
-      clientCode: 'GW5540',
-      connectedAt: '03 Oct 2026, 02:15 PM',
-      status: 'CONNECTED',
-      allowTrading: true,
-      copyRatio: '0.5x'
-    },
-    {
-      id: 'LNK-103',
-      clientName: 'Vikram Patel',
-      email: 'vikram.p@yahoo.in',
-      broker: 'Angel One',
-      clientCode: 'VP9912',
-      connectedAt: '03 Oct 2026, 05:30 PM',
-      status: 'PENDING_REAUTH',
-      allowTrading: false,
-      copyRatio: '1.0x'
-    }
-  ]);
-
-  // Watchlist Store
+  const [demats, setDemats] = useState([]);
+  const [staticIps, setStaticIps] = useState([]);
+  const [linkedUsers, setLinkedUsers] = useState([]);
   const [watchlist, setWatchlist] = useState([
-    { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend', algoActive: true },
-    { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3', algoActive: true },
-    { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Reversion', algoActive: false },
-    { id: 'WL-04', symbol: 'NSE:HDFCBANK', ltp: 1682.10, change: '+14.60 (+0.88%)', isUp: true, high: 1690.00, low: 1665.00, algoStrategy: 'Breakout 15M', algoActive: true },
-    { id: 'WL-05', symbol: 'MCX:GOLD26OCTFUT', ltp: 76450.00, change: '+180.00 (+0.24%)', isUp: true, high: 76600.00, low: 76220.00, algoStrategy: 'ATR Volatility', algoActive: false }
+    { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend Scalper', algoActive: true, mode: 'PAPER', status: 'WAITING_TRIGGER', lots: 1, qty: 75, targetPts: 60, slPts: 25, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
+    { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3 Breakout', algoActive: true, mode: 'PAPER', status: 'WAITING_TRIGGER', lots: 1, qty: 15, targetPts: 80, slPts: 35, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
+    { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Mean Reversion', algoActive: false, mode: 'PAPER', status: 'PAUSED', lots: 1, qty: 10, targetPts: 25, slPts: 12, trailingSl: false, autoSquareOff: '15:15', realizedPnl: 0 }
   ]);
-
-  // Copy Group Store
   const [copyGroup, setCopyGroup] = useState({
     groupName: 'SkandX High-Alpha Mirror Group',
-    masterAccount: 'ZER-6641',
-    status: 'ACTIVE',
+    masterAccount: 'UNASSIGNED',
+    status: 'PAUSED',
     maxLossLimit: 15000,
-    followers: [
-      { id: 'FOL-01', accountCode: 'ANG-9012', broker: 'Angel One', multiplier: 1.0, maxRiskPerTrade: 3000, status: 'ACTIVE' },
-      { id: 'FOL-02', accountCode: 'UPS-5501', broker: 'Upstox', multiplier: 0.5, maxRiskPerTrade: 1500, status: 'ACTIVE' }
-    ]
+    followers: []
+  });
+  const [orders, setOrders] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [telegramConfig, setTelegramConfig] = useState({
+    chatId: '',
+    botUsername: '@SkandXAlgoBot',
+    connected: false,
+    notifyFills: true,
+    notifyRejections: true,
+    notifyCopyTrades: true,
+    notifyDailyPnl: true
   });
 
-  // Orders Store
-  const [orders, setOrders] = useState([
-    {
-      id: 'BO-98210',
-      time: '09:25 AM',
-      broker: 'Zerodha Kite',
-      account: 'ZER-6641',
-      symbol: 'NSE:NIFTY24OCTFUT',
-      side: 'BUY',
-      qty: 50,
-      price: '₹24,890.50',
-      status: 'COMPLETED',
-      source: 'TradingView Webhook'
-    },
-    {
-      id: 'BO-98209',
-      time: '09:18 AM',
-      broker: 'Angel One',
-      account: 'ANG-9012',
-      symbol: 'NSE:BANKNIFTY24OCTFUT',
-      side: 'SELL',
-      qty: 15,
-      price: '₹51,220.00',
-      status: 'COMPLETED',
-      source: 'TradingView Webhook'
-    }
-  ]);
-
-  // Wallet Transaction History
-  const [transactions, setTransactions] = useState([
-    { id: 'TX-901', date: '04 Oct 2026, 07:15 AM', type: 'CREDIT', amount: 3500.00, method: 'UPI Instant (GPay)', status: 'SUCCESS' },
-    { id: 'TX-900', date: '01 Oct 2026, 09:30 AM', type: 'DEBIT', amount: 499.00, method: 'Static IP Mumbai BKC Lease', status: 'SUCCESS' }
-  ]);
-
-  // Modals inside Full-Page Console
-  const user = useStore(state => state.user);
+  // Modals
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutItem, setCheckoutItem] = useState({
     type: 'STATIC_IP',
@@ -266,16 +144,20 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [adminStats, setAdminStats] = useState(null);
   const [loadingAdminStats, setLoadingAdminStats] = useState(false);
 
+  // Demat & Order Modals
   const [showAddDematModal, setShowAddDematModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedStockForOrder, setSelectedStockForOrder] = useState(null);
   const [orderSide, setOrderSide] = useState('BUY');
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [orderTargetDemat, setOrderTargetDemat] = useState('ALL');
+  const [orderQty, setOrderQty] = useState(50);
+  const [orderType, setOrderType] = useState('MARKET');
+  const [orderTargetPts, setOrderTargetPts] = useState(80);
+  const [orderSlPts, setOrderSlPts] = useState(40);
+
   const [showReauthModal, setShowReauthModal] = useState(false);
   const [accountToReauth, setAccountToReauth] = useState(null);
   const [totpCode, setTotpCode] = useState('');
-  const [customRechargeAmount, setCustomRechargeAmount] = useState('1000');
-  const [rechargePaymentMethod, setRechargePaymentMethod] = useState('UPI');
 
   // Add Demat Form State
   const [newBroker, setNewBroker] = useState('Zerodha Kite Connect');
@@ -283,7 +165,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [newAccountName, setNewAccountName] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
   const [newApiSecret, setNewApiSecret] = useState('');
-  const [newIp, setNewIp] = useState('103.212.120.45');
+  const [newIp, setNewIp] = useState('Shared NSE Gateway (Default)');
+
+  // Link Client Modal State
+  const [showAddLinkUserModal, setShowAddLinkUserModal] = useState(false);
+  const [newLinkClientName, setNewLinkClientName] = useState('');
+  const [newLinkEmail, setNewLinkEmail] = useState('');
+  const [newLinkBroker, setNewLinkBroker] = useState('Zerodha Kite');
+  const [newLinkClientCode, setNewLinkClientCode] = useState('');
+  const [newLinkCopyRatio, setNewLinkCopyRatio] = useState('1.0x');
+
+  // Group Copy Add Follower Modal State
+  const [showAddFollowerModal, setShowAddFollowerModal] = useState(false);
+  const [newFollowerBroker, setNewFollowerBroker] = useState('Angel One');
+  const [newFollowerCode, setNewFollowerCode] = useState('');
+  const [newFollowerMultiplier, setNewFollowerMultiplier] = useState(1.0);
+  const [newFollowerMaxRisk, setNewFollowerMaxRisk] = useState(3000);
+
+  // Static IP Binding Selection Map
+  const [ipBindSelection, setIpBindSelection] = useState({});
 
   // Watchlist Search / Add
   const [searchSymbol, setSearchSymbol] = useState('');
@@ -297,30 +197,54 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [whTarget, setWhTarget] = useState(100);
   const [whSl, setWhSl] = useState(50);
 
-  // Sync state from server on mount
+  // Fetch per-user state from backend on mount and when logged-in user changes
+  const fetchBridgeState = useCallback(async () => {
+    try {
+      const d = await apiFetch('/api/v1/bridge/all');
+      if (d && d.success) {
+        if (d.stats) setConfig(prev => ({ ...prev, ...d.stats }));
+        if (d.platformFeatures) setPlatformFeatures(prev => ({ ...prev, ...d.platformFeatures }));
+        if (Array.isArray(d.demats)) setDemats(d.demats);
+        if (Array.isArray(d.staticIps)) setStaticIps(d.staticIps);
+        if (Array.isArray(d.linkedUsers)) setLinkedUsers(d.linkedUsers);
+        if (Array.isArray(d.watchlist)) setWatchlist(d.watchlist);
+        if (d.copyGroups) setCopyGroup(d.copyGroups);
+        if (Array.isArray(d.orders)) setOrders(d.orders);
+        if (Array.isArray(d.transactions)) setTransactions(d.transactions);
+        if (d.telegram) setTelegramConfig(prev => ({ ...prev, ...d.telegram }));
+      }
+    } catch (_) {}
+  }, [apiFetch]);
+
   useEffect(() => {
-    fetch('/api/v1/bridge/all')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) {
-          if (d.stats) setConfig(d.stats);
-          if (d.demats) setDemats(d.demats);
-          if (d.staticIps) setStaticIps(d.staticIps);
-          if (d.linkedUsers) setLinkedUsers(d.linkedUsers);
-          if (d.watchlist) setWatchlist(d.watchlist);
-          if (d.copyGroups) setCopyGroup(d.copyGroups);
-          if (d.orders) setOrders(d.orders);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    fetchBridgeState();
+  }, [fetchBridgeState, user?.id]);
 
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3500);
-  };
+  // Sync live market LTP into watchlist items when marketStocks updates
+  useEffect(() => {
+    if (!Array.isArray(marketStocks) || marketStocks.length === 0) return;
+    setWatchlist(prev => prev.map(w => {
+      const rawSym = String(w.symbol || '').split(':').pop().replace(/\d+OCTFUT|\d+NOVFUT|\d+DECFUT/i, '');
+      const matched = marketStocks.find(s => {
+        const sSym = String(s.symbol || '').toUpperCase();
+        return sSym === rawSym || (rawSym === 'NIFTY' && sSym.includes('NIFTY 50')) || (rawSym === 'BANKNIFTY' && sSym.includes('BANK'));
+      });
+      if (matched && Number(matched.price) > 0) {
+        const price = Number(matched.price);
+        const pct = Number(matched.changePercent || matched.change || 0);
+        const isUp = pct >= 0;
+        return {
+          ...w,
+          ltp: price,
+          isUp,
+          change: `${isUp ? '+' : ''}${pct.toFixed(2)}%`
+        };
+      }
+      return w;
+    }));
+  }, [marketStocks]);
 
-  const shareUrl = `https://skandx.in/connect-demat?ref=${config.connectionToken}`;
+  const shareUrl = `https://www.skandx.in/algo?tab=LinkUser&ref=${config.connectionToken}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -328,15 +252,41 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   const handleRegenerateToken = async () => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/regenerate-token', { method: 'POST' });
+      if (data.success && data.token) {
+        setConfig(prev => ({ ...prev, connectionToken: data.token }));
+        showToast('Regenerated new Demat connection link!');
+        return;
+      }
+    } catch (_) {}
     const newToken = 'skandx_demat_' + Math.random().toString(36).substring(2, 9);
     setConfig(prev => ({ ...prev, connectionToken: newToken }));
     showToast('Regenerated new Demat connection link!');
+  };
+
+  const handleUpdateBridgeSettings = async (nextConfigPatch = {}, nextFeaturesPatch = {}) => {
+    const updatedConfig = { ...config, ...nextConfigPatch };
+    const updatedFeatures = { ...platformFeatures, ...nextFeaturesPatch };
+    setConfig(updatedConfig);
+    setPlatformFeatures(updatedFeatures);
     try {
-      await fetch('/api/v1/bridge/regenerate-token', { method: 'POST' });
+      await apiFetch('/api/v1/bridge/settings/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          allowConnectAccount: updatedConfig.allowConnectAccount,
+          allowPurchaseIp: updatedConfig.allowPurchaseIp,
+          platformFeatures: updatedFeatures
+        })
+      });
     } catch (_) {}
   };
 
   const handleRenewAllAccounts = async () => {
+    if (demats.length === 0) {
+      showToast('No Demat accounts connected yet. Click "Connect New Demat" first.');
+      return;
+    }
     setDemats(prev => prev.map(a => ({
       ...a,
       status: 'ACTIVE',
@@ -344,9 +294,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       lastLogin: 'Just now'
     })));
     setConfig(prev => ({ ...prev, expiredDemat: 0 }));
-    showToast('All connected Demat sessions successfully renewed!');
+    showToast('All connected Demat sessions renewed!');
     try {
-      await fetch('/api/v1/bridge/renew-demat', { method: 'POST' });
+      await apiFetch('/api/v1/bridge/renew-demat', { method: 'POST' });
     } catch (_) {}
   };
 
@@ -358,6 +308,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
   const handleConfirmReauth = async () => {
     if (!accountToReauth) return;
+    if (!totpCode || totpCode.trim().length < 4) {
+      showToast('Please enter a valid TOTP code from your authenticator app.');
+      return;
+    }
     setDemats(prev => prev.map(a => a.id === accountToReauth.id ? {
       ...a,
       status: 'ACTIVE',
@@ -368,16 +322,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     setShowReauthModal(false);
     showToast(`Session authenticated for ${accountToReauth.broker} (${accountToReauth.clientCode})!`);
     try {
-      await fetch(`/api/v1/bridge/demats/${accountToReauth.id}/renew`, { method: 'POST' });
+      await apiFetch(`/api/v1/bridge/demats/${accountToReauth.id}/renew`, { method: 'POST' });
     } catch (_) {}
   };
 
   const handleToggleTrade = async (id) => {
-    setDemats(prev => prev.map(a => a.id === id ? { ...a, tradingActive: !a.tradingActive } : a));
     const target = demats.find(a => a.id === id);
+    setDemats(prev => prev.map(a => a.id === id ? { ...a, tradingActive: !a.tradingActive } : a));
     showToast(`Algo execution ${!target?.tradingActive ? 'ENABLED' : 'DISABLED'} for ${target?.clientCode}`);
     try {
-      await fetch(`/api/v1/bridge/demats/${id}/toggle-trade`, { method: 'POST' });
+      await apiFetch(`/api/v1/bridge/demats/${id}/toggle-trade`, { method: 'POST' });
     } catch (_) {}
   };
 
@@ -387,7 +341,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     setConfig(prev => ({ ...prev, totalDemat: Math.max(0, prev.totalDemat - 1) }));
     showToast('Demat account disconnected.');
     try {
-      await fetch(`/api/v1/bridge/demats/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/v1/bridge/demats/${id}`, { method: 'DELETE' });
     } catch (_) {}
   };
 
@@ -397,163 +351,49 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       showToast('Please enter Client ID / UCC');
       return;
     }
-    const newAcc = {
-      id: 'ACC-' + Math.floor(10 + Math.random() * 90),
+    const payload = {
       broker: newBroker,
-      brokerKey: newBroker.toLowerCase().includes('angel') ? 'angel' : 'zerodha',
-      clientCode: newClientCode.toUpperCase(),
-      name: newAccountName || `${newClientCode} Trading A/C`,
-      apiKey: newApiKey || 'kite_' + Math.random().toString(36).substring(2, 8),
-      status: 'ACTIVE',
-      tradingActive: true,
-      ip: newIp,
-      lastLogin: 'Just now',
-      expiresIn: 'Active (Valid 24h)',
+      clientCode: newClientCode.toUpperCase().trim(),
+      name: newAccountName.trim() || `${newClientCode.toUpperCase().trim()} Trading A/C`,
+      apiKey: newApiKey.trim() || ('api_' + Math.random().toString(36).substring(2, 8)),
+      ip: newIp || 'Shared NSE Gateway (Default)',
       segment: 'Equity, F&O, Currency'
     };
 
-    setDemats(prev => [newAcc, ...prev]);
-    setConfig(prev => ({ ...prev, totalDemat: prev.totalDemat + 1 }));
+    try {
+      const data = await apiFetch('/api/v1/bridge/demats', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (data.success && data.demats) {
+        setDemats(data.demats);
+        setConfig(prev => ({ ...prev, totalDemat: data.demats.length }));
+      } else {
+        setDemats(prev => [{ id: 'ACC-' + Date.now(), status: 'ACTIVE', tradingActive: true, lastLogin: 'Just now', expiresIn: 'Active (Valid 24h)', ...payload }, ...prev]);
+      }
+    } catch (_) {}
+
     setShowAddDematModal(false);
     setNewClientCode('');
     setNewAccountName('');
     setNewApiKey('');
     setNewApiSecret('');
-    showToast(`Connected ${newAcc.broker} (${newAcc.clientCode}) successfully!`);
-
-    try {
-      await fetch('/api/v1/bridge/demats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAcc)
-      });
-    } catch (_) {}
+    showToast(`Connected ${payload.broker} (${payload.clientCode})!`);
   };
 
+  // ── Razorpay Checkout Triggers ───────────────────────────────────────────
   const handleOpenCheckout = (item) => {
     setCheckoutItem(item);
     setShowCheckoutModal(true);
   };
 
-  const handlePaymentSuccess = (result) => {
-    if (result.item?.type === 'STATIC_IP') {
-      const octet = Math.floor(50 + Math.random() * 150);
-      const newStaticIp = {
-        id: 'IP-0' + (staticIps.length + 1),
-        ip: `103.212.120.${octet}`,
-        datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-        status: 'WHITELISTED',
-        latency: '1.8 ms',
-        assignedTo: 'Unassigned (Ready for Demat)',
-        port: '8080 (SOCKS5/HTTP)',
-        expiresAt: '30 Days Remaining'
-      };
-      setStaticIps(prev => [newStaticIp, ...prev]);
-      setConfig(prev => ({
-        ...prev,
-        totalStaticIp: prev.totalStaticIp + 1,
-        availableStaticIp: prev.availableStaticIp + 1
-      }));
-      showToast('⚡ Dedicated Mumbai BKC Static IP (₹350/mo) activated!');
-    } else if (result.item?.type === 'LINK_USER') {
-      setConfig(prev => ({
-        ...prev,
-        totalLinkSlots: (prev.totalLinkSlots || 5) + 1
-      }));
-      showToast('👥 Linked Client Demat Slot (₹250/mo) activated!');
-    } else if (result.item?.type === 'WALLET_RECHARGE') {
-      setConfig(prev => ({
-        ...prev,
-        availableCredit: prev.availableCredit + result.amount
-      }));
-      showToast(`₹${result.amount.toLocaleString('en-IN')} added to Wallet!`);
-    } else if (result.item?.type === 'PLAN') {
-      showToast(`🎉 Subscribed to ${result.item.title}!`);
-    }
-
-    const tx = {
-      id: result.transactionId || ('TX-' + Math.floor(100 + Math.random() * 900)),
-      date: 'Just now',
-      type: result.item?.type === 'WALLET_RECHARGE' ? 'CREDIT' : 'DEBIT',
-      amount: result.amount,
-      method: 'Online Payment Gateway',
-      status: 'SUCCESS'
-    };
-    setTransactions(prev => [tx, ...prev]);
-  };
-
-  const handleDeployAlgo = (newAlgo) => {
-    setWatchlist(prev => {
-      const idx = prev.findIndex(w => w.id === newAlgo.id);
-      if (idx !== -1) {
-        const next = [...prev];
-        next[idx] = newAlgo;
-        return next;
-      }
-      return [newAlgo, ...prev];
+  const handleOpenAddFundsRazorpay = () => {
+    handleOpenCheckout({
+      type: 'WALLET_RECHARGE',
+      title: 'SkandX Algo Wallet Top-Up',
+      amount: 500,
+      subtitle: 'Instant credit via Razorpay Official Gateway (UPI, QR, Cards, NetBanking)'
     });
-    showToast(`Deployed ${newAlgo.symbol} with ${newAlgo.algoStrategy}!`);
-    try {
-      fetch('/api/v1/bridge/watchlist/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAlgo)
-      });
-    } catch (_) {}
-  };
-
-  const handleToggleWatchlistAlgo = async (id) => {
-    setWatchlist(prev => prev.map(w => {
-      if (w.id === id) {
-        const nextActive = !w.algoActive;
-        return {
-          ...w,
-          algoActive: nextActive,
-          status: nextActive ? 'WAITING_TRIGGER' : 'PAUSED'
-        };
-      }
-      return w;
-    }));
-    const target = watchlist.find(w => w.id === id);
-    showToast(`Algo strategy ${!target?.algoActive ? 'STARTED' : 'PAUSED'} for ${target?.symbol}`);
-    try {
-      await fetch(`/api/v1/bridge/watchlist/${id}/toggle`, { method: 'POST' });
-    } catch (_) {}
-  };
-
-  const handleSquareOffWatchlistAlgo = async (id) => {
-    const target = watchlist.find(w => w.id === id);
-    if (!target) return;
-    setWatchlist(prev => prev.map(w => w.id === id ? { ...w, status: 'WAITING_TRIGGER' } : w));
-    const exitOrder = {
-      id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: 'Zerodha Kite',
-      account: 'ZER-6641',
-      symbol: target.symbol,
-      side: 'SQUARE_OFF',
-      qty: target.qty || 50,
-      price: `₹${target.ltp?.toFixed(2) || '0.00'}`,
-      status: 'COMPLETED',
-      source: '1-Click Algo Position Exit'
-    };
-    setOrders(prev => [exitOrder, ...prev]);
-    showToast(`Position squared off for ${target.symbol}!`);
-    try {
-      await fetch(`/api/v1/bridge/watchlist/${id}/square-off`, { method: 'POST' });
-    } catch (_) {}
-  };
-
-  const fetchAdminStats = async () => {
-    setLoadingAdminStats(true);
-    try {
-      const res = await fetch('/api/v1/bridge/admin/system-stats');
-      const data = await res.json();
-      if (data.success) {
-        setAdminStats(data);
-      }
-    } catch (_) {}
-    setLoadingAdminStats(false);
   };
 
   const handlePurchaseStaticIp = () => {
@@ -574,6 +414,462 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     });
   };
 
+  const handlePaymentSuccess = (result) => {
+    if (typeof result.newBalance === 'number') {
+      setConfig(prev => ({ ...prev, availableCredit: result.newBalance }));
+    } else if (result.item?.type === 'WALLET_RECHARGE') {
+      setConfig(prev => ({ ...prev, availableCredit: prev.availableCredit + Number(result.amount || 0) }));
+    }
+
+    if (result.activePlan) {
+      setConfig(prev => ({ ...prev, activePlan: result.activePlan }));
+    }
+
+    if (result.newIp) {
+      setStaticIps(prev => [result.newIp, ...prev.filter(ip => ip.id !== result.newIp.id)]);
+      setConfig(prev => ({
+        ...prev,
+        totalStaticIp: prev.totalStaticIp + 1,
+        availableStaticIp: prev.availableStaticIp + 1
+      }));
+    }
+
+    if (typeof result.newLinkUserSlots === 'number') {
+      setConfig(prev => ({ ...prev, totalLinkSlots: result.newLinkUserSlots }));
+    }
+
+    if (Array.isArray(result.transactions)) {
+      setTransactions(result.transactions);
+    }
+
+    if (result.item?.type === 'STATIC_IP') {
+      showToast('⚡ Dedicated Mumbai BKC Static IP (₹350/mo) provisioned via Razorpay!');
+    } else if (result.item?.type === 'LINK_USER') {
+      showToast('👥 Linked Client Demat Slot (₹250/mo) activated via Razorpay!');
+    } else if (result.item?.type === 'WALLET_RECHARGE') {
+      showToast(`💰 ₹${Number(result.amount || 0).toLocaleString('en-IN')} added to your SkandX Algo Wallet!`);
+    } else if (String(result.item?.type || '').startsWith('PLAN')) {
+      showToast(`🎉 Upgraded to ${result.item?.title || result.activePlan}!`);
+    }
+  };
+
+  const handleBindStaticIp = async (ipId) => {
+    const selectedDematId = ipBindSelection[ipId];
+    if (!selectedDematId) {
+      showToast('Please select a Demat account to bind this IP.');
+      return;
+    }
+    try {
+      const data = await apiFetch(`/api/v1/bridge/ips/${ipId}/bind`, {
+        method: 'POST',
+        body: JSON.stringify({ dematId: selectedDematId })
+      });
+      if (data.success) {
+        if (data.staticIps) setStaticIps(data.staticIps);
+        if (data.demats) setDemats(data.demats);
+        showToast(selectedDematId === 'UNASSIGNED' ? 'Static IP unbound and returned to pool.' : 'Static IP bound to Demat account!');
+      }
+    } catch (_) {
+      showToast('Failed to bind Static IP.');
+    }
+  };
+
+  // ── Link Users Handlers ──────────────────────────────────────────────────
+  const handleAddLinkUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!newLinkClientName.trim() || !newLinkClientCode.trim()) {
+      showToast('Please enter Client Name and Broker UCC.');
+      return;
+    }
+    try {
+      const data = await apiFetch('/api/v1/bridge/link-users/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientName: newLinkClientName.trim(),
+          email: newLinkEmail.trim(),
+          broker: newLinkBroker,
+          clientCode: newLinkClientCode.toUpperCase().trim(),
+          copyRatio: newLinkCopyRatio
+        })
+      });
+      if (!data.success) {
+        showToast(data.error || 'Slot limit reached. Purchase an additional Client Slot (₹250/mo).');
+        setShowAddLinkUserModal(false);
+        handlePurchaseLinkSlot();
+        return;
+      }
+      if (data.linkedUsers) setLinkedUsers(data.linkedUsers);
+      setShowAddLinkUserModal(false);
+      setNewLinkClientName('');
+      setNewLinkEmail('');
+      setNewLinkClientCode('');
+      showToast(`Linked client ${newLinkClientName.trim()} (${newLinkClientCode.toUpperCase().trim()})!`);
+    } catch (_) {
+      showToast('Could not link client account.');
+    }
+  };
+
+  const handleUpdateLinkedUser = async (id, patch) => {
+    setLinkedUsers(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u));
+    try {
+      await apiFetch(`/api/v1/bridge/link-users/${id}/update`, {
+        method: 'POST',
+        body: JSON.stringify(patch)
+      });
+      showToast('Updated client copy settings.');
+    } catch (_) {}
+  };
+
+  const handleRevokeLinkedUser = async (u) => {
+    if (!window.confirm(`Revoke Demat link access for ${u.clientName} (${u.clientCode})?`)) return;
+    setLinkedUsers(prev => prev.filter(lu => lu.id !== u.id));
+    showToast(`Revoked access for ${u.clientName}`);
+    try {
+      await apiFetch(`/api/v1/bridge/link-users/${u.id}`, { method: 'DELETE' });
+    } catch (_) {}
+  };
+
+  // ── Watchlist & Strategy Handlers ────────────────────────────────────────
+  const handleDeployAlgo = async (newAlgo) => {
+    const isExisting = watchlist.some(w => w.id === newAlgo.id);
+    setWatchlist(prev => {
+      const idx = prev.findIndex(w => w.id === newAlgo.id);
+      if (idx !== -1) {
+        const next = [...prev];
+        next[idx] = newAlgo;
+        return next;
+      }
+      return [newAlgo, ...prev];
+    });
+    showToast(`${isExisting ? 'Updated' : 'Deployed'} ${newAlgo.symbol} (${newAlgo.algoStrategy})!`);
+    try {
+      if (isExisting) {
+        await apiFetch(`/api/v1/bridge/watchlist/${newAlgo.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(newAlgo)
+        });
+      } else {
+        await apiFetch('/api/v1/bridge/watchlist/add', {
+          method: 'POST',
+          body: JSON.stringify(newAlgo)
+        });
+      }
+    } catch (_) {}
+  };
+
+  const handleToggleWatchlistAlgo = async (id) => {
+    const target = watchlist.find(w => w.id === id);
+    setWatchlist(prev => prev.map(w => {
+      if (w.id === id) {
+        const nextActive = !w.algoActive;
+        return {
+          ...w,
+          algoActive: nextActive,
+          status: nextActive ? 'WAITING_TRIGGER' : 'PAUSED'
+        };
+      }
+      return w;
+    }));
+    showToast(`Algo strategy ${!target?.algoActive ? 'STARTED' : 'PAUSED'} for ${target?.symbol}`);
+    try {
+      await apiFetch(`/api/v1/bridge/watchlist/${id}/toggle`, { method: 'POST' });
+    } catch (_) {}
+  };
+
+  const handleSquareOffWatchlistAlgo = async (id) => {
+    const target = watchlist.find(w => w.id === id);
+    if (!target) return;
+    try {
+      const data = await apiFetch(`/api/v1/bridge/watchlist/${id}/square-off`, { method: 'POST' });
+      if (data.success) {
+        if (data.watchlist) setWatchlist(data.watchlist);
+        if (data.orders) setOrders(data.orders);
+        showToast(`Position squared off for ${target.symbol}!`);
+        return;
+      }
+    } catch (_) {}
+    setWatchlist(prev => prev.map(w => w.id === id ? { ...w, status: 'WAITING_TRIGGER' } : w));
+    showToast(`Position squared off for ${target.symbol}!`);
+  };
+
+  const handleAddWatchlist = async () => {
+    if (!searchSymbol.trim()) return;
+    const cleanSym = searchSymbol.trim().toUpperCase();
+    const fullSym = cleanSym.includes(':') ? cleanSym : `NSE:${cleanSym}`;
+    const newItem = {
+      id: 'WL-' + Math.floor(100 + Math.random() * 900),
+      symbol: fullSym,
+      ltp: 2450.00,
+      change: '+0.62%',
+      isUp: true,
+      high: 2480.00,
+      low: 2420.00,
+      algoStrategy: 'EMA 9/21 Trend Scalper',
+      algoActive: true,
+      mode: 'PAPER',
+      status: 'WAITING_TRIGGER',
+      lots: 1,
+      qty: 50,
+      targetPts: 60,
+      slPts: 30,
+      trailingSl: true,
+      autoSquareOff: '15:15',
+      realizedPnl: 0
+    };
+    setWatchlist(prev => [newItem, ...prev]);
+    setSearchSymbol('');
+    showToast(`Added ${newItem.symbol} to Algo Watchlist!`);
+    try {
+      await apiFetch('/api/v1/bridge/watchlist/add', {
+        method: 'POST',
+        body: JSON.stringify(newItem)
+      });
+    } catch (_) {}
+  };
+
+  const handleDeleteWatchlist = async (id) => {
+    setWatchlist(prev => prev.filter(w => w.id !== id));
+    showToast('Strategy removed from Watchlist.');
+    try {
+      await apiFetch(`/api/v1/bridge/watchlist/${id}`, { method: 'DELETE' });
+    } catch (_) {}
+  };
+
+  const handleOpenPlaceOrder = (stock, side) => {
+    setSelectedStockForOrder(stock);
+    setOrderSide(side);
+    setOrderQty(stock?.qty || 50);
+    setOrderTargetPts(stock?.targetPts || 80);
+    setOrderSlPts(stock?.slPts || 40);
+    setOrderType('MARKET');
+    setOrderTargetDemat(demats[0]?.id || 'ALL');
+    setShowOrderModal(true);
+  };
+
+  const handleExecuteOrderSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedStockForOrder) return;
+    const chosenDemat = demats.find(d => d.id === orderTargetDemat);
+    const payload = {
+      broker: chosenDemat ? chosenDemat.broker : (demats[0]?.broker || 'Paper OMS Simulator'),
+      account: chosenDemat ? chosenDemat.clientCode : (demats[0]?.clientCode || 'PAPER-SIM'),
+      symbol: selectedStockForOrder.symbol,
+      side: orderSide,
+      qty: Number(orderQty) || 50,
+      orderType,
+      targetPts: Number(orderTargetPts) || 80,
+      slPts: Number(orderSlPts) || 40,
+      price: `₹${(selectedStockForOrder.ltp || 25000).toFixed(2)}`,
+      source: 'Manual Algo Execution'
+    };
+
+    try {
+      const data = await apiFetch('/api/v1/bridge/order', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (data.success && data.orders) {
+        setOrders(data.orders);
+      }
+    } catch (_) {}
+
+    setShowOrderModal(false);
+    showToast(`Order Executed: ${orderSide} ${payload.qty} ${payload.symbol} @ ${payload.price}!`);
+  };
+
+  // ── Copy Group Handlers ──────────────────────────────────────────────────
+  const handleUpdateCopyGroup = async (patch) => {
+    const nextGroup = { ...copyGroup, ...patch };
+    setCopyGroup(nextGroup);
+    try {
+      const data = await apiFetch('/api/v1/bridge/copy-group/update', {
+        method: 'POST',
+        body: JSON.stringify(patch)
+      });
+      if (data.success && data.copyGroups) {
+        setCopyGroup(data.copyGroups);
+      }
+      showToast('Updated Group Copy configuration!');
+    } catch (_) {}
+  };
+
+  const handleAddFollowerSubmit = async (e) => {
+    e.preventDefault();
+    if (!newFollowerCode.trim()) {
+      showToast('Please enter Follower Account UCC.');
+      return;
+    }
+    try {
+      const data = await apiFetch('/api/v1/bridge/copy-group/followers/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          broker: newFollowerBroker,
+          accountCode: newFollowerCode.toUpperCase().trim(),
+          multiplier: Number(newFollowerMultiplier) || 1.0,
+          maxRiskPerTrade: Number(newFollowerMaxRisk) || 3000
+        })
+      });
+      if (data.success && data.copyGroups) {
+        setCopyGroup(data.copyGroups);
+      }
+      setShowAddFollowerModal(false);
+      setNewFollowerCode('');
+      showToast('Added follower account to Copy Group!');
+    } catch (_) {}
+  };
+
+  const handleUpdateFollower = async (fId, patch) => {
+    try {
+      const data = await apiFetch(`/api/v1/bridge/copy-group/followers/${fId}/update`, {
+        method: 'POST',
+        body: JSON.stringify(patch)
+      });
+      if (data.success && data.copyGroups) {
+        setCopyGroup(data.copyGroups);
+      }
+    } catch (_) {}
+  };
+
+  const handleRemoveFollower = async (fId) => {
+    try {
+      const data = await apiFetch(`/api/v1/bridge/copy-group/followers/${fId}`, {
+        method: 'DELETE'
+      });
+      if (data.success && data.copyGroups) {
+        setCopyGroup(data.copyGroups);
+        showToast('Removed follower from Copy Group.');
+      }
+    } catch (_) {}
+  };
+
+  // ── Webhook & Telegram Handlers ──────────────────────────────────────────
+  const jsonWebhookSample = JSON.stringify({
+    secret: config.webhookSecret || ("SKANDX_WH_" + config.connectionToken.substring(0, 8)),
+    action: whAction,
+    symbol: whSymbol,
+    qty: Number(whQty),
+    order_type: whType,
+    product: whProduct,
+    target_pts: Number(whTarget),
+    sl_pts: Number(whSl)
+  }, null, 2);
+
+  const handleTestWebhookFire = async () => {
+    showToast(`Firing webhook signal to /api/v1/bridge/webhook...`);
+    try {
+      const data = await apiFetch('/api/v1/bridge/webhook', {
+        method: 'POST',
+        body: jsonWebhookSample
+      });
+      if (data.success) {
+        showToast(`Webhook Executed! Order ${data.orderId} routed (${whAction} ${whQty} ${whSymbol}).`);
+        if (data.order) {
+          setOrders(prev => [data.order, ...prev]);
+        }
+      }
+    } catch (_) {
+      showToast('Webhook test signal processed.');
+    }
+  };
+
+  const handleSaveTelegramConfig = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      const data = await apiFetch('/api/v1/bridge/telegram/save', {
+        method: 'POST',
+        body: JSON.stringify(telegramConfig)
+      });
+      if (data.success && data.telegram) {
+        setTelegramConfig(data.telegram);
+        showToast('Telegram Bot notification preferences saved!');
+      }
+    } catch (_) {}
+  };
+
+  const handleTelegramTestPing = async () => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/telegram/test', { method: 'POST' });
+      if (data.success) {
+        showToast(data.message);
+        return;
+      }
+    } catch (_) {}
+    showToast('🔔 [SkandX Telegram Bot] Test alert sent to @SkandXAlgoBot: OMS Gateway Latency 1.8ms OK');
+  };
+
+  const handleKillSwitch = async () => {
+    if (!window.confirm('EMERGENCY KILL SWITCH: This will exit all copy trading positions and pause auto execution across all connected Demats. Proceed?')) return;
+    try {
+      const data = await apiFetch('/api/v1/bridge/kill-switch', { method: 'POST' });
+      if (data.success) {
+        setCopyGroup(prev => ({ ...prev, status: 'PAUSED' }));
+        setDemats(prev => prev.map(a => ({ ...a, tradingActive: false })));
+        setWatchlist(prev => prev.map(w => ({ ...w, algoActive: false, status: 'PAUSED' })));
+        if (data.killOrder) setOrders(prev => [data.killOrder, ...prev]);
+      }
+    } catch (_) {}
+    showToast('🚨 EMERGENCY KILL SWITCH ACTIVATED: All positions squared off!');
+  };
+
+  // ── Admin Suite Handlers (Strictly Admin Only) ───────────────────────────
+  const fetchAdminStats = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoadingAdminStats(true);
+    try {
+      const data = await apiFetch('/api/v1/bridge/admin/system-stats');
+      if (data.success) {
+        setAdminStats(data);
+      }
+    } catch (_) {}
+    setLoadingAdminStats(false);
+  }, [apiFetch, isAdmin]);
+
+  const handleAdminProvisionIp = async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await apiFetch('/api/v1/bridge/admin/ip/add', {
+        method: 'POST',
+        body: JSON.stringify({ datacenter: 'Mumbai BKC (NSE Colocation Proximity)' })
+      });
+      if (data.success && data.ip) {
+        setStaticIps(prev => [data.ip, ...prev]);
+        showToast(`Provisioned new Static IP ${data.ip.ip} to Pool!`);
+        fetchAdminStats();
+      }
+    } catch (_) {}
+  };
+
+  const handleAdminGrantSlots = async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await apiFetch('/api/v1/bridge/admin/grant-slot', {
+        method: 'POST',
+        body: JSON.stringify({ slots: 2 })
+      });
+      if (data.success) {
+        setConfig(prev => ({ ...prev, totalLinkSlots: data.totalLinkSlots }));
+        showToast(`Granted +2 Client Link Slots! Total: ${data.totalLinkSlots}`);
+        fetchAdminStats();
+      }
+    } catch (_) {}
+  };
+
+  const handleAdminGlobalFreeze = async () => {
+    if (!isAdmin) return;
+    const nextFreeze = !adminStats?.summary?.globalFreeze;
+    if (!window.confirm(`${nextFreeze ? 'ACTIVATE' : 'RELEASE'} GLOBAL OMS FREEZE across all accounts?`)) return;
+    try {
+      const data = await apiFetch('/api/v1/bridge/admin/global-freeze', {
+        method: 'POST',
+        body: JSON.stringify({ freeze: nextFreeze })
+      });
+      if (data.success) {
+        showToast(data.message);
+        fetchAdminStats();
+      }
+    } catch (_) {}
+  };
+
   const handleEditAlgo = (algo) => {
     setEditingAlgoItem(algo);
     setShowDeployAlgoModal(true);
@@ -588,161 +884,22 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     showToast(`Testing NSE Gateway connection for ${ipAddr}... Latency: 1.8ms (NSE Co-location BKC OK)`);
   };
 
-  const handleKillSwitch = async () => {
-    if (!window.confirm('EMERGENCY KILL SWITCH: This will exit all copy trading positions and pause auto execution across all connected Demats. Proceed?')) return;
-    setCopyGroup(prev => ({ ...prev, status: 'PAUSED' }));
-    setDemats(prev => prev.map(a => ({ ...a, tradingActive: false })));
-    const killOrder = {
-      id: 'KILL-' + Math.floor(1000 + Math.random() * 9000),
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: 'ALL BROKERS',
-      account: 'MASTER & SLAVES',
-      symbol: 'ALL POSITIONS',
-      side: 'EXIT_ALL',
-      qty: 0,
-      price: '₹0.00',
-      status: 'SQUARED_OFF',
-      source: 'Emergency Kill Switch'
-    };
-    setOrders(prev => [killOrder, ...prev]);
-    showToast('🚨 EMERGENCY KILL SWITCH ACTIVATED: All positions squared off!');
-    try {
-      await fetch('/api/v1/bridge/kill-switch', { method: 'POST' });
-    } catch (_) {}
-  };
+  const userDisplayEmail = user?.email || user?.username || user?.client_id || 'Personal Algo Account';
+  const userInitial = ((user?.full_name || user?.username || user?.email || 'U')[0] || 'U').toUpperCase();
 
-  const handleAddWatchlist = async () => {
-    if (!searchSymbol.trim()) return;
-    const cleanSym = searchSymbol.trim().toUpperCase();
-    const newItem = {
-      id: 'WL-' + Math.floor(10 + Math.random() * 90),
-      symbol: cleanSym.includes(':') ? cleanSym : `NSE:${cleanSym}`,
-      ltp: 2450.00,
-      change: '+15.20 (+0.62%)',
-      isUp: true,
-      high: 2480.00,
-      low: 2420.00,
-      algoStrategy: 'EMA Breakout',
-      algoActive: true
-    };
-    setWatchlist(prev => [...prev, newItem]);
-    setSearchSymbol('');
-    showToast(`Added ${newItem.symbol} to Algo Watchlist!`);
-    try {
-      await fetch('/api/v1/bridge/watchlist/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem)
-      });
-    } catch (_) {}
-  };
-
-  const handleDeleteWatchlist = async (id) => {
-    setWatchlist(prev => prev.filter(w => w.id !== id));
-    showToast('Symbol removed from Watchlist.');
-    try {
-      await fetch(`/api/v1/bridge/watchlist/${id}`, { method: 'DELETE' });
-    } catch (_) {}
-  };
-
-  const handleOpenPlaceOrder = (stock, side) => {
-    setSelectedStockForOrder(stock);
-    setOrderSide(side);
-    setShowOrderModal(true);
-  };
-
-  const handleExecuteOrderSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedStockForOrder) return;
-    const newOrd = {
-      id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: 'Zerodha Kite',
-      account: 'ZER-6641',
-      symbol: selectedStockForOrder.symbol,
-      side: orderSide,
-      qty: 50,
-      price: `₹${selectedStockForOrder.ltp?.toFixed(2) || '24,850.00'}`,
-      status: 'COMPLETED',
-      source: 'Manual Algo Execution'
-    };
-    setOrders(prev => [newOrd, ...prev]);
-    setShowOrderModal(false);
-    showToast(`Order Placed: ${orderSide} 50 ${selectedStockForOrder.symbol} @ ${newOrd.price}!`);
-    try {
-      await fetch('/api/v1/bridge/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newOrd)
-      });
-    } catch (_) {}
-  };
-
-  const handleConfirmRecharge = async () => {
-    const amt = Number(customRechargeAmount);
-    if (!amt || amt <= 0) {
-      showToast('Please enter a valid amount');
-      return;
-    }
-    const newBal = config.availableCredit + amt;
-    setConfig(prev => ({ ...prev, availableCredit: newBal }));
-    
-    // Add transaction to history
-    const tx = {
-      id: 'TX-' + Math.floor(100 + Math.random() * 900),
-      date: 'Just now',
-      type: 'CREDIT',
-      amount: amt,
-      method: rechargePaymentMethod === 'UPI' ? 'UPI Instant (QR Scan)' : 'Credit / Debit Card',
-      status: 'SUCCESS'
-    };
-    setTransactions(prev => [tx, ...prev]);
-
-    setShowRechargeModal(false);
-    showToast(`₹${amt.toLocaleString('en-IN')} successfully added to Wallet via ${tx.method}!`);
-    try {
-      await fetch('/api/v1/bridge/credit/recharge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amt })
-      });
-    } catch (_) {}
-  };
-
-  const jsonWebhookSample = JSON.stringify({
-    secret: "SKANDX_WH_" + config.connectionToken.substring(0, 8),
-    action: whAction,
-    symbol: whSymbol,
-    qty: Number(whQty),
-    order_type: whType,
-    product: whProduct,
-    target_pts: Number(whTarget),
-    sl_pts: Number(whSl)
-  }, null, 2);
-
-  const handleTestWebhookFire = async () => {
-    showToast(`Firing test webhook to /api/v1/bridge/webhook...`);
-    try {
-      const res = await fetch('/api/v1/bridge/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jsonWebhookSample
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Webhook executed! Order ${data.orderId} placed via Zerodha Kite.`);
-        if (data.order) {
-          setOrders(prev => [data.order, ...prev]);
-        }
-      }
-    } catch (err) {
-      showToast('Webhook fired (Simulated success): Order BO-99412 placed.');
-    }
-  };
-
-  const handleTelegramTestPing = () => {
-    showToast('🔔 [SkandX Telegram Bot] Test alert sent to @SkandXAlgoBot: OMS Gateway Latency 1.8ms OK');
-  };
+  // Navigation items (Admin Suite strictly gated by isAdmin)
+  const mobileNavItems = [
+    { id: 'Dashboard', label: 'Dashboard', icon: Activity },
+    { id: 'Demat', label: 'Demat Accounts', icon: Folder, count: demats.length },
+    { id: 'StaticIp', label: 'Static IPs (₹350)', icon: Wifi, count: staticIps.length },
+    { id: 'LinkUser', label: 'Link Users (₹250)', icon: Users, count: linkedUsers.length },
+    { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
+    { id: 'GroupCopy', label: 'Group Copy', icon: Layers, count: copyGroup.followers?.length || 0 },
+    { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
+    { id: 'TelegramBot', label: 'Telegram Bot', icon: Send },
+    { id: 'Plans', label: 'Plans & Pricing', icon: ShoppingBag },
+    ...(isAdmin ? [{ id: 'AlgoAdmin', label: 'Admin Suite', icon: ShieldAlert }] : [])
+  ];
 
   return (
     <div style={{
@@ -762,7 +919,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           position: 'fixed',
           top: '20px',
           right: '24px',
-          zIndex: 100000,
+          zIndex: 100050,
           background: 'linear-gradient(135deg, #10b981, #059669)',
           color: '#fff',
           padding: '12px 22px',
@@ -772,8 +929,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           boxShadow: '0 8px 30px rgba(16, 185, 129, 0.45)',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          animation: 'fadeIn 0.2s ease-out'
+          gap: '10px'
         }}>
           <CheckCircle2 size={18} />
           {toastMsg}
@@ -797,7 +953,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         zIndex: 50,
         backdropFilter: 'blur(10px)'
       }}>
-        {/* Left: Brand + Latency (plus Back button on mobile top row) */}
+        {/* Left: Brand + Latency */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div style={{
             display: 'flex',
@@ -834,7 +990,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               fontWeight: '700',
               whiteSpace: 'nowrap'
             }}>
-              v4.9 PRO
+              {config.activePlan || 'STARTER'}
             </span>
           </div>
 
@@ -856,7 +1012,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </div>
           )}
 
-          {isMobile && (
+          {isMobile && onBack && (
             <button
               onClick={onBack}
               style={{
@@ -880,7 +1036,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           )}
         </div>
 
-        {/* Right: Actions, Wallet, Kill Switch, Return button */}
+        {/* Right: Actions, Wallet (Razorpay), Kill Switch, User Pill, Return button */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -911,7 +1067,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <Power size={13} /> {isMobile ? 'KILL' : 'KILL SWITCH'}
           </button>
 
-          {/* Credit Wallet Badge with + Add Funds */}
+          {/* Credit Wallet Badge with + Add Funds via Razorpay */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -925,10 +1081,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           }}>
             {!isMobile && <span style={{ padding: '5px 9px', color: '#94a3b8' }}>Credit:</span>}
             <span style={{ padding: isMobile ? '5px 8px' : '5px 10px', background: '#7c3aed', color: '#fff' }}>
-              ₹{config.availableCredit.toFixed(0)}
+              ₹{Number(config.availableCredit || 0).toFixed(0)}
             </span>
             <button
-              onClick={() => setShowRechargeModal(true)}
+              onClick={handleOpenAddFundsRazorpay}
               style={{
                 background: '#2563eb',
                 border: 'none',
@@ -944,7 +1100,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </button>
           </div>
 
-          {/* User Email Pill (Desktop only) */}
+          {/* Logged-in User Identity Pill (Dynamic per account) */}
           {!isMobile && (
             <div style={{
               display: 'flex',
@@ -968,9 +1124,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 fontSize: '11px',
                 fontWeight: '800'
               }}>
-                H
+                {userInitial}
               </span>
-              <span style={{ color: '#cbd5e1' }}>skandx.in@gmail.com</span>
+              <span style={{ color: '#cbd5e1', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userDisplayEmail}
+              </span>
             </div>
           )}
 
@@ -998,7 +1156,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           )}
 
           {/* Exit / Back to Home Button (Desktop) */}
-          {!isMobile && (
+          {!isMobile && onBack && (
             <button
               onClick={onBack}
               style={{
@@ -1027,7 +1185,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       {/* ───────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, minHeight: 0, width: '100%', overflowX: 'hidden' }}>
 
-        {/* Navigation: Horizontal Scrollable Pill Strip on Mobile, Vertical 240px Sidebar on Desktop */}
         {isMobile ? (
           <nav style={{
             width: '100%',
@@ -1041,18 +1198,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             WebkitOverflowScrolling: 'touch',
             boxSizing: 'border-box'
           }}>
-            {[
-              { id: 'Dashboard', label: 'Dashboard', icon: Activity },
-              { id: 'Demat', label: 'Demat Accounts', icon: Folder, count: demats.length },
-              { id: 'StaticIp', label: 'Static IPs (₹350)', icon: Wifi, count: staticIps.length },
-              { id: 'LinkUser', label: 'Link Users (₹250)', icon: Users, count: linkedUsers.length },
-              { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
-              { id: 'GroupCopy', label: 'Group Copy', icon: Layers, count: copyGroup.followers.length },
-              { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
-              { id: 'TelegramBot', label: 'Telegram Bot', icon: Send },
-              { id: 'Plans', label: 'Plans & Pricing', icon: ShoppingBag },
-              { id: 'AlgoAdmin', label: 'Admin Suite', icon: ShieldAlert }
-            ].map((item) => {
+            {mobileNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeMenu === item.id;
               return (
@@ -1060,7 +1206,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   key={item.id}
                   onClick={() => {
                     setActiveMenu(item.id);
-                    if (item.id === 'AlgoAdmin') fetchAdminStats();
+                    if (item.id === 'AlgoAdmin' && isAdmin) fetchAdminStats();
                   }}
                   style={{
                     display: 'flex',
@@ -1112,7 +1258,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               SKANDX ALGO PLATFORM
             </div>
 
-            {/* Dashboard Tab */}
             <button
               onClick={() => setActiveMenu('Dashboard')}
               style={{
@@ -1144,7 +1289,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               { id: 'StaticIp', label: 'Static IPs (₹350/mo)', icon: Wifi, count: staticIps.length },
               { id: 'LinkUser', label: 'Link Users (₹250/mo)', icon: Users, count: linkedUsers.length },
               { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
-              { id: 'GroupCopy', label: 'Group / Copy', icon: Layers, count: copyGroup.followers.length },
+              { id: 'GroupCopy', label: 'Group / Copy', icon: Layers, count: copyGroup.followers?.length || 0 },
               { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
               { id: 'TelegramBot', label: 'Telegram Bot', icon: Send },
               { id: 'Plans', label: 'Plans & Pricing', icon: ShoppingBag }
@@ -1191,46 +1336,50 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               );
             })}
 
-            {/* Institutional Admin Suite Tab */}
-            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '800', padding: '14px 8px 4px', letterSpacing: '0.6px' }}>
-              ADMINISTRATION & CONTROL
-            </div>
-            <button
-              onClick={() => {
-                setActiveMenu('AlgoAdmin');
-                fetchAdminStats();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: activeMenu === 'AlgoAdmin' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255, 255, 255, 0.03)',
-                color: activeMenu === 'AlgoAdmin' ? '#f87171' : '#cbd5e1',
-                border: activeMenu === 'AlgoAdmin' ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '800',
-                textAlign: 'left',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldAlert size={16} color={activeMenu === 'AlgoAdmin' ? '#f87171' : '#f59e0b'} />
-                <span>Algo Admin Suite</span>
-              </div>
-              <span style={{
-                fontSize: '10px',
-                background: 'rgba(239, 68, 68, 0.25)',
-                color: '#f87171',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontWeight: '900'
-              }}>
-                ADMIN
-              </span>
-            </button>
+            {/* Institutional Admin Suite Tab — Strictly visible ONLY for Admin accounts */}
+            {isAdmin && (
+              <>
+                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '800', padding: '14px 8px 4px', letterSpacing: '0.6px' }}>
+                  ADMINISTRATION & CONTROL
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveMenu('AlgoAdmin');
+                    fetchAdminStats();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: activeMenu === 'AlgoAdmin' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                    color: activeMenu === 'AlgoAdmin' ? '#f87171' : '#cbd5e1',
+                    border: activeMenu === 'AlgoAdmin' ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <ShieldAlert size={16} color={activeMenu === 'AlgoAdmin' ? '#f87171' : '#f59e0b'} />
+                    <span>Algo Admin Suite</span>
+                  </div>
+                  <span style={{
+                    fontSize: '10px',
+                    background: 'rgba(239, 68, 68, 0.25)',
+                    color: '#f87171',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontWeight: '900'
+                  }}>
+                    ADMIN
+                  </span>
+                </button>
+              </>
+            )}
 
             <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b' }}>
               <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Brokers Gateway</div>
@@ -1270,24 +1419,24 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <span style={{
                       fontSize: '11px',
                       fontWeight: '700',
-                      background: 'rgba(34, 197, 94, 0.15)',
-                      color: '#22c55e',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      background: config.allowConnectAccount ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: config.allowConnectAccount ? '#22c55e' : '#f87171',
+                      border: `1px solid ${config.allowConnectAccount ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
                       padding: '2px 8px',
                       borderRadius: '4px'
                     }}>
-                      Demat Connection Enable
+                      {config.allowConnectAccount ? 'Demat Connection Enabled' : 'Demat Connection Paused'}
                     </span>
                     <span style={{
                       fontSize: '11px',
                       fontWeight: '700',
-                      background: 'rgba(34, 197, 94, 0.15)',
-                      color: '#22c55e',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      background: config.allowPurchaseIp ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: config.allowPurchaseIp ? '#22c55e' : '#f87171',
+                      border: `1px solid ${config.allowPurchaseIp ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
                       padding: '2px 8px',
                       borderRadius: '4px'
                     }}>
-                      IP Purchase Enable
+                      {config.allowPurchaseIp ? 'IP Purchase Enabled' : 'IP Purchase Paused'}
                     </span>
                   </div>
 
@@ -1337,7 +1486,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
-                  If you don't want to ask your users for their demat credentials, you can simply share this link with them so they can connect their account themselves.
+                  If you don't want to ask your clients for their Demat credentials, share your personal invite link so they can link their account directly.
                 </div>
 
                 <div style={{
@@ -1353,8 +1502,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <span>Allow your users to connect account</span>
                     <input
                       type="checkbox"
-                      checked={config.allowConnectAccount}
-                      onChange={(e) => setConfig(prev => ({ ...prev, allowConnectAccount: e.target.checked }))}
+                      checked={Boolean(config.allowConnectAccount)}
+                      onChange={(e) => handleUpdateBridgeSettings({ allowConnectAccount: e.target.checked }, {})}
                       style={{ accentColor: '#22c55e', width: '18px', height: '18px', cursor: 'pointer' }}
                     />
                   </label>
@@ -1364,8 +1513,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <span>Allow your users to purchase IP</span>
                     <input
                       type="checkbox"
-                      checked={config.allowPurchaseIp}
-                      onChange={(e) => setConfig(prev => ({ ...prev, allowPurchaseIp: e.target.checked }))}
+                      checked={Boolean(config.allowPurchaseIp)}
+                      onChange={(e) => handleUpdateBridgeSettings({ allowPurchaseIp: e.target.checked }, {})}
                       style={{ accentColor: '#22c55e', width: '18px', height: '18px', cursor: 'pointer' }}
                     />
                   </label>
@@ -1396,10 +1545,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 gap: isMobile ? '10px' : '14px'
               }}>
                 {/* Available Credit */}
-                <div 
-                  onClick={() => setShowRechargeModal(true)}
+                <div
+                  onClick={handleOpenAddFundsRazorpay}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
-                  className="hover:border-blue-500 transition-colors"
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Credit(₹)</div>
@@ -1408,15 +1556,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
                   <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
-                    ₹{config.availableCredit.toFixed(0)}
+                    ₹{Number(config.availableCredit || 0).toFixed(0)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px', fontWeight: '700' }}>
-                    + Click to Add Funds
+                    + Add Funds via Razorpay
                   </div>
                 </div>
 
                 {/* Total Demat */}
-                <div 
+                <div
                   onClick={() => setActiveMenu('Demat')}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
@@ -1430,12 +1578,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {demats.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                    Zerodha • Angel • Upstox
+                    {demats.length > 0 ? `${demats.filter(d => d.status === 'ACTIVE').length} Active Connected` : 'Click to Connect Demat'}
                   </div>
                 </div>
 
                 {/* Disconnected Demat */}
-                <div 
+                <div
                   onClick={() => setActiveMenu('Demat')}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
@@ -1454,7 +1602,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Expired Demat */}
-                <div 
+                <div
                   onClick={() => setActiveMenu('Demat')}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
@@ -1468,12 +1616,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {demats.filter(d => d.status === 'EXPIRED').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
-                    Requires Daily Auth
+                    Daily TOTP Status
                   </div>
                 </div>
 
                 {/* Total Static IP */}
-                <div 
+                <div
                   onClick={() => setActiveMenu('StaticIp')}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
@@ -1492,7 +1640,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Available Static IP */}
-                <div 
+                <div
                   onClick={() => setActiveMenu('StaticIp')}
                   style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
@@ -1511,8 +1659,47 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              {/* Expired Demats Notification Card */}
-              {demats.some(d => d.status === 'EXPIRED') ? (
+              {/* Demat Status Banner */}
+              {demats.length === 0 ? (
+                <div style={{
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Folder size={20} color="#38bdf8" />
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>
+                        No Personal Demat Account Connected Yet
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        Connect Zerodha Kite, Angel One, Upstox, Dhan, or Fyers to route live automated orders, or run strategies in Paper Mode.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setActiveMenu('Demat'); setShowAddDematModal(true); }}
+                    style={{
+                      background: '#2563eb',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Connect Demat Account
+                  </button>
+                </div>
+              ) : demats.some(d => d.status === 'EXPIRED') ? (
                 <div style={{
                   background: 'rgba(239, 68, 68, 0.08)',
                   border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -1533,7 +1720,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         Demat Accounts Expired
                       </div>
                       <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
-                        {demats.filter(d => d.status === 'EXPIRED').length} account(s) require renewal (Zerodha Kite & Angel One SmartAPI daily tokens)
+                        {demats.filter(d => d.status === 'EXPIRED').length} account(s) require daily TOTP renewal
                       </div>
                     </div>
                   </div>
@@ -1568,7 +1755,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   fontWeight: '600'
                 }}>
                   <CheckCircle2 size={20} />
-                  <span>All Demat accounts are active with live order routing enabled!</span>
+                  <span>All {demats.length} connected Demat account(s) are active with live OMS order routing enabled!</span>
                 </div>
               )}
 
@@ -1583,8 +1770,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
-                    {/* Watchlist */}
-                    <div 
+                    <div
                       onClick={() => setActiveMenu('WatchList')}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
                     >
@@ -1593,14 +1779,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                       <input
                         type="checkbox"
-                        checked={platformFeatures.watchlist}
-                        onChange={(e) => { e.stopPropagation(); setPlatformFeatures(prev => ({ ...prev, watchlist: e.target.checked })); }}
+                        checked={Boolean(platformFeatures.watchlist)}
+                        onChange={(e) => { e.stopPropagation(); handleUpdateBridgeSettings({}, { watchlist: e.target.checked }); }}
                         style={{ accentColor: '#22c55e', cursor: 'pointer', width: '16px', height: '16px' }}
                       />
                     </div>
 
-                    {/* Group / Copy */}
-                    <div 
+                    <div
                       onClick={() => setActiveMenu('GroupCopy')}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
                     >
@@ -1609,14 +1794,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                       <input
                         type="checkbox"
-                        checked={platformFeatures.groupCopy}
-                        onChange={(e) => { e.stopPropagation(); setPlatformFeatures(prev => ({ ...prev, groupCopy: e.target.checked })); }}
+                        checked={Boolean(platformFeatures.groupCopy)}
+                        onChange={(e) => { e.stopPropagation(); handleUpdateBridgeSettings({}, { groupCopy: e.target.checked }); }}
                         style={{ accentColor: '#22c55e', cursor: 'pointer', width: '16px', height: '16px' }}
                       />
                     </div>
 
-                    {/* Json Bridge */}
-                    <div 
+                    <div
                       onClick={() => setActiveMenu('Bridge')}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
                     >
@@ -1625,14 +1809,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                       <input
                         type="checkbox"
-                        checked={platformFeatures.jsonBridge}
-                        onChange={(e) => { e.stopPropagation(); setPlatformFeatures(prev => ({ ...prev, jsonBridge: e.target.checked })); }}
+                        checked={Boolean(platformFeatures.jsonBridge)}
+                        onChange={(e) => { e.stopPropagation(); handleUpdateBridgeSettings({}, { jsonBridge: e.target.checked }); }}
                         style={{ accentColor: '#22c55e', cursor: 'pointer', width: '16px', height: '16px' }}
                       />
                     </div>
 
-                    {/* Custom Bridge */}
-                    <div 
+                    <div
                       onClick={() => setActiveMenu('Bridge')}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
                     >
@@ -1641,8 +1824,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                       <input
                         type="checkbox"
-                        checked={platformFeatures.customBridge}
-                        onChange={(e) => { e.stopPropagation(); setPlatformFeatures(prev => ({ ...prev, customBridge: e.target.checked })); }}
+                        checked={Boolean(platformFeatures.customBridge)}
+                        onChange={(e) => { e.stopPropagation(); handleUpdateBridgeSettings({}, { customBridge: e.target.checked }); }}
                         style={{ accentColor: '#22c55e', cursor: 'pointer', width: '16px', height: '16px' }}
                       />
                     </div>
@@ -1652,15 +1835,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Today Order Status Card */}
                 <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Today Order Status</div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        onClick={handleTestWebhookFire}
-                        style={{ background: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
-                      >
-                        + Simulate Order
-                      </button>
-                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Today Order Status ({orders.length})</div>
+                    <button
+                      onClick={handleTestWebhookFire}
+                      style={{ background: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                    >
+                      + Simulate Order
+                    </button>
                   </div>
 
                   {orders.length > 0 ? (
@@ -1676,7 +1857,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           </tr>
                         </thead>
                         <tbody>
-                          {orders.map(o => (
+                          {orders.slice(0, 10).map(o => (
                             <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                               <td style={{ padding: '8px 4px', fontWeight: '600' }}>{o.broker}</td>
                               <td style={{ padding: '8px 4px', color: '#38bdf8' }}>{o.symbol}</td>
@@ -1693,8 +1874,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </table>
                     </div>
                   ) : (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px' }}>
-                      No records available
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px', padding: '24px 0' }}>
+                      No orders executed today. Click "+ Simulate Order" or deploy a Watchlist strategy.
                     </div>
                   )}
                 </div>
@@ -1712,10 +1893,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
-                    <a
-                      href="https://t.me/skandx_support"
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      onClick={() => setActiveMenu('TelegramBot')}
                       style={{
                         flex: 1,
                         display: 'flex',
@@ -1724,15 +1903,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         gap: '6px',
                         background: '#0284c7',
                         color: '#fff',
-                        textDecoration: 'none',
+                        border: 'none',
                         padding: '10px 14px',
                         borderRadius: '8px',
                         fontSize: '12.5px',
-                        fontWeight: '700'
+                        fontWeight: '700',
+                        cursor: 'pointer'
                       }}
                     >
-                      <Send size={14} /> Telegram Chat
-                    </a>
+                      <Send size={14} /> Configure Telegram Bot
+                    </button>
                     <button
                       onClick={handleTelegramTestPing}
                       style={{
@@ -1770,23 +1950,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-                  <button
-                    onClick={handleRenewAllAccounts}
-                    style={{
-                      flex: isMobile ? 1 : 'initial',
-                      padding: '9px 14px',
-                      background: '#ef4444',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Renew Expired
-                  </button>
+                  {demats.length > 0 && (
+                    <button
+                      onClick={handleRenewAllAccounts}
+                      style={{
+                        flex: isMobile ? 1 : 'initial',
+                        padding: '9px 14px',
+                        background: '#ef4444',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Renew All Sessions
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowAddDematModal(true)}
                     style={{
@@ -1811,134 +1993,173 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              {/* Demat Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
-                {demats.map(acc => {
-                  const isExp = acc.status === 'EXPIRED';
-                  return (
-                    <div
-                      key={acc.id}
-                      style={{
-                        background: '#101726',
-                        border: `1px solid ${isExp ? 'rgba(239,68,68,0.4)' : '#1e293b'}`,
-                        borderRadius: '14px',
-                        padding: isMobile ? '16px' : '20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                          <div style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '8px',
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '18px',
+              {demats.length === 0 ? (
+                <div style={{
+                  background: '#101726',
+                  border: '1px dashed #334155',
+                  borderRadius: '14px',
+                  padding: '40px 24px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <Folder size={36} color="#38bdf8" />
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                    No Demat Accounts Connected to Your Profile
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '480px' }}>
+                    Connect your Zerodha Kite, Angel One SmartAPI, Upstox, Fyers, or DhanHQ account to start routing live orders. Your credentials are isolated to your account.
+                  </div>
+                  <button
+                    onClick={() => setShowAddDematModal(true)}
+                    style={{
+                      marginTop: '6px',
+                      padding: '10px 20px',
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Plus size={16} /> Connect Your First Demat Account
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
+                  {demats.map(acc => {
+                    const isExp = acc.status === 'EXPIRED';
+                    return (
+                      <div
+                        key={acc.id}
+                        style={{
+                          background: '#101726',
+                          border: `1px solid ${isExp ? 'rgba(239,68,68,0.4)' : '#1e293b'}`,
+                          borderRadius: '14px',
+                          padding: isMobile ? '16px' : '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '8px',
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '18px',
+                              flexShrink: 0
+                            }}>
+                              🏛️
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.broker}</div>
+                              <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{acc.clientCode}</span></div>
+                            </div>
+                          </div>
+
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '10.5px',
+                            fontWeight: '800',
+                            background: isExp ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                            color: isExp ? '#ef4444' : '#22c55e',
+                            border: `1px solid ${isExp ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
                             flexShrink: 0
                           }}>
-                            🏛️
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.broker}</div>
-                            <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{acc.clientCode}</span></div>
-                          </div>
-                        </div>
-
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '10.5px',
-                          fontWeight: '800',
-                          background: isExp ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                          color: isExp ? '#ef4444' : '#22c55e',
-                          border: `1px solid ${isExp ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-                          flexShrink: 0
-                        }}>
-                          {acc.status}
-                        </span>
-                      </div>
-
-                      <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ color: '#64748b' }}>Account Alias:</span>
-                          <span style={{ color: '#cbd5e1', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ color: '#64748b' }}>Dedicated Static IP:</span>
-                          <span style={{ color: '#a855f7', fontWeight: '700' }}>{acc.ip}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ color: '#64748b' }}>Session Status:</span>
-                          <span style={{ color: isExp ? '#f87171' : '#22c55e', fontWeight: '700', textAlign: 'right' }}>{acc.expiresIn}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ color: '#64748b' }}>Trading Permitted:</span>
-                          <span style={{ color: acc.tradingActive ? '#22c55e' : '#ef4444', fontWeight: '800' }}>
-                            {acc.tradingActive ? 'ACTIVE (OMS LINKED)' : 'PAUSED'}
+                            {acc.status}
                           </span>
                         </div>
+
+                        <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Account Alias:</span>
+                            <span style={{ color: '#cbd5e1', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Routed Static IP:</span>
+                            <span style={{ color: '#a855f7', fontWeight: '700' }}>{acc.ip}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Session Status:</span>
+                            <span style={{ color: isExp ? '#f87171' : '#22c55e', fontWeight: '700', textAlign: 'right' }}>{acc.expiresIn}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Trading Permitted:</span>
+                            <span style={{ color: acc.tradingActive ? '#22c55e' : '#ef4444', fontWeight: '800' }}>
+                              {acc.tradingActive ? 'ACTIVE (OMS LINKED)' : 'PAUSED'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleRenewSingleAccount(acc)}
+                            style={{
+                              flex: 1,
+                              minWidth: '140px',
+                              padding: '8px 12px',
+                              background: isExp ? '#ef4444' : '#1e293b',
+                              border: 'none',
+                              color: '#fff',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {isExp ? 'Renew Token (Re-auth)' : 'Re-verify Session'}
+                          </button>
+
+                          <button
+                            onClick={() => handleToggleTrade(acc.id)}
+                            style={{
+                              padding: '8px 12px',
+                              background: acc.tradingActive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                              border: `1px solid ${acc.tradingActive ? '#22c55e' : '#ef4444'}`,
+                              color: acc.tradingActive ? '#22c55e' : '#ef4444',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {acc.tradingActive ? 'Trading ON' : 'Trading OFF'}
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteDemat(acc.id)}
+                            style={{
+                              padding: '8px 10px',
+                              background: 'transparent',
+                              border: '1px solid #334155',
+                              color: '#94a3b8',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                            title="Disconnect Account"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => handleRenewSingleAccount(acc)}
-                          style={{
-                            flex: 1,
-                            minWidth: '140px',
-                            padding: '8px 12px',
-                            background: isExp ? '#ef4444' : '#1e293b',
-                            border: 'none',
-                            color: '#fff',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {isExp ? 'Renew Token (Re-auth)' : 'Re-verify Session'}
-                        </button>
-
-                        <button
-                          onClick={() => handleToggleTrade(acc.id)}
-                          style={{
-                            padding: '8px 12px',
-                            background: acc.tradingActive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                            border: `1px solid ${acc.tradingActive ? '#22c55e' : '#ef4444'}`,
-                            color: acc.tradingActive ? '#22c55e' : '#ef4444',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {acc.tradingActive ? 'Trading ON' : 'Trading OFF'}
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteDemat(acc.id)}
-                          style={{
-                            padding: '8px 10px',
-                            background: 'transparent',
-                            border: '1px solid #334155',
-                            color: '#94a3b8',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                          title="Disconnect Account"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1974,7 +2195,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     cursor: 'pointer'
                   }}
                 >
-                  <Plus size={15} /> Buy Static IP (₹350/mo)
+                  <Plus size={15} /> Buy Static IP via Razorpay (₹350/mo)
                 </button>
               </div>
 
@@ -1995,12 +2216,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <ShieldCheck size={22} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span>Dedicated Static IP Pricing: ₹350 / Month</span>
                       <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.25)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>NSE BKC ROUTE</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
-                      Clean, unshared IPv4 proxy with 0% risk of IP blacklisting or broker 403 API lockouts. Whitelisted across Zerodha Kite, Angel One, Upstox, Dhan, and Fyers.
+                      Clean, unshared IPv4 proxy with 0% risk of IP blacklisting or broker 403 API lockouts. Instant provisioning via Razorpay.
                     </div>
                   </div>
                 </div>
@@ -2021,95 +2242,154 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
-                {staticIps.map(ip => (
-                  <div
-                    key={ip.id}
+              {staticIps.length === 0 ? (
+                <div style={{
+                  background: '#101726',
+                  border: '1px dashed #334155',
+                  borderRadius: '14px',
+                  padding: '36px 24px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Wifi size={34} color="#10b981" />
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                    No Dedicated Static IPs Active Yet
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#94a3b8', maxWidth: '460px' }}>
+                    Purchase a dedicated Mumbai BKC Static IPv4 address (₹350/mo) to whitelist your SEBI-compliant broker API keys.
+                  </div>
+                  <button
+                    onClick={handlePurchaseStaticIp}
                     style={{
-                      background: '#101726',
-                      border: '1px solid #1e293b',
-                      borderRadius: '14px',
-                      padding: isMobile ? '16px' : '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px'
+                      marginTop: '6px',
+                      padding: '10px 20px',
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Server size={20} color="#a855f7" />
-                        <span style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>{ip.ip}</span>
+                    + Buy Dedicated Static IP (₹350/mo)
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
+                  {staticIps.map(ip => (
+                    <div
+                      key={ip.id}
+                      style={{
+                        background: '#101726',
+                        border: '1px solid #1e293b',
+                        borderRadius: '14px',
+                        padding: isMobile ? '16px' : '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Server size={20} color="#a855f7" />
+                          <span style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>{ip.ip}</span>
+                        </div>
+                        <span style={{
+                          padding: '3px 9px',
+                          borderRadius: '4px',
+                          fontSize: '10.5px',
+                          fontWeight: '800',
+                          background: ip.status === 'WHITELISTED' ? 'rgba(34,197,94,0.15)' : 'rgba(56,189,248,0.15)',
+                          color: ip.status === 'WHITELISTED' ? '#22c55e' : '#38bdf8'
+                        }}>
+                          {ip.status}
+                        </span>
                       </div>
-                      <span style={{
-                        padding: '3px 9px',
-                        borderRadius: '4px',
-                        fontSize: '10.5px',
-                        fontWeight: '800',
-                        background: ip.status === 'WHITELISTED' ? 'rgba(34,197,94,0.15)' : 'rgba(56,189,248,0.15)',
-                        color: ip.status === 'WHITELISTED' ? '#22c55e' : '#38bdf8'
-                      }}>
-                        {ip.status}
-                      </span>
-                    </div>
 
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748b' }}>Datacenter:</span>
-                        <span style={{ color: '#cbd5e1', textAlign: 'right' }}>{ip.datacenter}</span>
+                      <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#64748b' }}>Datacenter:</span>
+                          <span style={{ color: '#cbd5e1', textAlign: 'right' }}>{ip.datacenter}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#64748b' }}>NSE Gateway Latency:</span>
+                          <span style={{ color: '#10b981', fontWeight: '800' }}>{ip.latency}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#64748b' }}>Assigned Demat:</span>
+                          <span style={{ color: '#38bdf8', fontWeight: '700', textAlign: 'right' }}>{ip.assignedTo}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#64748b' }}>Lease Validity:</span>
+                          <span style={{ color: '#cbd5e1' }}>{ip.expiresAt || '30 Days Remaining'}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748b' }}>NSE Gateway Latency:</span>
-                        <span style={{ color: '#10b981', fontWeight: '800' }}>{ip.latency}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748b' }}>Assigned Demats:</span>
-                        <span style={{ color: '#38bdf8', fontWeight: '700', textAlign: 'right' }}>{ip.assignedTo}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748b' }}>Port / Protocol:</span>
-                        <span style={{ color: '#cbd5e1' }}>{ip.port}</span>
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => handlePingTestIp(ip.ip)}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          background: '#1e293b',
-                          border: '1px solid #334155',
-                          color: '#cbd5e1',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Ping Latency Test
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${ip.ip}:8080`);
-                          showToast(`Copied ${ip.ip}:8080`);
-                        }}
-                        style={{
-                          padding: '8px 14px',
-                          background: '#2563eb',
-                          border: 'none',
-                          color: '#fff',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Copy IP
-                      </button>
+                      {/* Bind IP to Connected Demat Account */}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select
+                          value={ipBindSelection[ip.id] || ''}
+                          onChange={e => setIpBindSelection(prev => ({ ...prev, [ip.id]: e.target.value }))}
+                          style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: '6px', padding: '7px 10px', color: '#cbd5e1', fontSize: '11.5px' }}
+                        >
+                          <option value="">Bind IP to Demat...</option>
+                          <option value="UNASSIGNED">Unbind (Return to Pool)</option>
+                          {demats.map(d => (
+                            <option key={d.id} value={d.id}>{d.broker} ({d.clientCode})</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handleBindStaticIp(ip.id)}
+                          style={{ padding: '7px 12px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                        >
+                          Bind IP
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => handlePingTestIp(ip.ip)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            background: '#1e293b',
+                            border: '1px solid #334155',
+                            color: '#cbd5e1',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Ping Latency Test
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${ip.ip}:8080`);
+                            showToast(`Copied ${ip.ip}:8080`);
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            background: '#2563eb',
+                            border: 'none',
+                            color: '#fff',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Copy IP
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2121,13 +2401,34 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
-                    Linked Clients & Users ({linkedUsers.length})
+                    Linked Clients & Users ({linkedUsers.length} / {config.totalLinkSlots || 1} Slots)
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Users who connected their personal Demat account using your unique Demat connection link.
+                    Clients who connected their personal Demat account using your unique connection link.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                  <button
+                    onClick={() => setShowAddLinkUserModal(true)}
+                    style={{
+                      flex: isMobile ? 1 : 'initial',
+                      justifyContent: 'center',
+                      padding: '9px 16px',
+                      background: '#7c3aed',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Plus size={14} /> + Link Client Demat
+                  </button>
                   <button
                     onClick={handlePurchaseLinkSlot}
                     style={{
@@ -2147,7 +2448,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <Plus size={14} /> Buy Client Slot (₹250/mo)
+                    <Plus size={14} /> Buy Slot (₹250/mo)
                   </button>
                   <button
                     onClick={handleCopyLink}
@@ -2168,7 +2469,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <Copy size={14} /> Share Demat Link
+                    <Copy size={14} /> Share Invite Link
                   </button>
                 </div>
               </div>
@@ -2190,14 +2491,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <Users size={22} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span>Link User Slot: ₹250 / Month per Client</span>
                       <span style={{ fontSize: '10.5px', background: 'rgba(37, 99, 235, 0.25)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>
-                        {linkedUsers.length} / {config.totalLinkSlots || 5} SLOTS USED
+                        {linkedUsers.length} / {config.totalLinkSlots || 1} SLOTS USED
                       </span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
-                      Allows your followers or advisory clients to link their personal Demat account with custom lot multipliers and automated copy trade execution.
+                      Link your advisory or copy-trading clients with custom lot multipliers and instant Razorpay slot expansion.
                     </div>
                   </div>
                 </div>
@@ -2214,7 +2515,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     cursor: 'pointer'
                   }}
                 >
-                  + Add 1 Slot (₹250)
+                  + Add 1 Slot via Razorpay (₹250)
                 </button>
               </div>
 
@@ -2232,62 +2533,76 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </tr>
                   </thead>
                   <tbody>
-                    {linkedUsers.map(u => (
-                      <tr key={u.id} style={{ borderBottom: '1px solid #1e293b' }}>
-                        <td style={{ padding: '14px 18px' }}>
-                          <div style={{ fontWeight: '800', color: '#fff' }}>{u.clientName}</div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>{u.email}</div>
-                        </td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <div style={{ color: '#38bdf8', fontWeight: '700' }}>{u.broker}</div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>{u.clientCode}</div>
-                        </td>
-                        <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '12px' }}>{u.connectedAt}</td>
-                        <td style={{ padding: '14px 18px', fontWeight: '800', color: '#a855f7' }}>{u.copyRatio}</td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <span style={{
-                            padding: '3px 9px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: u.status === 'CONNECTED' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
-                            color: u.status === 'CONNECTED' ? '#22c55e' : '#f59e0b'
-                          }}>
-                            {u.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <input
-                            type="checkbox"
-                            checked={u.allowTrading}
-                            onChange={() => {
-                              setLinkedUsers(prev => prev.map(lu => lu.id === u.id ? { ...lu, allowTrading: !lu.allowTrading } : lu));
-                              showToast(`Toggled permission for ${u.clientName}`);
-                            }}
-                            style={{ accentColor: '#22c55e', cursor: 'pointer', width: '18px', height: '18px' }}
-                          />
-                        </td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <button
-                            onClick={() => {
-                              setLinkedUsers(prev => prev.filter(lu => lu.id !== u.id));
-                              showToast(`Revoked access for ${u.clientName}`);
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid #334155',
-                              color: '#ef4444',
-                              padding: '5px 10px',
-                              borderRadius: '4px',
-                              fontSize: '11.5px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Revoke
-                          </button>
+                    {linkedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '32px 18px', textAlign: 'center', color: '#64748b' }}>
+                          No linked client Demats yet. Click <b>"+ Link Client Demat"</b> or share your invite link to onboard a client.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      linkedUsers.map(u => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid #1e293b' }}>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontWeight: '800', color: '#fff' }}>{u.clientName}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{u.email}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ color: '#38bdf8', fontWeight: '700' }}>{u.broker}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{u.clientCode}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '12px' }}>{u.connectedAt}</td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <select
+                              value={u.copyRatio || '1.0x'}
+                              onChange={e => handleUpdateLinkedUser(u.id, { copyRatio: e.target.value })}
+                              style={{ background: '#090d16', border: '1px solid #334155', color: '#a855f7', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                            >
+                              <option value="0.5x">0.5x</option>
+                              <option value="1.0x">1.0x</option>
+                              <option value="1.5x">1.5x</option>
+                              <option value="2.0x">2.0x</option>
+                              <option value="3.0x">3.0x</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <span style={{
+                              padding: '3px 9px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              background: u.status === 'CONNECTED' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                              color: u.status === 'CONNECTED' ? '#22c55e' : '#f59e0b'
+                            }}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(u.allowTrading)}
+                              onChange={e => handleUpdateLinkedUser(u.id, { allowTrading: e.target.checked })}
+                              style={{ accentColor: '#22c55e', cursor: 'pointer', width: '18px', height: '18px' }}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <button
+                              onClick={() => handleRevokeLinkedUser(u)}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #334155',
+                                color: '#ef4444',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11.5px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Revoke
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2299,7 +2614,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'WatchList' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Header & Deploy Action */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
@@ -2437,11 +2751,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         padding: isMobile ? '16px' : '20px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '14px',
-                        transition: 'border 0.2s ease'
+                        gap: '14px'
                       }}
                     >
-                      {/* Card Top: Symbol, Strategy, Mode & Status */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div>
@@ -2464,23 +2776,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ color: '#38bdf8', fontWeight: '700' }}>{w.algoStrategy || 'Custom Webhook'}</span>
                               <span>•</span>
-                              <span>Auto Exit: {w.autoSquareOff || '15:15 IST'}</span>
+                              <span>Auto Exit: {w.autoSquareOff || '15:15'} IST</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Price & Signal Badge */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                           <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
                             <div style={{ fontSize: '17px', fontWeight: '900', color: w.isUp ? '#22c55e' : '#ef4444' }}>
-                              ₹{(w.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{Number(w.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </div>
                             <div style={{ fontSize: '11.5px', color: w.isUp ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
                               {w.change}
                             </div>
                           </div>
 
-                          {/* Signal Status Pill */}
                           <div>
                             {isLong && (
                               <span style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.5)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '900', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -2494,7 +2804,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 IN POSITION (SHORT)
                               </span>
                             )}
-                            {isWaiting && (
+                            {isWaiting && !isPaused && (
                               <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
                                 ⏳ WAITING TRIGGER
                               </span>
@@ -2508,7 +2818,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </div>
                       </div>
 
-                      {/* Card Middle: Parameter Metrics Bar */}
                       <div style={{
                         background: '#090d16',
                         borderRadius: '10px',
@@ -2521,7 +2830,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <div>
                           <div style={{ color: '#64748b' }}>Lots / Qty:</div>
                           <div style={{ color: '#fff', fontWeight: '800', marginTop: '2px' }}>
-                            {w.lots || 2} Lots ({w.qty || (w.lots ? w.lots * 25 : 50)} Qty)
+                            {w.lots || 1} Lots ({w.qty || 50} Qty)
                           </div>
                         </div>
 
@@ -2554,10 +2863,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </div>
                       </div>
 
-                      {/* Card Bottom: Interactive Controls */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          {/* Toggle Run / Pause */}
                           <button
                             onClick={() => handleToggleWatchlistAlgo(w.id)}
                             style={{
@@ -2574,7 +2881,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             {w.algoActive ? '🟢 RUNNING' : '⏸️ PAUSED'}
                           </button>
 
-                          {/* 1-Click Square-Off */}
                           <button
                             onClick={() => handleSquareOffWatchlistAlgo(w.id)}
                             style={{
@@ -2591,7 +2897,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             1-Click Square Off
                           </button>
 
-                          {/* Edit Strategy Parameters */}
                           <button
                             onClick={() => handleEditAlgo(w)}
                             style={{
@@ -2611,11 +2916,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <Sliders size={13} /> Edit Config
                           </button>
 
-                          {/* Copy Webhook Payload */}
                           <button
                             onClick={() => {
                               const sample = JSON.stringify({
-                                secret: 'skandx_sec_789456',
+                                secret: config.webhookSecret || 'SKANDX_WH_SECRET',
                                 action: 'BUY',
                                 symbol: w.symbol,
                                 qty: w.qty || 50,
@@ -2644,7 +2948,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           </button>
                         </div>
 
-                        {/* Manual Interventions (Buy / Sell & Delete) */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button
                             onClick={() => handleOpenPlaceOrder(w, 'BUY')}
@@ -2685,41 +2988,73 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Group & Multi-Account Copy Trading
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Replicate orders from one Master account to multiple Slave Demats in sub-50ms latency.
+                    Replicate orders from your Master Demat account to Follower Demats with custom lot multipliers.
                   </p>
                 </div>
-                <button
-                  onClick={handleKillSwitch}
-                  style={{
-                    width: isMobile ? '100%' : 'auto',
-                    justifyContent: 'center',
-                    padding: '9px 18px',
-                    background: '#ef4444',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '12.5px',
-                    fontWeight: '800',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Power size={15} /> EMERGENCY KILL ALL
-                </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                  <button
+                    onClick={() => setShowAddFollowerModal(true)}
+                    style={{
+                      flex: isMobile ? 1 : 'initial',
+                      justifyContent: 'center',
+                      padding: '9px 16px',
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={15} /> + Add Follower Account
+                  </button>
+                  <button
+                    onClick={handleKillSwitch}
+                    style={{
+                      flex: isMobile ? 1 : 'initial',
+                      justifyContent: 'center',
+                      padding: '9px 18px',
+                      background: '#ef4444',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Power size={15} /> EMERGENCY KILL ALL
+                  </button>
+                </div>
               </div>
 
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                     <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7', flexShrink: 0 }}>
                       👑
                     </div>
                     <div>
                       <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{copyGroup.groupName}</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        Master Demat: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{copyGroup.masterAccount} (Zerodha Kite)</span>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                        <span>Master Demat:</span>
+                        <select
+                          value={copyGroup.masterAccount || 'UNASSIGNED'}
+                          onChange={e => handleUpdateCopyGroup({ masterAccount: e.target.value })}
+                          style={{ background: '#090d16', border: '1px solid #334155', color: '#38bdf8', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                        >
+                          <option value="UNASSIGNED">Select Master Demat...</option>
+                          {demats.map(d => (
+                            <option key={d.id} value={d.clientCode}>{d.broker} ({d.clientCode})</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -2729,8 +3064,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <button
                       onClick={() => {
                         const newSt = copyGroup.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-                        setCopyGroup(prev => ({ ...prev, status: newSt }));
-                        showToast(`Copy Trading ${newSt}!`);
+                        handleUpdateCopyGroup({ status: newSt });
                       }}
                       style={{
                         padding: '7px 16px',
@@ -2750,48 +3084,75 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 <div style={{ borderTop: '1px solid #1e293b', paddingTop: '14px' }}>
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
-                    Follower / Child Demat Accounts:
+                    Follower / Child Demat Accounts ({copyGroup.followers?.length || 0}):
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {copyGroup.followers.map(f => (
-                      <div
-                        key={f.id}
-                        style={{
-                          background: '#090d16',
-                          border: '1px solid #1e293b',
-                          borderRadius: '8px',
-                          padding: '14px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '12px'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: '800', color: '#fff' }}>{f.broker} - {f.accountCode}</div>
-                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Max Risk/Trade: ₹{f.maxRiskPerTrade}</div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ fontSize: '12.5px', color: '#cbd5e1' }}>
-                            Multiplier: <span style={{ color: '#a855f7', fontWeight: '800' }}>{f.multiplier}x</span>
+                  {(!copyGroup.followers || copyGroup.followers.length === 0) ? (
+                    <div style={{ background: '#090d16', border: '1px dashed #334155', borderRadius: '8px', padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
+                      No follower accounts added to this Copy Group yet. Click <b>"+ Add Follower Account"</b> above to start mirroring trades.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {copyGroup.followers.map(f => (
+                        <div
+                          key={f.id}
+                          style={{
+                            background: '#090d16',
+                            border: '1px solid #1e293b',
+                            borderRadius: '8px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: '800', color: '#fff' }}>{f.broker} - {f.accountCode}</div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>Max Risk/Trade: ₹{f.maxRiskPerTrade}</div>
                           </div>
-                          <span style={{
-                            padding: '3px 9px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: '800',
-                            background: 'rgba(34,197,94,0.15)',
-                            color: '#22c55e'
-                          }}>
-                            {f.status}
-                          </span>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: '12.5px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>Multiplier:</span>
+                              <select
+                                value={f.multiplier}
+                                onChange={e => handleUpdateFollower(f.id, { multiplier: Number(e.target.value) })}
+                                style={{ background: '#101726', border: '1px solid #334155', color: '#a855f7', fontWeight: '800', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}
+                              >
+                                {[0.5, 1.0, 1.5, 2.0, 3.0, 5.0].map(m => (
+                                  <option key={m} value={m}>{m}x</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              onClick={() => handleUpdateFollower(f.id, { status: f.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' })}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: f.status === 'ACTIVE' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                                color: f.status === 'ACTIVE' ? '#22c55e' : '#f59e0b'
+                              }}
+                            >
+                              {f.status}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveFollower(f.id)}
+                              style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                              title="Remove Follower"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2807,11 +3168,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   TradingView, Chartink & Python Webhook Bridge
                 </h2>
                 <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                  Zero-latency JSON alert webhook listener routing strategy signals directly into live Demats.
+                  Zero-latency JSON alert webhook listener routing strategy signals directly into your connected Demats.
                 </p>
               </div>
 
-              {/* Target Webhook Endpoints */}
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8' }}>
@@ -2819,7 +3179,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText('https://skandx.in/api/v1/bridge/webhook');
+                      navigator.clipboard.writeText('https://www.skandx.in/api/v1/bridge/webhook');
                       showToast('Copied Webhook URL!');
                     }}
                     style={{ padding: '6px 12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
@@ -2828,11 +3188,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </button>
                 </div>
                 <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13.5px', wordBreak: 'break-all' }}>
-                  https://skandx.in/api/v1/bridge/webhook
+                  https://www.skandx.in/api/v1/bridge/webhook
                 </code>
               </div>
 
-              {/* Webhook JSON Generator Form */}
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
                   Interactive TradingView Alert Payload Builder
@@ -2897,7 +3256,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                {/* Pre-formatted output */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#94a3b8' }}>TradingView Alert Message JSON:</span>
@@ -2947,7 +3305,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   Telegram Bot OMS & Notifications
                 </h2>
                 <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                  Get real-time filled trade alerts and control your algorithms using Telegram chat commands.
+                  Receive instant trade execution alerts and control your algorithms using Telegram chat commands.
                 </p>
               </div>
 
@@ -2958,8 +3316,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <Send size={20} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>@SkandXAlgoBot</div>
-                      <div style={{ fontSize: '12px', color: '#22c55e', fontWeight: '600' }}>● Bot Gateway Connected & Running</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{telegramConfig.botUsername || '@SkandXAlgoBot'}</div>
+                      <div style={{ fontSize: '12px', color: telegramConfig.connected ? '#22c55e' : '#f59e0b', fontWeight: '600' }}>
+                        {telegramConfig.connected ? `● Connected to Chat ID: ${telegramConfig.chatId}` : '○ Enter your Telegram Chat ID below to activate personal alerts'}
+                      </div>
                     </div>
                   </div>
 
@@ -2970,6 +3330,46 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Send Test Trade Alert
                   </button>
                 </div>
+
+                {/* Telegram Configuration Form */}
+                <form onSubmit={handleSaveTelegramConfig} style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fff' }}>
+                    Personal Telegram Alert Routing
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Enter your Telegram Chat ID (e.g. 581920412)"
+                      value={telegramConfig.chatId || ''}
+                      onChange={e => setTelegramConfig(prev => ({ ...prev, chatId: e.target.value }))}
+                      style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '13px' }}
+                    />
+                    <button
+                      type="submit"
+                      style={{ padding: '10px 16px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}
+                    >
+                      Save Telegram Settings
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {[
+                      { key: 'notifyFills', label: 'Order Fills' },
+                      { key: 'notifyRejections', label: 'Broker Rejections' },
+                      { key: 'notifyCopyTrades', label: 'Follower Copy Trades' },
+                      { key: 'notifyDailyPnl', label: '15:30 Daily P&L Summary' }
+                    ].map(item => (
+                      <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#cbd5e1', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(telegramConfig[item.key])}
+                          onChange={e => setTelegramConfig(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                          style={{ accentColor: '#22c55e' }}
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
+                </form>
 
                 <div style={{ borderTop: '1px solid #1e293b', paddingTop: '16px' }}>
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
@@ -2999,7 +3399,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* TAB 9: PLANS & PRICING                                        */}
+          {/* TAB 9: PLANS & PRICING (WITH RAZORPAY CHECKOUT)               */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'Plans' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -3008,14 +3408,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   Institutional Algo Trading Plans & Add-ons
                 </h2>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
-                  Ultra-low latency OMS infrastructure, colocation static IP pools, and multi-broker routing.
+                  All subscriptions and add-ons are processed securely through the official Razorpay Payment Gateway.
                 </p>
               </div>
 
-              {/* 3 Pricing Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
                 {/* Plan 1: Starter Free */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#101726', border: config.activePlan === 'STARTER' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.5px' }}>STARTER</div>
                   <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Paper & Basic Algo</h3>
                   <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
@@ -3030,7 +3429,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Paper Trading Simulation OMS</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> TradingView & Chartink Webhook Bridge</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Standard 150ms execution router</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Community & Support Forum</div>
                   </div>
 
                   <button
@@ -3047,14 +3445,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'default'
                     }}
                   >
-                    Current Active Plan
+                    {config.activePlan === 'STARTER' ? 'Current Active Plan' : 'Included in Your Plan'}
                   </button>
                 </div>
 
-                {/* Plan 2: Pro Algo Trader (Featured) */}
+                {/* Plan 2: Pro Algo Trader */}
                 <div style={{
                   background: 'linear-gradient(180deg, #131c31 0%, #101726 100%)',
-                  border: '2px solid #2563eb',
+                  border: config.activePlan === 'PRO' ? '2px solid #22c55e' : '2px solid #2563eb',
                   borderRadius: '14px',
                   padding: '24px',
                   display: 'flex',
@@ -3066,7 +3464,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     top: '-12px',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    background: '#2563eb',
+                    background: config.activePlan === 'PRO' ? '#16a34a' : '#2563eb',
                     color: '#fff',
                     padding: '3px 12px',
                     borderRadius: '12px',
@@ -3074,7 +3472,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     fontWeight: '900',
                     letterSpacing: '0.5px'
                   }}>
-                    MOST POPULAR
+                    {config.activePlan === 'PRO' ? 'ACTIVE PLAN' : 'MOST POPULAR'}
                   </div>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.5px' }}>PRO TRADER</div>
                   <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Live Multi-Broker Algo</h3>
@@ -3088,23 +3486,23 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Up to 5 Connected Demats</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Real Live Market Order Routing</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Sub-50ms Low Latency OMS Router</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> 5 Client Link Slots Included</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Telegram Bot OMS & Instant Alerts</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Unlimited Watchlist Strategies</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Trailing SL & Auto 15:15 Exit</div>
                   </div>
 
                   <button
                     onClick={() => handleOpenCheckout({
-                      type: 'PLAN',
+                      type: 'PLAN_PRO',
+                      id: 'PRO',
                       title: 'Pro Algo Trader Plan',
                       amount: 999,
-                      subtitle: '1 Month Pro Multi-Broker Algo Subscription'
+                      subtitle: '1 Month Pro Multi-Broker Algo Subscription via Razorpay'
                     })}
                     style={{
                       width: '100%',
                       padding: '12px',
-                      background: '#2563eb',
+                      background: config.activePlan === 'PRO' ? '#16a34a' : '#2563eb',
                       border: 'none',
                       color: '#fff',
                       borderRadius: '8px',
@@ -3114,12 +3512,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       boxShadow: '0 4px 14px rgba(37,99,235,0.4)'
                     }}
                   >
-                    Upgrade to Pro (₹999/mo)
+                    {config.activePlan === 'PRO' ? 'Renew Pro Plan (₹999/mo)' : 'Upgrade with Razorpay (₹999/mo)'}
                   </button>
                 </div>
 
                 {/* Plan 3: Institutional Copy Master */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#101726', border: config.activePlan === 'INSTITUTIONAL' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#a855f7', letterSpacing: '0.5px' }}>INSTITUTIONAL</div>
                   <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Copy Trading Master Suite</h3>
                   <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
@@ -3131,19 +3529,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Unlimited Demat Accounts</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 10 Follower Demat Slots Included</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 15 Follower Demat Slots Included</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Master-to-Slave Sub-20ms Copy Engine</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 2 Dedicated BKC Static IPs Included</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Emergency Global Kill Switch Suite</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Dedicated Telegram / Call Support Desk</div>
                   </div>
 
                   <button
                     onClick={() => handleOpenCheckout({
-                      type: 'PLAN',
+                      type: 'PLAN_INSTITUTIONAL',
+                      id: 'INSTITUTIONAL',
                       title: 'Institutional Copy Master',
                       amount: 2499,
-                      subtitle: '1 Month Master Demat Multi-Account Copy Trading Suite'
+                      subtitle: '1 Month Master Demat Multi-Account Copy Trading Suite via Razorpay'
                     })}
                     style={{
                       width: '100%',
@@ -3157,18 +3555,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    Get Institutional (₹2,499/mo)
+                    {config.activePlan === 'INSTITUTIONAL' ? 'Renew Institutional (₹2,499/mo)' : 'Get Institutional via Razorpay (₹2,499/mo)'}
                   </button>
                 </div>
               </div>
 
               {/* Add-on Rate Cards */}
-              <div style={{ marginTop: '12px' }}>
+              <div style={{ marginTop: '8px' }}>
                 <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#fff', margin: '0 0 12px' }}>
                   A La Carte Add-ons & Infrastructure
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '14px' }}>
-                  {/* Static IP Addon */}
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -3183,11 +3580,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handlePurchaseStaticIp}
                       style={{ marginTop: '14px', padding: '9px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      Buy Static IP (₹350)
+                      Buy Static IP via Razorpay (₹350)
                     </button>
                   </div>
 
-                  {/* Link User Slot Addon */}
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -3202,36 +3598,76 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handlePurchaseLinkSlot}
                       style={{ marginTop: '14px', padding: '9px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      Buy Client Slot (₹250)
+                      Buy Client Slot via Razorpay (₹250)
                     </button>
                   </div>
 
-                  {/* High Frequency Colocation Addon */}
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>BKC Microsecond Router</div>
-                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>INCLUDED</span>
+                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Algo Wallet Recharge</div>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>INSTANT</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        PTP synchronized hardware time stamping and direct leased line socket tunnels into broker OMS.
+                        Top up your SkandX Algo Wallet via Razorpay UPI, Cards, or NetBanking for instant 1-click renewals.
                       </div>
                     </div>
-                    <div style={{ marginTop: '14px', padding: '8px', background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '6px', textAlign: 'center', color: '#c084fc', fontSize: '11.5px', fontWeight: '700' }}>
-                      Active for All Accounts
-                    </div>
+                    <button
+                      onClick={handleOpenAddFundsRazorpay}
+                      style={{ marginTop: '14px', padding: '9px', background: '#7c3aed', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
+                    >
+                      + Top Up Wallet via Razorpay
+                    </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Payment & Wallet Transaction History */}
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                  Your Razorpay & Wallet Transaction History ({transactions.length})
+                </div>
+                {transactions.length === 0 ? (
+                  <div style={{ fontSize: '12.5px', color: '#64748b', padding: '12px 0' }}>
+                    No payment transactions recorded on this account yet.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 10px' }}>Ref ID</th>
+                          <th style={{ padding: '8px 10px' }}>Date</th>
+                          <th style={{ padding: '8px 10px' }}>Type</th>
+                          <th style={{ padding: '8px 10px' }}>Method / Description</th>
+                          <th style={{ padding: '8px 10px' }}>Amount</th>
+                          <th style={{ padding: '8px 10px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map(tx => (
+                          <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#38bdf8' }}>{tx.id}</td>
+                            <td style={{ padding: '8px 10px', color: '#94a3b8' }}>{tx.date}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: '800', color: tx.type === 'CREDIT' ? '#22c55e' : '#f59e0b' }}>{tx.type}</td>
+                            <td style={{ padding: '8px 10px' }}>{tx.method}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: '800' }}>₹{Number(tx.amount || 0).toLocaleString('en-IN')}</td>
+                            <td style={{ padding: '8px 10px', color: '#22c55e', fontWeight: '700' }}>{tx.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* TAB 10: INSTITUTIONAL ALGO ADMIN SUITE                        */}
+          {/* TAB 10: INSTITUTIONAL ALGO ADMIN SUITE (STRICTLY ADMIN ONLY)  */}
           {/* ───────────────────────────────────────────────────────────── */}
-          {activeMenu === 'AlgoAdmin' && (
+          {activeMenu === 'AlgoAdmin' && isAdmin && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Header with Server Status */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -3262,20 +3698,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    <RefreshCw size={13} className={loadingAdminStats ? 'animate-spin' : ''} /> Refresh Telemetry
+                    <RefreshCw size={13} /> Refresh Telemetry
                   </button>
 
                   <button
-                    onClick={() => {
-                      if (!window.confirm('GLOBAL OMS FREEZE: This will halt all order routing across all connected user accounts on the server. Confirm?')) return;
-                      showToast('🚨 Global OMS Emergency Freeze Activated!');
-                    }}
+                    onClick={handleAdminGlobalFreeze}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       padding: '8px 16px',
-                      background: '#ef4444',
+                      background: adminStats?.summary?.globalFreeze ? '#16a34a' : '#ef4444',
                       border: 'none',
                       color: '#fff',
                       borderRadius: '8px',
@@ -3284,7 +3717,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    <Power size={13} /> Global Freeze Switch
+                    <Power size={13} /> {adminStats?.summary?.globalFreeze ? 'Release OMS Freeze' : 'Global Freeze Switch'}
                   </button>
                 </div>
               </div>
@@ -3304,13 +3737,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
-                  <span style={{ color: '#fff', fontWeight: '800' }}>Mumbai BKC Equinix MB2 Node (NSE Colocation)</span>
+                  <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (NSE Colocation)'}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', color: '#94a3b8' }}>
-                  <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>±0.4μs OK</strong></span>
-                  <span>Tick Throughput: <strong style={{ color: '#38bdf8' }}>68,420 / sec</strong></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                  <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>{adminStats?.serverStatus?.clockSync || '±0.4μs OK'}</strong></span>
+                  <span>Tick Throughput: <strong style={{ color: '#38bdf8' }}>{adminStats?.serverStatus?.tickRate || '68,420 / sec'}</strong></span>
                   <span>OMS Latency: <strong style={{ color: '#10b981' }}>1.8 ms</strong></span>
-                  <span>Uptime: <strong style={{ color: '#fff' }}>99.98%</strong></span>
+                  <span>Uptime: <strong style={{ color: '#fff' }}>{adminStats?.serverStatus?.uptime || '99.98%'}</strong></span>
                 </div>
               </div>
 
@@ -3318,20 +3751,28 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
                 <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>TOTAL DEMATS ACTIVE</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginTop: '6px' }}>142</div>
-                  <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '4px' }}>● 138 Active • 4 Re-auth</div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginTop: '6px' }}>
+                    {adminStats?.summary?.totalDemats ?? demats.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '4px' }}>
+                    ● {adminStats?.summary?.activeDemats ?? demats.filter(d => d.status === 'ACTIVE').length} Active • {adminStats?.summary?.expiredDemats ?? demats.filter(d => d.status === 'EXPIRED').length} Re-auth
+                  </div>
                 </div>
 
                 <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>TODAY ROUTED ORDERS</div>
-                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#38bdf8', marginTop: '6px' }}>1,842</div>
-                  <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px' }}>₹4.82 Cr Notional Turn</div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#38bdf8', marginTop: '6px' }}>
+                    {adminStats?.summary?.todayOrders ?? orders.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px' }}>
+                    Across {adminStats?.summary?.totalUsersConfigured ?? 1} Algo Hub Users
+                  </div>
                 </div>
 
                 <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>STATIC IP POOL</div>
                   <div style={{ fontSize: '24px', fontWeight: '900', color: '#10b981', marginTop: '6px' }}>
-                    {staticIps.length} / 15
+                    {adminStats?.summary?.totalStaticIps ?? staticIps.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>Clean BKC Class-C Subnets</div>
                 </div>
@@ -3339,7 +3780,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>CLIENT LINK SLOTS</div>
                   <div style={{ fontSize: '24px', fontWeight: '900', color: '#a855f7', marginTop: '6px' }}>
-                    {linkedUsers.length} / {config.totalLinkSlots || 5}
+                    {linkedUsers.length} / {config.totalLinkSlots || 1}
                   </div>
                   <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '4px' }}>Follower Copy Capacity</div>
                 </div>
@@ -3355,7 +3796,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <thead>
                       <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
                         <th style={{ padding: '10px 14px' }}>Broker Gateway</th>
-                        <th style={{ padding: '10px 14px' }}>API Engine</th>
                         <th style={{ padding: '10px 14px' }}>Ping Latency</th>
                         <th style={{ padding: '10px 14px' }}>Active Sessions</th>
                         <th style={{ padding: '10px 14px' }}>Gateway Status</th>
@@ -3363,18 +3803,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { name: 'Zerodha Kite Connect', api: 'REST API v3 + WebSocket Ticker', latency: '4.2 ms', sessions: 64, status: 'OPERATIONAL' },
-                        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: 38, status: 'OPERATIONAL' },
-                        { name: 'Upstox Pro API', api: 'Pro API v2 Protobuf Feed', latency: '8.4 ms', sessions: 19, status: 'OPERATIONAL' },
-                        { name: 'DhanHQ Open API', api: 'DhanHQ v2 Feed & Order API', latency: '5.1 ms', sessions: 12, status: 'OPERATIONAL' },
-                        { name: 'Fyers API', api: 'Fyers API v3 Multi-Socket', latency: '7.8 ms', sessions: 8, status: 'OPERATIONAL' }
-                      ].map((bg, idx) => (
+                      {(adminStats?.brokerGateways || [
+                        { name: 'Zerodha Kite Connect v3', latency: '4.2ms', activeSessions: 1, status: 'OPERATIONAL' },
+                        { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' },
+                        { name: 'Upstox Pro API v2', latency: '8.4ms', activeSessions: 1, status: 'OPERATIONAL' },
+                        { name: 'DhanHQ Open API', latency: '5.1ms', activeSessions: 1, status: 'OPERATIONAL' },
+                        { name: 'Fyers API v3', latency: '7.8ms', activeSessions: 1, status: 'OPERATIONAL' }
+                      ]).map((bg, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
                           <td style={{ padding: '12px 14px', fontWeight: '800', color: '#fff' }}>{bg.name}</td>
-                          <td style={{ padding: '12px 14px', color: '#94a3b8' }}>{bg.api}</td>
                           <td style={{ padding: '12px 14px', color: '#10b981', fontWeight: '800' }}>{bg.latency}</td>
-                          <td style={{ padding: '12px 14px', color: '#38bdf8', fontWeight: '700' }}>{bg.sessions} Demats</td>
+                          <td style={{ padding: '12px 14px', color: '#38bdf8', fontWeight: '700' }}>{bg.activeSessions} Demats</td>
                           <td style={{ padding: '12px 14px' }}>
                             <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '3px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800' }}>
                               ● {bg.status}
@@ -3402,31 +3841,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px' }}>
                   <button
-                    onClick={() => {
-                      const oct = Math.floor(50 + Math.random() * 150);
-                      const newIp = {
-                        id: 'IP-0' + (staticIps.length + 1),
-                        ip: `103.212.120.${oct}`,
-                        datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-                        status: 'WHITELISTED',
-                        latency: '1.8 ms',
-                        assignedTo: 'Admin Pool Reserve',
-                        port: '8080 (SOCKS5/HTTP)',
-                        expiresAt: 'Permanent Admin'
-                      };
-                      setStaticIps(prev => [newIp, ...prev]);
-                      showToast(`Provisioned new Static IP ${newIp.ip} to Pool!`);
-                    }}
+                    onClick={handleAdminProvisionIp}
                     style={{ padding: '12px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
                   >
                     + Provision New Static IP to Pool
                   </button>
 
                   <button
-                    onClick={() => {
-                      setConfig(prev => ({ ...prev, totalLinkSlots: (prev.totalLinkSlots || 5) + 2 }));
-                      showToast('Granted +2 Link User Client Slots!');
-                    }}
+                    onClick={handleAdminGrantSlots}
                     style={{ padding: '12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
                   >
                     + Grant 2 Client Slots (Admin Override)
@@ -3440,33 +3862,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </button>
                 </div>
               </div>
-
-              {/* Real-Time Execution Audit Stream */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
-                    Live OMS Execution & Audit Stream
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: '700' }}>
-                    ● STREAMING LIVE
-                  </div>
-                </div>
-
-                <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '11.5px' }}>
-                  {[
-                    { time: '15:28:44.102', event: '[ORDER_FILLED] NSE:NIFTY24OCTFUT BUY 50 QTY @ 25,014.20 -> Zerodha Kite (ZER6641) [Latency: 4.1ms]', ok: true },
-                    { time: '15:28:44.118', event: '[COPY_TRIGGER] Replicating ZER6641 -> Follower AB1234 (Angel One) [Latency: 12.8ms] STATUS: SUCCESS', ok: true },
-                    { time: '15:25:01.004', event: '[WEBHOOK_RECV] TradingView Alert payload parsed: Action=BUY Symbol=NSE:BANKNIFTY Qty=15', ok: true },
-                    { time: '15:20:12.880', event: '[HEARTBEAT] NSE BKC Colocation Master Socket OK. Clock offset: +0.2μs', ok: true },
-                    { time: '15:15:00.001', event: '[AUTO_SQUAREOFF] Scheduled 15:15 intraday exit sequence completed. 0 open risk items.', ok: true }
-                  ].map((log, idx) => (
-                    <div key={idx} style={{ color: log.ok ? '#94a3b8' : '#f87171', display: 'flex', gap: '10px' }}>
-                      <span style={{ color: '#64748b' }}>{log.time}</span>
-                      <span style={{ color: '#cbd5e1' }}>{log.event}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -3474,166 +3869,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 1: ADD FUNDS / RECHARGE WALLET MODAL                    */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      {showRechargeModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 100010,
-          background: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
-        }}>
-          <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '480px',
-            padding: '24px',
-            color: '#fff',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Wallet size={20} color="#22c55e" />
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Add Platform Credit</h3>
-              </div>
-              <button onClick={() => setShowRechargeModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '0 0 16px' }}>
-              Add credit to purchase dedicated static IPs and execute high-frequency multi-broker algo orders.
-            </p>
-
-            {/* Current Balance */}
-            <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Current Wallet Balance:</span>
-              <span style={{ fontSize: '18px', fontWeight: '900', color: '#22c55e' }}>₹{config.availableCredit.toFixed(2)}</span>
-            </div>
-
-            {/* Quick Presets */}
-            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', marginBottom: '8px' }}>
-              SELECT RECHARGE AMOUNT:
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px' }}>
-              {['500', '1000', '2500', '5000', '10000'].map(amt => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => setCustomRechargeAmount(amt)}
-                  style={{
-                    padding: '10px',
-                    background: customRechargeAmount === amt ? 'rgba(56,189,248,0.18)' : '#090d16',
-                    border: `1px solid ${customRechargeAmount === amt ? '#38bdf8' : '#1e293b'}`,
-                    borderRadius: '8px',
-                    color: customRechargeAmount === amt ? '#38bdf8' : '#cbd5e1',
-                    fontWeight: '800',
-                    fontSize: '13px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ₹{Number(amt).toLocaleString('en-IN')}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Amount Input */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '11.5px', color: '#64748b' }}>Custom Amount (₹)</label>
-              <input
-                type="number"
-                value={customRechargeAmount}
-                onChange={e => setCustomRechargeAmount(e.target.value)}
-                style={{
-                  width: '100%',
-                  background: '#090d16',
-                  border: '1px solid #1e293b',
-                  borderRadius: '8px',
-                  padding: '10px 14px',
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  marginTop: '4px'
-                }}
-              />
-            </div>
-
-            {/* Payment Method Selector */}
-            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', marginBottom: '8px' }}>
-              PAYMENT METHOD:
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-              <div 
-                onClick={() => setRechargePaymentMethod('UPI')}
-                style={{
-                  padding: '12px',
-                  background: rechargePaymentMethod === 'UPI' ? 'rgba(34,197,94,0.12)' : '#090d16',
-                  border: `1px solid ${rechargePaymentMethod === 'UPI' ? '#22c55e' : '#1e293b'}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Smartphone size={16} color="#22c55e" />
-                <div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>Instant UPI</div>
-                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>GPay, PhonePe, Paytm QR</div>
-                </div>
-              </div>
-
-              <div 
-                onClick={() => setRechargePaymentMethod('CARD')}
-                style={{
-                  padding: '12px',
-                  background: rechargePaymentMethod === 'CARD' ? 'rgba(56,189,248,0.12)' : '#090d16',
-                  border: `1px solid ${rechargePaymentMethod === 'CARD' ? '#38bdf8' : '#1e293b'}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <CreditCard size={16} color="#38bdf8" />
-                <div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>Card / Netbanking</div>
-                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Debit, Credit Card & Netbanking</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowRechargeModal(false)}
-                style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRecharge}
-                style={{ flex: 2, padding: '11px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: '800', fontSize: '13px' }}
-              >
-                Add ₹{Number(customRechargeAmount || 0).toLocaleString('en-IN')} Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 2: CONNECT NEW DEMAT ACCOUNT                            */}
+      {/* MODAL 1: CONNECT NEW DEMAT ACCOUNT                            */}
       {/* ───────────────────────────────────────────────────────────── */}
       {showAddDematModal && (
         <div style={{
@@ -3730,12 +3966,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Route via Dedicated Static IP</label>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Route via Static IP</label>
                 <select
                   value={newIp}
                   onChange={e => setNewIp(e.target.value)}
                   style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                 >
+                  <option value="Shared NSE Gateway (Default)">Shared NSE Gateway (Default Free)</option>
                   {staticIps.map(ip => (
                     <option key={ip.id} value={ip.ip}>{ip.ip} ({ip.datacenter})</option>
                   ))}
@@ -3763,7 +4000,236 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 3: RE-AUTH / TOTP RENEWAL MODAL                         */}
+      {/* MODAL 2: LINK NEW CLIENT DEMAT MODAL                          */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {showAddLinkUserModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100010,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#121826',
+            border: '1px solid #1e293b',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '24px',
+            color: '#fff'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Link Client Demat Account</h3>
+              <button onClick={() => setShowAddLinkUserModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddLinkUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Arjun Mehta"
+                  value={newLinkClientName}
+                  onChange={e => setNewLinkClientName(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client Email</label>
+                <input
+                  type="email"
+                  placeholder="client@example.com"
+                  value={newLinkEmail}
+                  onChange={e => setNewLinkEmail(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker</label>
+                  <select
+                    value={newLinkBroker}
+                    onChange={e => setNewLinkBroker(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  >
+                    <option value="Zerodha Kite">Zerodha Kite</option>
+                    <option value="Angel One">Angel One</option>
+                    <option value="Upstox Pro">Upstox Pro</option>
+                    <option value="Groww Demat">Groww Demat</option>
+                    <option value="DhanHQ">DhanHQ</option>
+                    <option value="Fyers">Fyers</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker UCC / ID *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. ZER9912"
+                    value={newLinkClientCode}
+                    onChange={e => setNewLinkClientCode(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Default Copy Multiplier</label>
+                <select
+                  value={newLinkCopyRatio}
+                  onChange={e => setNewLinkCopyRatio(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                >
+                  <option value="0.5x">0.5x Multiplier</option>
+                  <option value="1.0x">1.0x Multiplier</option>
+                  <option value="1.5x">1.5x Multiplier</option>
+                  <option value="2.0x">2.0x Multiplier</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddLinkUserModal(false)}
+                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ flex: 1, padding: '11px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: '800' }}
+                >
+                  Link Client Demat
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL 3: ADD FOLLOWER TO COPY GROUP MODAL                     */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {showAddFollowerModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100010,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#121826',
+            border: '1px solid #1e293b',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '460px',
+            padding: '24px',
+            color: '#fff'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Add Follower to Copy Group</h3>
+              <button onClick={() => setShowAddFollowerModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddFollowerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Select From Connected / Linked Demats or Enter Custom</label>
+                <select
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const [b, c] = val.split('||');
+                    setNewFollowerBroker(b);
+                    setNewFollowerCode(c);
+                  }}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                >
+                  <option value="">Choose existing Demat or type below...</option>
+                  {demats.map(d => (
+                    <option key={d.id} value={`${d.broker}||${d.clientCode}`}>{d.broker} ({d.clientCode})</option>
+                  ))}
+                  {linkedUsers.map(u => (
+                    <option key={u.id} value={`${u.broker}||${u.clientCode}`}>{u.clientName} - {u.broker} ({u.clientCode})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Name</label>
+                  <input
+                    type="text"
+                    value={newFollowerBroker}
+                    onChange={e => setNewFollowerBroker(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Account UCC *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. ANG9012"
+                    value={newFollowerCode}
+                    onChange={e => setNewFollowerCode(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Lot Multiplier</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={newFollowerMultiplier}
+                    onChange={e => setNewFollowerMultiplier(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Max Risk / Trade (₹)</label>
+                  <input
+                    type="number"
+                    value={newFollowerMaxRisk}
+                    onChange={e => setNewFollowerMaxRisk(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddFollowerModal(false)}
+                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ flex: 1, padding: '11px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: '800' }}
+                >
+                  Add Follower
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL 4: RE-AUTH / TOTP RENEWAL MODAL                         */}
       {/* ───────────────────────────────────────────────────────────── */}
       {showReauthModal && accountToReauth && (
         <div style={{
@@ -3849,7 +4315,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 4: PLACE ALGO ORDER MODAL                               */}
+      {/* MODAL 5: PLACE ALGO ORDER MODAL (CONTROLLED)                  */}
       {/* ───────────────────────────────────────────────────────────── */}
       {showOrderModal && selectedStockForOrder && (
         <div style={{
@@ -3896,10 +4362,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <form onSubmit={handleExecuteOrderSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '11.5px', color: '#64748b' }}>Route to Demat Account</label>
-                <select style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}>
-                  <option>ALL CONNECTED DEMATS (MASTER + SLAVES)</option>
+                <select
+                  value={orderTargetDemat}
+                  onChange={e => setOrderTargetDemat(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                >
+                  <option value="ALL">ALL CONNECTED DEMATS / PAPER OMS</option>
                   {demats.map(d => (
-                    <option key={d.id}>{d.broker} ({d.clientCode})</option>
+                    <option key={d.id} value={d.id}>{d.broker} ({d.clientCode})</option>
                   ))}
                 </select>
               </div>
@@ -3909,15 +4379,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <label style={{ fontSize: '11.5px', color: '#64748b' }}>Quantity</label>
                   <input
                     type="number"
-                    defaultValue={50}
+                    min="1"
+                    value={orderQty}
+                    onChange={e => setOrderQty(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
                   <label style={{ fontSize: '11.5px', color: '#64748b' }}>Order Type</label>
-                  <select style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}>
-                    <option>MARKET</option>
-                    <option>LIMIT</option>
+                  <select
+                    value={orderType}
+                    onChange={e => setOrderType(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                  >
+                    <option value="MARKET">MARKET</option>
+                    <option value="LIMIT">LIMIT</option>
                   </select>
                 </div>
               </div>
@@ -3927,7 +4403,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <label style={{ fontSize: '11.5px', color: '#64748b' }}>Target (Points)</label>
                   <input
                     type="number"
-                    defaultValue={100}
+                    value={orderTargetPts}
+                    onChange={e => setOrderTargetPts(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
@@ -3935,7 +4412,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <label style={{ fontSize: '11.5px', color: '#64748b' }}>Stop Loss (Points)</label>
                   <input
                     type="number"
-                    defaultValue={50}
+                    value={orderSlPts}
+                    onChange={e => setOrderSlPts(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
@@ -3955,7 +4433,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   cursor: 'pointer'
                 }}
               >
-                Execute {orderSide} via SkandX OMS
+                Execute {orderSide} ({orderQty} Qty) via SkandX OMS
               </button>
             </form>
           </div>
@@ -3963,18 +4441,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 5: ALGO PAYMENT GATEWAY MODAL (UPI QR / CARDS / WALLET) */}
+      {/* MODAL 6: OFFICIAL RAZORPAY & ALGO WALLET CHECKOUT MODAL       */}
       {/* ───────────────────────────────────────────────────────────── */}
       <AlgoPaymentGatewayModal
         isOpen={showCheckoutModal}
         onClose={() => setShowCheckoutModal(false)}
         item={checkoutItem}
         onSuccess={handlePaymentSuccess}
+        onPaymentSuccess={handlePaymentSuccess}
         walletBalance={config.availableCredit}
       />
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL 6: DEPLOY / CONFIGURE ALGO STRATEGY MODAL               */}
+      {/* MODAL 7: DEPLOY / CONFIGURE ALGO STRATEGY MODAL               */}
       {/* ───────────────────────────────────────────────────────────── */}
       <DeployAlgoModal
         isOpen={showDeployAlgoModal}
@@ -3983,6 +4462,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           setEditingAlgoItem(null);
         }}
         onDeploy={handleDeployAlgo}
+        editingItem={editingAlgoItem}
         editingAlgo={editingAlgoItem}
       />
 

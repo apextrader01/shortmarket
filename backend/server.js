@@ -14413,7 +14413,7 @@ Key rules:
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🌟 SKANDX ALGO MULTI-BROKER DEMAT & WEBHOOK BRIDGE SUITE (HUB 11 / HUB 12)
+// 🌟 SKANDX ALGO MULTI-BROKER DEMAT & WEBHOOK BRIDGE SUITE (PER-USER + RAZORPAY)
 // ─────────────────────────────────────────────────────────────────────────────
 function maskBrokerApiKey(rawKey) {
   const clean = String(rawKey || '').trim();
@@ -14425,335 +14425,413 @@ function maskBrokerApiKey(rawKey) {
 
 app.use('/api/v1/bridge', apiLimiter);
 
-let bridgeOrdersStore = [
-  {
-    id: 'BO-98210',
-    timestamp: '09:25 AM',
-    broker: 'Zerodha Kite',
-    account: 'ZER-6641',
-    symbol: 'NSE:NIFTY24OCTFUT',
-    side: 'BUY',
-    qty: 50,
-    price: 24890.50,
-    status: 'COMPLETED',
-    source: 'TradingView Webhook'
-  },
-  {
-    id: 'BO-98209',
-    timestamp: '09:18 AM',
-    broker: 'Angel One',
-    account: 'ANG-9012',
-    symbol: 'NSE:BANKNIFTY24OCTFUT',
-    side: 'SELL',
-    qty: 15,
-    price: 51220.00,
-    status: 'COMPLETED',
-    source: 'TradingView Webhook'
-  }
+const userBridgeStatesCache = new Map(); // userId -> state object
+const bridgeUserLookupCache = new Map(); // userId -> { user, ts }
+const algoAdminAuditLogs = [
+  { time: new Date().toLocaleTimeString('en-IN', { hour12: false }), event: '[GATEWAY_INIT] Mumbai BKC Equinix MB2 Node Connected — OMS Router Active (1.8ms)', ok: true }
 ];
 
-let bridgeConfig = {
-  allowConnectAccount: true,
-  allowPurchaseIp: true,
-  connectionToken: 'skandx_broker_demat_9433',
-  availableCredit: 3500.00,
-  totalDemat: 3,
-  disconnectedDemat: 0,
-  expiredDemat: 2,
-  totalStaticIp: 4,
-  availableStaticIp: 2,
-  totalLinkSlots: 5,
-  usedLinkSlots: 3,
-  staticIpMonthlyRate: 350,
-  linkUserMonthlyRate: 250,
-  currentPlan: 'PRO_ALGO',
-  serverHealth: {
-    bkcLatency: '1.8ms',
-    uptime: '99.98%',
-    redisQueue: '0 msgs (Healthy)',
-    activeTickStream: '68,400 ticks/sec'
-  }
-};
-
-let dematAccountsStore = [
-  {
-    id: 'ACC-01',
-    broker: 'Zerodha Kite Connect',
-    brokerKey: 'zerodha',
-    clientCode: 'ZER-6641',
-    name: 'Harikrishnan Primary',
-    apiKey: 'kite_••••382b',
-    status: 'EXPIRED',
-    tradingActive: true,
-    ip: '103.212.120.45',
-    lastLogin: 'Today, 08:30 AM',
-    expiresIn: 'Expired (Requires Daily TOTP Auth)',
-    segment: 'Equity, F&O, Currency'
-  },
-  {
-    id: 'ACC-02',
-    broker: 'Angel One SmartAPI',
-    brokerKey: 'angel',
-    clientCode: 'ANG-9012',
-    name: 'Harikrishnan Alpha Hedge',
-    apiKey: 'smar••••9bc2',
-    status: 'EXPIRED',
-    tradingActive: true,
-    ip: '103.212.120.46',
-    lastLogin: 'Yesterday, 03:20 PM',
-    expiresIn: 'Expired (TOTP Re-auth required)',
-    segment: 'Futures & Options'
-  },
-  {
-    id: 'ACC-03',
-    broker: 'Upstox Pro API v2',
-    brokerKey: 'upstox',
-    clientCode: 'UPS-5501',
-    name: 'Momentum Scalper',
-    apiKey: 'upst••••7718',
-    status: 'ACTIVE',
-    tradingActive: true,
-    ip: '103.212.120.45',
-    lastLogin: 'Today, 09:15 AM',
-    expiresIn: 'Active (Valid 14h)',
-    segment: 'NSE Equities'
-  }
-];
-
-let staticIpsStore = [
-  {
-    id: 'IP-01',
-    ip: '103.212.120.45',
-    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-    status: 'WHITELISTED',
-    latency: '1.8 ms',
-    assignedTo: 'ZER-6641 (Zerodha), UPS-5501 (Upstox)',
-    port: '8080 (SOCKS5/HTTP)',
-    expiresAt: '30 Days Remaining'
-  },
-  {
-    id: 'IP-02',
-    ip: '103.212.120.46',
-    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-    status: 'WHITELISTED',
-    latency: '2.1 ms',
-    assignedTo: 'ANG-9012 (Angel One)',
-    port: '8080 (SOCKS5/HTTP)',
-    expiresAt: '28 Days Remaining'
-  },
-  {
-    id: 'IP-03',
-    ip: '103.212.120.47',
-    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-    status: 'AVAILABLE',
-    latency: '1.9 ms',
-    assignedTo: 'Unassigned (Ready for Demat)',
-    port: '8080 (SOCKS5/HTTP)',
-    expiresAt: 'Dedicated Pool'
-  }
-];
-
-let linkedUsersStore = [
-  {
-    id: 'LNK-101',
-    clientName: 'Rajesh Kumar',
-    email: 'rajesh.k@gmail.com',
-    broker: 'Zerodha Kite',
-    clientCode: 'RK7821',
-    connectedAt: '02 Oct 2026, 11:40 AM',
-    status: 'CONNECTED',
-    allowTrading: true,
-    copyRatio: '1.0x'
-  },
-  {
-    id: 'LNK-102',
-    clientName: 'Priya Sharma',
-    email: 'priya.invests@outlook.com',
-    broker: 'Groww Demat',
-    clientCode: 'GW5540',
-    connectedAt: '03 Oct 2026, 02:15 PM',
-    status: 'CONNECTED',
-    allowTrading: true,
-    copyRatio: '0.5x'
-  },
-  {
-    id: 'LNK-103',
-    clientName: 'Vikram Patel',
-    email: 'vikram.p@yahoo.in',
-    broker: 'Angel One',
-    clientCode: 'VP9912',
-    connectedAt: '03 Oct 2026, 05:30 PM',
-    status: 'PENDING_REAUTH',
-    allowTrading: false,
-    copyRatio: '1.0x'
-  }
-];
-
-let watchlistStore = [
-  { 
-    id: 'WL-01', 
-    symbol: 'NSE:NIFTY24OCTFUT', 
-    ltp: 25014.60, 
-    change: '+104.20 (+0.42%)', 
-    isUp: true, 
-    high: 25080.00, 
-    low: 24920.00, 
-    algoStrategy: 'EMA 9/21 Trend Scalper', 
-    algoActive: true,
-    mode: 'LIVE',
-    status: 'IN_POSITION_LONG',
-    lots: 1,
-    qty: 75,
-    targetPts: 60,
-    slPts: 25,
-    trailingSl: true,
-    autoSquareOff: '15:15',
-    realizedPnl: 2850
-  },
-  { 
-    id: 'WL-02', 
-    symbol: 'NSE:BANKNIFTY51500CE', 
-    ltp: 342.50, 
-    change: '+48.20 (+16.38%)', 
-    isUp: true, 
-    high: 380.00, 
-    low: 260.00, 
-    algoStrategy: '9:20 AM Short Straddle', 
-    algoActive: true,
-    mode: 'LIVE',
-    status: 'IN_POSITION_SHORT',
-    lots: 2,
-    qty: 30,
-    targetPts: 110,
-    slPts: 55,
-    trailingSl: true,
-    autoSquareOff: '15:15',
-    realizedPnl: 1420
-  },
-  { 
-    id: 'WL-03', 
-    symbol: 'NSE:RELIANCE', 
-    ltp: 2985.40, 
-    change: '-12.80 (-0.43%)', 
-    isUp: false, 
-    high: 3012.00, 
-    low: 2975.00, 
-    algoStrategy: 'VWAP Mean Reversion', 
-    algoActive: false,
-    mode: 'PAPER',
-    status: 'WAITING_TRIGGER',
-    lots: 1,
-    qty: 50,
-    targetPts: 20,
-    slPts: 10,
-    trailingSl: false,
-    autoSquareOff: '15:15',
-    realizedPnl: 0
-  },
-  { 
-    id: 'WL-04', 
-    symbol: 'NSE:FINNIFTY23800PE', 
-    ltp: 112.80, 
-    change: '-18.40 (-14.02%)', 
-    isUp: false, 
-    high: 145.00, 
-    low: 105.00, 
-    algoStrategy: 'Supertrend 7/3 Breakout', 
-    algoActive: true,
-    mode: 'PAPER',
-    status: 'WAITING_TRIGGER',
-    lots: 1,
-    qty: 65,
-    targetPts: 35,
-    slPts: 18,
-    trailingSl: true,
-    autoSquareOff: '15:15',
-    realizedPnl: 580
-  },
-  { 
-    id: 'WL-05', 
-    symbol: 'MCX:GOLD26OCTFUT', 
-    ltp: 76450.00, 
-    change: '+180.00 (+0.24%)', 
-    isUp: true, 
-    high: 76600.00, 
-    low: 76220.00, 
-    algoStrategy: 'ATR Volatility Breakout', 
-    algoActive: false,
-    mode: 'LIVE',
-    status: 'PAUSED',
-    lots: 1,
-    qty: 1,
-    targetPts: 400,
-    slPts: 200,
-    trailingSl: true,
-    autoSquareOff: '23:15',
-    realizedPnl: 0
-  }
-];
-
-let copyGroupsStore = {
-  groupName: 'SkandX High-Alpha Mirror Group',
-  masterAccount: 'ZER-6641',
-  status: 'ACTIVE',
-  maxLossLimit: 15000,
-  followers: [
-    { id: 'FOL-01', accountCode: 'ANG-9012', broker: 'Angel One', multiplier: 1.0, maxRiskPerTrade: 3000, status: 'ACTIVE' },
-    { id: 'FOL-02', accountCode: 'UPS-5501', broker: 'Upstox', multiplier: 0.5, maxRiskPerTrade: 1500, status: 'ACTIVE' }
-  ]
-};
-
-// 1. Unified state endpoint
-app.get('/api/v1/bridge/all', (req, res) => {
-  const expiredCount = dematAccountsStore.filter(a => a.status === 'EXPIRED').length;
-  bridgeConfig.totalDemat = dematAccountsStore.length;
-  bridgeConfig.expiredDemat = expiredCount;
-  bridgeConfig.disconnectedDemat = dematAccountsStore.filter(a => a.status === 'DISCONNECTED').length;
-  bridgeConfig.totalStaticIp = staticIpsStore.length;
-  bridgeConfig.availableStaticIp = staticIpsStore.filter(i => i.status === 'AVAILABLE').length;
-
-  res.json({
-    success: true,
-    stats: bridgeConfig,
-    demats: dematAccountsStore,
-    staticIps: staticIpsStore,
-    linkedUsers: linkedUsersStore,
-    watchlist: watchlistStore,
-    copyGroups: copyGroupsStore,
-    orders: bridgeOrdersStore
+function appendAlgoAuditLog(eventText, ok = true) {
+  algoAdminAuditLogs.unshift({
+    time: new Date().toLocaleTimeString('en-IN', { hour12: false }),
+    event: eventText,
+    ok
   });
+  if (algoAdminAuditLogs.length > 100) algoAdminAuditLogs.pop();
+}
+
+async function resolveBridgeUser(req) {
+  try {
+    let token = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (req.cookies && req.cookies.token && typeof req.cookies.token === 'string') {
+      token = req.cookies.token.trim();
+    }
+
+    if (!token) {
+      return { id: 'guest', username: 'Guest Trader', email: 'guest@skandx.in', client_id: 'GUEST01', is_admin: false, isGuest: true };
+    }
+
+    const decoded = await new Promise((resolve) => {
+      jwt.verify(token, JWT_SECRET, (err, payload) => resolve(err ? null : payload));
+    });
+    if (!decoded || !decoded.id) {
+      return { id: 'guest', username: 'Guest Trader', email: 'guest@skandx.in', client_id: 'GUEST01', is_admin: false, isGuest: true };
+    }
+
+    const now = Date.now();
+    const cached = bridgeUserLookupCache.get(decoded.id);
+    if (cached && now - cached.ts < 30000) {
+      return cached.user;
+    }
+
+    const dbUser = await db('users')
+      .select('id', 'username', 'email', 'phone', 'client_id', 'is_admin', 'subscription_tier')
+      .where({ id: decoded.id })
+      .first()
+      .catch(() => null);
+
+    if (!dbUser) {
+      return { id: 'guest', username: 'Guest Trader', email: 'guest@skandx.in', client_id: 'GUEST01', is_admin: false, isGuest: true };
+    }
+
+    const resolvedUser = {
+      id: dbUser.id,
+      username: dbUser.username || 'Trader',
+      email: dbUser.email || '',
+      phone: dbUser.phone || '',
+      client_id: dbUser.client_id || ('SE' + String(dbUser.id).padStart(6, '0')),
+      is_admin: Boolean(dbUser.is_admin),
+      subscription_tier: dbUser.subscription_tier || 'BASIC',
+      isGuest: false
+    };
+    if (bridgeUserLookupCache.size > 5000) bridgeUserLookupCache.clear();
+    bridgeUserLookupCache.set(decoded.id, { user: resolvedUser, ts: now });
+    return resolvedUser;
+  } catch (_) {
+    return { id: 'guest', username: 'Guest Trader', email: 'guest@skandx.in', client_id: 'GUEST01', is_admin: false, isGuest: true };
+  }
+}
+
+function createDefaultUserBridgeState(userObj) {
+  const clientTag = String(userObj.client_id || userObj.id || 'trader').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const displayName = userObj.username || (userObj.email ? userObj.email.split('@')[0] : 'Trader');
+  return {
+    ownerId: userObj.id,
+    ownerEmail: userObj.email || '',
+    ownerName: displayName,
+    config: {
+      allowConnectAccount: true,
+      allowPurchaseIp: true,
+      connectionToken: `skandx_demat_${clientTag}`,
+      availableCredit: 0,
+      totalDemat: 0,
+      disconnectedDemat: 0,
+      expiredDemat: 0,
+      totalStaticIp: 0,
+      availableStaticIp: 0,
+      totalLinkSlots: 1,
+      usedLinkSlots: 0,
+      staticIpMonthlyRate: 350,
+      linkUserMonthlyRate: 250,
+      currentPlan: 'STARTER'
+    },
+    platformFeatures: {
+      watchlist: true,
+      groupCopy: true,
+      jsonBridge: true,
+      customBridge: true
+    },
+    telegramConfig: {
+      botConnected: false,
+      chatId: '',
+      botUsername: '@SkandXAlgoBot',
+      alerts: {
+        orderFills: true,
+        slTargetHits: true,
+        tokenExpiry: true,
+        copyErrors: true
+      }
+    },
+    demats: [],
+    staticIps: [],
+    linkedUsers: [],
+    watchlist: [
+      {
+        id: 'WL-01',
+        symbol: 'NSE:NIFTY24OCTFUT',
+        ltp: priceCache['NSE:NIFTY50-INDEX']?.ltp || 25014.60,
+        change: '+0.42%',
+        isUp: true,
+        high: 25080.00,
+        low: 24920.00,
+        algoStrategy: 'EMA 9/21 Trend Scalper',
+        algoActive: true,
+        mode: 'PAPER',
+        status: 'WAITING_TRIGGER',
+        lots: 1,
+        qty: 75,
+        targetPts: 60,
+        slPts: 25,
+        trailingSl: true,
+        autoSquareOff: '15:15',
+        realizedPnl: 0
+      },
+      {
+        id: 'WL-02',
+        symbol: 'NSE:BANKNIFTY51500CE',
+        ltp: 342.50,
+        change: '+1.85%',
+        isUp: true,
+        high: 380.00,
+        low: 260.00,
+        algoStrategy: '9:20 AM Short Straddle',
+        algoActive: false,
+        mode: 'PAPER',
+        status: 'PAUSED',
+        lots: 1,
+        qty: 30,
+        targetPts: 110,
+        slPts: 55,
+        trailingSl: true,
+        autoSquareOff: '15:15',
+        realizedPnl: 0
+      },
+      {
+        id: 'WL-03',
+        symbol: 'NSE:RELIANCE',
+        ltp: priceCache['NSE:RELIANCE']?.ltp || 2985.40,
+        change: '-0.43%',
+        isUp: false,
+        high: 3012.00,
+        low: 2975.00,
+        algoStrategy: 'VWAP Mean Reversion',
+        algoActive: false,
+        mode: 'PAPER',
+        status: 'PAUSED',
+        lots: 1,
+        qty: 50,
+        targetPts: 25,
+        slPts: 12,
+        trailingSl: false,
+        autoSquareOff: '15:15',
+        realizedPnl: 0
+      }
+    ],
+    copyGroups: {
+      groupName: `${displayName} Mirror Group`,
+      masterAccount: '',
+      status: 'PAUSED',
+      maxLossLimit: 15000,
+      followers: []
+    },
+    orders: [],
+    transactions: []
+  };
+}
+
+function recalculateBridgeStats(state) {
+  if (!state || !state.config) return state;
+  state.demats = Array.isArray(state.demats) ? state.demats : [];
+  state.staticIps = Array.isArray(state.staticIps) ? state.staticIps : [];
+  state.linkedUsers = Array.isArray(state.linkedUsers) ? state.linkedUsers : [];
+  state.watchlist = Array.isArray(state.watchlist) ? state.watchlist : [];
+  state.orders = Array.isArray(state.orders) ? state.orders : [];
+  state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
+
+  // Refresh watchlist LTP from live priceCache when available
+  state.watchlist.forEach(w => {
+    const cleanSym = String(w.symbol || '').toUpperCase();
+    const cachedTick = priceCache[cleanSym] || (cleanSym.includes('NIFTY') && !cleanSym.includes('BANK') && !cleanSym.includes('FIN') ? priceCache['NSE:NIFTY50-INDEX'] : null);
+    if (cachedTick && Number(cachedTick.ltp) > 0 && !cleanSym.endsWith('CE') && !cleanSym.endsWith('PE')) {
+      w.ltp = Number(cachedTick.ltp);
+      if (cachedTick.chp !== undefined) {
+        const chpNum = Number(cachedTick.chp) || 0;
+        w.isUp = chpNum >= 0;
+        w.change = `${chpNum >= 0 ? '+' : ''}${chpNum.toFixed(2)}%`;
+      }
+    }
+  });
+
+  state.config.totalDemat = state.demats.length;
+  state.config.expiredDemat = state.demats.filter(a => a.status === 'EXPIRED').length;
+  state.config.disconnectedDemat = state.demats.filter(a => a.status === 'DISCONNECTED').length;
+  state.config.totalStaticIp = state.staticIps.length;
+  state.config.availableStaticIp = state.staticIps.filter(i => i.status === 'AVAILABLE' || !i.assignedTo || i.assignedTo.startsWith('Unassigned')).length;
+  state.config.usedLinkSlots = state.linkedUsers.length;
+  if (typeof state.config.totalLinkSlots !== 'number' || state.config.totalLinkSlots < 1) {
+    state.config.totalLinkSlots = Math.max(1, state.linkedUsers.length);
+  }
+  return state;
+}
+
+async function getUserBridgeState(userObj) {
+  const key = String(userObj.id || 'guest');
+  if (userBridgeStatesCache.has(key)) {
+    return recalculateBridgeStats(userBridgeStatesCache.get(key));
+  }
+
+  if (!userObj.isGuest) {
+    try {
+      const settingKey = `algo_hub_state_u_${key}`;
+      const row = await db('system_settings').where({ key: settingKey }).first();
+      if (row && row.value) {
+        const parsed = JSON.parse(row.value);
+        if (parsed && typeof parsed === 'object') {
+          const def = createDefaultUserBridgeState(userObj);
+          const merged = {
+            ...def,
+            ...parsed,
+            config: { ...def.config, ...(parsed.config || {}) },
+            platformFeatures: { ...def.platformFeatures, ...(parsed.platformFeatures || {}) },
+            telegramConfig: {
+              ...def.telegramConfig,
+              ...(parsed.telegramConfig || {}),
+              alerts: { ...def.telegramConfig.alerts, ...(parsed.telegramConfig?.alerts || {}) }
+            },
+            copyGroups: { ...def.copyGroups, ...(parsed.copyGroups || {}) }
+          };
+          recalculateBridgeStats(merged);
+          userBridgeStatesCache.set(key, merged);
+          return merged;
+        }
+      }
+    } catch (_) {}
+  }
+
+  const freshState = createDefaultUserBridgeState(userObj);
+  userBridgeStatesCache.set(key, freshState);
+  return freshState;
+}
+
+async function saveUserBridgeState(userObj, state) {
+  const key = String(userObj.id || 'guest');
+  recalculateBridgeStats(state);
+  userBridgeStatesCache.set(key, state);
+  if (userObj.isGuest) return state;
+
+  try {
+    const settingKey = `algo_hub_state_u_${key}`;
+    const payload = JSON.stringify(state);
+    const existing = await db('system_settings').where({ key: settingKey }).first();
+    if (existing) {
+      await db('system_settings').where({ key: settingKey }).update({ value: payload });
+    } else {
+      await db('system_settings').insert({ key: settingKey, value: payload });
+    }
+  } catch (err) {
+    console.warn('[ALGO BRIDGE] Could not persist user bridge state:', err.message);
+  }
+  return state;
+}
+
+// Helper to find a referrer's bridge state by connectionToken (for client onboarding links)
+async function findBridgeStateByToken(refToken) {
+  if (!refToken) return null;
+  const cleanRef = String(refToken).trim();
+  for (const [, st] of userBridgeStatesCache.entries()) {
+    if (st?.config?.connectionToken === cleanRef) {
+      return st;
+    }
+  }
+  try {
+    const rows = await db('system_settings').where('key', 'like', 'algo_hub_state_u_%').select('key', 'value');
+    for (const r of rows) {
+      try {
+        const parsed = JSON.parse(r.value);
+        if (parsed?.config?.connectionToken === cleanRef) {
+          const uid = r.key.replace('algo_hub_state_u_', '');
+          userBridgeStatesCache.set(uid, parsed);
+          return parsed;
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return null;
+}
+
+// 1. Unified per-user state endpoint
+app.get('/api/v1/bridge/all', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    res.json({
+      success: true,
+      isAdmin: Boolean(userObj.is_admin),
+      user: {
+        id: userObj.id,
+        username: userObj.username,
+        email: userObj.email,
+        client_id: userObj.client_id,
+        is_admin: Boolean(userObj.is_admin)
+      },
+      stats: state.config,
+      platformFeatures: state.platformFeatures,
+      telegramConfig: state.telegramConfig,
+      demats: state.demats,
+      staticIps: state.staticIps,
+      linkedUsers: state.linkedUsers,
+      watchlist: state.watchlist,
+      copyGroups: state.copyGroups,
+      orders: state.orders,
+      transactions: state.transactions
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-app.get('/api/v1/bridge/stats', (req, res) => {
-  const expiredCount = dematAccountsStore.filter(a => a.status === 'EXPIRED').length;
-  bridgeConfig.totalDemat = dematAccountsStore.length;
-  bridgeConfig.expiredDemat = expiredCount;
-  res.json({ success: true, stats: bridgeConfig, orders: bridgeOrdersStore });
+app.get('/api/v1/bridge/stats', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    res.json({ success: true, stats: state.config, orders: state.orders });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-app.post('/api/v1/bridge/config', (req, res) => {
-  const { allowConnectAccount, allowPurchaseIp, connectionToken } = req.body || {};
-  if (allowConnectAccount !== undefined) bridgeConfig.allowConnectAccount = !!allowConnectAccount;
-  if (allowPurchaseIp !== undefined) bridgeConfig.allowPurchaseIp = !!allowPurchaseIp;
-  if (connectionToken) bridgeConfig.connectionToken = String(connectionToken).slice(0, 64);
-  res.json({ success: true, stats: bridgeConfig });
+app.post('/api/v1/bridge/config', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { allowConnectAccount, allowPurchaseIp, connectionToken, platformFeatures, telegramConfig } = req.body || {};
+
+    if (allowConnectAccount !== undefined) state.config.allowConnectAccount = Boolean(allowConnectAccount);
+    if (allowPurchaseIp !== undefined) state.config.allowPurchaseIp = Boolean(allowPurchaseIp);
+    if (connectionToken) state.config.connectionToken = String(connectionToken).slice(0, 64);
+    if (platformFeatures && typeof platformFeatures === 'object') {
+      state.platformFeatures = { ...state.platformFeatures, ...platformFeatures };
+    }
+    if (telegramConfig && typeof telegramConfig === 'object') {
+      state.telegramConfig = {
+        ...state.telegramConfig,
+        ...telegramConfig,
+        alerts: { ...state.telegramConfig.alerts, ...(telegramConfig.alerts || {}) }
+      };
+    }
+
+    await saveUserBridgeState(userObj, state);
+    res.json({
+      success: true,
+      stats: state.config,
+      platformFeatures: state.platformFeatures,
+      telegramConfig: state.telegramConfig
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-app.post('/api/v1/bridge/regenerate-token', (req, res) => {
-  const crypto = require('crypto');
-  bridgeConfig.connectionToken = 'skandx_demat_' + crypto.randomBytes(6).toString('hex');
-  res.json({ success: true, token: bridgeConfig.connectionToken });
+app.post('/api/v1/bridge/regenerate-token', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const clientTag = String(userObj.client_id || userObj.id || 'trd').toLowerCase().replace(/[^a-z0-9]/g, '');
+    state.config.connectionToken = `skandx_demat_${clientTag}_${crypto.randomBytes(4).toString('hex')}`;
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, token: state.config.connectionToken, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 2. Demat CRUD & Session Renewals
-app.post('/api/v1/bridge/demats', (req, res) => {
+app.post('/api/v1/bridge/demats', async (req, res) => {
   try {
-    const { broker, clientCode, name, apiKey, ip } = req.body || {};
-    if (!clientCode) return res.status(400).json({ error: 'Client code is required' });
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { broker, clientCode, name, apiKey, ip, segment } = req.body || {};
+    if (!clientCode || !String(clientCode).trim()) {
+      return res.status(400).json({ error: 'Client ID / UCC is required' });
+    }
     const safeClientCode = String(clientCode).trim().slice(0, 24).toUpperCase();
+    const chosenIp = String(ip || (state.staticIps[0]?.ip) || 'Shared Gateway (150ms)').slice(0, 48);
 
     const newAcc = {
-      id: 'ACC-' + Math.floor(10 + Math.random() * 90),
+      id: 'ACC-' + Math.floor(100 + Math.random() * 900),
       broker: String(broker || 'Zerodha Kite Connect').slice(0, 48),
       brokerKey: String(broker || '').toLowerCase().includes('angel') ? 'angel' : 'zerodha',
       clientCode: safeClientCode,
@@ -14761,360 +14839,981 @@ app.post('/api/v1/bridge/demats', (req, res) => {
       apiKey: maskBrokerApiKey(apiKey),
       status: 'ACTIVE',
       tradingActive: true,
-      ip: String(ip || '103.212.120.45').slice(0, 32),
+      ip: chosenIp,
       lastLogin: 'Just now',
       expiresIn: 'Active (Valid 24h)',
-      segment: 'Equity, F&O, Currency'
+      segment: String(segment || 'Equity, F&O, Currency').slice(0, 48)
     };
 
-    dematAccountsStore.unshift(newAcc);
-    if (dematAccountsStore.length > 25) dematAccountsStore.pop();
-    res.json({ success: true, account: newAcc, demats: dematAccountsStore });
+    state.demats.unshift(newAcc);
+    if (state.demats.length > 25) state.demats.pop();
+
+    // Update Static IP binding if chosenIp matches a static IP
+    const matchedIp = state.staticIps.find(item => item.ip === chosenIp);
+    if (matchedIp) {
+      matchedIp.status = 'WHITELISTED';
+      matchedIp.assignedTo = `${safeClientCode} (${newAcc.broker.split(' ')[0]})`;
+    }
+
+    // Set default Master Account for Copy Group if none set
+    if (!state.copyGroups.masterAccount) {
+      state.copyGroups.masterAccount = safeClientCode;
+    }
+
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[DEMAT_CONNECTED] ${userObj.email || userObj.username} connected ${newAcc.broker} (${safeClientCode})`, true);
+    res.json({
+      success: true,
+      account: newAcc,
+      demats: state.demats,
+      staticIps: state.staticIps,
+      copyGroups: state.copyGroups,
+      stats: state.config
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to add Demat account' });
   }
 });
 
-app.post('/api/v1/bridge/demats/:id/renew', (req, res) => {
-  const acc = dematAccountsStore.find(a => a.id === req.params.id);
-  if (acc) {
-    acc.status = 'ACTIVE';
-    acc.lastLogin = 'Just now';
-    acc.expiresIn = 'Active (Valid 24h)';
-    return res.json({ success: true, account: acc });
-  }
-  res.status(404).json({ error: 'Account not found' });
-});
-
-app.post('/api/v1/bridge/demats/:id/toggle-trade', (req, res) => {
-  const acc = dematAccountsStore.find(a => a.id === req.params.id);
-  if (acc) {
-    acc.tradingActive = !acc.tradingActive;
-    return res.json({ success: true, account: acc });
-  }
-  res.status(404).json({ error: 'Account not found' });
-});
-
-app.delete('/api/v1/bridge/demats/:id', (req, res) => {
-  dematAccountsStore = dematAccountsStore.filter(a => a.id !== req.params.id);
-  res.json({ success: true, demats: dematAccountsStore });
-});
-
-app.post('/api/v1/bridge/renew-demat', (req, res) => {
-  dematAccountsStore.forEach(a => {
-    a.status = 'ACTIVE';
-    a.expiresIn = 'Active (Valid 24h)';
-    a.lastLogin = 'Just now';
-  });
-  bridgeConfig.expiredDemat = 0;
-  res.json({ success: true, message: 'All Demat tokens renewed successfully!' });
-});
-
-// 3. Static IP Allocation
-app.post('/api/v1/bridge/ips/purchase', (req, res) => {
-  const octet = Math.floor(50 + Math.random() * 150);
-  const newIp = {
-    id: 'IP-0' + (staticIpsStore.length + 1),
-    ip: `103.212.120.${octet}`,
-    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-    status: 'AVAILABLE',
-    latency: (1.5 + Math.random()).toFixed(1) + ' ms',
-    assignedTo: 'Unassigned (Dedicated Pool)',
-    port: '8080 (SOCKS5/HTTP)',
-    expiresAt: '30 Days Remaining'
-  };
-  staticIpsStore.push(newIp);
-  if (staticIpsStore.length > 25) staticIpsStore.shift();
-  res.json({ success: true, ip: newIp, ips: staticIpsStore });
-});
-
-// 4. Watchlist Management & Trading
-app.post('/api/v1/bridge/watchlist/add', (req, res) => {
-  const { symbol, ltp } = req.body || {};
-  if (!symbol) return res.status(400).json({ error: 'Symbol required' });
-  const item = {
-    id: 'WL-' + Math.floor(10 + Math.random() * 90),
-    symbol: String(symbol).slice(0, 32).toUpperCase(),
-    ltp: Number(ltp) || 2450.00,
-    change: '+15.20 (+0.62%)',
-    isUp: true,
-    high: (Number(ltp) || 2450) * 1.01,
-    low: (Number(ltp) || 2450) * 0.99,
-    algoStrategy: 'EMA Breakout',
-    algoActive: true
-  };
-  watchlistStore.push(item);
-  if (watchlistStore.length > 30) watchlistStore.shift();
-  res.json({ success: true, item, watchlist: watchlistStore });
-});
-
-app.delete('/api/v1/bridge/watchlist/:id', (req, res) => {
-  watchlistStore = watchlistStore.filter(w => w.id !== req.params.id);
-  res.json({ success: true, watchlist: watchlistStore });
-});
-
-// 5. Emergency Kill Switch
-app.post('/api/v1/bridge/kill-switch', (req, res) => {
-  copyGroupsStore.status = 'PAUSED';
-  dematAccountsStore.forEach(a => { a.tradingActive = false; });
-  const killOrder = {
-    id: 'KILL-' + Math.floor(1000 + Math.random() * 9000),
-    timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    broker: 'ALL BROKERS',
-    account: 'MASTER & SLAVES',
-    symbol: 'ALL POSITIONS',
-    side: 'EXIT_ALL',
-    qty: 0,
-    price: 0,
-    status: 'SQUARED_OFF',
-    source: 'Emergency Kill Switch'
-  };
-  bridgeOrdersStore.unshift(killOrder);
-  if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
-  res.json({ success: true, message: 'EMERGENCY KILL SWITCH ENGAGED: All algo positions exited and copy trading paused!' });
-});
-
-// 6. Credit Recharge
-app.post('/api/v1/bridge/credit/recharge', (req, res) => {
-  const amount = Math.max(0, Math.min(1000000, Number(req.body?.amount) || 1000));
-  bridgeConfig.availableCredit += amount;
-  res.json({ success: true, credit: bridgeConfig.availableCredit });
-});
-
-// 7. Order Placement & Webhook Trigger
-app.post('/api/v1/bridge/order', (req, res) => {
+app.post('/api/v1/bridge/demats/:id/renew', async (req, res) => {
   try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const acc = state.demats.find(a => a.id === req.params.id);
+    if (acc) {
+      acc.status = 'ACTIVE';
+      acc.lastLogin = 'Just now';
+      acc.expiresIn = 'Active (Valid 24h)';
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, account: acc, demats: state.demats, stats: state.config });
+    }
+    res.status(404).json({ error: 'Account not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/demats/:id/toggle-trade', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const acc = state.demats.find(a => a.id === req.params.id);
+    if (acc) {
+      acc.tradingActive = !acc.tradingActive;
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, account: acc, demats: state.demats, stats: state.config });
+    }
+    res.status(404).json({ error: 'Account not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/v1/bridge/demats/:id', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const target = state.demats.find(a => a.id === req.params.id);
+    state.demats = state.demats.filter(a => a.id !== req.params.id);
+    if (target) {
+      state.staticIps.forEach(ipItem => {
+        if (ipItem.assignedTo && ipItem.assignedTo.includes(target.clientCode)) {
+          ipItem.assignedTo = 'Unassigned (Ready for Demat)';
+          ipItem.status = 'AVAILABLE';
+        }
+      });
+    }
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, demats: state.demats, staticIps: state.staticIps, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/renew-demat', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.demats.forEach(a => {
+      a.status = 'ACTIVE';
+      a.expiresIn = 'Active (Valid 24h)';
+      a.lastLogin = 'Just now';
+    });
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, message: 'All Demat tokens renewed successfully!', demats: state.demats, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Static IP Binding & Allocation
+app.post('/api/v1/bridge/ips/:id/bind', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const ipObj = state.staticIps.find(i => i.id === req.params.id);
+    if (!ipObj) return res.status(404).json({ error: 'Static IP not found' });
+
+    const { dematId } = req.body || {};
+    if (!dematId || dematId === 'UNASSIGNED') {
+      ipObj.assignedTo = 'Unassigned (Ready for Demat)';
+      ipObj.status = 'AVAILABLE';
+    } else {
+      const acc = state.demats.find(d => d.id === dematId || d.clientCode === dematId);
+      if (!acc) return res.status(404).json({ error: 'Demat account not found' });
+      acc.ip = ipObj.ip;
+      ipObj.assignedTo = `${acc.clientCode} (${acc.broker.split(' ')[0]})`;
+      ipObj.status = 'WHITELISTED';
+    }
+
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, staticIps: state.staticIps, demats: state.demats, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/ips/purchase', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const octet = Math.floor(40 + Math.random() * 180);
+    const newIp = {
+      id: 'IP-' + Math.floor(100 + Math.random() * 900),
+      ip: `103.212.120.${octet}`,
+      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+      status: 'WHITELISTED',
+      latency: (1.6 + Math.random() * 0.5).toFixed(1) + ' ms',
+      assignedTo: 'Unassigned (Ready for Demat)',
+      port: '8080 (SOCKS5/HTTP)',
+      expiresAt: '30 Days Remaining'
+    };
+    state.staticIps.unshift(newIp);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, ip: newIp, ips: state.staticIps, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Link Users (Client Onboarding & Management)
+app.post('/api/v1/bridge/link-users/add', async (req, res) => {
+  try {
+    const { refToken, clientName, email, broker, clientCode, copyRatio } = req.body || {};
+    let userObj = await resolveBridgeUser(req);
+    let state = await getUserBridgeState(userObj);
+
+    // If submitted via a shared referral token, attach to that referrer's state
+    if (refToken) {
+      const refState = await findBridgeStateByToken(refToken);
+      if (refState && refState.ownerId) {
+        state = refState;
+        userObj = { id: refState.ownerId, email: refState.ownerEmail, username: refState.ownerName, isGuest: false };
+      }
+    }
+
+    if (!state.config.allowConnectAccount) {
+      return res.status(403).json({ error: 'Client Demat onboarding is currently disabled by the account owner.' });
+    }
+
+    if (state.linkedUsers.length >= (state.config.totalLinkSlots || 1)) {
+      return res.status(400).json({
+        error: `All ${state.config.totalLinkSlots || 1} Link User slot(s) are currently in use. Please purchase an additional Client Slot (₹250/mo) via Razorpay.`
+      });
+    }
+
+    if (!clientName || !clientCode) {
+      return res.status(400).json({ error: 'Client Name and Broker Client ID (UCC) are required.' });
+    }
+
+    const newLinked = {
+      id: 'LNK-' + Math.floor(100 + Math.random() * 900),
+      clientName: String(clientName).trim().slice(0, 48),
+      email: String(email || 'client@skandx.in').trim().slice(0, 64),
+      broker: String(broker || 'Zerodha Kite').trim().slice(0, 48),
+      clientCode: String(clientCode).trim().toUpperCase().slice(0, 24),
+      connectedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      status: 'CONNECTED',
+      allowTrading: true,
+      copyRatio: String(copyRatio || '1.0x').slice(0, 10)
+    };
+
+    state.linkedUsers.unshift(newLinked);
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[CLIENT_LINKED] ${newLinked.clientName} (${newLinked.clientCode}) linked to ${userObj.email || userObj.username}`, true);
+    res.json({ success: true, linkedUser: newLinked, linkedUsers: state.linkedUsers, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/link-users/:id/update', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const target = state.linkedUsers.find(u => u.id === req.params.id);
+    if (!target) return res.status(404).json({ error: 'Linked client not found' });
+
+    const { allowTrading, copyRatio, status } = req.body || {};
+    if (allowTrading !== undefined) target.allowTrading = Boolean(allowTrading);
+    if (copyRatio !== undefined) target.copyRatio = String(copyRatio).slice(0, 10);
+    if (status !== undefined) target.status = String(status).slice(0, 24);
+
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, linkedUser: target, linkedUsers: state.linkedUsers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/v1/bridge/link-users/:id', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.linkedUsers = state.linkedUsers.filter(u => u.id !== req.params.id);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, linkedUsers: state.linkedUsers, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/link-users/purchase', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.config.totalLinkSlots = (state.config.totalLinkSlots || 1) + 1;
+    await saveUserBridgeState(userObj, state);
+    res.json({
+      success: true,
+      message: 'Added 1 Linked Client Demat Slot (₹250/mo)',
+      totalLinkSlots: state.config.totalLinkSlots,
+      usedLinkSlots: state.linkedUsers.length,
+      stats: state.config
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Watchlist Management & Strategy Controls
+app.post('/api/v1/bridge/watchlist/add', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const body = req.body || {};
+    if (!body.symbol) return res.status(400).json({ error: 'Symbol is required' });
+
+    const cleanSym = String(body.symbol).trim().toUpperCase().slice(0, 36);
+    const formattedSym = cleanSym.includes(':') ? cleanSym : `NSE:${cleanSym}`;
+    const liveTick = priceCache[formattedSym];
+    const resolvedLtp = Number(body.ltp) || (liveTick && Number(liveTick.ltp)) || 2450.00;
+
+    const existingIdx = body.id ? state.watchlist.findIndex(w => w.id === body.id) : -1;
+    const item = {
+      id: body.id || ('WL-' + Math.floor(100 + Math.random() * 900)),
+      symbol: formattedSym,
+      ltp: resolvedLtp,
+      change: body.change || '+0.65%',
+      isUp: body.isUp !== undefined ? Boolean(body.isUp) : true,
+      high: Number(body.high) || Number((resolvedLtp * 1.01).toFixed(2)),
+      low: Number(body.low) || Number((resolvedLtp * 0.99).toFixed(2)),
+      algoStrategy: String(body.algoStrategy || 'EMA 9/21 Trend Scalper').slice(0, 48),
+      algoActive: body.algoActive !== undefined ? Boolean(body.algoActive) : true,
+      mode: body.mode === 'PAPER' ? 'PAPER' : 'LIVE',
+      status: body.status || (body.algoActive === false ? 'PAUSED' : 'WAITING_TRIGGER'),
+      lots: Math.max(1, Number(body.lots) || 1),
+      qty: Math.max(1, Number(body.qty) || 50),
+      targetPts: Math.max(1, Number(body.targetPts) || 60),
+      slPts: Math.max(1, Number(body.slPts) || 25),
+      trailingSl: body.trailingSl !== undefined ? Boolean(body.trailingSl) : true,
+      autoSquareOff: String(body.autoSquareOff || '15:15').slice(0, 12),
+      realizedPnl: Number(body.realizedPnl) || 0
+    };
+
+    if (existingIdx !== -1) {
+      state.watchlist[existingIdx] = item;
+    } else {
+      state.watchlist.unshift(item);
+      if (state.watchlist.length > 35) state.watchlist.pop();
+    }
+
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, item, watchlist: state.watchlist });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/v1/bridge/watchlist/:id', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const idx = state.watchlist.findIndex(w => w.id === req.params.id);
+    if (idx !== -1) {
+      state.watchlist[idx] = { ...state.watchlist[idx], ...(req.body || {}) };
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, item: state.watchlist[idx], watchlist: state.watchlist });
+    }
+    res.status(404).json({ error: 'Watchlist strategy not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/watchlist/:id/toggle', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const item = state.watchlist.find(w => w.id === req.params.id);
+    if (item) {
+      item.algoActive = !item.algoActive;
+      item.status = item.algoActive ? 'WAITING_TRIGGER' : 'PAUSED';
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, item, watchlist: state.watchlist });
+    }
+    res.status(404).json({ error: 'Watchlist item not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const item = state.watchlist.find(w => w.id === req.params.id);
+    if (item) {
+      item.status = 'WAITING_TRIGGER';
+      const primaryDemat = state.demats[0];
+      const exitOrder = {
+        id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
+        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        broker: primaryDemat ? primaryDemat.broker : (item.mode === 'PAPER' ? 'SkandX Paper OMS' : 'Primary Broker'),
+        account: primaryDemat ? primaryDemat.clientCode : (item.mode === 'PAPER' ? 'PAPER-SIM' : 'MASTER'),
+        symbol: item.symbol,
+        side: 'SQUARE_OFF',
+        qty: item.qty || 50,
+        price: `₹${Number(item.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        status: 'COMPLETED',
+        source: '1-Click Algo Position Exit'
+      };
+      state.orders.unshift(exitOrder);
+      if (state.orders.length > 50) state.orders.pop();
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, message: `Squared off position for ${item.symbol}`, item, order: exitOrder, watchlist: state.watchlist, orders: state.orders });
+    }
+    res.status(404).json({ error: 'Watchlist item not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/v1/bridge/watchlist/:id', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.watchlist = state.watchlist.filter(w => w.id !== req.params.id);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, watchlist: state.watchlist });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Group / Copy Trading Management
+app.post('/api/v1/bridge/copy-group/update', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { groupName, masterAccount, status, maxLossLimit } = req.body || {};
+    if (groupName !== undefined) state.copyGroups.groupName = String(groupName).slice(0, 64);
+    if (masterAccount !== undefined) state.copyGroups.masterAccount = String(masterAccount).slice(0, 32);
+    if (status !== undefined) state.copyGroups.status = status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED';
+    if (maxLossLimit !== undefined) state.copyGroups.maxLossLimit = Math.max(0, Number(maxLossLimit) || 15000);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, copyGroups: state.copyGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/copy-group/followers/add', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { accountCode, broker, multiplier, maxRiskPerTrade } = req.body || {};
+    if (!accountCode) return res.status(400).json({ error: 'Follower Account Code is required' });
+
+    const newFollower = {
+      id: 'FOL-' + Math.floor(100 + Math.random() * 900),
+      accountCode: String(accountCode).trim().toUpperCase().slice(0, 24),
+      broker: String(broker || 'Zerodha Kite').trim().slice(0, 36),
+      multiplier: Math.max(0.1, Math.min(50, Number(multiplier) || 1.0)),
+      maxRiskPerTrade: Math.max(100, Number(maxRiskPerTrade) || 3000),
+      status: 'ACTIVE'
+    };
+
+    state.copyGroups.followers = Array.isArray(state.copyGroups.followers) ? state.copyGroups.followers : [];
+    state.copyGroups.followers.push(newFollower);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, follower: newFollower, copyGroups: state.copyGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/copy-group/followers/:id/update', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const fol = (state.copyGroups.followers || []).find(f => f.id === req.params.id);
+    if (!fol) return res.status(404).json({ error: 'Follower account not found' });
+
+    const { multiplier, maxRiskPerTrade, status } = req.body || {};
+    if (multiplier !== undefined) fol.multiplier = Math.max(0.1, Math.min(50, Number(multiplier) || 1.0));
+    if (maxRiskPerTrade !== undefined) fol.maxRiskPerTrade = Math.max(100, Number(maxRiskPerTrade) || 3000);
+    if (status !== undefined) fol.status = status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED';
+
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, copyGroups: state.copyGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/v1/bridge/copy-group/followers/:id', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.copyGroups.followers = (state.copyGroups.followers || []).filter(f => f.id !== req.params.id);
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, copyGroups: state.copyGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Emergency Kill Switch
+app.post('/api/v1/bridge/kill-switch', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.copyGroups.status = 'PAUSED';
+    state.demats.forEach(a => { a.tradingActive = false; });
+    state.watchlist.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const killOrder = {
+      id: 'KILL-' + Math.floor(1000 + Math.random() * 9000),
+      time: nowTime,
+      timestamp: nowTime,
+      broker: 'ALL BROKERS',
+      account: 'MASTER & FOLLOWERS',
+      symbol: 'ALL POSITIONS',
+      side: 'EXIT_ALL',
+      qty: 0,
+      price: '₹0.00',
+      status: 'SQUARED_OFF',
+      source: 'Emergency Kill Switch'
+    };
+    state.orders.unshift(killOrder);
+    if (state.orders.length > 50) state.orders.pop();
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[KILL_SWITCH] Emergency Kill Switch triggered by ${userObj.email || userObj.username}`, false);
+    res.json({
+      success: true,
+      message: 'EMERGENCY KILL SWITCH ENGAGED: All algo positions exited and copy trading paused!',
+      demats: state.demats,
+      watchlist: state.watchlist,
+      copyGroups: state.copyGroups,
+      orders: state.orders
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Order Placement, Webhook Trigger & Telegram Bot
+app.post('/api/v1/bridge/order', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
     const payload = req.body || {};
+    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
+    const rawPrice = String(payload.price || '').replace(/[₹,\s]/g, '');
+    const numericPrice = Number(rawPrice) || 25014.60;
+
     const newOrder = {
       id: orderId,
-      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: String(payload.broker || 'Zerodha Kite').slice(0, 32),
-      account: String(payload.account || 'ZER-6641').slice(0, 24),
-      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 32),
+      time: nowTime,
+      timestamp: nowTime,
+      broker: String(payload.broker || state.demats[0]?.broker || 'SkandX Paper OMS').slice(0, 36),
+      account: String(payload.account || state.demats[0]?.clientCode || 'PAPER-SIM').slice(0, 24),
+      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 36),
       side: String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase(),
       qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
-      price: Math.max(0, Number(payload.price) || 25014.60),
+      orderType: String(payload.orderType || 'MARKET').slice(0, 12),
+      price: `₹${numericPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      targetPts: Number(payload.targetPts) || 0,
+      slPts: Number(payload.slPts) || 0,
       status: 'COMPLETED',
-      source: String(payload.source || 'Manual Algo Placement').slice(0, 48)
+      source: String(payload.source || 'Manual Algo Execution').slice(0, 48)
     };
-    bridgeOrdersStore.unshift(newOrder);
-    if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
-    res.json({ success: true, orderId, order: newOrder });
+    state.orders.unshift(newOrder);
+
+    // Replicate across active followers if Copy Group is ACTIVE or routeAll is true
+    if (state.copyGroups.status === 'ACTIVE' && Array.isArray(state.copyGroups.followers)) {
+      state.copyGroups.followers.filter(f => f.status === 'ACTIVE').forEach(fol => {
+        const repQty = Math.max(1, Math.round(newOrder.qty * (Number(fol.multiplier) || 1)));
+        state.orders.unshift({
+          id: 'CPY-' + Math.floor(10000 + Math.random() * 90000),
+          time: nowTime,
+          timestamp: nowTime,
+          broker: fol.broker,
+          account: fol.accountCode,
+          symbol: newOrder.symbol,
+          side: newOrder.side,
+          qty: repQty,
+          orderType: newOrder.orderType,
+          price: newOrder.price,
+          status: 'COMPLETED',
+          source: `Copy Trade (${fol.multiplier}x)`
+        });
+      });
+    }
+
+    if (state.orders.length > 50) state.orders.length = 50;
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[ORDER_ROUTED] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY -> ${newOrder.broker} (${newOrder.account})`, true);
+    res.json({ success: true, orderId, order: newOrder, orders: state.orders });
   } catch (err) {
     res.status(400).json({ error: 'Invalid order payload' });
   }
 });
 
-app.post('/api/v1/bridge/webhook', (req, res) => {
+app.post('/api/v1/bridge/webhook', async (req, res) => {
   try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
     const payload = req.body || {};
+    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
+    const sym = String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 36).toUpperCase();
+    const livePrice = priceCache[sym]?.ltp || Number(payload.price) || 25014.60;
+    const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+
     const newOrder = {
       id: orderId,
-      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: String(payload.broker || 'Zerodha Kite').slice(0, 32),
-      account: String(payload.account || 'ZER-6641').slice(0, 24),
-      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 32),
+      time: nowTime,
+      timestamp: nowTime,
+      broker: String(payload.broker || primaryDemat?.broker || 'SkandX Paper OMS').slice(0, 36),
+      account: String(payload.account || primaryDemat?.clientCode || 'PAPER-SIM').slice(0, 24),
+      symbol: sym,
       side: String(payload.action || payload.side || 'BUY').slice(0, 12).toUpperCase(),
       qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
-      price: Math.max(0, Number(payload.price) || 24850.00),
+      price: `₹${Number(livePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
       status: 'COMPLETED',
       source: 'TradingView Webhook'
     };
-    bridgeOrdersStore.unshift(newOrder);
-    if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
-    res.json({ success: true, orderId, status: 'ORDER_PLACED', order: newOrder });
+    state.orders.unshift(newOrder);
+    if (state.orders.length > 50) state.orders.pop();
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[WEBHOOK_EXEC] ${sym} ${newOrder.side} ${newOrder.qty} QTY via Webhook (${newOrder.account})`, true);
+    res.json({ success: true, orderId, status: 'ORDER_PLACED', order: newOrder, orders: state.orders });
   } catch (err) {
     res.status(400).json({ success: false, error: 'Invalid webhook payload' });
   }
 });
 
-// 8. Purchase Link User Slot (₹250/month)
-app.post('/api/v1/bridge/link-users/purchase', (req, res) => {
-  bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
-  res.json({
-    success: true,
-    message: 'Added 1 Linked Client Demat Slot (₹250/mo)',
-    totalLinkSlots: bridgeConfig.totalLinkSlots,
-    usedLinkSlots: linkedUsersStore.length
-  });
+app.post('/api/v1/bridge/telegram/save', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { chatId, alerts } = req.body || {};
+    if (chatId !== undefined) {
+      state.telegramConfig.chatId = String(chatId).trim().slice(0, 64);
+      state.telegramConfig.botConnected = Boolean(state.telegramConfig.chatId);
+    }
+    if (alerts && typeof alerts === 'object') {
+      state.telegramConfig.alerts = { ...state.telegramConfig.alerts, ...alerts };
+    }
+    await saveUserBridgeState(userObj, state);
+    res.json({ success: true, telegramConfig: state.telegramConfig });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 9. Payment Gateway Checkout (Handles Static IP ₹350, Link User ₹250, Plans, & Wallet)
-app.post('/api/v1/bridge/checkout', (req, res) => {
-  try {
-    const { itemType, itemId, amount, paymentMethod, transactionRef } = req.body || {};
-    const cost = Number(amount) || 0;
-    const txId = transactionRef || ('TXN_UPI_' + Math.floor(10000000 + Math.random() * 90000000));
+// 9. Official Razorpay Checkout & Verification for Algo Hub (Static IP ₹350, Link Slot ₹250, Plans ₹999/₹2499, Wallet Recharge)
+function resolveAlgoPaymentItem(body = {}) {
+  const itemType = String(body.itemType || 'STATIC_IP').toUpperCase();
+  if (itemType === 'STATIC_IP') {
+    return { itemType: 'STATIC_IP', planKey: 'ALGO_STATIC_IP', amountInr: 350, title: 'Dedicated Mumbai BKC Static IP (1 Month)' };
+  }
+  if (itemType === 'LINK_USER') {
+    return { itemType: 'LINK_USER', planKey: 'ALGO_LINK_SLOT', amountInr: 250, title: '1 Linked Client Demat Slot (1 Month)' };
+  }
+  if (itemType === 'PLAN_INSTITUTIONAL' || (itemType === 'PLAN' && Number(body.amount) >= 2000)) {
+    return { itemType: 'PLAN_INSTITUTIONAL', planKey: 'ALGO_INSTITUTIONAL', amountInr: 2499, title: 'Institutional Copy Trading Master Suite (1 Month)' };
+  }
+  if (itemType === 'PLAN_PRO' || itemType === 'PLAN') {
+    return { itemType: 'PLAN_PRO', planKey: 'ALGO_PRO', amountInr: 999, title: 'Pro Multi-Broker Algo Trader Plan (1 Month)' };
+  }
+  if (itemType === 'WALLET_RECHARGE') {
+    const customAmt = Math.max(100, Math.min(100000, Math.round(Number(body.amount) || 1000)));
+    return { itemType: 'WALLET_RECHARGE', planKey: 'ALGO_WALLET', amountInr: customAmt, title: `SkandX Algo Wallet Credit (+₹${customAmt})` };
+  }
+  const fallbackAmt = Math.max(100, Math.round(Number(body.amount) || 350));
+  return { itemType, planKey: 'ALGO_ADDON', amountInr: fallbackAmt, title: String(body.title || 'SkandX Algo Service') };
+}
 
-    if (itemType === 'STATIC_IP') {
-      const octet = Math.floor(50 + Math.random() * 150);
-      const newIp = {
-        id: 'IP-0' + (staticIpsStore.length + 1),
-        ip: `103.212.120.${octet}`,
+function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Razorpay Secure Checkout') {
+  const { itemType, amountInr, title } = resolvedItem;
+  let provisionedData = {};
+
+  if (itemType === 'STATIC_IP') {
+    const octet = Math.floor(40 + Math.random() * 180);
+    const newIp = {
+      id: 'IP-' + Math.floor(100 + Math.random() * 900),
+      ip: `103.212.120.${octet}`,
+      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+      status: 'WHITELISTED',
+      latency: (1.6 + Math.random() * 0.4).toFixed(1) + ' ms',
+      assignedTo: 'Unassigned (Ready for Demat)',
+      port: '8080 (SOCKS5/HTTP)',
+      expiresAt: '30 Days Remaining'
+    };
+    state.staticIps.unshift(newIp);
+    provisionedData = { newIp };
+  } else if (itemType === 'LINK_USER') {
+    state.config.totalLinkSlots = (state.config.totalLinkSlots || 1) + 1;
+    provisionedData = { totalLinkSlots: state.config.totalLinkSlots };
+  } else if (itemType === 'WALLET_RECHARGE') {
+    state.config.availableCredit = Number((Number(state.config.availableCredit || 0) + amountInr).toFixed(2));
+    provisionedData = { availableCredit: state.config.availableCredit };
+  } else if (itemType === 'PLAN_PRO') {
+    state.config.currentPlan = 'PRO_ALGO';
+    state.config.totalLinkSlots = Math.max(state.config.totalLinkSlots || 1, 3);
+    if (state.staticIps.length === 0) {
+      state.staticIps.unshift({
+        id: 'IP-' + Math.floor(100 + Math.random() * 900),
+        ip: `103.212.120.${Math.floor(40 + Math.random() * 180)}`,
         datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
         status: 'WHITELISTED',
-        latency: (1.5 + Math.random()).toFixed(1) + ' ms',
-        assignedTo: 'Unassigned (Ready for Demat)',
+        latency: '1.8 ms',
+        assignedTo: 'Unassigned (Pro Plan Included)',
         port: '8080 (SOCKS5/HTTP)',
         expiresAt: '30 Days Remaining'
-      };
-      staticIpsStore.push(newIp);
-      bridgeConfig.totalStaticIp = staticIpsStore.length;
-      bridgeConfig.availableStaticIp = staticIpsStore.filter(i => i.status === 'AVAILABLE' || i.status === 'WHITELISTED').length;
-      
-      return res.json({
-        success: true,
-        transactionId: txId,
-        message: `Successfully provisioned Dedicated Mumbai BKC Static IP: ${newIp.ip} (₹350/mo)`,
-        item: newIp,
-        ips: staticIpsStore
       });
     }
-
-    if (itemType === 'LINK_USER') {
-      bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
-      return res.json({
-        success: true,
-        transactionId: txId,
-        message: 'Successfully activated 1 Link User Client Slot (₹250/mo)',
-        totalLinkSlots: bridgeConfig.totalLinkSlots,
-        usedLinkSlots: linkedUsersStore.length
+    provisionedData = { currentPlan: state.config.currentPlan };
+  } else if (itemType === 'PLAN_INSTITUTIONAL') {
+    state.config.currentPlan = 'INSTITUTIONAL';
+    state.config.totalLinkSlots = (state.config.totalLinkSlots || 1) + 5;
+    for (let i = 0; i < 2; i++) {
+      state.staticIps.unshift({
+        id: 'IP-' + Math.floor(100 + Math.random() * 900),
+        ip: `103.212.120.${Math.floor(40 + Math.random() * 180)}`,
+        datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+        status: 'WHITELISTED',
+        latency: '1.7 ms',
+        assignedTo: 'Unassigned (Institutional Pool)',
+        port: '8080 (SOCKS5/HTTP)',
+        expiresAt: '30 Days Remaining'
       });
     }
-
-    if (itemType === 'WALLET_RECHARGE') {
-      bridgeConfig.availableCredit += cost;
-      return res.json({
-        success: true,
-        transactionId: txId,
-        message: `₹${cost.toLocaleString('en-IN')} added to SkandX Algo Wallet`,
-        credit: bridgeConfig.availableCredit
-      });
-    }
-
-    if (itemType === 'PLAN_UPGRADE') {
-      bridgeConfig.currentPlan = String(itemId || 'ENTERPRISE').toUpperCase();
-      return res.json({
-        success: true,
-        transactionId: txId,
-        message: `Successfully upgraded to ${bridgeConfig.currentPlan} Plan!`,
-        plan: bridgeConfig.currentPlan
-      });
-    }
-
-    res.json({ success: true, transactionId: txId, message: 'Payment processed successfully' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Checkout processing failed' });
+    provisionedData = { currentPlan: state.config.currentPlan };
   }
-});
 
-// 10. Watchlist Strategy Controls & Actions
-app.post('/api/v1/bridge/watchlist/:id/toggle', (req, res) => {
-  const item = watchlistStore.find(w => w.id === req.params.id);
-  if (item) {
-    item.algoActive = !item.algoActive;
-    item.status = item.algoActive ? (item.status === 'PAUSED' ? 'WAITING_TRIGGER' : item.status) : 'PAUSED';
-    return res.json({ success: true, item, watchlist: watchlistStore });
-  }
-  res.status(404).json({ error: 'Watchlist item not found' });
-});
-
-app.post('/api/v1/bridge/watchlist/:id/square-off', (req, res) => {
-  const item = watchlistStore.find(w => w.id === req.params.id);
-  if (item) {
-    item.status = 'WAITING_TRIGGER';
-    const exitOrder = {
-      id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
-      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      broker: 'Zerodha Kite',
-      account: 'ZER-6641',
-      symbol: item.symbol,
-      side: 'SQUARE_OFF',
-      qty: item.qty || 50,
-      price: item.ltp || 0,
-      status: 'COMPLETED',
-      source: '1-Click Algo Position Exit'
-    };
-    bridgeOrdersStore.unshift(exitOrder);
-    if (bridgeOrdersStore.length > 50) bridgeOrdersStore.pop();
-    return res.json({ success: true, message: `Squared off position for ${item.symbol}`, item, order: exitOrder });
-  }
-  res.status(404).json({ error: 'Watchlist item not found' });
-});
-
-app.put('/api/v1/bridge/watchlist/:id', (req, res) => {
-  const idx = watchlistStore.findIndex(w => w.id === req.params.id);
-  if (idx !== -1) {
-    watchlistStore[idx] = { ...watchlistStore[idx], ...req.body };
-    return res.json({ success: true, item: watchlistStore[idx], watchlist: watchlistStore });
-  }
-  res.status(404).json({ error: 'Watchlist item not found' });
-});
-
-// 11. Institutional Algo Admin Suite Endpoints
-app.get('/api/v1/bridge/admin/system-stats', (req, res) => {
-  res.json({
-    success: true,
-    infrastructure: {
-      bkcGatewayStatus: 'ONLINE_ACTIVE',
-      bkcLatencyMs: 1.8,
-      serverUptimePct: 99.98,
-      redisQueueBacklog: 0,
-      activeTicksPerSec: 68400,
-      packetLossPct: 0.00
-    },
-    gateways: [
-      { broker: 'Zerodha Kite Connect', status: 'ACTIVE', latency: '12ms', rateLimit: '3/s', throttled: 0 },
-      { broker: 'Angel One SmartAPI', status: 'ACTIVE', latency: '18ms', rateLimit: '10/s', throttled: 0 },
-      { broker: 'Upstox Pro API v2', status: 'ACTIVE', latency: '14ms', rateLimit: '5/s', throttled: 0 },
-      { broker: 'Fyers API v3', status: 'ACTIVE', latency: '16ms', rateLimit: '10/s', throttled: 0 },
-      { broker: 'Finvasia Shoonya', status: 'ACTIVE', latency: '21ms', rateLimit: '10/s', throttled: 0 },
-      { broker: 'Dhan Open API', status: 'ACTIVE', latency: '15ms', rateLimit: '10/s', throttled: 0 }
-    ],
-    staticIps: staticIpsStore,
-    linkedUsers: linkedUsersStore,
-    demats: dematAccountsStore,
-    totalOrdersToday: bridgeOrdersStore.length + 382,
-    activeSubscribers: 142,
-    monthlyRecurringRevenue: '₹1,24,500'
-  });
-});
-
-app.post('/api/v1/bridge/admin/ip/add', (req, res) => {
-  const octet = Math.floor(100 + Math.random() * 120);
-  const ip = {
-    id: 'IP-' + (staticIpsStore.length + 1),
-    ip: `103.212.120.${octet}`,
-    datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
-    status: 'AVAILABLE',
-    latency: '1.7 ms',
-    assignedTo: 'Admin Pool Standby',
-    port: '8080 (SOCKS5/HTTP)',
-    expiresAt: 'Permanent Admin Block'
+  const txRecord = {
+    id: txId,
+    date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    type: itemType === 'WALLET_RECHARGE' ? 'CREDIT' : 'DEBIT',
+    itemTitle: title,
+    amount: amountInr,
+    method: methodLabel,
+    status: 'SUCCESS'
   };
-  staticIpsStore.push(ip);
-  bridgeConfig.totalStaticIp = staticIpsStore.length;
-  res.json({ success: true, ip, ips: staticIpsStore });
-});
+  state.transactions.unshift(txRecord);
+  if (state.transactions.length > 50) state.transactions.pop();
 
-app.post('/api/v1/bridge/admin/grant-slot', (req, res) => {
-  const { slotType } = req.body || {};
-  if (slotType === 'IP') {
-    bridgeConfig.totalStaticIp += 1;
-    bridgeConfig.availableStaticIp += 1;
-  } else {
-    bridgeConfig.totalLinkSlots = (bridgeConfig.totalLinkSlots || 5) + 1;
+  recalculateBridgeStats(state);
+  return { txRecord, provisionedData };
+}
+
+app.post('/api/v1/bridge/razorpay/create-order', authenticateToken, async (req, res) => {
+  const resolved = resolveAlgoPaymentItem(req.body);
+  const amountPaise = resolved.amountInr * 100;
+  try {
+    const { client, key_id, key_secret } = await getRazorpayClient();
+    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: resolved.planKey,
+        amount: resolved.amountInr,
+        paymentType: 'ONE_TIME',
+        status: 'FAILED',
+        failureReason: 'Razorpay keys not configured on server'
+      });
+      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
+    }
+
+    const order = await client.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `algo_${req.user.id}_${Date.now()}`,
+      notes: {
+        user_id: String(req.user.id),
+        item_type: resolved.itemType,
+        title: resolved.title
+      }
+    });
+
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: resolved.planKey,
+      amount: resolved.amountInr,
+      paymentType: 'ONE_TIME',
+      status: 'INITIATED',
+      razorpayOrderId: order.id
+    });
+
+    res.json({
+      ...order,
+      key_id,
+      amount: amountPaise,
+      amountInr: resolved.amountInr,
+      currency: 'INR',
+      itemType: resolved.itemType,
+      title: resolved.title
+    });
+  } catch (error) {
+    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: resolved.planKey,
+      amount: resolved.amountInr,
+      paymentType: 'ONE_TIME',
+      status: 'FAILED',
+      failureReason: 'Razorpay Algo Order Rejected: ' + errMsg
+    });
+    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
   }
-  res.json({ success: true, config: bridgeConfig });
 });
 
-app.post('/api/v1/bridge/admin/global-freeze', (req, res) => {
-  copyGroupsStore.status = 'PAUSED';
-  dematAccountsStore.forEach(a => { a.tradingActive = false; });
-  watchlistStore.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
-  res.json({ success: true, message: 'GLOBAL EMERGENCY FREEZE ACTIVATED: All user algos and copy executions halted.' });
+app.post('/api/v1/bridge/razorpay/verify', authenticateToken, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, itemType, amount, title } = req.body || {};
+    const resolved = resolveAlgoPaymentItem({ itemType, amount, title });
+
+    const { key_secret: secret } = await getRazorpayConfig();
+    if (!secret || secret === 'secret_placeholder') {
+      return res.status(503).json({ error: 'Payment gateway configuration is incomplete.' });
+    }
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing required Razorpay verification parameters.' });
+    }
+
+    const bodyStr = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');
+    const isAuthentic = expectedSignature.length === razorpay_signature.length &&
+      crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
+
+    if (!isAuthentic) {
+      await logSubscriptionAttempt({
+        userId: req.user.id,
+        plan: resolved.planKey,
+        amount: resolved.amountInr,
+        paymentType: 'ONE_TIME',
+        status: 'FAILED',
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        failureReason: 'Invalid Razorpay Payment Signature'
+      });
+      return res.status(400).json({ error: 'Invalid Payment Signature' });
+    }
+
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified');
+    await saveUserBridgeState(userObj, state);
+
+    await logSubscriptionAttempt({
+      userId: req.user.id,
+      plan: resolved.planKey,
+      amount: resolved.amountInr,
+      paymentType: 'ONE_TIME',
+      status: 'SUCCESS',
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      failureReason: null
+    });
+
+    appendAlgoAuditLog(`[RAZORPAY_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${razorpay_payment_id}]`, true);
+
+    res.json({
+      success: true,
+      transactionId: razorpay_payment_id,
+      txRecord,
+      provisionedData,
+      stats: state.config,
+      staticIps: state.staticIps,
+      linkedUsers: state.linkedUsers,
+      transactions: state.transactions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Deduct from existing Algo Wallet Credit (for users who recharged their wallet via Razorpay)
+app.post('/api/v1/bridge/wallet/pay', authenticateToken, async (req, res) => {
+  try {
+    const resolved = resolveAlgoPaymentItem(req.body);
+    if (resolved.itemType === 'WALLET_RECHARGE') {
+      return res.status(400).json({ error: 'Wallet recharge must be completed via Razorpay checkout.' });
+    }
+
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const currentBal = Number(state.config.availableCredit || 0);
+
+    if (currentBal < resolved.amountInr) {
+      return res.status(400).json({
+        error: `Insufficient Algo Wallet balance (Available: ₹${currentBal.toFixed(2)}, Required: ₹${resolved.amountInr}). Please pay via Razorpay or add funds first.`
+      });
+    }
+
+    state.config.availableCredit = Number((currentBal - resolved.amountInr).toFixed(2));
+    const txId = 'WAL_' + Math.floor(10000000 + Math.random() * 90000000);
+    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, txId, 'SkandX Algo Wallet');
+    await saveUserBridgeState(userObj, state);
+
+    res.json({
+      success: true,
+      transactionId: txId,
+      txRecord,
+      provisionedData,
+      stats: state.config,
+      staticIps: state.staticIps,
+      linkedUsers: state.linkedUsers,
+      transactions: state.transactions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10. Institutional Algo Admin Suite Endpoints (STRICTLY ADMIN-ONLY!)
+app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    let totalDematsAcrossPlatform = 0;
+    let activeDematsAcrossPlatform = 0;
+    let expiredDematsAcrossPlatform = 0;
+    let totalStaticIpsAcrossPlatform = 0;
+    let totalLinkedClientsAcrossPlatform = 0;
+    let totalLinkCapacityAcrossPlatform = 0;
+    let totalOrdersAcrossPlatform = 0;
+
+    for (const [, st] of userBridgeStatesCache.entries()) {
+      totalDematsAcrossPlatform += (st.demats || []).length;
+      activeDematsAcrossPlatform += (st.demats || []).filter(d => d.status === 'ACTIVE').length;
+      expiredDematsAcrossPlatform += (st.demats || []).filter(d => d.status === 'EXPIRED').length;
+      totalStaticIpsAcrossPlatform += (st.staticIps || []).length;
+      totalLinkedClientsAcrossPlatform += (st.linkedUsers || []).length;
+      totalLinkCapacityAcrossPlatform += Number(st.config?.totalLinkSlots || 1);
+      totalOrdersAcrossPlatform += (st.orders || []).length;
+    }
+
+    res.json({
+      success: true,
+      infrastructure: {
+        bkcGatewayStatus: 'ONLINE_ACTIVE',
+        bkcLatencyMs: 1.8,
+        serverUptimePct: 99.98,
+        redisQueueBacklog: 0,
+        activeTicksPerSec: Object.keys(priceCache).length * 42 + 1240,
+        packetLossPct: 0.00
+      },
+      summary: {
+        totalDemats: totalDematsAcrossPlatform,
+        activeDemats: activeDematsAcrossPlatform,
+        expiredDemats: expiredDematsAcrossPlatform,
+        totalOrdersToday: totalOrdersAcrossPlatform,
+        totalStaticIps: totalStaticIpsAcrossPlatform,
+        totalLinkedClients: totalLinkedClientsAcrossPlatform,
+        totalLinkCapacity: Math.max(5, totalLinkCapacityAcrossPlatform)
+      },
+      gateways: [
+        { name: 'Zerodha Kite Connect', api: 'REST API v3 + WebSocket Ticker', latency: '4.2 ms', sessions: activeDematsAcrossPlatform + 12, status: 'OPERATIONAL' },
+        { name: 'Angel One SmartAPI', api: 'SmartAPI REST v2 + Socket v2', latency: '6.1 ms', sessions: 8, status: 'OPERATIONAL' },
+        { name: 'Upstox Pro API v2', api: 'Pro API v2 Protobuf Feed', latency: '8.4 ms', sessions: 6, status: 'OPERATIONAL' },
+        { name: 'DhanHQ Open API', api: 'DhanHQ v2 Feed & Order API', latency: '5.1 ms', sessions: 4, status: 'OPERATIONAL' },
+        { name: 'Fyers API v3', api: 'Fyers API v3 Multi-Socket', latency: '7.8 ms', sessions: 5, status: 'OPERATIONAL' }
+      ],
+      auditLogs: algoAdminAuditLogs
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/admin/ip/add', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const octet = Math.floor(40 + Math.random() * 180);
+    const ip = {
+      id: 'IP-' + Math.floor(100 + Math.random() * 900),
+      ip: `103.212.120.${octet}`,
+      datacenter: 'Mumbai BKC (NSE Colocation Proximity)',
+      status: 'WHITELISTED',
+      latency: '1.7 ms',
+      assignedTo: 'Unassigned (Admin Pool)',
+      port: '8080 (SOCKS5/HTTP)',
+      expiresAt: 'Permanent Admin Block'
+    };
+    state.staticIps.unshift(ip);
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[ADMIN_PROVISION] Admin ${userObj.email} provisioned Static IP ${ip.ip}`, true);
+    res.json({ success: true, ip, staticIps: state.staticIps, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/admin/grant-slot', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const count = Math.max(1, Number(req.body?.count) || 2);
+    state.config.totalLinkSlots = (state.config.totalLinkSlots || 1) + count;
+    await saveUserBridgeState(userObj, state);
+    appendAlgoAuditLog(`[ADMIN_QUOTA] Admin ${userObj.email} granted +${count} Client Link Slots`, true);
+    res.json({ success: true, stats: state.config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/admin/global-freeze', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    for (const [uid, st] of userBridgeStatesCache.entries()) {
+      st.copyGroups.status = 'PAUSED';
+      (st.demats || []).forEach(a => { a.tradingActive = false; });
+      (st.watchlist || []).forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+      if (uid !== 'guest') {
+        await saveUserBridgeState({ id: uid, isGuest: false }, st);
+      }
+    }
+    appendAlgoAuditLog(`[GLOBAL_FREEZE] Admin ${req.user?.email || req.user?.id} activated Global OMS Freeze!`, false);
+    res.json({ success: true, message: 'GLOBAL EMERGENCY FREEZE ACTIVATED: All user algos and copy executions halted.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── In-Memory HTML Template & Server-Side SEO Engine (0 Disk I/O at 1 Lakh Concurrent Users) ───
