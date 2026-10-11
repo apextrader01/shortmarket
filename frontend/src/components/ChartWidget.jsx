@@ -8,9 +8,7 @@ import StockDetails from './StockDetails';
 
 const TIMEFRAMES = [
   { label: '1M',  value: 'ONE_MINUTE' },
-  { label: '3M',  value: 'THREE_MINUTE' },
   { label: '5M',  value: 'FIVE_MINUTE' },
-  { label: '10M', value: 'TEN_MINUTE' },
   { label: '15M', value: 'FIFTEEN_MINUTE' },
   { label: '30M', value: 'THIRTY_MINUTE' },
   { label: '1H',  value: 'ONE_HOUR' },
