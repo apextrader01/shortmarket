@@ -15675,29 +15675,57 @@ app.use((req, res) => {
   }
 
   const cleanPath = (req.path || '/').toLowerCase().replace(/\/+$/, '') || '/';
-  const seoEntry = SERVER_SEO_MAP[cleanPath];
-  if (!seoEntry) {
-    return res.type('html').send(rawHtml);
+
+  // Google AdSense Policy Compliance: Never load adsbygoogle.js on login, account deletion, admin, or auth utility pages
+  const isNoAdsUtilityRoute = [
+    '/login',
+    '/register',
+    '/delete-account',
+    '/delete',
+    '/data-rights',
+    '/adminpanel'
+  ].some(p => cleanPath === p || cleanPath.startsWith(p + '/'));
+
+  let baseHtml = rawHtml;
+  if (isNoAdsUtilityRoute) {
+    baseHtml = baseHtml
+      .replace(/<meta\s+name="google-adsense-account"[^>]*>/gi, '')
+      .replace(/<script[^>]*pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js[^>]*><\/script>/gi, '')
+      .replace('</head>', '<meta name="robots" content="noindex, nofollow" /></head>');
   }
 
-  const canonicalUrl = `https://skandx.in${cleanPath}`;
+  const seoEntry = SERVER_SEO_MAP[cleanPath];
+  if (!seoEntry) {
+    return res.type('html').send(baseHtml);
+  }
+
+  const canonicalUrl = `https://skandx.in${cleanPath === '/' ? '/' : cleanPath}`;
   const jsonLdScript = `<script type="application/ld+json">${JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: seoEntry.title.split('|')[0].trim(),
-    operatingSystem: 'Web, Android, iOS, Windows, macOS',
-    applicationCategory: 'FinanceApplication',
+    '@type': 'WebPage',
+    name: seoEntry.title,
     url: canonicalUrl,
     description: seoEntry.desc,
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' }
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'SkandX',
+      url: 'https://skandx.in/'
+    }
   })}</script>`;
 
-  let customizedHtml = rawHtml
+  const routeHeroSection = `<section style="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:20px;margin-bottom:24px;">
+    <h1 style="font-size:28px;color:#f8fafc;margin:0 0 10px;">${seoEntry.title}</h1>
+    <p style="font-size:16px;color:#e2e8f0;margin:0 0 10px;">${seoEntry.desc}</p>
+    <p style="font-size:14px;color:#94a3b8;margin:0;">Canonical URL: <a href="${canonicalUrl}" style="color:#38bdf8;">${canonicalUrl}</a> — Interactive SkandX Financial Module &amp; Educational Reference Guide.</p>
+  </section>`;
+
+  let customizedHtml = baseHtml
     .replace(/<title>.*?<\/title>/i, `<title>${seoEntry.title}</title>`)
     .replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i, `<meta name="description" content="${seoEntry.desc}" />`)
     .replace(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:title" content="${seoEntry.title}" />`)
     .replace(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:description" content="${seoEntry.desc}" />`)
-    .replace(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:url" content="${canonicalUrl}" />`);
+    .replace(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:url" content="${canonicalUrl}" />`)
+    .replace(/<h1 style="font-size:28px;color:#f8fafc;margin:0 0 14px;">[\s\S]*?<\/h1>/i, routeHeroSection);
 
   if (/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i.test(customizedHtml)) {
     customizedHtml = customizedHtml.replace(

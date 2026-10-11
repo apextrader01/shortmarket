@@ -44,8 +44,17 @@ function attachAdSenseLayoutGuard() {
   }
 }
 
+function isNoAdsUtilityPath() {
+  if (typeof window === 'undefined' || !window.location) return false;
+  const p = (window.location.pathname || '/').toLowerCase();
+  return ['/login', '/register', '/delete-account', '/delete', '/data-rights', '/adminpanel'].some(
+    route => p === route || p.startsWith(route + '/')
+  );
+}
+
 function injectAdSenseScript(clientId) {
   if (!clientId || typeof document === 'undefined') return;
+  if (isNoAdsUtilityPath()) return;
   if (isUserAdFreeTier(useStore.getState()?.user)) return;
   const cleanId = String(clientId).trim();
   if (!cleanId.startsWith('ca-pub-')) return;
@@ -1080,7 +1089,7 @@ export default function AdBannerWidget({ onUpgradeClick }) {
     }
   }, [config?.enabled, config?.adsense_client_id, config?.adsense_banner_slot, config?.direct_sponsor_enabled, isAdFree]);
 
-  if (!config || !config.enabled || isAdFree) return null;
+  if (!config || !config.enabled || isAdFree || isNoAdsUtilityPath()) return null;
 
   // Pure Google AdSense Mode (Direct Sponsor / Internal Ad Card is OFF):
   // Do NOT show the internal SkandX banner wrapper ("GOOGLE ADS | Sponsored Advertisement | Watch 30s Ad").

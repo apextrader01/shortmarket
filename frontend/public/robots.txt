@@ -1,53 +1,63 @@
+# Google AdSense & Ads Quality Crawlers (Full Access)
+User-agent: Mediapartners-Google
+Allow: /
+Disallow: /adminpanel
+Disallow: /login
+Disallow: /delete-account
+Disallow: /delete
+
+User-agent: AdsBot-Google
+Allow: /
+Disallow: /adminpanel
+
+User-agent: AdsBot-Google-Mobile
+Allow: /
+Disallow: /adminpanel
+
 User-agent: *
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
+Disallow: /login
+Disallow: /delete-account
+Disallow: /delete
 
 # Google Gemini & Search Generative AI Crawler
 User-agent: Google-Extended
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 User-agent: GoogleOther
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # OpenAI ChatGPT Search & Web Crawlers
 User-agent: GPTBot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # Perplexity AI Search Crawler
 User-agent: PerplexityBot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # Anthropic Claude Search Crawler
 User-agent: ClaudeBot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # Microsoft Copilot & Bing Search Crawler
 User-agent: Bingbot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # Apple Intelligence & Siri Search Crawler
 User-agent: Applebot
 Allow: /
 Disallow: /adminpanel
-Disallow: /api/
 
 # Canonical Sitemap Declaration
 Sitemap: https://skandx.in/sitemap.xml
