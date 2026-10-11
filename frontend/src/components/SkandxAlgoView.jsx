@@ -152,9 +152,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [adminPaymentSearch, setAdminPaymentSearch] = useState('');
   const [editingAdminUser, setEditingAdminUser] = useState(null);
   const [editAlgoWalletVal, setEditAlgoWalletVal] = useState('');
-  const [editPaperBalanceVal, setEditPaperBalanceVal] = useState('');
   const [editAlgoPlanVal, setEditAlgoPlanVal] = useState('STARTER');
   const [editLinkSlotsVal, setEditLinkSlotsVal] = useState(1);
+  const [editMaxOrderQtyVal, setEditMaxOrderQtyVal] = useState(1800);
+  const [editDailyLossLimitVal, setEditDailyLossLimitVal] = useState(25000);
 
   // Demat & Order Modals
   const [showAddDematModal, setShowAddDematModal] = useState(false);
@@ -864,9 +865,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const handleOpenEditAdminUser = (acc) => {
     setEditingAdminUser(acc);
     setEditAlgoWalletVal(String(acc.algoWalletBalance ?? 0));
-    setEditPaperBalanceVal(String(acc.paperBalance ?? 1000000));
     setEditAlgoPlanVal(acc.activePlan || 'STARTER');
     setEditLinkSlotsVal(acc.totalLinkSlots || 1);
+    setEditMaxOrderQtyVal(acc.maxOrderQty || 1800);
+    setEditDailyLossLimitVal(acc.dailyLossLimit || 25000);
   };
 
   const handleSaveAdminUserEdit = async (e) => {
@@ -877,13 +879,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         method: 'POST',
         body: JSON.stringify({
           algoWalletBalance: Number(editAlgoWalletVal),
-          paperBalance: Number(editPaperBalanceVal),
           activePlan: editAlgoPlanVal,
-          totalLinkSlots: Number(editLinkSlotsVal)
+          totalLinkSlots: Number(editLinkSlotsVal),
+          maxOrderQty: Number(editMaxOrderQtyVal),
+          dailyLossLimit: Number(editDailyLossLimitVal)
         })
       });
       if (data.success) {
-        showToast(data.message || 'Account updated successfully!');
+        showToast(data.message || 'Algo account updated successfully!');
         if (String(editingAdminUser.id) === String(user?.id) && data.stats) {
           setConfig(prev => ({ ...prev, ...data.stats }));
         }
@@ -3775,6 +3778,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             const allOrdersList = Array.isArray(adminStats?.allOrders) ? adminStats.allOrders : orders;
             const auditLogsList = Array.isArray(adminStats?.auditLogs) ? adminStats.auditLogs : [];
 
+            const formatAlgoServiceName = (rawPlan) => {
+              const code = String(rawPlan || '').toUpperCase().trim();
+              if (code === 'ALGO_WALLET' || code === 'WALLET_RECHARGE') return 'Algo Wallet Credit Top-Up';
+              if (code === 'ALGO_STATIC_IP' || code === 'STATIC_IP') return 'Dedicated BKC Static IP (₹350/mo)';
+              if (code === 'ALGO_LINK_USER' || code === 'LINK_USER') return 'Client Demat Link Slot (₹250/mo)';
+              if (code === 'ALGO_PRO' || code === 'PLAN_PRO') return 'Pro Algo Trader Plan (₹999/mo)';
+              if (code === 'ALGO_INSTITUTIONAL' || code === 'PLAN_INSTITUTIONAL') return 'Institutional Copy Master (₹2,499/mo)';
+              return rawPlan || 'SkandX Algo Service';
+            };
+
             const filteredAccounts = allAccounts.filter(acc => {
               const q = adminUserSearch.trim().toLowerCase();
               const matchSearch = !q ||
@@ -3791,15 +3804,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               const matchStatus =
                 adminPaymentFilter === 'ALL' ||
                 (adminPaymentFilter === 'SUCCESS' && st === 'SUCCESS') ||
-                (adminPaymentFilter === 'FAILED' && (st === 'FAILED' || st === 'REJECTED')) ||
-                (adminPaymentFilter === 'INITIATED' && (st === 'INITIATED' || st === 'CANCELLED'));
+                (adminPaymentFilter === 'FAILED' && (st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED')) ||
+                (adminPaymentFilter === 'INITIATED' && st === 'INITIATED');
               const q = adminPaymentSearch.trim().toLowerCase();
+              const formattedService = formatAlgoServiceName(p.plan).toLowerCase();
               const matchQuery = !q ||
                 String(p.email || '').toLowerCase().includes(q) ||
                 String(p.username || '').toLowerCase().includes(q) ||
                 String(p.clientId || '').toLowerCase().includes(q) ||
                 String(p.txRef || '').toLowerCase().includes(q) ||
                 String(p.plan || '').toLowerCase().includes(q) ||
+                formattedService.includes(q) ||
                 String(p.failureReason || '').toLowerCase().includes(q);
               return matchStatus && matchQuery;
             });
@@ -3816,7 +3831,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </h2>
                     </div>
                     <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                      Complete control over all user accounts, current Algo Wallet & Paper money, Successful & Rejected Razorpay payments, Demats, Static IPs & OMS Gateways.
+                      Dedicated 100% SkandX Algo control center — manage Algo accounts, Algo Wallet money, Successful & Rejected Algo Razorpay payments, Demats, Static IPs & OMS Gateways.
                     </p>
                   </div>
 
@@ -3838,7 +3853,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         cursor: 'pointer'
                       }}
                     >
-                      <RefreshCw size={13} /> {loadingAdminStats ? 'Syncing...' : 'Sync Razorpay & Accounts'}
+                      <RefreshCw size={13} /> {loadingAdminStats ? 'Syncing...' : 'Sync Razorpay & Algo Accounts'}
                     </button>
 
                     <button
@@ -3887,15 +3902,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                {/* 8 Master Admin KPI Cards (Accounts, Money, Payments, Demats, IPs, Slots) */}
+                {/* 8 Master Algo Admin KPI Cards (100% Algo-Only Metrics) */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
                   <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: adminSubTab === 'ACCOUNTS' ? '1px solid #38bdf8' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL USER ACCOUNTS</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL ALGO ACCOUNTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#fff', marginTop: '5px' }}>
                       {adminStats?.summary?.totalUsers ?? allAccounts.length}
                     </div>
                     <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '3px' }}>
-                      Click to view & edit all accounts
+                      Click to view & edit Algo accounts
                     </div>
                   </div>
 
@@ -3905,27 +3920,27 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       ₹{Number(adminStats?.summary?.totalAlgoWalletMoney || 0).toLocaleString('en-IN')}
                     </div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
-                      Paper Capital: ₹{Number((adminStats?.summary?.totalPaperMoney || 0) / 100000).toFixed(1)}L across users
+                      Live Algo Hub Wallet Credits Across Users
                     </div>
                   </div>
 
                   <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('SUCCESS'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'SUCCESS' ? '1px solid #22c55e' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>SUCCESSFUL PAYMENTS</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>SUCCESSFUL ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#22c55e', marginTop: '5px' }}>
-                      {adminStats?.summary?.successPaymentsCount ?? 0} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(adminStats?.summary?.totalRevenue || 0).toLocaleString('en-IN')})</span>
+                      {adminStats?.summary?.successPaymentsCount ?? 0} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(adminStats?.summary?.algoRevenue ?? adminStats?.summary?.totalRevenue ?? 0).toLocaleString('en-IN')})</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '3px' }}>
-                      ● Verified Razorpay & Wallet Credits
+                      ● Verified Algo Plans, IPs, Slots & Wallet
                     </div>
                   </div>
 
                   <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('FAILED'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'FAILED' ? '1px solid #ef4444' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>REJECTED / FAILED PAYMENTS</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>REJECTED / CANCELLED ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#ef4444', marginTop: '5px' }}>
                       {adminStats?.summary?.failedPaymentsCount ?? 0}
                     </div>
                     <div style={{ fontSize: '11px', color: '#f87171', marginTop: '3px' }}>
-                      ● {adminStats?.summary?.initiatedPaymentsCount ?? 0} Initiated / Cancelled
+                      ● {adminStats?.summary?.initiatedPaymentsCount ?? 0} Active Checkout Pending
                     </div>
                   </div>
 
@@ -3940,12 +3955,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TODAY ROUTED ORDERS</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TODAY ROUTED ALGO ORDERS</div>
                     <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '5px' }}>
                       {adminStats?.summary?.todayOrders ?? orders.length}
                     </div>
                     <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '3px' }}>
-                      Across {adminStats?.summary?.totalUsersConfigured ?? 1} Accounts
+                      Across {adminStats?.summary?.totalUsersConfigured ?? 1} Algo Accounts
                     </div>
                   </div>
 
@@ -3966,17 +3981,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                {/* Admin Navigation Sub-Tabs */}
+                {/* Admin Navigation Sub-Tabs (Wrap cleanly without horizontal scrollbar) */}
                 <div style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   gap: '8px',
-                  overflowX: 'auto',
-                  paddingBottom: '4px',
+                  paddingBottom: '10px',
                   borderBottom: '1px solid #1e293b'
                 }}>
                   {[
-                    { id: 'ACCOUNTS', label: `👥 All Accounts & Money (${allAccounts.length})` },
-                    { id: 'PAYMENTS', label: `💳 Payments: Success & Rejected (${allPayments.length})` },
+                    { id: 'ACCOUNTS', label: `👥 Algo Accounts & Wallet Money (${allAccounts.length})` },
+                    { id: 'PAYMENTS', label: `💳 Algo Payments: Success & Rejected (${allPayments.length})` },
                     { id: 'INFRASTRUCTURE', label: '🖥️ Broker Gateways & OMS Overrides' },
                     { id: 'DEMATS_IPS', label: `🔗 All Demats (${allDematsList.length}) & Static IPs (${allIpsList.length})` },
                     { id: 'AUDIT_LOGS', label: `📜 Security Audit Logs (${auditLogsList.length})` }
@@ -3987,15 +4002,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         key={tab.id}
                         onClick={() => setAdminSubTab(tab.id)}
                         style={{
-                          padding: '9px 16px',
+                          padding: '9px 15px',
                           borderRadius: '8px',
                           border: active ? '1px solid #38bdf8' : '1px solid #1e293b',
                           background: active ? 'rgba(56, 189, 248, 0.16)' : '#101726',
                           color: active ? '#38bdf8' : '#cbd5e1',
                           fontSize: '12.5px',
                           fontWeight: '800',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap'
+                          cursor: 'pointer'
                         }}
                       >
                         {tab.label}
@@ -4004,16 +4018,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   })}
                 </div>
 
-                {/* ── SUB-TAB 1: ALL ACCOUNTS & CURRENT MONEY ── */}
+                {/* ── SUB-TAB 1: ALL ALGO ACCOUNTS & WALLET MONEY ── */}
                 {adminSubTab === 'ACCOUNTS' && (
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
                         <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
-                          All Registered User Accounts — Current Algo Wallet & Paper Money ({filteredAccounts.length})
+                          All SkandX Algo User Accounts — Current Algo Wallet Money & Quotas ({filteredAccounts.length})
                         </div>
                         <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                          View each user's live Algo Wallet balance, Paper Trading capital, active Algo Plan, connected Demats, Static IPs & Link Slots.
+                          View each user's live Algo Wallet balance, total Algo spend, active Algo Plan, connected Demats, Static IPs, Link Slots & Copy status.
                         </div>
                       </div>
 
@@ -4022,7 +4036,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                           <input
                             type="text"
-                            placeholder="Search email, user, SKX ID..."
+                            placeholder="Search email, user, Client ID..."
                             value={adminUserSearch}
                             onChange={e => setAdminUserSearch(e.target.value)}
                             style={{
@@ -4050,34 +4064,34 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             fontWeight: '700'
                           }}
                         >
-                          <option value="ALL">All Plans</option>
+                          <option value="ALL">All Algo Plans</option>
                           <option value="STARTER">Starter (Free)</option>
-                          <option value="PRO">Pro (₹999/mo)</option>
+                          <option value="PRO">Pro Algo (₹999/mo)</option>
                           <option value="INSTITUTIONAL">Institutional (₹2,499/mo)</option>
                         </select>
                       </div>
                     </div>
 
                     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', minWidth: '980px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
                         <thead>
                           <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
-                            <th style={{ padding: '10px 12px' }}>Client ID & Account</th>
+                            <th style={{ padding: '10px 12px' }}>Client ID & Algo Account</th>
                             <th style={{ padding: '10px 12px' }}>Algo Wallet Money</th>
-                            <th style={{ padding: '10px 12px' }}>Paper Trading Money</th>
-                            <th style={{ padding: '10px 12px' }}>Algo Plan</th>
-                            <th style={{ padding: '10px 12px' }}>Demats</th>
+                            <th style={{ padding: '10px 12px' }}>Total Algo Spend</th>
+                            <th style={{ padding: '10px 12px' }}>Active Algo Plan</th>
+                            <th style={{ padding: '10px 12px' }}>Connected Demats</th>
                             <th style={{ padding: '10px 12px' }}>Static IPs</th>
                             <th style={{ padding: '10px 12px' }}>Link Slots</th>
-                            <th style={{ padding: '10px 12px' }}>Active Algos</th>
-                            <th style={{ padding: '10px 12px' }}>Admin Actions</th>
+                            <th style={{ padding: '10px 12px' }}>Active Algos & Copy</th>
+                            <th style={{ padding: '10px 12px' }}>Algo Admin Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {filteredAccounts.length === 0 ? (
                             <tr>
                               <td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                                {loadingAdminStats ? 'Loading user accounts...' : 'No matching accounts found.'}
+                                {loadingAdminStats ? 'Loading Algo user accounts...' : 'No matching Algo accounts found.'}
                               </td>
                             </tr>
                           ) : (
@@ -4100,14 +4114,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   <div style={{ fontSize: '14px', fontWeight: '900', color: '#10b981' }}>
                                     ₹{Number(acc.algoWalletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </div>
-                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Algo Credit</div>
+                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Current Algo Credit</div>
                                 </td>
 
                                 <td style={{ padding: '10px 12px' }}>
-                                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#e2e8f0' }}>
-                                    ₹{Number(acc.paperBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#38bdf8' }}>
+                                    ₹{Number(acc.algoTotalPaid || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                   </div>
-                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>Paper Capital ({acc.paperSubscriptionTier})</div>
+                                  <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                                    {acc.algoPaymentsCount || 0} Paid{acc.algoFailedCount ? ` • ${acc.algoFailedCount} Rejected` : ''}
+                                  </div>
                                 </td>
 
                                 <td style={{ padding: '10px 12px' }}>
@@ -4145,9 +4161,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                                 <td style={{ padding: '10px 12px' }}>
                                   <span style={{ fontWeight: '700', color: acc.activeAlgosCount > 0 ? '#22c55e' : '#64748b' }}>
-                                    {acc.activeAlgosCount} / {acc.watchlistCount}
+                                    {acc.activeAlgosCount} / {acc.watchlistCount} Algos
                                   </span>
-                                  <div style={{ fontSize: '10px', color: '#64748b' }}>{acc.ordersCount} Orders</div>
+                                  <div style={{ fontSize: '10px', color: '#64748b' }}>
+                                    {acc.ordersCount} Orders • Copy {acc.copyGroupStatus || 'PAUSED'}
+                                  </div>
                                 </td>
 
                                 <td style={{ padding: '10px 12px' }}>
@@ -4168,11 +4186,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                         cursor: 'pointer'
                                       }}
                                     >
-                                      <Edit2 size={11} /> Edit Money & Plan
+                                      <Edit2 size={11} /> Edit Wallet & Plan
                                     </button>
                                     <button
                                       onClick={() => handleQuickAdminUserAction(acc.id, { action: 'GRANT_STATIC_IP' })}
-                                      title="Grant 1 Dedicated Static IP to this account"
+                                      title="Grant 1 Dedicated Static IP to this Algo account"
                                       style={{
                                         background: 'rgba(16,185,129,0.16)',
                                         border: '1px solid rgba(16,185,129,0.35)',
@@ -4188,7 +4206,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     </button>
                                     <button
                                       onClick={() => handleQuickAdminUserAction(acc.id, { slotsToAdd: 1 })}
-                                      title="Grant 1 Client Link Slot to this account"
+                                      title="Grant 1 Client Link Slot to this Algo account"
                                       style={{
                                         background: 'rgba(168,85,247,0.16)',
                                         border: '1px solid rgba(168,85,247,0.35)',
@@ -4213,25 +4231,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 )}
 
-                {/* ── SUB-TAB 2: PAYMENTS: SUCCESSFUL & REJECTED / FAILED ── */}
+                {/* ── SUB-TAB 2: ALGO PAYMENTS LEDGER: SUCCESSFUL, REJECTED & CANCELLED ── */}
                 {adminSubTab === 'PAYMENTS' && (
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
                         <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
-                          Razorpay & Algo Wallet Payment Ledger — Successful, Rejected & Initiated ({filteredPayments.length})
+                          SkandX Algo Payment Ledger — Successful, Rejected & Cancelled ({filteredPayments.length})
                         </div>
                         <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                          Real-time log of every successful order, bank/UPI rejection with exact failure reason, wallet debit, and admin grant.
+                          Dedicated log of SkandX Algo Hub payments only (Algo Wallet top-ups, Static IPs ₹350, Link Slots ₹250, Pro ₹999 & Institutional ₹2,499).
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                         {[
-                          { id: 'ALL', label: `All (${allPayments.length})`, color: '#38bdf8' },
+                          { id: 'ALL', label: `All Algo (${allPayments.length})`, color: '#38bdf8' },
                           { id: 'SUCCESS', label: `✅ Successful (${adminStats?.summary?.successPaymentsCount ?? 0})`, color: '#22c55e' },
-                          { id: 'FAILED', label: `❌ Rejected / Failed (${adminStats?.summary?.failedPaymentsCount ?? 0})`, color: '#ef4444' },
-                          { id: 'INITIATED', label: `⏳ Initiated (${adminStats?.summary?.initiatedPaymentsCount ?? 0})`, color: '#f59e0b' }
+                          { id: 'FAILED', label: `❌ Rejected / Cancelled (${adminStats?.summary?.failedPaymentsCount ?? 0})`, color: '#ef4444' },
+                          { id: 'INITIATED', label: `⏳ Active Checkout (${adminStats?.summary?.initiatedPaymentsCount ?? 0})`, color: '#f59e0b' }
                         ].map(f => (
                           <button
                             key={f.id}
@@ -4253,7 +4271,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                         <input
                           type="text"
-                          placeholder="Search email, order_id, reason..."
+                          placeholder="Search email, order_id, service..."
                           value={adminPaymentSearch}
                           onChange={e => setAdminPaymentSearch(e.target.value)}
                           style={{
@@ -4274,8 +4292,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <thead>
                           <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
                             <th style={{ padding: '10px 12px' }}>Ref / Razorpay ID</th>
-                            <th style={{ padding: '10px 12px' }}>Account (User / Email)</th>
-                            <th style={{ padding: '10px 12px' }}>Plan / Algo Service</th>
+                            <th style={{ padding: '10px 12px' }}>Algo Account (User / Email)</th>
+                            <th style={{ padding: '10px 12px' }}>SkandX Algo Service / Plan</th>
                             <th style={{ padding: '10px 12px' }}>Amount</th>
                             <th style={{ padding: '10px 12px' }}>Method</th>
                             <th style={{ padding: '10px 12px' }}>Status</th>
@@ -4287,7 +4305,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           {filteredPayments.length === 0 ? (
                             <tr>
                               <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                                No payment records match the selected filter.
+                                No SkandX Algo payment records match the selected filter.
                               </td>
                             </tr>
                           ) : (
@@ -4295,6 +4313,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               const st = String(p.status || 'INITIATED').toUpperCase();
                               const isSuccess = st === 'SUCCESS';
                               const isFailed = st === 'FAILED' || st === 'REJECTED';
+                              const isCancelled = st === 'CANCELLED';
                               return (
                                 <tr key={`${p.id}_${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                   <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#38bdf8' }}>
@@ -4307,10 +4326,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     <div style={{ fontWeight: '800', color: '#fff' }}>{p.username} <span style={{ fontSize: '10.5px', color: '#38bdf8', fontFamily: 'monospace' }}>({p.clientId})</span></div>
                                     <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.email}</div>
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontWeight: '800', color: '#e2e8f0' }}>
-                                    {p.plan}
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <div style={{ fontWeight: '800', color: '#e2e8f0' }}>{formatAlgoServiceName(p.plan)}</div>
+                                    <div style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>{p.plan}</div>
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontWeight: '900', color: isSuccess ? '#10b981' : (isFailed ? '#f87171' : '#f59e0b') }}>
+                                  <td style={{ padding: '10px 12px', fontWeight: '900', color: isSuccess ? '#10b981' : ((isFailed || isCancelled) ? '#f87171' : '#f59e0b') }}>
                                     ₹{Number(p.amount || 0).toLocaleString('en-IN')}
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '11.5px', color: '#cbd5e1' }}>
@@ -4322,14 +4342,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                       borderRadius: '4px',
                                       fontSize: '10.5px',
                                       fontWeight: '900',
-                                      background: isSuccess ? 'rgba(34,197,94,0.16)' : (isFailed ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.16)'),
-                                      color: isSuccess ? '#22c55e' : (isFailed ? '#f87171' : '#f59e0b')
+                                      background: isSuccess ? 'rgba(34,197,94,0.16)' : ((isFailed || isCancelled) ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.16)'),
+                                      color: isSuccess ? '#22c55e' : ((isFailed || isCancelled) ? '#f87171' : '#f59e0b')
                                     }}>
-                                      ● {isFailed ? 'REJECTED / FAILED' : st}
+                                      ● {isFailed ? 'REJECTED / FAILED' : (isCancelled ? 'CANCELLED / DISMISSED' : st)}
                                     </span>
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: isFailed ? '#fca5a5' : '#94a3b8', maxWidth: '260px' }}>
-                                    {p.failureReason || (isSuccess ? 'Razorpay Signature Verified & Provisioned' : 'Awaiting gateway completion')}
+                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: (isFailed || isCancelled) ? '#fca5a5' : '#94a3b8', maxWidth: '260px' }}>
+                                    {p.failureReason || (isSuccess ? 'Razorpay Signature Verified & Algo Service Provisioned' : 'Awaiting gateway completion')}
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
                                     {p.createdAt ? new Date(p.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -4574,7 +4594,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 )}
 
-                {/* ── MODAL: ADMIN EDIT USER MONEY, PLAN & QUOTAS ── */}
+                {/* ── MODAL: ADMIN EDIT ALGO USER WALLET, PLAN, QUOTAS & RISK LIMITS ── */}
                 {editingAdminUser && (
                   <div style={{
                     position: 'fixed',
@@ -4600,7 +4620,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                         <div>
                           <div style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>
-                            Manage Account — {editingAdminUser.username}
+                            Manage SkandX Algo Account — {editingAdminUser.username}
                           </div>
                           <div style={{ fontSize: '11.5px', color: '#38bdf8', fontFamily: 'monospace' }}>
                             {editingAdminUser.clientId} • {editingAdminUser.email}
@@ -4623,20 +4643,6 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={editAlgoWalletVal}
                             onChange={e => setEditAlgoWalletVal(e.target.value)}
                             style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#10b981', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>
-                            Paper Trading Virtual Capital Balance (₹)
-                          </label>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            value={editPaperBalanceVal}
-                            onChange={e => setEditPaperBalanceVal(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#38bdf8', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
                           />
                         </div>
 
@@ -4663,6 +4669,31 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               value={editLinkSlotsVal}
                               onChange={e => setEditLinkSlotsVal(e.target.value)}
                               style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#a855f7', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Max Single Order Qty</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editMaxOrderQtyVal}
+                              onChange={e => setEditMaxOrderQtyVal(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Daily MTM Loss Limit (₹)</label>
+                            <input
+                              type="number"
+                              min="500"
+                              step="500"
+                              value={editDailyLossLimitVal}
+                              onChange={e => setEditDailyLossLimitVal(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
                             />
                           </div>
                         </div>
@@ -4696,7 +4727,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             type="submit"
                             style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #0284c7, #2563eb)', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
                           >
-                            Save Account Changes
+                            Save Algo Account Changes
                           </button>
                         </div>
                       </form>

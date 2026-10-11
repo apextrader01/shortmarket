@@ -5760,12 +5760,22 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       }
     }
 
-    // 3. Query subscription_payments joined with users
+    // 3. Heal any legacy Algo orders that were logged as MONTHLY before plan separation, then query Paper Trading subscription_payments
+    try {
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 500 }).update({ plan: 'ALGO_WALLET' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 350 }).update({ plan: 'ALGO_STATIC_IP' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 250 }).update({ plan: 'ALGO_LINK_USER' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 999 }).update({ plan: 'ALGO_PRO' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 2499 }).update({ plan: 'ALGO_INSTITUTIONAL' });
+    } catch (_) {}
+
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
 
     let query = db('subscription_payments')
       .leftJoin('users', 'subscription_payments.user_id', 'users.id')
+      .whereRaw("UPPER(COALESCE(subscription_payments.plan, '')) NOT LIKE 'ALGO_%'")
+      .whereNotIn('subscription_payments.plan', ['STATIC_IP', 'LINK_USER', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE'])
       .select(
         'subscription_payments.*',
         db.raw('COALESCE(users.username, subscription_payments.username) as username'),
@@ -15835,6 +15845,31 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       }
     } catch (_) {}
 
+    // 1b. Heal any legacy Algo orders that were logged with plan='MONTHLY' before plan separation,
+    // and auto-expire abandoned INITIATED Algo orders older than 10 minutes as CANCELLED.
+    try {
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 500 }).update({ plan: 'ALGO_WALLET' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 350 }).update({ plan: 'ALGO_STATIC_IP' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 250 }).update({ plan: 'ALGO_LINK_USER' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 999 }).update({ plan: 'ALGO_PRO' });
+      await db('subscription_payments').where({ plan: 'MONTHLY', amount: 2499 }).update({ plan: 'ALGO_INSTITUTIONAL' });
+
+      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
+      await db('subscription_payments')
+        .where({ status: 'INITIATED' })
+        .whereNull('razorpay_payment_id')
+        .where('created_at', '<', tenMinsAgo)
+        .andWhere(builder => {
+          builder.whereRaw("UPPER(COALESCE(plan, '')) LIKE 'ALGO_%'")
+            .orWhereIn('plan', ['STATIC_IP', 'LINK_USER', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE']);
+        })
+        .update({
+          status: 'CANCELLED',
+          failure_reason: 'Checkout dismissed or timed out before payment completion',
+          updated_at: new Date()
+        });
+    } catch (_) {}
+
     // 2. Optional live Razorpay sync (?syncRazorpay=true)
     if (req.query.syncRazorpay === 'true') {
       try {
@@ -15850,7 +15885,6 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
                 })
                 .first();
               const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
-              const amountInr = Math.round((Number(p.amount) || 0) / 100);
               const failMsg = p.error_description || p.error_reason || null;
               if (exists) {
                 if (exists.status !== 'SUCCESS' && rzpStatus === 'SUCCESS') {
@@ -15874,9 +15908,9 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       } catch (_) {}
     }
 
-    // 3. Query all user accounts from PostgreSQL / SQLite
+    // 3. Query all user accounts from PostgreSQL / SQLite (Algo-only metrics)
     const dbUsers = await db('users')
-      .select('id', 'username', 'email', 'phone', 'client_id', 'balance', 'is_admin', 'is_banned', 'subscription_tier', 'subscription_expires', 'created_at', 'updated_at')
+      .select('id', 'username', 'email', 'phone', 'client_id', 'is_admin', 'is_banned', 'created_at', 'updated_at')
       .orderBy('id', 'desc')
       .limit(500)
       .catch(() => []);
@@ -15889,25 +15923,122 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     let totalLinkCapacityAcrossPlatform = 0;
     let totalOrdersAcrossPlatform = 0;
     let totalAlgoWalletMoney = 0;
-    let totalPaperMoney = 0;
 
     const allDemats = [];
     const allStaticIps = [];
     const allLinkedUsers = [];
     const allOrders = [];
 
+    // 4. Query ONLY SkandX Algo payment records from subscription_payments (exclude Paper Trading plans)
+    const dbPayments = await db('subscription_payments')
+      .leftJoin('users', 'subscription_payments.user_id', 'users.id')
+      .where(builder => {
+        builder.whereRaw("UPPER(COALESCE(subscription_payments.plan, '')) LIKE 'ALGO_%'")
+          .orWhereIn('subscription_payments.plan', [
+            'STATIC_IP',
+            'LINK_USER',
+            'PLAN_PRO',
+            'PLAN_INSTITUTIONAL',
+            'WALLET_RECHARGE'
+          ]);
+      })
+      .select(
+        'subscription_payments.*',
+        db.raw('COALESCE(users.username, subscription_payments.username) as resolved_username'),
+        db.raw('COALESCE(users.email, subscription_payments.email) as resolved_email'),
+        db.raw('COALESCE(users.phone, subscription_payments.phone) as resolved_phone'),
+        db.raw('COALESCE(users.client_id, subscription_payments.client_id) as resolved_client_id')
+      )
+      .orderBy('subscription_payments.created_at', 'desc')
+      .limit(500)
+      .catch(() => []);
+
+    const payments = dbPayments.map(p => ({
+      id: p.id,
+      txRef: p.razorpay_payment_id || p.razorpay_order_id || p.razorpay_subscription_id || `PAY-${p.id}`,
+      orderId: p.razorpay_order_id || null,
+      paymentId: p.razorpay_payment_id || null,
+      userId: p.user_id,
+      username: p.resolved_username || 'Trader',
+      email: p.resolved_email || '—',
+      phone: p.resolved_phone || '—',
+      clientId: p.resolved_client_id || (p.user_id ? `SKX-${String(p.user_id).padStart(4, '0')}` : '—'),
+      plan: p.plan || 'ALGO_WALLET',
+      amount: Number(p.amount || 0),
+      paymentType: p.payment_type || 'ONE_TIME',
+      status: String(p.status || 'INITIATED').toUpperCase(),
+      failureReason: p.failure_reason || null,
+      createdAt: p.created_at
+    }));
+
+    // Also include any per-user Algo Wallet or Algo Hub transactions not already in subscription_payments
+    const seenRefs = new Set();
+    payments.forEach(p => {
+      if (p.txRef) seenRefs.add(String(p.txRef));
+      if (p.orderId) seenRefs.add(String(p.orderId));
+      if (p.paymentId) seenRefs.add(String(p.paymentId));
+    });
+
+    for (const u of dbUsers) {
+      const st = userBridgeStatesCache.get(String(u.id));
+      if (st && Array.isArray(st.transactions)) {
+        const clientIdStr = u.client_id || `SKX-${String(u.id).padStart(4, '0')}`;
+        for (const tx of st.transactions) {
+          if (tx && tx.id && !seenRefs.has(String(tx.id))) {
+            seenRefs.add(String(tx.id));
+            const txStatus = String(tx.status || 'SUCCESS').toUpperCase();
+            payments.push({
+              id: tx.id,
+              txRef: tx.id,
+              orderId: null,
+              paymentId: tx.id,
+              userId: u.id,
+              username: u.username || (u.email ? u.email.split('@')[0] : `User #${u.id}`),
+              email: u.email || '—',
+              phone: u.phone || '—',
+              clientId: clientIdStr,
+              plan: tx.itemTitle || tx.type || 'ALGO_WALLET',
+              amount: Number(tx.amount || 0),
+              paymentType: String(tx.id).startsWith('WAL_') ? 'ALGO_WALLET' : (String(tx.id).startsWith('ADM_') ? 'ADMIN_GRANT' : 'RAZORPAY'),
+              status: txStatus === 'REJECTED' ? 'FAILED' : txStatus,
+              failureReason: tx.failureReason || (tx.method && txStatus !== 'SUCCESS' ? tx.method : null),
+              createdAt: tx.date || new Date().toISOString()
+            });
+          }
+        }
+      }
+    }
+
+    // Compute per-user Algo spend and payment counts
+    const userAlgoPaidMap = new Map();
+    const userAlgoPayCountMap = new Map();
+    const userAlgoFailCountMap = new Map();
+    for (const p of payments) {
+      const uidKey = String(p.userId || '');
+      if (!uidKey) continue;
+      const st = String(p.status || '').toUpperCase();
+      if (st === 'SUCCESS') {
+        userAlgoPayCountMap.set(uidKey, (userAlgoPayCountMap.get(uidKey) || 0) + 1);
+        if (p.paymentType !== 'ADMIN_GRANT') {
+          userAlgoPaidMap.set(uidKey, (userAlgoPaidMap.get(uidKey) || 0) + Number(p.amount || 0));
+        }
+      } else if (st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED') {
+        userAlgoFailCountMap.set(uidKey, (userAlgoFailCountMap.get(uidKey) || 0) + 1);
+      }
+    }
+
     const accounts = dbUsers.map(u => {
       const uid = String(u.id);
       const st = userBridgeStatesCache.get(uid) || null;
       const algoBal = Number(st?.config?.availableCredit || 0);
-      const paperBal = Number(u.balance || 0);
       const userDemats = Array.isArray(st?.demats) ? st.demats : [];
       const userIps = Array.isArray(st?.staticIps) ? st.staticIps : [];
       const userLinks = Array.isArray(st?.linkedUsers) ? st.linkedUsers : [];
       const userWatchlist = Array.isArray(st?.watchlist) ? st.watchlist : [];
       const userOrders = Array.isArray(st?.orders) ? st.orders : [];
       const linkSlots = Number(st?.config?.totalLinkSlots || 1);
-      const activePlan = st?.config?.activePlan || st?.config?.currentPlan || (u.subscription_tier && !['BASIC', 'FREE', 'NORMAL'].includes(String(u.subscription_tier).toUpperCase()) ? String(u.subscription_tier).toUpperCase() : 'STARTER');
+      const rawAlgoPlan = String(st?.config?.activePlan || st?.config?.currentPlan || 'STARTER').toUpperCase();
+      const activePlan = ['PRO', 'INSTITUTIONAL', 'STARTER'].includes(rawAlgoPlan) ? rawAlgoPlan : 'STARTER';
 
       totalDematsAcrossPlatform += userDemats.length;
       activeDematsAcrossPlatform += userDemats.filter(d => d.status === 'ACTIVE').length;
@@ -15917,7 +16048,6 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       totalLinkCapacityAcrossPlatform += linkSlots;
       totalOrdersAcrossPlatform += userOrders.length;
       totalAlgoWalletMoney += algoBal;
-      totalPaperMoney += paperBal;
 
       const clientIdStr = u.client_id || `SKX-${String(u.id).padStart(4, '0')}`;
 
@@ -15965,11 +16095,11 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         phone: u.phone || '',
         isAdmin: Boolean(u.is_admin),
         isBanned: Boolean(u.is_banned),
-        paperBalance: paperBal,
         algoWalletBalance: algoBal,
+        algoTotalPaid: userAlgoPaidMap.get(uid) || 0,
+        algoPaymentsCount: userAlgoPayCountMap.get(uid) || 0,
+        algoFailedCount: userAlgoFailCountMap.get(uid) || 0,
         activePlan,
-        paperSubscriptionTier: u.subscription_tier || 'BASIC',
-        subscriptionExpires: u.subscription_expires || null,
         dematsCount: userDemats.length,
         activeDematsCount: userDemats.filter(d => d.status === 'ACTIVE').length,
         expiredDematsCount: userDemats.filter(d => d.status === 'EXPIRED').length,
@@ -15981,6 +16111,10 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         ordersCount: userOrders.length,
         copyGroupStatus: st?.copyGroups?.status || 'PAUSED',
         followersCount: (st?.copyGroups?.followers || []).length,
+        webhookEnabled: st?.config?.webhookEnabled !== false,
+        maxOrderQty: Number(st?.config?.maxOrderQty || 1800),
+        dailyLossLimit: Number(st?.config?.dailyLossLimit || 25000),
+        autoSquareOffTime: st?.config?.autoSquareOffTime || '15:18:00',
         telegramConnected: Boolean(st?.telegramConfig?.connected || st?.telegram?.connected),
         createdAt: u.created_at,
         demats: userDemats,
@@ -15989,73 +16123,11 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       };
     });
 
-    // 4. Query all payment records (Successful, Rejected/Failed, Initiated) from subscription_payments + user transactions
-    const dbPayments = await db('subscription_payments')
-      .leftJoin('users', 'subscription_payments.user_id', 'users.id')
-      .select(
-        'subscription_payments.*',
-        db.raw('COALESCE(users.username, subscription_payments.username) as resolved_username'),
-        db.raw('COALESCE(users.email, subscription_payments.email) as resolved_email'),
-        db.raw('COALESCE(users.phone, subscription_payments.phone) as resolved_phone'),
-        db.raw('COALESCE(users.client_id, subscription_payments.client_id) as resolved_client_id')
-      )
-      .orderBy('subscription_payments.created_at', 'desc')
-      .limit(500)
-      .catch(() => []);
-
-    const payments = dbPayments.map(p => ({
-      id: p.id,
-      txRef: p.razorpay_payment_id || p.razorpay_order_id || p.razorpay_subscription_id || `PAY-${p.id}`,
-      orderId: p.razorpay_order_id || null,
-      paymentId: p.razorpay_payment_id || null,
-      userId: p.user_id,
-      username: p.resolved_username || 'Trader',
-      email: p.resolved_email || '—',
-      phone: p.resolved_phone || '—',
-      clientId: p.resolved_client_id || (p.user_id ? `SKX-${String(p.user_id).padStart(4, '0')}` : '—'),
-      plan: p.plan || 'ALGO_SERVICE',
-      amount: Number(p.amount || 0),
-      paymentType: p.payment_type || 'ONE_TIME',
-      status: String(p.status || 'INITIATED').toUpperCase(),
-      failureReason: p.failure_reason || null,
-      createdAt: p.created_at
-    }));
-
-    // Also include any Wallet or Algo transactions not already in subscription_payments
-    const seenRefs = new Set(payments.map(p => String(p.txRef)));
-    for (const acc of accounts) {
-      const st = userBridgeStatesCache.get(String(acc.id));
-      if (st && Array.isArray(st.transactions)) {
-        for (const tx of st.transactions) {
-          if (tx && tx.id && !seenRefs.has(String(tx.id))) {
-            seenRefs.add(String(tx.id));
-            const txStatus = String(tx.status || 'SUCCESS').toUpperCase();
-            payments.push({
-              id: tx.id,
-              txRef: tx.id,
-              orderId: null,
-              paymentId: tx.id,
-              userId: acc.id,
-              username: acc.username,
-              email: acc.email,
-              phone: acc.phone,
-              clientId: acc.clientId,
-              plan: tx.itemTitle || tx.type || 'ALGO_WALLET',
-              amount: Number(tx.amount || 0),
-              paymentType: String(tx.id).startsWith('WAL_') ? 'ALGO_WALLET' : (String(tx.id).startsWith('ADM_') ? 'ADMIN_GRANT' : 'RAZORPAY'),
-              status: txStatus === 'REJECTED' ? 'FAILED' : txStatus,
-              failureReason: tx.failureReason || (tx.method && txStatus !== 'SUCCESS' ? tx.method : null),
-              createdAt: tx.date || new Date().toISOString()
-            });
-          }
-        }
-      }
-    }
-
     let totalRevenue = 0;
     let algoRevenue = 0;
     let successCount = 0;
     let failedCount = 0;
+    let cancelledCount = 0;
     let initiatedCount = 0;
 
     for (const p of payments) {
@@ -16064,12 +16136,12 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         successCount++;
         if (p.paymentType !== 'ADMIN_GRANT') {
           totalRevenue += Number(p.amount || 0);
-          if (String(p.plan || '').includes('ALGO') || String(p.plan || '').includes('STATIC_IP') || String(p.plan || '').includes('LINK') || String(p.plan || '').includes('WALLET') || p.paymentType === 'ALGO_WALLET') {
-            algoRevenue += Number(p.amount || 0);
-          }
+          algoRevenue += Number(p.amount || 0);
         }
       } else if (st === 'FAILED' || st === 'REJECTED') {
         failedCount++;
+      } else if (st === 'CANCELLED') {
+        cancelledCount++;
       } else {
         initiatedCount++;
       }
@@ -16098,11 +16170,11 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         totalLinkedClients: totalLinkedClientsAcrossPlatform,
         totalLinkCapacity: Math.max(1, totalLinkCapacityAcrossPlatform),
         totalAlgoWalletMoney,
-        totalPaperMoney,
         totalRevenue,
         algoRevenue,
         successPaymentsCount: successCount,
-        failedPaymentsCount: failedCount,
+        failedPaymentsCount: failedCount + cancelledCount,
+        cancelledPaymentsCount: cancelledCount,
         initiatedPaymentsCount: initiatedCount
       },
       accounts,
@@ -16132,7 +16204,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
   }
 });
 
-// Admin Per-User Account Management (Modify Algo Wallet Balance, Paper Balance, Plan, Static IPs, Link Slots, Demat Status)
+// Admin Per-User Algo Account Management (Modify Algo Wallet Balance, Algo Plan, Static IPs, Link Slots, Demat Status, Risk Limits)
 app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const targetUserId = Number(req.params.userId);
@@ -16158,50 +16230,36 @@ app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireA
     const {
       action,
       algoWalletBalance,
-      paperBalance,
       activePlan,
       slotsToAdd,
-      totalLinkSlots
+      totalLinkSlots,
+      maxOrderQty,
+      dailyLossLimit
     } = req.body || {};
 
-    let actionSummary = 'Updated account settings';
+    let actionSummary = 'Updated Algo account settings';
 
     // 1. Update Algo Wallet Balance (Current Money in Algo Hub)
     if (algoWalletBalance !== undefined && algoWalletBalance !== null && !isNaN(Number(algoWalletBalance))) {
       const prevBal = Number(state.config.availableCredit || 0);
       const nextBal = Math.max(0, Number(Number(algoWalletBalance).toFixed(2)));
       const diff = Number((nextBal - prevBal).toFixed(2));
-      state.config.availableCredit = nextBal;
-      state.transactions.unshift({
-        id: 'ADM_' + Math.floor(100000 + Math.random() * 900000),
-        date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        type: diff >= 0 ? 'CREDIT' : 'DEBIT',
-        itemTitle: 'Admin Algo Wallet Adjustment',
-        amount: Math.abs(diff),
-        method: `Admin Override (₹${prevBal.toLocaleString('en-IN')} ➔ ₹${nextBal.toLocaleString('en-IN')})`,
-        status: 'SUCCESS'
-      });
+      if (diff !== 0) {
+        state.config.availableCredit = nextBal;
+        state.transactions.unshift({
+          id: 'ADM_' + Math.floor(100000 + Math.random() * 900000),
+          date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          type: diff >= 0 ? 'CREDIT' : 'DEBIT',
+          itemTitle: 'Admin Algo Wallet Adjustment',
+          amount: Math.abs(diff),
+          method: `Admin Override (₹${prevBal.toLocaleString('en-IN')} ➔ ₹${nextBal.toLocaleString('en-IN')})`,
+          status: 'SUCCESS'
+        });
+      }
       actionSummary = `Algo Wallet set to ₹${nextBal.toLocaleString('en-IN')}`;
     }
 
-    // 2. Update Paper Trading Balance (Current Money in Paper Terminal)
-    if (paperBalance !== undefined && paperBalance !== null && !isNaN(Number(paperBalance))) {
-      const nextPaper = Math.max(0, Number(Number(paperBalance).toFixed(2)));
-      const prevPaper = Number(targetUser.balance || 0);
-      const delta = Number((nextPaper - prevPaper).toFixed(2));
-      await db('users').where({ id: targetUserId }).update({ balance: nextPaper });
-      if (delta !== 0) {
-        await db('ledger').insert({
-          user_id: targetUserId,
-          amount: delta,
-          type: delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL',
-          description: `Algo Admin balance adjustment (₹${prevPaper.toLocaleString('en-IN')} ➔ ₹${nextPaper.toLocaleString('en-IN')})`
-        }).catch(() => {});
-      }
-      actionSummary = `Paper Balance set to ₹${nextPaper.toLocaleString('en-IN')}`;
-    }
-
-    // 3. Update Active Algo Plan
+    // 2. Update Active Algo Plan
     if (activePlan) {
       const cleanPlan = String(activePlan).toUpperCase().trim();
       state.config.activePlan = cleanPlan;
@@ -16213,13 +16271,21 @@ app.post('/api/v1/bridge/admin/user/:userId/update', authenticateToken, requireA
       }
       await logSubscriptionAttempt({
         userId: targetUserId,
-        plan: cleanPlan === 'INSTITUTIONAL' ? 'ALGO_INSTITUTIONAL' : (cleanPlan === 'PRO' ? 'ALGO_PRO' : 'BASIC'),
+        plan: cleanPlan === 'INSTITUTIONAL' ? 'ALGO_INSTITUTIONAL' : (cleanPlan === 'PRO' ? 'ALGO_PRO' : 'ALGO_WALLET'),
         amount: 0,
         paymentType: 'ADMIN_GRANT',
         status: 'SUCCESS',
-        failureReason: `Plan set to ${cleanPlan} by Algo Admin`
+        failureReason: `Algo Plan set to ${cleanPlan} by Algo Admin`
       });
       actionSummary = `Algo Plan set to ${cleanPlan}`;
+    }
+
+    // 3. Update Per-User Algo Risk Limits (Max Order Qty / Daily Loss Limit)
+    if (maxOrderQty !== undefined && !isNaN(Number(maxOrderQty))) {
+      state.config.maxOrderQty = Math.max(1, Number(maxOrderQty));
+    }
+    if (dailyLossLimit !== undefined && !isNaN(Number(dailyLossLimit))) {
+      state.config.dailyLossLimit = Math.max(500, Number(dailyLossLimit));
     }
 
     // 4. Grant Static IP to this specific user

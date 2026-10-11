@@ -140,6 +140,8 @@ export default function AlgoPaymentGatewayModal({
 
       setProcessStepText('Awaiting payment confirmation in Razorpay...');
 
+      let paymentCompleted = false;
+
       const options = {
         key: orderData.key_id,
         amount: orderData.amount,
@@ -163,12 +165,34 @@ export default function AlgoPaymentGatewayModal({
           color: '#0284c7'
         },
         modal: {
-          ondismiss: () => {
+          ondismiss: async () => {
             setIsProcessing(false);
             setProcessStepText('');
+            if (!paymentCompleted) {
+              try {
+                const failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
+                  method: 'POST',
+                  headers: getAuthHeaders(),
+                  body: JSON.stringify({
+                    razorpay_order_id: resolvedOrderId,
+                    error_description: 'Checkout dismissed by user before completing payment',
+                    error_reason: 'user_cancelled',
+                    status: 'CANCELLED',
+                    itemType: item?.type || 'STATIC_IP',
+                    amount: effectiveAmount,
+                    title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+                  })
+                });
+                const failData = await failRes.json().catch(() => ({}));
+                if (failData?.transactions) {
+                  notifyParent({ paymentFailed: true, transactions: failData.transactions });
+                }
+              } catch (_) {}
+            }
           }
         },
         handler: async (response) => {
+          paymentCompleted = true;
           try {
             setIsProcessing(true);
             setProcessStepText('Verifying Razorpay signature & provisioning service...');
