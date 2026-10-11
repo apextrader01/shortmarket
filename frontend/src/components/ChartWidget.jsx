@@ -58,8 +58,9 @@ export default function ChartWidget({
 
   const selectedSymbol = (isModal && chartModalSymbol) ? chartModalSymbol : storeSelectedSymbol;
   const price   = useStore(state => state.prices[selectedSymbol]);
-  const candles = candleData[`${selectedSymbol}_${chartInterval}`] || candleData[selectedSymbol] || [];
+  const candles = candleData[`${selectedSymbol}_${chartInterval}`] || [];
   const isLight = theme === 'light';
+  const prevSymbolRef = useRef(selectedSymbol);
 
   // ── Build chart instance ────────────────────────────────────────────────────
   const buildChart = useCallback(() => {
@@ -197,12 +198,15 @@ export default function ChartWidget({
     const cleanup = buildChart();
     const cacheKey = `${selectedSymbol}_${chartInterval}`;
     const hasCached = Array.isArray(useStore.getState().candleData?.[cacheKey]) && useStore.getState().candleData[cacheKey].length > 0;
-    // If already cached on client, resolve immediately; otherwise debounce 250ms so rapid watchlist clicking doesn't spam the backend
+    const isSameSymbol = prevSymbolRef.current === selectedSymbol;
+    prevSymbolRef.current = selectedSymbol;
+    // Resolve in 0ms when already cached or switching timeframe on the same symbol; 60ms debounce for rapid watchlist scrolling
+    const debounceMs = (hasCached || isSameSymbol) ? 0 : 60;
     const debounceTimer = setTimeout(() => {
       if (mountedRef.current && selectedSymbol) {
         loadCandleData(selectedSymbol, chartInterval);
       }
-    }, hasCached ? 0 : 250);
+    }, debounceMs);
 
     return () => {
       clearTimeout(debounceTimer);
@@ -228,6 +232,17 @@ export default function ChartWidget({
   const applyLiveTickToCandle = useCallback((currentPrice) => {
     if (!mountedRef.current || !currentPrice || !Number.isFinite(Number(currentPrice.ltp))) return;
     const ltp = Number(currentPrice.ltp);
+
+    // Only roll/update live candles when the symbol's exchange session is actively open in IST
+    const isCommodity = String(selectedSymbol || '').toUpperCase().includes('MCX');
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const day = istNow.getDay();
+    const mins = istNow.getHours() * 60 + istNow.getMinutes();
+    const isSessionOpen = day >= 1 && day <= 5 && (
+      isCommodity ? (mins >= 540 && mins <= 1435) : (mins >= 555 && mins < 930)
+    );
+    if (!isSessionOpen) return;
+
     const rawTs = currentPrice.timestamp ? Math.floor(new Date(currentPrice.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000);
     const tickSec = (rawTs > 0 ? rawTs : Math.floor(Date.now() / 1000)) + 19800;
 
@@ -244,19 +259,18 @@ export default function ChartWidget({
         ONE_DAY: 86400,
       };
       const intervalSec = intervalSecMap[chartInterval] || 300;
-      const elapsed = tickSec - prev.time;
+      const alignOffset = intervalSec === 86400 ? 19800 : ((intervalSec === 1800 || intervalSec === 3600) ? 900 : 0);
+      const currentBucketTime = Math.floor((tickSec - alignOffset) / intervalSec) * intervalSec + alignOffset;
 
       let updatedBar;
-      if (elapsed >= intervalSec) {
-        const steps = Math.floor(elapsed / intervalSec);
-        const barTime = prev.time + steps * intervalSec;
+      if (currentBucketTime > prev.time) {
         if (chartInterval === 'ONE_DAY') {
           const dayOpen = Number(currentPrice.open) > 0 ? Number(currentPrice.open) : ltp;
           const dayHigh = Number(currentPrice.high) > 0 ? Math.max(Number(currentPrice.high), ltp, dayOpen) : Math.max(ltp, dayOpen);
           const dayLow  = Number(currentPrice.low)  > 0 ? Math.min(Number(currentPrice.low),  ltp, dayOpen) : Math.min(ltp, dayOpen);
-          updatedBar = { time: barTime, open: dayOpen, high: dayHigh, low: dayLow, close: ltp, volume: Number(currentPrice.volume) || 0 };
+          updatedBar = { time: currentBucketTime, open: dayOpen, high: dayHigh, low: dayLow, close: ltp, volume: Number(currentPrice.volume) || 0 };
         } else {
-          updatedBar = { time: barTime, open: ltp, high: ltp, low: ltp, close: ltp, volume: 0 };
+          updatedBar = { time: currentBucketTime, open: ltp, high: ltp, low: ltp, close: ltp, volume: 0 };
         }
       } else {
         if (chartInterval === 'ONE_DAY') {
@@ -290,7 +304,7 @@ export default function ChartWidget({
         } catch (_) {}
       }
     }
-  }, [chartInterval]);
+  }, [chartInterval, selectedSymbol]);
 
   // Push candle and indicator data into chart
   useEffect(() => {
@@ -392,9 +406,17 @@ export default function ChartWidget({
         if (price) applyLiveTickToCandle(price);
       }
 
-      chartRef.current?.timeScale().fitContent();
+      const visibleBars = isMobile ? 75 : 130;
+      if (uniqueCandles.length > visibleBars) {
+        chartRef.current?.timeScale().setVisibleLogicalRange({
+          from: uniqueCandles.length - visibleBars,
+          to: uniqueCandles.length + 2,
+        });
+      } else {
+        chartRef.current?.timeScale().fitContent();
+      }
     } catch (e) { console.error(e) }
-  }, [candles, selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD, theme, applyLiveTickToCandle]);
+  }, [candles, selectedSymbol, chartInterval, isMobile, showSMA, showEMA, showRSI, showMACD, theme, applyLiveTickToCandle]);
 
   // Live tick update
   useEffect(() => {

@@ -11401,6 +11401,18 @@ function resolveLivePriceForSymbol(cleanSymbol) {
 // so cached charts stay 100% live for hours without re-fetching from Fyers every 60 seconds.
 function mergeLiveTickIntoCandles(candles, cleanSymbol, interval) {
   if (!Array.isArray(candles) || candles.length === 0) return candles;
+
+  // Check if market session is open for this symbol right now; never mutate completed historical candles off-market
+  const isCommodity = String(cleanSymbol || '').toUpperCase().includes('MCX');
+  const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const day = istNow.getDay();
+  const mins = istNow.getHours() * 60 + istNow.getMinutes();
+  const holidayToday = typeof isMarketHoliday === 'function' ? isMarketHoliday(istNow) : false;
+  const isWithinSession = day >= 1 && day <= 5 && !holidayToday && (
+    isCommodity ? (mins >= 540 && mins <= 1435) : (mins >= 555 && mins < 930)
+  );
+  if (!isWithinSession) return candles;
+
   const livePrice = resolveLivePriceForSymbol(cleanSymbol);
   const ltp = Number(livePrice?.ltp);
   if (!Number.isFinite(ltp) || ltp <= 0) return candles;
@@ -11410,53 +11422,42 @@ function mergeLiveTickIntoCandles(candles, cleanSymbol, interval) {
   if (!last || !Number.isFinite(Number(last.time))) return candles;
 
   const bucketSec = getIntervalSeconds(interval);
-  const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
+  const alignOffset = bucketSec === 86400 ? 19800 : ((bucketSec === 1800 || bucketSec === 3600) ? 900 : 0);
   const rawTsSec = livePrice.timestamp
     ? Math.floor(new Date(livePrice.timestamp).getTime() / 1000)
     : Math.floor(Date.now() / 1000);
   const tickSec = (rawTsSec > 0 ? rawTsSec : Math.floor(Date.now() / 1000)) + 19800;
   const currentBucketTime = Math.floor((tickSec - alignOffset) / bucketSec) * bucketSec + alignOffset;
 
-  // Only roll over into a new bar if the live tick timestamp is newer than the last candle
+  // Roll over into a new bar when the live tick timestamp enters a newer bucket during active session
   if (currentBucketTime > last.time && (tickSec - last.time) < 7 * 86400) {
-    // Check if market is open for this symbol before creating new intraday bars after hours
-    const isCommodity = cleanSymbol.toUpperCase().includes('MCX');
-    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const day = istNow.getDay();
-    const mins = istNow.getHours() * 60 + istNow.getMinutes();
-    const isWithinSession = day >= 1 && day <= 5 && (
-      isCommodity ? (mins >= 540 && mins <= 1435) : (mins >= 555 && mins <= 935)
-    );
-
-    if (isWithinSession) {
-      if (bucketSec === 86400) {
-        const dayOpen = Number(livePrice.open) > 0 ? Number(livePrice.open) : ltp;
-        const dayHigh = Number(livePrice.high) > 0 ? Math.max(Number(livePrice.high), ltp, dayOpen) : Math.max(ltp, dayOpen);
-        const dayLow  = Number(livePrice.low)  > 0 ? Math.min(Number(livePrice.low),  ltp, dayOpen) : Math.min(ltp, dayOpen);
-        candles.push({
-          time: currentBucketTime,
-          open: dayOpen,
-          high: dayHigh,
-          low: dayLow,
-          close: ltp,
-          volume: Number(livePrice.volume) || 0,
-        });
-      } else {
-        candles.push({
-          time: currentBucketTime,
-          open: ltp,
-          high: ltp,
-          low: ltp,
-          close: ltp,
-          volume: 0,
-        });
-      }
-      if (candles.length > 1500) candles.shift();
-      return candles;
+    if (bucketSec === 86400) {
+      const dayOpen = Number(livePrice.open) > 0 ? Number(livePrice.open) : ltp;
+      const dayHigh = Number(livePrice.high) > 0 ? Math.max(Number(livePrice.high), ltp, dayOpen) : Math.max(ltp, dayOpen);
+      const dayLow  = Number(livePrice.low)  > 0 ? Math.min(Number(livePrice.low),  ltp, dayOpen) : Math.min(ltp, dayOpen);
+      candles.push({
+        time: currentBucketTime,
+        open: dayOpen,
+        high: dayHigh,
+        low: dayLow,
+        close: ltp,
+        volume: Number(livePrice.volume) || 0,
+      });
+    } else {
+      candles.push({
+        time: currentBucketTime,
+        open: ltp,
+        high: ltp,
+        low: ltp,
+        close: ltp,
+        volume: 0,
+      });
     }
+    if (candles.length > 1500) candles.shift();
+    return candles;
   }
 
-  // Update current (last) candle OHLC in-place
+  // Update current (last) candle OHLC in-place during active session
   if (bucketSec === 86400) {
     if (Number(livePrice.open) > 0) last.open = Number(livePrice.open);
     last.high = Math.max(last.high, Number(livePrice.high) || ltp, ltp);
@@ -11483,7 +11484,7 @@ function buildSyntheticCandlesFromLivePrice(cleanSymbol, interval) {
   const prevClose = Number(livePrice.prev_close || livePrice.close) > 0 ? Number(livePrice.prev_close || livePrice.close) : open;
 
   const bucketSec = getIntervalSeconds(interval);
-  const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
+  const alignOffset = bucketSec === 86400 ? 19800 : ((bucketSec === 1800 || bucketSec === 3600) ? 900 : 0);
   const nowSec = Math.floor(Date.now() / 1000) + 19800;
   const currentBucket = Math.floor((nowSec - alignOffset) / bucketSec) * bucketSec + alignOffset;
 
@@ -11632,142 +11633,156 @@ function resampleCandlesFromOneMinute(oneMinCandles, targetInterval) {
 
 app.get('/api/candles/:symbol', async (req, res) => {
   try {
-    const { fetchCandleData, addSubscription } = require('./services/fyers');
+    const { fetchCandleData, addSubscription, toFyersSymbol } = require('./services/fyers');
     const interval = req.query.interval || 'ONE_DAY';
     let cleanSymbol = req.params.symbol;
     if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
       cleanSymbol = cleanSymbol.replace(/\s+/g, '');
     }
+    const canonicalSymbol = (typeof toFyersSymbol === 'function' && toFyersSymbol(cleanSymbol)) || cleanSymbol;
     // Ensure this symbol is subscribed to the Fyers WebSocket so its 1-minute candles keep building in RAM all day
     if (typeof addSubscription === 'function') {
-      try { addSubscription(cleanSymbol); } catch (_) {}
+      try { addSubscription(canonicalSymbol); } catch (_) {}
     }
-    const cacheKey = `${cleanSymbol}_${interval}`;
-    const master1mKey = `${cleanSymbol}_ONE_MINUTE`;
+    const cacheKey = `${canonicalSymbol}_${interval}`;
+    const master1mKey = `${canonicalSymbol}_ONE_MINUTE`;
     const now = Date.now();
-    const maxAgeMs = getCacheDuration(interval, cleanSymbol);
+    const maxAgeMs = getCacheDuration(interval, canonicalSymbol);
 
     // Allow Cloudflare / browser edge caching to absorb burst traffic across 1 Lakh users
     res.set('Cache-Control', 'public, max-age=5, s-maxage=10, stale-while-revalidate=30');
 
     // 1. Serve from ultra-fast RAM cache if valid (with live WebSocket tick merged in)
-    const cachedItem = candleCache[cacheKey];
+    const cachedItem = candleCache[cacheKey] || candleCache[`${cleanSymbol}_${interval}`];
     if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0 && (now - cachedItem.timestamp < maxAgeMs)) {
-      const liveMerged = mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
+      const liveMerged = mergeLiveTickIntoCandles(cachedItem.data, canonicalSymbol, interval);
       return res.json(liveMerged);
     }
 
     // 1b. If an intraday timeframe (5m, 15m, 30m, 1h) is requested and we ALREADY have the Master 1-Minute
     // candles for this stock in RAM, resample it in <0.3ms in RAM with ZERO upstream API calls!
     if (isIntradayInterval(interval)) {
-      const master1mItem = candleCache[master1mKey] || candleCache[`${cleanSymbol}_1`];
-      const master1mMaxAge = getCacheDuration('ONE_MINUTE', cleanSymbol);
+      const master1mItem = candleCache[master1mKey] || candleCache[`${cleanSymbol}_ONE_MINUTE`] || candleCache[`${canonicalSymbol}_1`];
+      const master1mMaxAge = getCacheDuration('ONE_MINUTE', canonicalSymbol);
       if (master1mItem && Array.isArray(master1mItem.data) && master1mItem.data.length > 0 && (now - master1mItem.timestamp < master1mMaxAge)) {
-        mergeLiveTickIntoCandles(master1mItem.data, cleanSymbol, 'ONE_MINUTE');
+        mergeLiveTickIntoCandles(master1mItem.data, canonicalSymbol, 'ONE_MINUTE');
         const resampled = resampleCandlesFromOneMinute(master1mItem.data, interval);
-        const liveMerged = mergeLiveTickIntoCandles(resampled, cleanSymbol, interval);
-        setCandleCache(cacheKey, liveMerged, master1mItem.timestamp, cleanSymbol, interval, false);
+        const liveMerged = mergeLiveTickIntoCandles(resampled, canonicalSymbol, interval);
+        setCandleCache(cacheKey, liveMerged, master1mItem.timestamp, canonicalSymbol, interval, false);
         return res.json(liveMerged);
       }
-    }
 
-    // 2. Single-flight lock: for ALL intraday intervals (1m, 5m, 15m, 30m, 1h) on the same stock,
-    // coalesce onto a single Master 1-Minute fetch so multiple users clicking different timeframes use ONLY 1 API call!
-    const lockKey = isIntradayInterval(interval) ? `INTRADAY_MASTER_${cleanSymbol}` : cacheKey;
-    let fetchTask = inflightRouteCandleRequests.get(lockKey);
-    if (!fetchTask) {
-      fetchTask = (async () => {
-        try {
-          if (isIntradayInterval(interval)) {
-            // Check PostgreSQL for Master 1-Minute cache first
+      // Coalesce concurrent intraday requests onto a single Master 1-Minute fetch
+      const masterLockKey = `INTRADAY_MASTER_${canonicalSymbol}`;
+      let masterTask = inflightRouteCandleRequests.get(masterLockKey);
+      if (!masterTask) {
+        masterTask = (async () => {
+          try {
             if (isCandleDbReady) {
               try {
-                const db1mRow = await db('market_candle_cache').where({ cache_key: master1mKey }).first();
-                const master1mMaxAge = getCacheDuration('ONE_MINUTE', cleanSymbol);
+                const db1mRow = await db('market_candle_cache')
+                  .whereIn('cache_key', [master1mKey, `${cleanSymbol}_ONE_MINUTE`])
+                  .orderBy('updated_at', 'desc')
+                  .first();
                 if (db1mRow && Array.isArray(db1mRow.candles_json) && db1mRow.candles_json.length > 0) {
                   const dbUpdatedAt = Number(db1mRow.updated_at) || 0;
                   if (now - dbUpdatedAt < master1mMaxAge) {
-                    const hydrated1m = mergeLiveTickIntoCandles(db1mRow.candles_json, cleanSymbol, 'ONE_MINUTE');
-                    setCandleCache(master1mKey, hydrated1m, dbUpdatedAt, cleanSymbol, 'ONE_MINUTE', false);
+                    const hydrated1m = mergeLiveTickIntoCandles(db1mRow.candles_json, canonicalSymbol, 'ONE_MINUTE');
+                    setCandleCache(master1mKey, hydrated1m, dbUpdatedAt, canonicalSymbol, 'ONE_MINUTE', false);
                     return hydrated1m;
                   }
                 }
               } catch (_) {}
             }
 
-            // Fetch Master 1-Minute series once from Fyers / Redis / Fallback
-            const oneMinCandles = await fetchCandleData(cleanSymbol, 'ONE_MINUTE');
+            const oneMinCandles = await fetchCandleData(canonicalSymbol, 'ONE_MINUTE');
             if (Array.isArray(oneMinCandles) && oneMinCandles.length > 0) {
-              const live1m = mergeLiveTickIntoCandles(oneMinCandles, cleanSymbol, 'ONE_MINUTE');
-              setCandleCache(master1mKey, live1m, Date.now(), cleanSymbol, 'ONE_MINUTE', true);
+              const live1m = mergeLiveTickIntoCandles(oneMinCandles, canonicalSymbol, 'ONE_MINUTE');
+              setCandleCache(master1mKey, live1m, Date.now(), canonicalSymbol, 'ONE_MINUTE', true);
               return live1m;
             }
+            return [];
+          } finally {
+            inflightRouteCandleRequests.delete(masterLockKey);
           }
+        })();
+        inflightRouteCandleRequests.set(masterLockKey, masterTask);
+      }
 
-          // 2a. Check PostgreSQL persistent cache for exact interval if fresh enough
+      const master1mCandles = await masterTask;
+      if (Array.isArray(master1mCandles) && master1mCandles.length > 0) {
+        if (getIntervalSeconds(interval) > 60) {
+          const resampled = resampleCandlesFromOneMinute(master1mCandles, interval);
+          const liveMerged = mergeLiveTickIntoCandles(resampled, canonicalSymbol, interval);
+          setCandleCache(cacheKey, liveMerged, Date.now(), canonicalSymbol, interval, false);
+          return res.json(liveMerged);
+        }
+        return res.json(master1mCandles);
+      }
+    }
+
+    // 2. Exact-interval single-flight lock (for ONE_DAY or fallback when 1m wasn't available)
+    let exactTask = inflightRouteCandleRequests.get(cacheKey);
+    if (!exactTask) {
+      exactTask = (async () => {
+        try {
           if (isCandleDbReady) {
             try {
-              const dbRow = await db('market_candle_cache').where({ cache_key: cacheKey }).first();
+              const dbRow = await db('market_candle_cache')
+                .whereIn('cache_key', [cacheKey, `${cleanSymbol}_${interval}`])
+                .orderBy('updated_at', 'desc')
+                .first();
               if (dbRow && Array.isArray(dbRow.candles_json) && dbRow.candles_json.length > 0) {
                 const dbUpdatedAt = Number(dbRow.updated_at) || 0;
                 if (now - dbUpdatedAt < maxAgeMs) {
-                  const hydrated = mergeLiveTickIntoCandles(dbRow.candles_json, cleanSymbol, interval);
-                  setCandleCache(cacheKey, hydrated, dbUpdatedAt, cleanSymbol, interval, false);
+                  const hydrated = mergeLiveTickIntoCandles(dbRow.candles_json, canonicalSymbol, interval);
+                  setCandleCache(cacheKey, hydrated, dbUpdatedAt, canonicalSymbol, interval, false);
                   return hydrated;
                 }
               }
             } catch (_) {}
           }
 
-          // 2b. Fetch requested interval directly (e.g. ONE_DAY or fallback if 1m wasn't available)
-          const candles = await fetchCandleData(cleanSymbol, interval);
-
+          const candles = await fetchCandleData(canonicalSymbol, interval);
           if (Array.isArray(candles) && candles.length > 0) {
-            const liveMerged = mergeLiveTickIntoCandles(candles, cleanSymbol, interval);
-            setCandleCache(cacheKey, liveMerged, Date.now(), cleanSymbol, interval, true);
+            const liveMerged = mergeLiveTickIntoCandles(candles, canonicalSymbol, interval);
+            setCandleCache(cacheKey, liveMerged, Date.now(), canonicalSymbol, interval, true);
             return liveMerged;
           }
 
-          // 2c. Stale-if-error fallback from RAM or PostgreSQL
           if (cachedItem && Array.isArray(cachedItem.data) && cachedItem.data.length > 0) {
-            return mergeLiveTickIntoCandles(cachedItem.data, cleanSymbol, interval);
+            return mergeLiveTickIntoCandles(cachedItem.data, canonicalSymbol, interval);
           }
           if (isCandleDbReady) {
             try {
-              const staleDbRow = await db('market_candle_cache').where({ cache_key: cacheKey }).first();
+              const staleDbRow = await db('market_candle_cache')
+                .whereIn('cache_key', [cacheKey, `${cleanSymbol}_${interval}`])
+                .orderBy('updated_at', 'desc')
+                .first();
               if (staleDbRow && Array.isArray(staleDbRow.candles_json) && staleDbRow.candles_json.length > 0) {
-                const hydrated = mergeLiveTickIntoCandles(staleDbRow.candles_json, cleanSymbol, interval);
-                setCandleCache(cacheKey, hydrated, Date.now(), cleanSymbol, interval, false);
+                const hydrated = mergeLiveTickIntoCandles(staleDbRow.candles_json, canonicalSymbol, interval);
+                setCandleCache(cacheKey, hydrated, Date.now(), canonicalSymbol, interval, false);
                 return hydrated;
               }
             } catch (_) {}
           }
 
-          // 2d. Final Safety Net: Build live candles from WebSocket priceCache (for uncached F&O Options / MCX if quota exhausted)
-          const synthetic = buildSyntheticCandlesFromLivePrice(cleanSymbol, interval);
+          const synthetic = buildSyntheticCandlesFromLivePrice(canonicalSymbol, interval);
           if (synthetic.length > 0) {
-            setCandleCache(cacheKey, synthetic, Date.now(), cleanSymbol, interval, false);
+            setCandleCache(cacheKey, synthetic, Date.now(), canonicalSymbol, interval, false);
             return synthetic;
           }
 
           return [];
         } finally {
-          inflightRouteCandleRequests.delete(lockKey);
+          inflightRouteCandleRequests.delete(cacheKey);
         }
       })();
-      inflightRouteCandleRequests.set(lockKey, fetchTask);
+      inflightRouteCandleRequests.set(cacheKey, exactTask);
     }
 
-    const baseCandles = await fetchTask;
-    // If lockKey was INTRADAY_MASTER_${cleanSymbol} and caller asked for 5m/15m/30m/1h, resample from 1m now
-    if (isIntradayInterval(interval) && getIntervalSeconds(interval) > 60 && Array.isArray(baseCandles) && baseCandles.length > 0) {
-      const resampled = resampleCandlesFromOneMinute(baseCandles, interval);
-      const liveMerged = mergeLiveTickIntoCandles(resampled, cleanSymbol, interval);
-      setCandleCache(cacheKey, liveMerged, Date.now(), cleanSymbol, interval, false);
-      return res.json(liveMerged);
-    }
-
-    return res.json(baseCandles);
+    const exactCandles = await exactTask;
+    return res.json(exactCandles);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

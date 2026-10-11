@@ -997,6 +997,46 @@ export const useStore = create(persist((set, get) => ({
     // Intraday caches stay fresh on client for 45s (live ticks update the tip in real time); daily/historical for 5 min
     const ttlMs = resolvedInterval === 'ONE_DAY' ? 5 * 60 * 1000 : 45 * 1000;
 
+    const intervalSecMap = {
+      ONE_MINUTE: 60,
+      THREE_MINUTE: 180,
+      FIVE_MINUTE: 300,
+      TEN_MINUTE: 600,
+      FIFTEEN_MINUTE: 900,
+      THIRTY_MINUTE: 1800,
+      ONE_HOUR: 3600,
+    };
+    const resampleFrom1m = (oneMinBars, targetInterval) => {
+      const bucketSec = intervalSecMap[targetInterval];
+      if (!bucketSec || bucketSec <= 60 || !Array.isArray(oneMinBars) || oneMinBars.length === 0) return null;
+      const alignOffset = (bucketSec === 1800 || bucketSec === 3600) ? 900 : 0;
+      const out = [];
+      let cur = null;
+      for (let i = 0; i < oneMinBars.length; i++) {
+        const c = oneMinBars[i];
+        if (!c || !Number.isFinite(Number(c.time))) continue;
+        const bTime = Math.floor((c.time - alignOffset) / bucketSec) * bucketSec + alignOffset;
+        if (!cur || cur.time !== bTime) {
+          if (cur) out.push(cur);
+          cur = {
+            time: bTime,
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close),
+            volume: Number(c.volume) || 0,
+          };
+        } else {
+          if (Number(c.high) > cur.high) cur.high = Number(c.high);
+          if (Number(c.low) < cur.low) cur.low = Number(c.low);
+          cur.close = Number(c.close);
+          cur.volume += (Number(c.volume) || 0);
+        }
+      }
+      if (cur) out.push(cur);
+      return out;
+    };
+
     const stateSnapshot = get();
     const cached = stateSnapshot.candleData[cacheKey];
     const cachedAt = stateSnapshot._candleCacheMeta?.[cacheKey] || 0;
@@ -1010,6 +1050,29 @@ export const useStore = create(persist((set, get) => ({
         }));
       }
       return cached;
+    }
+
+    // Instant 0ms client-side resampling if fresh ONE_MINUTE data is already in memory for this symbol
+    const master1mKey = `${symbol}_ONE_MINUTE`;
+    const cached1m = stateSnapshot.candleData[master1mKey];
+    const cached1mAt = stateSnapshot._candleCacheMeta?.[master1mKey] || 0;
+    if (
+      !options.force &&
+      intervalSecMap[resolvedInterval] > 60 &&
+      Array.isArray(cached1m) &&
+      cached1m.length > 0 &&
+      (now - cached1mAt) < ttlMs
+    ) {
+      const resampled = resampleFrom1m(cached1m, resolvedInterval);
+      if (Array.isArray(resampled) && resampled.length > 0) {
+        set((s) => ({
+          candleData: { ...s.candleData, [symbol]: resampled, [cacheKey]: resampled },
+          _candleCacheMeta: { ...(s._candleCacheMeta || {}), [cacheKey]: cached1mAt },
+          isLoadingCandles: false,
+          candleError: null,
+        }));
+        return resampled;
+      }
     }
 
     // Single-flight deduplication on client: reuse in-flight request if already fetching same symbol + interval
@@ -1028,8 +1091,28 @@ export const useStore = create(persist((set, get) => ({
           `${API}/api/candles/${encodeURIComponent(symbol)}?interval=${encodeURIComponent(resolvedInterval)}`
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const candles = await res.json();
+        let candles = await res.json();
         if (!Array.isArray(candles)) throw new Error('Invalid candle data');
+
+        // Fallback: if server returned empty for a higher intraday timeframe, fetch/resample from ONE_MINUTE
+        if (candles.length === 0 && intervalSecMap[resolvedInterval] > 60) {
+          let base1m = get().candleData[master1mKey];
+          if (!Array.isArray(base1m) || base1m.length === 0) {
+            const res1m = await fetch(`${API}/api/candles/${encodeURIComponent(symbol)}?interval=ONE_MINUTE`).catch(() => null);
+            if (res1m && res1m.ok) {
+              const parsed1m = await res1m.json().catch(() => []);
+              if (Array.isArray(parsed1m) && parsed1m.length > 0) base1m = parsed1m;
+            }
+          }
+          if (Array.isArray(base1m) && base1m.length > 0) {
+            candles = resampleFrom1m(base1m, resolvedInterval) || [];
+          }
+        }
+
+        if (candles.length === 0 && Array.isArray(cached) && cached.length > 0) {
+          candles = cached;
+        }
+
         set((state) => {
           const nextCandleData = {
             ...state.candleData,
@@ -1038,7 +1121,7 @@ export const useStore = create(persist((set, get) => ({
           };
           const nextMeta = {
             ...(state._candleCacheMeta || {}),
-            [cacheKey]: Date.now(),
+            [cacheKey]: candles.length > 0 ? Date.now() : 0,
           };
           const keys = Object.keys(nextCandleData);
           if (keys.length > 60) {
@@ -1049,8 +1132,10 @@ export const useStore = create(persist((set, get) => ({
             }
           }
           try {
-            // Persist up to 15 most recent symbol-interval datasets in sessionStorage for instant reload
-            const compactEntries = Object.entries(nextCandleData).slice(-15);
+            // Persist up to 15 most recent symbol-interval datasets (capped at 300 bars each) in sessionStorage
+            const compactEntries = Object.entries(nextCandleData)
+              .slice(-15)
+              .map(([k, v]) => [k, Array.isArray(v) ? v.slice(-300) : v]);
             sessionStorage.setItem('skandx_candle_cache_v1', JSON.stringify(Object.fromEntries(compactEntries)));
           } catch (_) {}
           return {

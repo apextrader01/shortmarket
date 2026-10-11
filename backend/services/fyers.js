@@ -245,6 +245,44 @@ function toFyersSymbol(symbol) {
     if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
 
+    const trimmed = String(symbol).trim();
+    const upperNoPrefix = trimmed.replace(/^(NSE:|BSE:)/i, '').trim().toUpperCase();
+    const INDEX_ALIAS_MAP = {
+        'NIFTY': 'NSE:NIFTY50-INDEX',
+        'NIFTY 50': 'NSE:NIFTY50-INDEX',
+        'NIFTY50': 'NSE:NIFTY50-INDEX',
+        'NIFTY50-INDEX': 'NSE:NIFTY50-INDEX',
+        'BANKNIFTY': 'NSE:NIFTYBANK-INDEX',
+        'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
+        'NIFTY BANK': 'NSE:NIFTYBANK-INDEX',
+        'NIFTYBANK': 'NSE:NIFTYBANK-INDEX',
+        'NIFTYBANK-INDEX': 'NSE:NIFTYBANK-INDEX',
+        'FINNIFTY': 'NSE:FINNIFTY-INDEX',
+        'FIN NIFTY': 'NSE:FINNIFTY-INDEX',
+        'NIFTY FIN SERVICE': 'NSE:FINNIFTY-INDEX',
+        'FINNIFTY-INDEX': 'NSE:FINNIFTY-INDEX',
+        'MIDCPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
+        'MIDCAP NIFTY': 'NSE:MIDCPNIFTY-INDEX',
+        'MIDCAPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
+        'NIFTY MID SELECT': 'NSE:MIDCPNIFTY-INDEX',
+        'MIDCPNIFTY-INDEX': 'NSE:MIDCPNIFTY-INDEX',
+        'NIFTYNXT50': 'NSE:NIFTYNXT50-INDEX',
+        'NIFTY NEXT 50': 'NSE:NIFTYNXT50-INDEX',
+        'NIFTYNXT50-INDEX': 'NSE:NIFTYNXT50-INDEX',
+        'INDIAVIX': 'NSE:INDIAVIX-INDEX',
+        'INDIA VIX': 'NSE:INDIAVIX-INDEX',
+        'INDIAVIX-INDEX': 'NSE:INDIAVIX-INDEX',
+        'SENSEX': 'BSE:SENSEX-INDEX',
+        'BSE SENSEX': 'BSE:SENSEX-INDEX',
+        'SENSEX-INDEX': 'BSE:SENSEX-INDEX',
+        'BANKEX': 'BSE:BANKEX-INDEX',
+        'BSE BANKEX': 'BSE:BANKEX-INDEX',
+        'BANKEX-INDEX': 'BSE:BANKEX-INDEX'
+    };
+    if (INDEX_ALIAS_MAP[upperNoPrefix]) {
+        return INDEX_ALIAS_MAP[upperNoPrefix];
+    }
+
     // 1. If symbol has an exchange prefix (e.g. BSE:KITEX, NSE:KITEX, MCX:CRUDEOIL),
     // check canonicalStockMap first to respect the specified exchange
     if (symbol.includes(':')) {
@@ -1378,13 +1416,19 @@ async function fetchYahooFallbackCandles(rawSymbol, fSym, res) {
             const c = Number(quote.close?.[i]);
             const v = Number(quote.volume?.[i] || 0);
             if (Number.isFinite(t) && Number.isFinite(o) && Number.isFinite(h) && Number.isFinite(l) && Number.isFinite(c)) {
+                const istSec = t + 19800;
+                if (res !== '1D') {
+                    const secOfDay = ((istSec % 86400) + 86400) % 86400;
+                    // NSE/BSE regular intraday session is 09:15:00 (33300s) to 15:29:59 (55799s)
+                    if (secOfDay < 33300 || secOfDay >= 55800) continue;
+                }
                 candles.push({
-                    time: t + 19800,
-                    open: o,
-                    high: h,
-                    low: l,
-                    close: c,
-                    volume: Number.isFinite(v) ? v : 0
+                    time: istSec,
+                    open: Number(o.toFixed(2)),
+                    high: Number(h.toFixed(2)),
+                    low: Number(l.toFixed(2)),
+                    close: Number(c.toFixed(2)),
+                    volume: Number.isFinite(v) ? Math.round(v) : 0
                 });
             }
         }
