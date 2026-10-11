@@ -12016,8 +12016,8 @@ io.on('connection', (socket) => {
         const isNewRoom = !socket.rooms.has(sym);
         socket.join(sym);
         if (isNewRoom) {
-          const p = priceCache[sym] || (sym.includes(':') ? priceCache[sym.split(':')[1]] : null);
-          if (p) {
+          const p = getPriceDataFromCache(sym);
+          if (p && p.ltp !== undefined) {
             requestedCache[sym] = [
               p.ltp,
               p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),

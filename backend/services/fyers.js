@@ -979,11 +979,19 @@ function addSubscriptionBatch(symbols) {
         // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
-        if (sharedPriceCache[s]) dirtySymbols.add(s);
         
         const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
+        const cached = sharedPriceCache[s] || (fSym ? sharedPriceCache[fSym] : null);
+        if (cached) {
+            sharedPriceCache[s] = cached;
+            dirtySymbols.add(s);
+            if (fSym) {
+                sharedPriceCache[fSym] = cached;
+                dirtySymbols.add(fSym);
+            }
+        }
         if (fSym) {
             if (!alreadySubscribed && !subQueue.includes(fSym)) {
                 subQueue.push(fSym);
@@ -1014,7 +1022,16 @@ function handlePingSubscriptions(symbols) {
         
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
-        if (sharedPriceCache[s]) dirtySymbols.add(s);
+        const fSym = toFyersSymbol(s);
+        const cached = sharedPriceCache[s] || (fSym ? sharedPriceCache[fSym] : null);
+        if (cached) {
+            sharedPriceCache[s] = cached;
+            dirtySymbols.add(s);
+            if (fSym) {
+                sharedPriceCache[fSym] = cached;
+                dirtySymbols.add(fSym);
+            }
+        }
         
         if (!clientSubscriptions.has(s)) {
             clientSubscriptions.add(s);

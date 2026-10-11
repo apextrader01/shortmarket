@@ -108,9 +108,11 @@ window.fetch = async function (url, options = {}) {
   return res;
 };
 
+const isStagingHost = typeof window !== 'undefined' && window.location && window.location.hostname.includes('staging');
+
 export const socket = io(API, { 
   withCredentials: false,
-  transports: ['websocket'], // Force websocket to bypass PM2 cluster long-polling issues
+  transports: isStagingHost ? ['polling', 'websocket'] : ['websocket', 'polling'],
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 10000,
