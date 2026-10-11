@@ -716,11 +716,7 @@ function App() {
   }, [activeTab, calculatorsInitialType]);
 
   useEffect(() => {
-    const handlePopState = () => {
-      if (isPoppingModalHistoryRef.current) {
-        isPoppingModalHistoryRef.current = false;
-        return;
-      }
+    const executeMobileBackStep = (fromPopState = false) => {
       const storeState = useStore.getState();
       const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
       const currentTab = activeTabRef.current || 'Home';
@@ -781,10 +777,9 @@ function App() {
             window.history.pushState({ appTab: currentTab, hasGuard: true, userActivated: true }, '', window.location.pathname);
           } catch (_) {}
         }
-        return;
+        return 'HANDLED_MODAL';
       }
 
-      // --- MOBILE NATIVE-LIKE BACK STACK NAVIGATION ---
       if (isMobileScreen) {
         const isRoot = (currentTab === rootTab) || (currentUser && (currentTab === 'Markets' || currentTab === 'Watchlist'));
 
@@ -811,7 +806,7 @@ function App() {
             window.history.pushState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
           } catch (_) {}
           setActiveTab(nextTab);
-          return;
+          return 'HANDLED_TAB';
         }
 
         // 3. Already on Root screen: Double-tap to exit guard
@@ -822,23 +817,66 @@ function App() {
           if (typeof storeState.showToast === 'function') {
             storeState.showToast('Press back again to exit', 'info');
           }
-          // Push guard so next back press triggers popstate again
           try {
             window.history.pushState({ appTab: rootTab, hasGuard: true, userActivated: true }, '', rootPath);
           } catch (_) {}
-          return;
+          return 'HANDLED_TOAST';
         } else {
-          // Second back press within 2000ms: User explicitly confirmed EXIT
-          try {
-            if (window.navigator?.app?.exitApp) {
-              window.navigator.app.exitApp();
-              return;
-            }
-          } catch (_) {}
-          window.history.back();
-          return;
+          if (fromPopState) {
+            try {
+              if (window.navigator?.app?.exitApp) {
+                window.navigator.app.exitApp();
+                return 'EXIT_APP';
+              }
+            } catch (_) {}
+            window.history.back();
+          }
+          return 'EXIT_APP';
         }
       }
+
+      return 'DESKTOP';
+    };
+
+    // Expose global bridge for Android MainActivity.java OnBackPressedCallback
+    window.__skandxHandleHardwareBack = () => executeMobileBackStep(false);
+
+    // Fallback for older installed Android APKs where MainActivity didn't intercept KEYCODE_BACK
+    // and minimized to launcher: when the user reopens the SkandX icon from the launcher while on a
+    // secondary screen or modal, step back automatically so it never gets stuck on that secondary page.
+    let lastPausedAt = 0;
+    const handleNativePause = () => {
+      lastPausedAt = Date.now();
+    };
+    const handleNativeResume = () => {
+      const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      if (!isMobileScreen) return;
+      if (lastPausedAt > 0 && Date.now() - lastPausedAt < 60000) {
+        lastPausedAt = 0;
+        const currentUser = userRef.current;
+        const rootTab = currentUser ? 'Watchlist' : 'Home';
+        const currentTab = activeTabRef.current || 'Home';
+        const isRoot = (currentTab === rootTab) || (currentUser && (currentTab === 'Markets' || currentTab === 'Watchlist'));
+        if (!isRoot) {
+          executeMobileBackStep(false);
+        }
+      }
+    };
+    const handleVisibilityStepBack = () => {
+      if (document.hidden) {
+        lastPausedAt = Date.now();
+      } else {
+        handleNativeResume();
+      }
+    };
+
+    const handlePopState = () => {
+      if (isPoppingModalHistoryRef.current) {
+        isPoppingModalHistoryRef.current = false;
+        return;
+      }
+      const res = executeMobileBackStep(true);
+      if (res !== 'DESKTOP') return;
 
       // --- DESKTOP WEB BROWSER ONLY (Screen > 768px) ---
       // 4. Standard path parsing for deep-links and desktop forward/backward buttons
@@ -875,10 +913,16 @@ function App() {
       setActiveTab(tabsMap[rawPath.toLowerCase()] || tabsMap[firstSeg] || 'Home');
     };
     window.addEventListener('popstate', handlePopState);
+    document.addEventListener('pause', handleNativePause);
+    document.addEventListener('resume', handleNativeResume);
+    document.addEventListener('visibilitychange', handleVisibilityStepBack);
     const handleOpenDeposit = () => setShowDepositModal(true);
     window.addEventListener('open-deposit-modal', handleOpenDeposit);
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener('pause', handleNativePause);
+      document.removeEventListener('resume', handleNativeResume);
+      document.removeEventListener('visibilitychange', handleVisibilityStepBack);
       window.removeEventListener('open-deposit-modal', handleOpenDeposit);
     };
   }, [
