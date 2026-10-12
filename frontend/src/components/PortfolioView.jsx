@@ -82,6 +82,7 @@ export default function PortfolioView() {
     '118778': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
     '120197': 'ICICI Prudential Liquid Fund - Direct Plan - Growth'
   });
+  const [mfNavs, setMfNavs] = useState({});
 
   const isMutualFund = (sym, assetClass) => {
     if (assetClass === 'MUTUAL_FUND') return true;
@@ -114,6 +115,12 @@ export default function PortfolioView() {
     if (!sym) return null;
     const clean = sym.includes(':') ? sym.split(':')[1] : sym;
     return mfNames[sym] || mfNames[clean] || mfNames[`${clean}-MF`] || mfNames[clean.replace('-MF', '')] || null;
+  };
+
+  const getMfNav = (sym) => {
+    if (!sym) return 0;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return Number(mfNavs[sym] || mfNavs[clean] || mfNavs[`${clean}-MF`] || mfNavs[clean.replace('-MF', '')] || 0);
   };
 
   const handleMfAction = (pos, mode = 'INVEST') => {
@@ -317,7 +324,11 @@ export default function PortfolioView() {
         || portfolioPrices[`MCX:${cleanNoEq}`] 
         || {};
       const avg = Math.abs(parseFloat(pos.average_price) || 0);
-      const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
+      const isMfPos = isMutualFund(pos.symbol, pos.asset_class);
+      const mfLiveNav = isMfPos ? getMfNav(pos.symbol) : 0;
+      const ltp = (isMfPos && mfLiveNav > 0)
+        ? mfLiveNav
+        : ((typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg);
       const qty = Math.abs(Number(pos.quantity) || 0);
       const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
       
@@ -340,12 +351,12 @@ export default function PortfolioView() {
         const symbolStr = pos.symbol || '';
         const cleanSymbolStr = symbolStr.replace(/^(NSE:|BSE:|MCX:)/i, '');
         
-        if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
-          invETFs += invested;
-          cntETFs++;
-        } else if (symbolStr.includes('-MF') || symbolStr.includes('MUTUALFUND')) {
+        if (isMfPos) {
           invMF += invested;
           cntMF++;
+        } else if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
+          invETFs += invested;
+          cntETFs++;
         } else if (
           symbolStr.includes('-MCX') || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSymbolStr) ||
           /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSymbolStr) || cleanSymbolStr.endsWith('-FUT') ||
@@ -377,30 +388,68 @@ export default function PortfolioView() {
       countMutualFunds: cntMF,
       unrealizedPnl: uPnl
     };
-  }, [holdings, positions, portfolioPrices]);
+  }, [holdings, positions, portfolioPrices, mfNavs]);
 
   useEffect(() => {
     const symbols = (deliveryPositions || []).map(p => p.symbol).filter(s => isMutualFund(s));
     const unique = [...new Set(symbols)];
-    const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
-    if (needed.length === 0) return;
+    if (unique.length === 0) return;
+
+    const neededNames = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
+    const neededNavs = unique.filter(s => !mfNavs[s] && !mfNavs[s.replace('-MF', '')]);
+
+    if (neededNavs.length > 0) {
+      fetch(`${API}/api/mf/by-ids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: neededNavs.map(s => String(s).replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '')) })
+      })
+        .then(r => r.ok ? r.json() : [])
+        .then(funds => {
+          if (Array.isArray(funds) && funds.length > 0) {
+            const navUpdates = {};
+            const nameUpdates = {};
+            funds.forEach(f => {
+              const idStr = String(f.id || f.schemeCode || '');
+              const navVal = parseFloat(f.nav || 0);
+              if (idStr && navVal > 0) {
+                navUpdates[idStr] = navVal;
+                navUpdates[`${idStr}-MF`] = navVal;
+              }
+              if (idStr && f.name) {
+                nameUpdates[idStr] = f.name;
+                nameUpdates[`${idStr}-MF`] = f.name;
+              }
+            });
+            if (Object.keys(navUpdates).length > 0) setMfNavs(prev => ({ ...prev, ...navUpdates }));
+            if (Object.keys(nameUpdates).length > 0) setMfNames(prev => ({ ...prev, ...nameUpdates }));
+          }
+        })
+        .catch(() => {});
+    }
+
+    if (neededNames.length === 0) return;
 
     fetch(`${API}/api/mf/names`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: needed })
+      body: JSON.stringify({ ids: neededNames })
     })
     .then(r => r.ok ? r.json() : {})
     .then(data => {
       setMfNames(prev => ({ ...prev, ...data }));
-      needed.forEach(symbol => {
-        if (!data[symbol]) {
+      neededNames.forEach(symbol => {
+        if (!data[symbol] || !mfNavs[symbol]) {
           const cleanId = String(symbol).replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
           fetch(`https://api.mfapi.in/mf/${cleanId}`)
             .then(r => r.json())
             .then(mfData => {
               if (mfData && mfData.meta && mfData.meta.scheme_name) {
-                setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+                setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name, [cleanId]: mfData.meta.scheme_name }));
+              }
+              if (mfData && mfData.data && mfData.data[0] && parseFloat(mfData.data[0].nav) > 0) {
+                const liveNav = parseFloat(mfData.data[0].nav);
+                setMfNavs(prev => ({ ...prev, [symbol]: liveNav, [cleanId]: liveNav }));
               }
             }).catch(() => {});
         }
@@ -448,7 +497,11 @@ export default function PortfolioView() {
           || portfolioPrices[`MCX:${cleanNoEq}`] 
           || {};
         const avg = Math.abs(parseFloat(pos?.average_price) || 0);
-        const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
+        const isMf = isMutualFund(pos?.symbol, pos?.asset_class);
+        const mfLiveNav = isMf ? getMfNav(pos?.symbol) : 0;
+        const ltp = (isMf && mfLiveNav > 0)
+          ? mfLiveNav
+          : ((typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg);
         const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
         const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
         const qty = Math.abs(Number(pos?.quantity) || 0);
@@ -459,10 +512,20 @@ export default function PortfolioView() {
         const current = isShort ? (invested + pnl) : rawCurrent;
         const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
         const dayChangeVal = (isShort ? -chg : chg) * qty;
-        const isMf = isMutualFund(pos?.symbol, pos?.asset_class);
         const displayName = isMf 
           ? (getMfName(pos?.symbol) || (pos?.symbol || '').replace('-MF', ''))
           : (pos?.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0];
+        const cleanMfCode = cleanSym.replace('-MF', '');
+        const pendingRedeemUnits = isMf
+          ? (orders || []).reduce((acc, ord) => {
+              if (ord.status !== 'AMO_PENDING' || String(ord.side || '').toUpperCase() !== 'SELL') return acc;
+              const ordClean = String(ord.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').replace('-MF', '');
+              if (ord.symbol === pos?.symbol || ordClean === cleanMfCode) {
+                return acc + (parseFloat(ord.quantity || 0) || 0);
+              }
+              return acc;
+            }, 0)
+          : 0;
         return {
           ...pos,
           average_price: avg,
@@ -478,7 +541,8 @@ export default function PortfolioView() {
           isProfit: pnl >= 0,
           isShort,
           isMf,
-          displayName
+          displayName,
+          pendingRedeemUnits: parseFloat(pendingRedeemUnits.toFixed(4))
         };
       } catch (_) {
         const fallbackAvg = Math.abs(parseFloat(pos?.average_price) || 0);
@@ -543,7 +607,7 @@ export default function PortfolioView() {
     });
 
     return list;
-  }, [deliveryPositions, portfolioPrices, searchTerm, filterType, assetFilter, sortBy, mfNames]);
+  }, [deliveryPositions, portfolioPrices, searchTerm, filterType, assetFilter, sortBy, mfNames, mfNavs, orders]);
 
   // Asset percentage helper
   const getAssetPct = (val) => {
@@ -1319,9 +1383,16 @@ export default function PortfolioView() {
                           {/* Line 1: Exchange & Segment | Total P&L */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {pos.isMf ? (
-                              <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                                MUTUAL FUND
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                  MUTUAL FUND
+                                </span>
+                                {pos.pendingRedeemUnits > 0 && (
+                                  <span style={{ fontSize: '9.5px', color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', padding: '2px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                                    ⏳ Queued Redeem ({pos.pendingRedeemUnits.toFixed(4)}u)
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
@@ -1455,9 +1526,16 @@ export default function PortfolioView() {
                                       MF
                                     </span>
                                   </div>
-                                  <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                                    Code: {safeSymbol}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                      Code: {safeSymbol}
+                                    </span>
+                                    {pos.pendingRedeemUnits > 0 && (
+                                      <span style={{ fontSize: '9px', color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', padding: '0px 4px', borderRadius: '3px', fontWeight: '700' }}>
+                                        ⏳ Queued Redeem ({pos.pendingRedeemUnits.toFixed(4)}u)
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

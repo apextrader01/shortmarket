@@ -9608,8 +9608,8 @@ app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
     
     const result = await SIPEngine.executeSingleSip(sip.id, priceCache, true);
     if (!result.success) {
-      if (result.reason === 'INSUFFICIENT_FUNDS') {
-        return res.status(400).json({ error: `Insufficient funds. Needed ₹${result.required}, Available ₹${result.available.toFixed(2)}` });
+      if (result.reason === 'INSUFFICIENT_FUNDS' || result.reason === 'SIP_PAUSED_INSUFFICIENT_FUNDS') {
+        return res.status(400).json({ error: `Insufficient funds. Needed ₹${Number(result.required || sip.amount || 0).toFixed(2)}, Available ₹${Number(result.available || 0).toFixed(2)}` });
       }
       if (result.reason === 'NAV_UNAVAILABLE') {
         return res.status(400).json({ error: 'Latest NAV is temporarily unavailable. Please try again shortly.' });
@@ -9619,6 +9619,12 @@ app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
       }
       return res.status(500).json({ error: result.reason || 'Failed to execute SIP installment' });
     }
+    try {
+      const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+      if (volumeMatchingEngine && volumeMatchingEngine.io) {
+        volumeMatchingEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+      }
+    } catch (e) {}
     res.json({
       success: true,
       queued: Boolean(result.queued),
@@ -9649,7 +9655,8 @@ app.post('/api/admin/mf/settle-pending', authenticateToken, async (req, res) => 
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-    const result = await SIPEngine.processPendingMutualFundOrders(priceCache);
+    const forceSettle = Boolean(req.body && req.body.forceSettle);
+    const result = await SIPEngine.processPendingMutualFundOrders(priceCache, { forceSettle });
     res.json({ success: true, message: `Settled ${result?.settled || 0} queued mutual fund orders (${result?.total || 0} evaluated).`, result });
   } catch (error) {
     res.status(500).json({ error: error.message, success: false });
@@ -10173,20 +10180,31 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
       
       const startOfToday = getTradingSessionStartIST();
 
-      const activeHoldings = await trx('holdings')
+      const allActiveHoldings = await trx('holdings')
         .where({ user_id: req.user.id })
         .where('quantity', '>', 0)
         .forUpdate();
 
-      const overnightPositions = await trx('positions')
+      const activeHoldings = (allActiveHoldings || []).filter(h => {
+        const sym = String(h.symbol || '');
+        const ac = String(h.asset_class || '').toUpperCase();
+        return !sym.endsWith('-MF') && !sym.includes('MUTUALFUND') && ac !== 'MUTUAL_FUND';
+      });
+
+      const allOvernightPositions = await trx('positions')
         .where({ user_id: req.user.id })
         .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
         .where('quantity', '!=', 0)
         .where('created_at', '<', startOfToday)
         .forUpdate();
 
+      const overnightPositions = (allOvernightPositions || []).filter(p => {
+        const sym = String(p.symbol || '');
+        return !sym.endsWith('-MF') && !sym.includes('MUTUALFUND');
+      });
+
       if ((!activeHoldings || activeHoldings.length === 0) && (!overnightPositions || overnightPositions.length === 0)) {
-        throw Object.assign(new Error('No active holdings to exit'), { statusCode: 400 });
+        throw Object.assign(new Error('No active equity holdings to exit. Mutual Fund units must be redeemed individually via the Mutual Funds panel.'), { statusCode: 400 });
       }
 
       const LedgerService = require('./services/ledgerService');
@@ -11445,6 +11463,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           // Validate Exchange Freeze Limit & Market Session / Holiday Status on order modification
           const isMF = String(order.symbol).endsWith('-MF') || String(order.symbol).includes('MUTUALFUND');
+          if (isMF) {
+            throw Object.assign(new Error('Mutual Fund orders cannot be modified once placed as per AMC guidelines.'), { statusCode: 400 });
+          }
           if (!isMF) {
             const isCommodity = isCommodityContract(order.symbol);
             const marketCheck = isSegmentMarketOpen(isCommodity, order.symbol, order.product_type, Boolean(order.is_exit));

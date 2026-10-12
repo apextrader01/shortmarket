@@ -7,9 +7,13 @@ import SkeletonLoader from './SkeletonLoader';
 import EmptyState from './EmptyState';
 import { isToday } from '../utils/pnlHelper';
 
+const isMfSymbol = (sym) => {
+  const clean = String(sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+  return clean.endsWith('-MF') || clean.includes(':MF') || clean.includes('MUTUALFUND') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+};
+
 const formatOrderQty = (order, qty) => {
-  const isMf = (order?.symbol || '').endsWith('-MF') || (order?.symbol || '').includes(':MF');
-  if (isMf) return Number(qty || 0).toFixed(4);
+  if (isMfSymbol(order?.symbol)) return Number(qty || 0).toFixed(4);
   return Math.round(Number(qty || 0)).toLocaleString('en-IN');
 };
 
@@ -42,6 +46,49 @@ export default function OrdersView() {
   const [activeTag, setActiveTag] = useState('');
   const [tradeNotes, setTradeNotes] = useState('');
   const [isSavingTag, setIsSavingTag] = useState(false);
+  const [mfNames, setMfNames] = useState({});
+
+  React.useEffect(() => {
+    const symbols = (orders || []).map(o => o.symbol).filter(s => isMfSymbol(s));
+    const unique = [...new Set(symbols)];
+    const needed = unique.filter(s => !mfNames[s] && !mfNames[String(s).replace('-MF', '')]);
+    if (needed.length === 0) return;
+
+    fetch(`${API}/api/mf/names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: needed })
+    })
+      .then(r => r.ok ? r.json() : {})
+      .then(data => {
+        if (data && typeof data === 'object') {
+          setMfNames(prev => ({ ...prev, ...data }));
+        }
+        needed.forEach(symbol => {
+          if (!data || !data[symbol]) {
+            const cleanId = String(symbol).replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+            if (/^\d{4,6}$/.test(cleanId)) {
+              fetch(`https://api.mfapi.in/mf/${cleanId}`)
+                .then(r => r.json())
+                .then(mfData => {
+                  if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                    setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name, [cleanId]: mfData.meta.scheme_name }));
+                  }
+                })
+                .catch(() => {});
+            }
+          }
+        });
+      })
+      .catch(() => {});
+  }, [orders]);
+
+  const getOrderDisplayName = (order) => {
+    const sym = String(order?.symbol || '');
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const cleanNoMf = clean.replace('-MF', '');
+    return mfNames[sym] || mfNames[clean] || mfNames[cleanNoMf] || sym.split('-')[0] || '—';
+  };
 
   const openTagModal = (order) => {
     setTagModalOrder(order);
@@ -137,6 +184,8 @@ export default function OrdersView() {
     displayOrders = displayOrders.filter(order => 
       String(order.id || '').toLowerCase().includes(lowerQuery) ||
       (order.symbol || '').toLowerCase().includes(lowerQuery) || 
+      getOrderDisplayName(order).toLowerCase().includes(lowerQuery) ||
+      (order.remarks || '').toLowerCase().includes(lowerQuery) ||
       (order.status || '').toLowerCase().includes(lowerQuery) ||
       (order.type || '').toLowerCase().includes(lowerQuery)
     );
@@ -447,8 +496,8 @@ export default function OrdersView() {
 
                         {/* Main Line: Symbol Name (Left) | Execution Price (Right) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>
-                            {(order.symbol || '').split('-')[0]}
+                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '68%' }} title={getOrderDisplayName(order)}>
+                            {getOrderDisplayName(order)}
                           </div>
                           <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
                             {priceVal > 0 ? `₹${priceVal.toFixed(2)}` : (order.type === 'MARKET' ? 'MKT' : '—')}
@@ -458,7 +507,7 @@ export default function OrdersView() {
                         {/* Bottom Line: Product/Exchange (Left) | Tag & Realized P&L (Right) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <span>{order.symbol?.includes(':') ? order.symbol.split(':')[0] : (((order.symbol || '').endsWith('-MF') || /^\d{5,6}$/.test(order.symbol || '') || ['EDEL', 'MIRA', 'NIPP'].includes(order.symbol)) ? 'MF' : 'NSE')}</span>
+                            <span>{order.symbol?.includes(':') ? order.symbol.split(':')[0] : (isMfSymbol(order.symbol) ? 'MF' : 'NSE')}</span>
                             <span>{order.product_type || 'NRML'}</span>
                             <span>{order.type || 'MKT'}</span>
                           </div>
@@ -611,15 +660,15 @@ export default function OrdersView() {
                   displayOrders.map(order => (
                   <tr 
                     key={order.id} 
-                    onClick={() => activeTab === 'Order History' && setSelectedOrder(order)}
+                    onClick={() => setSelectedOrder(order)}
                     style={{ 
                       borderBottom: '1px solid rgba(255,255,255,0.05)', 
-                      cursor: activeTab === 'Order History' ? 'pointer' : 'default',
+                      cursor: 'pointer',
                       transition: 'background 0.2s',
                       ...({})
                     }}
-                    onMouseEnter={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-                    onMouseLeave={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'transparent')}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '12px 16px' }}>
                       {(() => {
@@ -629,15 +678,15 @@ export default function OrdersView() {
                         return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
                       })()}
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '600', maxWidth: '280px' }}>
                       {(() => {
-                        const clean = (order.symbol || '').includes(':') ? (order.symbol || '').split(':')[1] : (order.symbol || '');
-                        const isMf = clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+                        const isMf = isMfSymbol(order.symbol);
+                        const displayName = getOrderDisplayName(order);
                         return (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <span>{(order.symbol || '').split('-')[0] || '—'}</span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: '100%' }} title={displayName}>
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '230px' }}>{displayName}</span>
                             {isMf && (
-                              <span style={{ fontSize: '9px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '1px 5px', borderRadius: '3px', fontWeight: '700' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '1px 5px', borderRadius: '3px', fontWeight: '700', flexShrink: 0 }}>
                                 MF
                               </span>
                             )}
@@ -731,7 +780,7 @@ export default function OrdersView() {
                       ) : order.status))}
                     </td>
                     {activeTab === 'Open Orders' && (
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                         {(() => {
                           const isMfOrder = (order.symbol || '').endsWith('-MF') || (order.symbol || '').includes('MUTUALFUND');
                           if (isMfOrder) {
@@ -744,13 +793,14 @@ export default function OrdersView() {
                           return (
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                               <button 
-                                onClick={() => useStore.getState().openEditOrderModal(order)}
+                                onClick={(e) => { e.stopPropagation(); useStore.getState().openEditOrderModal(order); }}
                                 style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
                               >
                                 EDIT
                               </button>
                               <button 
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (window.confirm('Are you sure you want to cancel this order?')) {
                                     useStore.getState().cancelOrder(order.id);
                                   }
@@ -793,10 +843,10 @@ export default function OrdersView() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  🏷️ Tag Trade — {(tagModalOrder.symbol || '').split('-')[0]}
+                  🏷️ Tag Trade — {getOrderDisplayName(tagModalOrder)}
                 </h3>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {tagModalOrder.side} {Number(tagModalOrder.quantity)} Qty @ ₹{parseFloat(tagModalOrder.price || tagModalOrder.average_price || 0).toFixed(2)}
+                  {tagModalOrder.side} {formatOrderQty(tagModalOrder, tagModalOrder.quantity)} Qty @ ₹{parseFloat(tagModalOrder.price || tagModalOrder.average_price || 0).toFixed(2)}
                 </div>
               </div>
               <button onClick={() => setTagModalOrder(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}>×</button>
@@ -903,10 +953,16 @@ export default function OrdersView() {
                 <span style={{ color: 'var(--text-secondary)' }}>Order ID:</span>
                 <span style={{ fontWeight: '600' }}>#{selectedOrder.id}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Name:</span>
-                <span style={{ fontWeight: '600' }}>{selectedOrder.symbol}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>Name:</span>
+                <span style={{ fontWeight: '600', textAlign: 'right' }}>{getOrderDisplayName(selectedOrder)}</span>
               </div>
+              {getOrderDisplayName(selectedOrder) !== selectedOrder.symbol && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Symbol / Code:</span>
+                  <span style={{ fontWeight: '600' }}>{selectedOrder.symbol}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Placed Time:</span>
                 <span style={{ fontWeight: '600' }}>{selectedOrder.created_at ? (() => { const d = new Date(selectedOrder.created_at); return isNaN(d.getTime()) ? '—' : d.toLocaleString(); })() : '—'}</span>
@@ -973,6 +1029,12 @@ export default function OrdersView() {
                     : selectedOrder.status}
                 </span>
               </div>
+              {selectedOrder.remarks && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600' }}>Remarks:</span>
+                  <span style={{ color: 'var(--text-primary)', lineHeight: '1.4' }}>{selectedOrder.remarks}</span>
+                </div>
+              )}
             </div>
             
             <button 

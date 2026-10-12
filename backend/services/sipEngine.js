@@ -165,6 +165,8 @@ class SIPEngine {
         return {
           success: false,
           reason: shouldPause ? 'SIP_PAUSED_INSUFFICIENT_FUNDS' : 'INSUFFICIENT_FUNDS',
+          required: amount,
+          available: parseFloat(user.balance) || 0,
           failureCount,
           nextExecutionDate: nextDate
         };
@@ -246,9 +248,17 @@ class SIPEngine {
           updated_at: new Date()
         });
 
+        const cleanSym = String(sip.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const schemeWithMf = isMf ? `${cleanSym.replace('-MF', '')}-MF` : cleanSym;
+
         // Credit or update Holdings
         const existingHolding = await trx('holdings')
-          .where({ user_id: user.id, symbol: sip.symbol })
+          .where({ user_id: user.id })
+          .where(builder => {
+            builder.where({ symbol: sip.symbol })
+                   .orWhere({ symbol: cleanSym })
+                   .orWhere({ symbol: schemeWithMf });
+          })
           .first();
 
         if (existingHolding) {
@@ -260,6 +270,7 @@ class SIPEngine {
           await trx('holdings').where({ id: existingHolding.id }).update({
             quantity: newQty,
             average_price: parseFloat(newAvg.toFixed(4)),
+            asset_class: assetClass,
             updated_at: new Date()
           });
         } else {
@@ -342,12 +353,14 @@ class SIPEngine {
 
       let successCount = 0;
       let failedCount = 0;
+      const affectedUserIds = new Set();
 
       for (const sip of dueSips) {
         try {
           const result = await SIPEngine.executeSingleSip(sip.id, priceCache);
           if (result && result.success) {
             successCount++;
+            if (sip.user_id) affectedUserIds.add(sip.user_id);
           } else {
             failedCount++;
           }
@@ -356,6 +369,15 @@ class SIPEngine {
           failedCount++;
         }
       }
+
+      try {
+        const volumeMatchingEngine = require('./volumeMatchingEngine');
+        if (volumeMatchingEngine && volumeMatchingEngine.io && affectedUserIds.size > 0) {
+          for (const uid of affectedUserIds) {
+            volumeMatchingEngine.io.to(uid.toString()).emit('sync_user_data');
+          }
+        }
+      } catch (e) {}
 
       console.log(`[SIPEngine] 🎯 Finished processing SIPs. Success: ${successCount}, Failed/Skipped: ${failedCount}`);
       return { total: dueSips.length, success: successCount, failed: failedCount };
@@ -376,9 +398,63 @@ class SIPEngine {
   }
 
   /**
+   * Determine whether a queued Mutual Fund order (AMO_PENDING) is eligible to settle at `nowDate`.
+   * - Never settles on Saturday or Sunday.
+   * - Orders placed on a previous calendar day (IST) are eligible to settle on the next business day.
+   * - Orders placed on the SAME calendar day (IST) are ONLY eligible to settle today if they were placed
+   *   BEFORE the 02:00 PM IST cut-off (e.g. pre-market 08:30 AM order settling at 09:00 AM IST).
+   *   Orders placed at or after 02:00 PM IST today MUST wait until the next business day.
+   */
+  static isOrderEligibleForSettlement(orderCreatedAt, nowDate = new Date()) {
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      const [nowDatePart, nowTimePart] = fmt.format(nowDate instanceof Date ? nowDate : new Date(nowDate)).split(', ');
+      const [ny, nm, nd] = nowDatePart.split('-').map(Number);
+      const [nh, nmin] = nowTimePart.split(':').map(Number);
+      const nowDayOfWeek = new Date(Date.UTC(ny, nm - 1, nd)).getUTCDay();
+      const nowMins = nh * 60 + nmin;
+
+      // Never settle on weekends (Saturday = 6, Sunday = 0)
+      if (nowDayOfWeek === 0 || nowDayOfWeek === 6) return false;
+
+      if (!orderCreatedAt) return true;
+      const ordObj = orderCreatedAt instanceof Date ? orderCreatedAt : new Date(orderCreatedAt);
+      if (isNaN(ordObj.getTime())) return true;
+
+      const [ordDatePart, ordTimePart] = fmt.format(ordObj).split(', ');
+      const [oh, omin] = ordTimePart.split(':').map(Number);
+      const ordMins = oh * 60 + omin;
+
+      // Order placed on a prior calendar day in IST -> eligible to settle on this business day
+      if (ordDatePart < nowDatePart) {
+        return true;
+      }
+
+      // Order placed today in IST -> only eligible if placed BEFORE 02:00 PM IST cut-off (840 mins)
+      // and current time is at or after 09:00 AM IST (540 mins)
+      if (ordDatePart === nowDatePart) {
+        return ordMins < 840 && nowMins >= 540;
+      }
+
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /**
    * Batch process all queued After-Cutoff Mutual Fund orders (AMO_PENDING) on next business day
    */
-  static async processPendingMutualFundOrders(priceCache = {}) {
+  static async processPendingMutualFundOrders(priceCache = {}, options = {}) {
     const lockKey = 'cron_mf_settlement_engine';
     let connection = null;
     let isLocked = false;
@@ -396,19 +472,24 @@ class SIPEngine {
 
       console.log('[SIPEngine] 🔄 Checking for queued After-Cutoff Mutual Fund orders to settle...');
       
-      const pendingOrders = await db('orders')
+      const allPendingOrders = await db('orders')
         .where('status', 'AMO_PENDING')
         .andWhere(builder => {
           builder.where('symbol', 'like', '%-MF').orWhere('symbol', 'like', '%MUTUALFUND%');
         })
         .orderBy('created_at', 'asc');
 
+      const nowDate = new Date();
+      const pendingOrders = (allPendingOrders || []).filter(ord =>
+        options && options.forceSettle ? true : SIPEngine.isOrderEligibleForSettlement(ord.created_at, nowDate)
+      );
+
       if (pendingOrders.length === 0) {
-        console.log('[SIPEngine] No pending mutual fund orders waiting for settlement.');
-        return { total: 0, settled: 0, failed: 0 };
+        console.log(`[SIPEngine] No eligible mutual fund orders ready for settlement today (${(allPendingOrders || []).length} queued for next business day).`);
+        return { total: 0, settled: 0, failed: 0, deferred: (allPendingOrders || []).length };
       }
 
-      console.log(`[SIPEngine] Found ${pendingOrders.length} queued mutual fund order(s) for settlement.`);
+      console.log(`[SIPEngine] Found ${pendingOrders.length} eligible mutual fund order(s) for settlement.`);
       let settledCount = 0;
       let failedCount = 0;
       const affectedUserIds = new Set();
@@ -594,6 +675,9 @@ class SIPEngine {
           await db.transaction(async (trx) => {
             await trx.raw('SELECT pg_advisory_xact_lock(?)', [ord.user_id]);
 
+            const dbOrd = await trx('orders').where({ id: ord.id }).first();
+            if (!dbOrd || dbOrd.status !== 'AMO_PENDING') return;
+
             // Update order status to EXECUTED
             await trx('orders').where({ id: ord.id }).update({
               status: 'EXECUTED',
@@ -606,9 +690,17 @@ class SIPEngine {
               updated_at: new Date()
             });
 
+            const cleanSym = String(ord.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+            const schemeWithMf = `${cleanSym.replace('-MF', '')}-MF`;
+
             // Credit units to holdings
             const existingHolding = await trx('holdings')
-              .where({ user_id: ord.user_id, symbol: ord.symbol })
+              .where({ user_id: ord.user_id })
+              .where(builder => {
+                builder.where({ symbol: ord.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: schemeWithMf });
+              })
               .first();
 
             if (existingHolding) {
@@ -708,19 +800,29 @@ class SIPEngine {
     }, { timezone: 'Asia/Kolkata' });
 
     // Initial check on server startup (delayed 8-10 seconds for DB/network warmup)
-    // Guarded to daytime hours (09:00 AM - 10:59 PM IST) so midnight restarts don't trigger SIPs before morning cron
+    // Guarded to business-day daytime hours (09:00 AM - 10:59 PM IST) so midnight/weekend restarts don't trigger prematurely
     setTimeout(() => {
-      const istHour = Number(
-        new Intl.DateTimeFormat('en-GB', {
+      try {
+        const fmt = new Intl.DateTimeFormat('en-CA', {
           timeZone: 'Asia/Kolkata',
-          hour: 'numeric',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
           hour12: false
-        }).format(new Date())
-      );
-      if (istHour >= 9 && istHour < 23) {
-        SIPEngine.processDueSips(priceCache);
-        SIPEngine.processPendingMutualFundOrders(priceCache);
-      }
+        });
+        const [dPart, tPart] = fmt.format(new Date()).split(', ');
+        const [y, m, d] = dPart.split('-').map(Number);
+        const [istHour] = tPart.split(':').map(Number);
+        const istDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+        if (istHour >= 9 && istHour < 23) {
+          SIPEngine.processDueSips(priceCache);
+          if (istDay >= 1 && istDay <= 5) {
+            SIPEngine.processPendingMutualFundOrders(priceCache);
+          }
+        }
+      } catch (e) {}
     }, 8000);
   }
 }

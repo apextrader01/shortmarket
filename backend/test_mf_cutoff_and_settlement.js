@@ -275,6 +275,36 @@ assert(triggerEngineCode.includes('average_price: execPrice'), 'triggerEngine.ex
 assert(mfModalCode.includes('formatAum(details?.aum)'), 'MutualFundDetailsModal formats AUM accurately in Crores');
 assert(mfModalCode.includes('pendingRedeemUnits'), 'MutualFundDetailsModal tracks and subtracts pending queued redemption units');
 
+// ─────────────────────────────────────────────────────────────────────────
+// MODULE 6: DEEP-DIVE SETTLEMENT ELIGIBILITY & PORTFOLIO/ORDER SAFEGUARDS
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\n▶ MODULE 6: Next-Business-Day Settlement Eligibility & Deep-Dive Safeguards');
+
+const SIPEngine = require('./services/sipEngine');
+// Order placed Monday 2026-10-12 at 03:00 PM IST (09:30 UTC - after 2:00 PM cut-off)
+const monAfterCutoff = new Date('2026-10-12T09:30:00Z');
+assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-12T09:35:00Z')) === false, 'After-2PM order on Monday is NOT settled on Monday afternoon restart');
+assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-12T17:00:00Z')) === false, 'After-2PM order on Monday is NOT settled at Monday 10:30 PM IST cron');
+assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-13T03:30:00Z')) === true, 'After-2PM order on Monday IS settled on Tuesday 09:00 AM IST cron');
+
+// Order placed Friday 2026-10-16 at 03:00 PM IST (09:30 UTC)
+const friAfterCutoff = new Date('2026-10-16T09:30:00Z');
+assert(SIPEngine.isOrderEligibleForSettlement(friAfterCutoff, new Date('2026-10-17T04:30:00Z')) === false, 'Friday after-2PM order is NOT settled on Saturday');
+assert(SIPEngine.isOrderEligibleForSettlement(friAfterCutoff, new Date('2026-10-18T04:30:00Z')) === false, 'Friday after-2PM order is NOT settled on Sunday');
+assert(SIPEngine.isOrderEligibleForSettlement(friAfterCutoff, new Date('2026-10-19T03:30:00Z')) === true, 'Friday after-2PM order IS settled on Monday 09:00 AM IST');
+
+// Pre-market order placed Wednesday 2026-10-14 at 08:30 AM IST (03:00 UTC - before 2:00 PM cut-off)
+const wedPreMarket = new Date('2026-10-14T03:00:00Z');
+assert(SIPEngine.isOrderEligibleForSettlement(wedPreMarket, new Date('2026-10-14T03:30:00Z')) === true, 'Pre-9AM order placed before 2:00 PM cut-off IS settled at 09:00 AM IST same day');
+
+assert(serverCode.includes('Mutual Fund orders cannot be modified once placed as per AMC guidelines.'), 'server.js PUT /api/order/:id blocks modifying Mutual Fund orders');
+assert(serverCode.includes('Mutual Fund units must be redeemed individually via the Mutual Funds panel.'), 'server.js /api/holdings/exit-all excludes Mutual Fund holdings from instant equity exit');
+assert(ordersViewCode.includes('getOrderDisplayName'), 'OrdersView resolves and displays Mutual Fund scheme names instead of raw numeric codes');
+
+const portfolioViewCode = fs.readFileSync(path.join(__dirname, '../frontend/src/components/PortfolioView.jsx'), 'utf8');
+assert(portfolioViewCode.includes('getMfNav'), 'PortfolioView resolves live Mutual Fund NAVs for accurate P&L calculation');
+assert(portfolioViewCode.includes('Queued Redeem'), 'PortfolioView displays Queued Redeem indicator for pending MF redemptions');
+
 console.log('\n======================================================================');
 console.log(`TOTAL AUDIT CHECKS: ${totalAsserts} | PASSED: ${passedAsserts} | FAILED: ${failedAsserts}`);
 console.log('======================================================================\n');

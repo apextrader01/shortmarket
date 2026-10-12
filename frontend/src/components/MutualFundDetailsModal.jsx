@@ -34,11 +34,12 @@ const getAmcDefaultMinimums = (amcOrName = '') => {
 };
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, placeOrder, setupSip, holdings, orders, fundHistoryCache, user } = useStore(useShallow(state => ({ 
+    const { fetchFundDetails, placeOrder, setupSip, holdings, positions, orders, fundHistoryCache, user } = useStore(useShallow(state => ({ 
         fetchFundDetails: state.fetchFundDetails, 
         placeOrder: state.placeOrder, 
         setupSip: state.setupSip,
         holdings: state.holdings,
+        positions: state.positions,
         orders: state.orders,
         fundHistoryCache: state.fundHistoryCache,
         user: state.user
@@ -92,14 +93,42 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     // Uniquely identify Fund Symbol by ID/schemeCode to prevent AMC prefix collisions
     const schemeCodeKey = String(fund.id || fund.schemeCode || '').replace(/-MF$/i, '');
     const fundSymbol = `${schemeCodeKey}-MF`;
-    const userHolding = (holdings || []).find(h => 
-        h.symbol === fundSymbol || 
-        h.symbol === fund.symbol || 
-        h.symbol === String(fund.id) || 
-        h.symbol === `${fund.id}-MF` || 
-        (fund.schemeCode && h.symbol === `${fund.schemeCode}-MF`) ||
-        (fund.name && h.symbol === `${fund.name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}-MF`)
-    );
+    const userHolding = useMemo(() => {
+        const matchesFund = (sym) => {
+            const s = String(sym || '');
+            return (
+                s === fundSymbol ||
+                s === fund.symbol ||
+                s === String(fund.id) ||
+                s === `${fund.id}-MF` ||
+                (fund.schemeCode && s === `${fund.schemeCode}-MF`) ||
+                (fund.name && s === `${fund.name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}-MF`)
+            );
+        };
+        const matchedHoldings = (holdings || []).filter(h => h && Number(h.quantity) > 0 && matchesFund(h.symbol));
+        const matchedPositions = (positions || []).filter(p =>
+            p &&
+            ['DEL', 'CNC', 'DELIVERY'].includes(p.product_type) &&
+            Number(p.quantity) > 0 &&
+            matchesFund(p.symbol)
+        );
+        const allRows = [...matchedHoldings, ...matchedPositions];
+        if (allRows.length === 0) return null;
+        let totalQty = 0;
+        let totalCost = 0;
+        allRows.forEach(r => {
+            const q = Number(r.quantity) || 0;
+            const avg = Math.abs(Number(r.average_price) || 0);
+            totalQty += q;
+            totalCost += q * avg;
+        });
+        return {
+            ...allRows[0],
+            symbol: allRows[0].symbol || fundSymbol,
+            quantity: parseFloat(totalQty.toFixed(4)),
+            average_price: totalQty > 0 ? totalCost / totalQty : Number(allRows[0].average_price || 0)
+        };
+    }, [holdings, positions, fundSymbol, fund.symbol, fund.id, fund.schemeCode, fund.name]);
     const actualSymbolToUse = userHolding?.symbol || fundSymbol;
 
     // Calculate any units already reserved in pending/queued SELL orders
