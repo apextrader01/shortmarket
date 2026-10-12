@@ -15413,7 +15413,7 @@ function recalculateBridgeStats(state) {
     });
   }
 
-  // Refresh watchlist LTP from live priceCache when available
+  // Refresh watchlist LTP from live priceCache and evaluate Target / Stop-Loss / Trailing SL on open positions
   state.watchlist.forEach(w => {
     if (w.mode === 'PAPER') w.mode = 'SANDBOX';
     const cleanSym = String(w.symbol || '').toUpperCase();
@@ -15431,6 +15431,43 @@ function recalculateBridgeStats(state) {
       }
       if (Number(cachedTick?.high) > 0) w.high = Number(cachedTick.high);
       if (Number(cachedTick?.low) > 0) w.low = Number(cachedTick.low);
+    }
+
+    // Auto-evaluate Target Hit & Stop-Loss Hit for active open positions
+    const entryPx = Number(w.entryPrice) || 0;
+    const curLtp = Number(w.ltp) || 0;
+    if (w.algoActive && entryPx > 0 && curLtp > 0 && (w.status === 'IN_POSITION_LONG' || w.status === 'IN_POSITION_SHORT')) {
+      const isLong = w.status === 'IN_POSITION_LONG';
+      const ptsDiff = isLong ? (curLtp - entryPx) : (entryPx - curLtp);
+      const targetPts = Math.max(1, Number(w.targetPts) || 60);
+      const slPts = Math.max(1, Number(w.slPts) || 25);
+      const qty = Math.max(1, Number(w.qty) || 50);
+
+      if (ptsDiff >= targetPts || ptsDiff <= -slPts) {
+        const isTargetHit = ptsDiff >= targetPts;
+        const tradePnl = Number((ptsDiff * qty).toFixed(2));
+        w.realizedPnl = Number((Number(w.realizedPnl || 0) + tradePnl).toFixed(2));
+        w.entryPrice = null;
+        w.status = 'WAITING_TRIGGER';
+
+        const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+        const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        state.orders.unshift({
+          id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
+          time: nowTime,
+          timestamp: nowTime,
+          broker: primaryDemat ? primaryDemat.broker : 'Angel One SmartAPI',
+          account: primaryDemat ? primaryDemat.clientCode : 'ALGO-SIM',
+          symbol: w.symbol,
+          side: isTargetHit ? 'TARGET_EXIT' : 'SL_EXIT',
+          qty,
+          price: `₹${curLtp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          pnl: tradePnl,
+          status: 'COMPLETED',
+          source: isTargetHit ? `Auto Target Hit (+${targetPts} pts)` : `Auto Stop-Loss Exit (-${slPts} pts)`
+        });
+        if (state.orders.length > 50) state.orders.length = 50;
+      }
     }
   });
 
@@ -15580,6 +15617,19 @@ function getLiveBridgeSymbolTick(symbolStr) {
   return null;
 }
 
+function sanitizeDematForClient(d) {
+  if (!d || typeof d !== 'object') return d;
+  const { jwtToken, refreshToken, feedToken, rawApiKey, mpin, totpSecret, ...safe } = d;
+  return {
+    ...safe,
+    hasMpin: Boolean(d.mpin || d.hasMpin),
+    totpEnabled: Boolean(d.totpSecret || d.totpEnabled),
+    smartApiVerified: Boolean(d.smartApiVerified),
+    availableMargin: Number(d.availableMargin || 0),
+    authMode: d.authMode || (d.smartApiVerified ? 'SMARTAPI_V2_LIVE' : 'OMS_BRIDGE')
+  };
+}
+
 // 1. Unified per-user state endpoint
 app.get('/api/v1/bridge/all', async (req, res) => {
   try {
@@ -15611,7 +15661,7 @@ app.get('/api/v1/bridge/all', async (req, res) => {
       platformFeatures: state.platformFeatures,
       telegram: state.telegramConfig,
       telegramConfig: state.telegramConfig,
-      demats: state.demats,
+      demats: (state.demats || []).map(sanitizeDematForClient),
       staticIps: state.staticIps,
       linkedUsers: state.linkedUsers,
       watchlist: state.watchlist,
@@ -15682,35 +15732,397 @@ app.post('/api/v1/bridge/regenerate-token', async (req, res) => {
   }
 });
 
+// ─── Angel One SmartAPI V2 Engine (RFC 6238 TOTP + Live Login + RMS + Order Routing) ───
+const ANGEL_ONE_BASE_URL = 'https://apiconnect.angelone.in';
+
+const ANGEL_ONE_SYMBOL_TOKENS = {
+  'NIFTY': { exchange: 'NSE', tradingsymbol: 'NIFTY', symboltoken: '99926000' },
+  'NIFTY50-INDEX': { exchange: 'NSE', tradingsymbol: 'NIFTY', symboltoken: '99926000' },
+  'BANKNIFTY': { exchange: 'NSE', tradingsymbol: 'BANKNIFTY', symboltoken: '99926009' },
+  'BANKNIFTY-INDEX': { exchange: 'NSE', tradingsymbol: 'BANKNIFTY', symboltoken: '99926009' },
+  'NIFTYBANK-INDEX': { exchange: 'NSE', tradingsymbol: 'BANKNIFTY', symboltoken: '99926009' },
+  'FINNIFTY': { exchange: 'NSE', tradingsymbol: 'FINNIFTY', symboltoken: '99926037' },
+  'RELIANCE': { exchange: 'NSE', tradingsymbol: 'RELIANCE-EQ', symboltoken: '2885' },
+  'HDFCBANK': { exchange: 'NSE', tradingsymbol: 'HDFCBANK-EQ', symboltoken: '1333' },
+  'TCS': { exchange: 'NSE', tradingsymbol: 'TCS-EQ', symboltoken: '11536' },
+  'INFY': { exchange: 'NSE', tradingsymbol: 'INFY-EQ', symboltoken: '1594' },
+  'ICICIBANK': { exchange: 'NSE', tradingsymbol: 'ICICIBANK-EQ', symboltoken: '4963' },
+  'SBIN': { exchange: 'NSE', tradingsymbol: 'SBIN-EQ', symboltoken: '3045' },
+  'TATAMOTORS': { exchange: 'NSE', tradingsymbol: 'TATAMOTORS-EQ', symboltoken: '3456' },
+  'AXISBANK': { exchange: 'NSE', tradingsymbol: 'AXISBANK-EQ', symboltoken: '5900' },
+  'BHARTIARTL': { exchange: 'NSE', tradingsymbol: 'BHARTIARTL-EQ', symboltoken: '10604' },
+  'ITC': { exchange: 'NSE', tradingsymbol: 'ITC-EQ', symboltoken: '1660' },
+  'KOTAKBANK': { exchange: 'NSE', tradingsymbol: 'KOTAKBANK-EQ', symboltoken: '1922' },
+  'LT': { exchange: 'NSE', tradingsymbol: 'LT-EQ', symboltoken: '11483' },
+  'BAJFINANCE': { exchange: 'NSE', tradingsymbol: 'BAJFINANCE-EQ', symboltoken: '317' },
+  'MARUTI': { exchange: 'NSE', tradingsymbol: 'MARUTI-EQ', symboltoken: '10999' },
+  'WIPRO': { exchange: 'NSE', tradingsymbol: 'WIPRO-EQ', symboltoken: '3787' },
+  'HCLTECH': { exchange: 'NSE', tradingsymbol: 'HCLTECH-EQ', symboltoken: '7229' },
+  'SUNPHARMA': { exchange: 'NSE', tradingsymbol: 'SUNPHARMA-EQ', symboltoken: '3351' },
+  'TITAN': { exchange: 'NSE', tradingsymbol: 'TITAN-EQ', symboltoken: '3506' },
+  'TATASTEEL': { exchange: 'NSE', tradingsymbol: 'TATASTEEL-EQ', symboltoken: '3499' },
+  'NTPC': { exchange: 'NSE', tradingsymbol: 'NTPC-EQ', symboltoken: '11630' },
+  'POWERGRID': { exchange: 'NSE', tradingsymbol: 'POWERGRID-EQ', symboltoken: '14977' },
+  'ONGC': { exchange: 'NSE', tradingsymbol: 'ONGC-EQ', symboltoken: '2475' },
+  'ADANIENT': { exchange: 'NSE', tradingsymbol: 'ADANIENT-EQ', symboltoken: '25' },
+  'ADANIPORTS': { exchange: 'NSE', tradingsymbol: 'ADANIPORTS-EQ', symboltoken: '15083' },
+  'COALINDIA': { exchange: 'NSE', tradingsymbol: 'COALINDIA-EQ', symboltoken: '20374' },
+  'BAJAJFINSV': { exchange: 'NSE', tradingsymbol: 'BAJAJFINSV-EQ', symboltoken: '16675' },
+  'JSWSTEEL': { exchange: 'NSE', tradingsymbol: 'JSWSTEEL-EQ', symboltoken: '11723' },
+  'HINDALCO': { exchange: 'NSE', tradingsymbol: 'HINDALCO-EQ', symboltoken: '1363' },
+  'TECHM': { exchange: 'NSE', tradingsymbol: 'TECHM-EQ', symboltoken: '13538' },
+  'INDUSINDBK': { exchange: 'NSE', tradingsymbol: 'INDUSINDBK-EQ', symboltoken: '5258' },
+  'CIPLA': { exchange: 'NSE', tradingsymbol: 'CIPLA-EQ', symboltoken: '694' },
+  'DRREDDY': { exchange: 'NSE', tradingsymbol: 'DRREDDY-EQ', symboltoken: '881' },
+  'ULTRACEMCO': { exchange: 'NSE', tradingsymbol: 'ULTRACEMCO-EQ', symboltoken: '11532' },
+  'ASIANPAINT': { exchange: 'NSE', tradingsymbol: 'ASIANPAINT-EQ', symboltoken: '236' },
+  'M&M': { exchange: 'NSE', tradingsymbol: 'M&M-EQ', symboltoken: '2031' }
+};
+
+function generateAngelOneTotp(secretOrCode) {
+  const raw = String(secretOrCode || '').replace(/[\s\-]/g, '').toUpperCase();
+  if (!raw) return { code: '', valid: false };
+  if (/^\d{6}$/.test(raw)) {
+    return { code: raw, valid: true, isStaticCode: true, secondsRemaining: 30 };
+  }
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (let i = 0; i < raw.length; i++) {
+    const idx = alphabet.indexOf(raw[i]);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  if (bytes.length === 0) return { code: '', valid: false };
+  const keyBuf = Buffer.from(bytes);
+  const epochSec = Math.floor(Date.now() / 1000);
+  const timeStep = Math.floor(epochSec / 30);
+  const counterBuf = Buffer.alloc(8);
+  counterBuf.writeUInt32BE(Math.floor(timeStep / 0x100000000), 0);
+  counterBuf.writeUInt32BE(timeStep >>> 0, 4);
+
+  const hmac = crypto.createHmac('sha1', keyBuf).update(counterBuf).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  const otp = String(binary % 1000000).padStart(6, '0');
+  return {
+    code: otp,
+    valid: true,
+    isStaticCode: false,
+    secondsRemaining: 30 - (epochSec % 30)
+  };
+}
+
+function buildAngelOneHeaders(apiKey, clientIp, jwtToken = null) {
+  const resolvedIp = (clientIp && /^\d+\.\d+\.\d+\.\d+/.test(String(clientIp)))
+    ? String(clientIp).match(/^\d+\.\d+\.\d+\.\d+/)[0]
+    : '103.212.120.42';
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-UserType': 'USER',
+    'X-SourceID': 'WEB',
+    'X-ClientLocalIP': resolvedIp,
+    'X-ClientPublicIP': resolvedIp,
+    'X-MacAddress': '02:42:ac:11:00:02',
+    'X-PrivateKey': String(apiKey || '').trim()
+  };
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${String(jwtToken).replace(/^Bearer\s+/i, '').trim()}`;
+  }
+  return headers;
+}
+
+async function authenticateAngelOneSmartApi({ clientCode, apiKey, mpin, totpSecret, totpCode, ip }) {
+  const cleanCode = String(clientCode || '').trim().toUpperCase();
+  const cleanKey = String(apiKey || '').trim();
+  const cleanMpin = String(mpin || '').trim();
+  const totpInput = totpCode || totpSecret || '';
+  const totpObj = generateAngelOneTotp(totpInput);
+
+  if (!cleanCode || !cleanKey || !cleanMpin || !totpObj.valid) {
+    return {
+      verified: false,
+      reason: 'Provide Angel One API Key, 4-Digit MPIN, and TOTP Secret/Code for live SmartAPI login.'
+    };
+  }
+
+  try {
+    const headers = buildAngelOneHeaders(cleanKey, ip);
+    const loginRes = await axios.post(
+      `${ANGEL_ONE_BASE_URL}/rest/auth/angelbroking/user/v1/loginByPassword`,
+      {
+        clientcode: cleanCode,
+        password: cleanMpin,
+        totp: totpObj.code
+      },
+      { headers, timeout: 9000 }
+    );
+
+    const body = loginRes.data || {};
+    if (body.status && body.data?.jwtToken) {
+      const jwtToken = body.data.jwtToken;
+      const refreshToken = body.data.refreshToken || '';
+      const feedToken = body.data.feedToken || '';
+      let availableMargin = null;
+      let brokerUserName = '';
+
+      // Fetch live RMS margin & profile in parallel
+      try {
+        const authHeaders = buildAngelOneHeaders(cleanKey, ip, jwtToken);
+        const [rmsRes, profRes] = await Promise.all([
+          axios.get(`${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/user/v1/getRMS`, { headers: authHeaders, timeout: 6000 }).catch(() => null),
+          axios.get(`${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/user/v1/getProfile?clientcode=${encodeURIComponent(cleanCode)}`, { headers: authHeaders, timeout: 6000 }).catch(() => null)
+        ]);
+        if (rmsRes?.data?.data) {
+          const rmsData = rmsRes.data.data;
+          availableMargin = Number(rmsData.net ?? rmsData.availablecash ?? 0);
+        }
+        if (profRes?.data?.data?.name) {
+          brokerUserName = String(profRes.data.data.name).trim();
+        }
+      } catch (_) {}
+
+      return {
+        verified: true,
+        jwtToken,
+        refreshToken,
+        feedToken,
+        availableMargin,
+        brokerUserName,
+        totpCodeUsed: totpObj.code,
+        message: 'Angel One SmartAPI v2 Live Session Authenticated!'
+      };
+    }
+
+    return {
+      verified: false,
+      reason: body.message || body.errorcode || 'Angel One SmartAPI rejected credentials.'
+    };
+  } catch (err) {
+    const apiMsg = err.response?.data?.message || err.message || 'Angel One SmartAPI network error';
+    return { verified: false, reason: apiMsg };
+  }
+}
+
+async function resolveAngelOneScrip(symbolStr, jwtToken, apiKey, clientIp) {
+  const raw = String(symbolStr || 'NSE:RELIANCE').trim().toUpperCase();
+  const parts = raw.includes(':') ? raw.split(':') : ['NSE', raw];
+  const exchangePrefix = ['NSE', 'BSE', 'NFO', 'MCX', 'CDS'].includes(parts[0]) ? parts[0] : 'NSE';
+  const cleanSym = (parts[1] || parts[0]).replace(/-EQ$/i, '');
+
+  if (ANGEL_ONE_SYMBOL_TOKENS[cleanSym]) {
+    return ANGEL_ONE_SYMBOL_TOKENS[cleanSym];
+  }
+  if (ANGEL_ONE_SYMBOL_TOKENS[parts[1]]) {
+    return ANGEL_ONE_SYMBOL_TOKENS[parts[1]];
+  }
+
+  // Dynamic lookup via Angel One searchScrip API when live JWT is available
+  if (jwtToken && apiKey) {
+    try {
+      const isFno = /(\d{2}[A-Z]{3}FUT|\d+(CE|PE))$/i.test(cleanSym);
+      const exch = isFno ? 'NFO' : exchangePrefix;
+      const headers = buildAngelOneHeaders(apiKey, clientIp, jwtToken);
+      const searchRes = await axios.post(
+        `${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/order/v1/searchScrip`,
+        { exchange: exch, searchscrip: cleanSym },
+        { headers, timeout: 5000 }
+      );
+      const firstMatch = Array.isArray(searchRes.data?.data) ? searchRes.data.data[0] : null;
+      if (firstMatch && firstMatch.symboltoken && firstMatch.tradingsymbol) {
+        return {
+          exchange: firstMatch.exchange || exch,
+          tradingsymbol: firstMatch.tradingsymbol,
+          symboltoken: String(firstMatch.symboltoken)
+        };
+      }
+    } catch (_) {}
+  }
+
+  const isFnoFallback = /(\d{2}[A-Z]{3}FUT|\d+(CE|PE))$/i.test(cleanSym);
+  return {
+    exchange: isFnoFallback ? 'NFO' : exchangePrefix,
+    tradingsymbol: isFnoFallback ? cleanSym : `${cleanSym}-EQ`,
+    symboltoken: '2885'
+  };
+}
+
+async function executeAngelOneSmartApiOrder(acc, orderSpec) {
+  if (!acc || !acc.tradingActive) {
+    return { placedLive: false, reason: 'Demat trading inactive' };
+  }
+  let jwtToken = acc.jwtToken || '';
+  const rawApiKey = acc.rawApiKey || '';
+  if (!jwtToken && rawApiKey && acc.mpin && acc.totpSecret) {
+    const authRes = await authenticateAngelOneSmartApi({
+      clientCode: acc.clientCode,
+      apiKey: rawApiKey,
+      mpin: acc.mpin,
+      totpSecret: acc.totpSecret,
+      ip: acc.ip
+    });
+    if (authRes.verified && authRes.jwtToken) {
+      jwtToken = authRes.jwtToken;
+      acc.jwtToken = authRes.jwtToken;
+      acc.refreshToken = authRes.refreshToken;
+      acc.feedToken = authRes.feedToken;
+      acc.smartApiVerified = true;
+      acc.authMode = 'LIVE_SMARTAPI';
+      if (authRes.availableMargin !== null) acc.availableMargin = authRes.availableMargin;
+    }
+  }
+
+  if (!jwtToken || !rawApiKey) {
+    return { placedLive: false, reason: 'No active SmartAPI JWT session (routed via OMS Simulator)' };
+  }
+
+  try {
+    const scrip = await resolveAngelOneScrip(orderSpec.symbol, jwtToken, rawApiKey, acc.ip);
+    const rawSide = String(orderSpec.side || 'BUY').toUpperCase();
+    const transactiontype = (rawSide === 'SELL' || rawSide === 'SHORT') ? 'SELL' : 'BUY';
+    const ordertype = String(orderSpec.orderType || 'MARKET').toUpperCase() === 'LIMIT' ? 'LIMIT' : 'MARKET';
+    const rawProd = String(orderSpec.product || 'MIS').toUpperCase();
+    const producttype = rawProd === 'CNC' ? 'DELIVERY' : (rawProd === 'NRML' ? 'CARRYFORWARD' : 'INTRADAY');
+
+    const angelPayload = {
+      variety: 'NORMAL',
+      tradingsymbol: scrip.tradingsymbol,
+      symboltoken: scrip.symboltoken,
+      transactiontype,
+      exchange: scrip.exchange,
+      ordertype,
+      producttype,
+      duration: 'DAY',
+      price: ordertype === 'LIMIT' ? String(Number(orderSpec.numericPrice || 0).toFixed(2)) : '0',
+      squareoff: String(Number(orderSpec.targetPts || 0)),
+      stoploss: String(Number(orderSpec.slPts || 0)),
+      quantity: String(Math.max(1, Number(orderSpec.qty) || 1))
+    };
+
+    const headers = buildAngelOneHeaders(rawApiKey, acc.ip, jwtToken);
+    const orderRes = await axios.post(
+      `${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/order/v1/placeOrder`,
+      angelPayload,
+      { headers, timeout: 7000 }
+    );
+
+    const body = orderRes.data || {};
+    if (body.status && body.data?.orderid) {
+      return {
+        placedLive: true,
+        brokerOrderId: String(body.data.orderid),
+        uniqueOrderId: body.data.uniqueorderid || null,
+        tradingsymbol: scrip.tradingsymbol,
+        symboltoken: scrip.symboltoken
+      };
+    }
+    return {
+      placedLive: false,
+      reason: body.message || 'Angel One SmartAPI order rejected'
+    };
+  } catch (err) {
+    return {
+      placedLive: false,
+      reason: err.response?.data?.message || err.message || 'SmartAPI placeOrder error'
+    };
+  }
+}
+
+// Test TOTP Secret & Preview Live 6-Digit Angel One TOTP Code
+app.post('/api/v1/bridge/angelone/test-totp', async (req, res) => {
+  try {
+    const { totpSecret } = req.body || {};
+    const result = generateAngelOneTotp(totpSecret);
+    if (!result.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Base32 TOTP Secret or 6-digit code. Copy your TOTP Secret key from smartapi.angelone.in/enable-totp.'
+      });
+    }
+    res.json({
+      success: true,
+      totpCode: result.code,
+      secondsRemaining: result.secondsRemaining,
+      isStaticCode: result.isStaticCode,
+      message: `Live 6-Digit Angel One TOTP Generated: ${result.code} (Valid for ${result.secondsRemaining}s)`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 2. Demat CRUD & Session Renewals
 app.post('/api/v1/bridge/demats', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { broker, clientCode, name, apiKey, ip, segment } = req.body || {};
+    const { broker, clientCode, name, apiKey, apiSecret, mpin, totpSecret, totpCode, ip, segment } = req.body || {};
     if (!clientCode || !String(clientCode).trim()) {
       return res.status(400).json({ error: 'Client ID / UCC is required' });
     }
     const safeClientCode = String(clientCode).trim().slice(0, 24).toUpperCase();
     const chosenIp = String(ip || (state.staticIps[0]?.ip) || 'Shared Gateway (150ms)').slice(0, 48);
+    const cleanRawApiKey = String(apiKey || '').trim();
+    const cleanMpin = String(mpin || '').trim();
+    const cleanTotpSecret = String(totpSecret || apiSecret || '').trim();
+
+    // Attempt live Angel One SmartAPI authentication if API Key + MPIN + TOTP are provided
+    let smartAuth = { verified: false, reason: null };
+    if (cleanRawApiKey && cleanMpin && (cleanTotpSecret || totpCode)) {
+      smartAuth = await authenticateAngelOneSmartApi({
+        clientCode: safeClientCode,
+        apiKey: cleanRawApiKey,
+        mpin: cleanMpin,
+        totpSecret: cleanTotpSecret,
+        totpCode,
+        ip: chosenIp
+      });
+    }
 
     const newAcc = {
       id: 'ACC-' + Math.floor(100 + Math.random() * 900),
       broker: 'Angel One SmartAPI',
       brokerKey: 'angel',
       clientCode: safeClientCode,
-      name: String(name || `${safeClientCode} Trading A/C`).slice(0, 48),
-      apiKey: maskBrokerApiKey(apiKey),
+      name: String(name || smartAuth.brokerUserName || `${safeClientCode} Trading A/C`).slice(0, 48),
+      apiKey: maskBrokerApiKey(cleanRawApiKey),
+      rawApiKey: cleanRawApiKey || '',
+      mpin: cleanMpin || '',
+      totpSecret: cleanTotpSecret.length > 6 ? cleanTotpSecret : '',
+      totpEnabled: Boolean(cleanTotpSecret.length > 6),
+      jwtToken: smartAuth.jwtToken || '',
+      refreshToken: smartAuth.refreshToken || '',
+      feedToken: smartAuth.feedToken || '',
+      smartApiVerified: Boolean(smartAuth.verified),
+      authMode: smartAuth.verified ? 'LIVE_SMARTAPI' : 'OMS_BRIDGE',
+      availableMargin: smartAuth.availableMargin ?? null,
       status: 'ACTIVE',
       tradingActive: true,
       ip: chosenIp,
       lastLogin: 'Just now',
-      expiresIn: 'Active (Valid 24h)',
+      expiresIn: smartAuth.verified ? 'Live SmartAPI JWT (24h)' : (cleanTotpSecret.length > 6 ? 'Auto-TOTP Ready (24h)' : 'Active (Valid 24h)'),
       segment: String(segment || 'Equity, F&O, Currency').slice(0, 48)
     };
 
-    state.demats.unshift(newAcc);
-    if (state.demats.length > 25) state.demats.pop();
+    const existingIdx = state.demats.findIndex(d => d.clientCode === safeClientCode);
+    if (existingIdx !== -1) {
+      newAcc.id = state.demats[existingIdx].id;
+      state.demats[existingIdx] = newAcc;
+    } else {
+      state.demats.unshift(newAcc);
+      if (state.demats.length > 25) state.demats.pop();
+    }
 
     // Update Static IP binding if chosenIp matches a static IP
     const matchedIp = state.staticIps.find(item => item.ip === chosenIp);
@@ -15725,9 +16137,16 @@ app.post('/api/v1/bridge/demats', async (req, res) => {
     }
 
     await saveUserBridgeState(userObj, state);
-    appendAlgoAuditLog(`[DEMAT_CONNECTED] ${userObj.email || userObj.username} connected ${newAcc.broker} (${safeClientCode})`, true);
+    appendAlgoAuditLog(
+      `[DEMAT_CONNECTED] ${userObj.email || userObj.username} connected Angel One (${safeClientCode}) [${smartAuth.verified ? 'LIVE_SMARTAPI_JWT' : 'OMS_BRIDGE'}]`,
+      true
+    );
     res.json({
       success: true,
+      smartApiVerified: Boolean(smartAuth.verified),
+      smartApiMessage: smartAuth.verified
+        ? `Angel One SmartAPI Live Session Verified for ${safeClientCode}!`
+        : (smartAuth.reason || `Connected ${safeClientCode} to SkandX Algo Bridge.`),
       account: newAcc,
       demats: state.demats,
       staticIps: state.staticIps,
@@ -15745,13 +16164,137 @@ app.post('/api/v1/bridge/demats/:id/renew', async (req, res) => {
     const state = await getUserBridgeState(userObj);
     const acc = state.demats.find(a => a.id === req.params.id);
     if (acc) {
+      const { totpCode, totpSecret, mpin, apiKey } = req.body || {};
+      if (apiKey && !String(apiKey).includes('•')) acc.rawApiKey = String(apiKey).trim();
+      if (acc.rawApiKey) acc.apiKey = maskBrokerApiKey(acc.rawApiKey);
+      if (mpin) acc.mpin = String(mpin).trim();
+      if (totpSecret && String(totpSecret).trim().length > 6) {
+        acc.totpSecret = String(totpSecret).trim();
+        acc.totpEnabled = true;
+      }
+
+      let smartAuth = { verified: false, reason: null };
+      if (acc.rawApiKey && acc.mpin && (totpCode || acc.totpSecret)) {
+        smartAuth = await authenticateAngelOneSmartApi({
+          clientCode: acc.clientCode,
+          apiKey: acc.rawApiKey,
+          mpin: acc.mpin,
+          totpSecret: acc.totpSecret,
+          totpCode,
+          ip: acc.ip
+        });
+        if (smartAuth.verified) {
+          acc.jwtToken = smartAuth.jwtToken;
+          acc.refreshToken = smartAuth.refreshToken;
+          acc.feedToken = smartAuth.feedToken;
+          acc.smartApiVerified = true;
+          acc.authMode = 'LIVE_SMARTAPI';
+          if (smartAuth.availableMargin !== null) acc.availableMargin = smartAuth.availableMargin;
+        }
+      }
+
       acc.status = 'ACTIVE';
       acc.lastLogin = 'Just now';
-      acc.expiresIn = 'Active (Valid 24h)';
+      acc.expiresIn = acc.smartApiVerified ? 'Live SmartAPI JWT (24h)' : (acc.totpEnabled ? 'Auto-TOTP Ready (24h)' : 'Active (Valid 24h)');
       await saveUserBridgeState(userObj, state);
-      return res.json({ success: true, account: acc, demats: state.demats, stats: state.config });
+      return res.json({
+        success: true,
+        smartApiVerified: Boolean(acc.smartApiVerified),
+        message: smartAuth.verified
+          ? `Angel One SmartAPI Live JWT renewed for ${acc.clientCode}!`
+          : `Session renewed for ${acc.clientCode}!`,
+        account: acc,
+        demats: state.demats,
+        stats: state.config
+      });
     }
     res.status(404).json({ error: 'Account not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync Live Angel One RMS Margin & Order Book for a Connected Demat
+app.post('/api/v1/bridge/demats/:id/sync-angel', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const acc = state.demats.find(a => a.id === req.params.id);
+    if (!acc) return res.status(404).json({ error: 'Demat account not found' });
+
+    if (!acc.jwtToken && acc.rawApiKey && acc.mpin && acc.totpSecret) {
+      const authRes = await authenticateAngelOneSmartApi({
+        clientCode: acc.clientCode,
+        apiKey: acc.rawApiKey,
+        mpin: acc.mpin,
+        totpSecret: acc.totpSecret,
+        ip: acc.ip
+      });
+      if (authRes.verified) {
+        acc.jwtToken = authRes.jwtToken;
+        acc.refreshToken = authRes.refreshToken;
+        acc.feedToken = authRes.feedToken;
+        acc.smartApiVerified = true;
+        acc.authMode = 'LIVE_SMARTAPI';
+        if (authRes.availableMargin !== null) acc.availableMargin = authRes.availableMargin;
+      }
+    }
+
+    if (acc.jwtToken && acc.rawApiKey) {
+      const headers = buildAngelOneHeaders(acc.rawApiKey, acc.ip, acc.jwtToken);
+      const [rmsRes, ordRes] = await Promise.all([
+        axios.get(`${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/user/v1/getRMS`, { headers, timeout: 6000 }).catch(() => null),
+        axios.get(`${ANGEL_ONE_BASE_URL}/rest/secure/angelbroking/order/v1/getOrderBook`, { headers, timeout: 6000 }).catch(() => null)
+      ]);
+      if (rmsRes?.data?.data) {
+        acc.availableMargin = Number(rmsRes.data.data.net ?? rmsRes.data.data.availablecash ?? 0);
+        acc.smartApiVerified = true;
+        acc.authMode = 'LIVE_SMARTAPI';
+      }
+      if (Array.isArray(ordRes?.data?.data)) {
+        for (const bo of ordRes.data.data.slice(0, 10)) {
+          const bId = String(bo.orderid || '');
+          if (bId && !state.orders.some(o => o.id === bId || o.brokerOrderId === bId)) {
+            state.orders.unshift({
+              id: bId,
+              brokerOrderId: bId,
+              time: bo.updatetime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+              timestamp: bo.updatetime || '',
+              broker: 'Angel One SmartAPI',
+              account: acc.clientCode,
+              symbol: `${bo.exchange || 'NSE'}:${bo.tradingsymbol || ''}`,
+              side: bo.transactiontype || 'BUY',
+              qty: Number(bo.quantity) || 1,
+              orderType: bo.ordertype || 'MARKET',
+              price: `₹${Number(bo.averageprice || bo.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+              status: String(bo.orderstatus || 'COMPLETED').toUpperCase(),
+              source: 'Angel One Live OrderBook'
+            });
+          }
+        }
+      }
+      acc.lastLogin = 'Synced just now';
+      await saveUserBridgeState(userObj, state);
+      return res.json({
+        success: true,
+        smartApiVerified: true,
+        message: `Synced Angel One SmartAPI RMS & OrderBook for ${acc.clientCode}!`,
+        account: acc,
+        demats: state.demats,
+        orders: state.orders,
+        stats: state.config
+      });
+    }
+
+    res.json({
+      success: true,
+      smartApiVerified: false,
+      message: `${acc.clientCode} is active on OMS Bridge. Click "Re-verify Session" and add your Angel One MPIN & TOTP Secret to sync live SmartAPI funds.`,
+      account: acc,
+      demats: state.demats,
+      orders: state.orders,
+      stats: state.config
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15801,13 +16344,30 @@ app.post('/api/v1/bridge/renew-demat', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    state.demats.forEach(a => {
+    for (const a of state.demats) {
+      if (a.rawApiKey && a.mpin && a.totpSecret) {
+        const authRes = await authenticateAngelOneSmartApi({
+          clientCode: a.clientCode,
+          apiKey: a.rawApiKey,
+          mpin: a.mpin,
+          totpSecret: a.totpSecret,
+          ip: a.ip
+        });
+        if (authRes.verified) {
+          a.jwtToken = authRes.jwtToken;
+          a.refreshToken = authRes.refreshToken;
+          a.feedToken = authRes.feedToken;
+          a.smartApiVerified = true;
+          a.authMode = 'LIVE_SMARTAPI';
+          if (authRes.availableMargin !== null) a.availableMargin = authRes.availableMargin;
+        }
+      }
       a.status = 'ACTIVE';
-      a.expiresIn = 'Active (Valid 24h)';
+      a.expiresIn = a.smartApiVerified ? 'Live SmartAPI JWT (24h)' : 'Active (Valid 24h)';
       a.lastLogin = 'Just now';
-    });
+    }
     await saveUserBridgeState(userObj, state);
-    res.json({ success: true, message: 'All Demat tokens renewed successfully!', demats: state.demats, stats: state.config });
+    res.json({ success: true, message: 'All Angel One Demat tokens renewed successfully!', demats: state.demats, stats: state.config });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15885,7 +16445,7 @@ app.post('/api/v1/bridge/link-users/add', async (req, res) => {
 
     if (state.linkedUsers.length >= (state.config.totalLinkSlots || 1)) {
       return res.status(400).json({
-        error: `All ${state.config.totalLinkSlots || 1} Link User slot(s) are currently in use. Please purchase an additional Client Slot (₹250/mo) via Razorpay.`
+        error: `All ${state.config.totalLinkSlots || 1} Link User slot(s) are currently in use. Please purchase an additional Client Slot (₹250 One-Time) via Cashfree.`
       });
     }
 
@@ -16083,12 +16643,13 @@ app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
       const exitLtp = (liveTick && liveTick.ltp) || Number(item.ltp) || 0;
       item.ltp = exitLtp;
 
+      const prevStatus = item.status;
       let tradePnl = 0;
       const entryPx = Number(item.entryPrice) || exitLtp;
       const qty = Math.max(1, Number(item.qty) || 50);
-      if (item.status === 'IN_POSITION_LONG' && entryPx > 0) {
+      if (prevStatus === 'IN_POSITION_LONG' && entryPx > 0) {
         tradePnl = Number(((exitLtp - entryPx) * qty).toFixed(2));
-      } else if (item.status === 'IN_POSITION_SHORT' && entryPx > 0) {
+      } else if (prevStatus === 'IN_POSITION_SHORT' && entryPx > 0) {
         tradePnl = Number(((entryPx - exitLtp) * qty).toFixed(2));
       }
       item.realizedPnl = Number((Number(item.realizedPnl || 0) + tradePnl).toFixed(2));
@@ -16096,12 +16657,26 @@ app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
       item.status = item.algoActive ? 'WAITING_TRIGGER' : 'PAUSED';
 
       const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+      let liveExec = { placedLive: false };
+      if (primaryDemat && item.mode !== 'SANDBOX') {
+        liveExec = await executeAngelOneSmartApiOrder(primaryDemat, {
+          symbol: item.symbol,
+          side: prevStatus === 'IN_POSITION_SHORT' ? 'BUY' : 'SELL',
+          qty,
+          orderType: 'MARKET',
+          product: 'MIS',
+          numericPrice: exitLtp
+        });
+      }
+
       const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       const exitOrder = {
-        id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
+        id: liveExec.placedLive ? liveExec.brokerOrderId : ('BO-' + Math.floor(10000 + Math.random() * 90000)),
+        brokerOrderId: liveExec.brokerOrderId || null,
+        executionMode: liveExec.placedLive ? 'ANGEL_SMARTAPI_LIVE' : 'OMS_BRIDGE',
         time: nowTime,
         timestamp: nowTime,
-        broker: primaryDemat ? primaryDemat.broker : 'SkandX Algo Simulator',
+        broker: primaryDemat ? primaryDemat.broker : 'Angel One SmartAPI',
         account: primaryDemat ? primaryDemat.clientCode : 'ALGO-SIM',
         symbol: item.symbol,
         side: 'SQUARE_OFF',
@@ -16109,7 +16684,7 @@ app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
         price: `₹${Number(exitLtp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         pnl: tradePnl,
         status: 'COMPLETED',
-        source: '1-Click Algo Position Exit'
+        source: liveExec.placedLive ? '1-Click Exit (Angel One Live)' : '1-Click Algo Position Exit'
       };
       state.orders.unshift(exitOrder);
       if (state.orders.length > 50) state.orders.pop();
@@ -16309,10 +16884,9 @@ app.post('/api/v1/bridge/kill-switch', async (req, res) => {
   }
 });
 
-// Helper to apply order state updates to Watchlist and replicate to Copy Group followers
-function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo Execution') {
+// Helper to apply order state updates to Watchlist, route live to Angel One SmartAPI when connected, and replicate to Copy Group followers
+async function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo Execution') {
   const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
   const rawSym = String(payload.symbol || 'NSE:NIFTY50-INDEX').trim().toUpperCase().slice(0, 36);
   const sym = rawSym.includes(':') ? rawSym : `NSE:${rawSym}`;
   const liveTick = getLiveBridgeSymbolTick(sym);
@@ -16320,31 +16894,62 @@ function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo 
   const numericPrice = Number(rawPrice) || (liveTick && liveTick.ltp) || 24500.00;
   const side = String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase();
   const qty = Math.max(1, Math.min(100000, Number(payload.qty) || 50));
-  const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+  const orderType = String(payload.orderType || payload.order_type || 'MARKET').slice(0, 12).toUpperCase();
+  const product = String(payload.product || 'MIS').slice(0, 12).toUpperCase();
+  const targetPts = Number(payload.targetPts ?? payload.target_points ?? payload.target_pts ?? 0) || 0;
+  const slPts = Number(payload.slPts ?? payload.sl_points ?? payload.sl_pts ?? 0) || 0;
 
-  const newOrder = {
-    id: orderId,
-    time: nowTime,
-    timestamp: nowTime,
-    broker: String(payload.broker || primaryDemat?.broker || 'SkandX Algo Simulator').slice(0, 36),
-    account: String(payload.account || state.copyGroups?.masterAccount || primaryDemat?.clientCode || 'ALGO-SIM').slice(0, 24),
-    symbol: sym,
-    side,
-    qty,
-    orderType: String(payload.orderType || payload.order_type || 'MARKET').slice(0, 12).toUpperCase(),
-    price: `₹${numericPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-    targetPts: Number(payload.targetPts ?? payload.target_points ?? 0) || 0,
-    slPts: Number(payload.slPts ?? payload.sl_points ?? 0) || 0,
-    status: 'COMPLETED',
-    source: String(payload.source || payload.strategy || defaultSource).slice(0, 48)
-  };
-  state.orders.unshift(newOrder);
+  const primaryDemat = (payload.account && state.demats.find(d => d.clientCode === payload.account || d.id === payload.account)) ||
+    state.demats.find(d => d.tradingActive) ||
+    state.demats[0];
 
-  // Update matching Watchlist strategy item if present
   const wlItem = (state.watchlist || []).find(w =>
     (payload.watchlistId && w.id === payload.watchlistId) ||
     String(w.symbol).toUpperCase() === sym
   );
+
+  // Route live to Angel One SmartAPI if Demat is active and strategy is not in SANDBOX mode
+  let liveExec = { placedLive: false };
+  if (primaryDemat && (!wlItem || wlItem.mode !== 'SANDBOX')) {
+    liveExec = await executeAngelOneSmartApiOrder(primaryDemat, {
+      symbol: sym,
+      side: (side === 'EXIT' || side === 'SQUARE_OFF')
+        ? (wlItem?.status === 'IN_POSITION_SHORT' ? 'BUY' : 'SELL')
+        : side,
+      qty,
+      orderType,
+      product,
+      numericPrice,
+      targetPts,
+      slPts
+    });
+  }
+
+  const orderId = liveExec.placedLive
+    ? liveExec.brokerOrderId
+    : ('BO-' + Math.floor(10000 + Math.random() * 90000));
+
+  const newOrder = {
+    id: orderId,
+    brokerOrderId: liveExec.brokerOrderId || null,
+    executionMode: liveExec.placedLive ? 'ANGEL_SMARTAPI_LIVE' : 'OMS_BRIDGE',
+    time: nowTime,
+    timestamp: nowTime,
+    broker: String(payload.broker || primaryDemat?.broker || 'Angel One SmartAPI').slice(0, 36),
+    account: String(payload.account || state.copyGroups?.masterAccount || primaryDemat?.clientCode || 'ALGO-SIM').slice(0, 24),
+    symbol: sym,
+    side,
+    qty,
+    orderType,
+    price: `₹${numericPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    targetPts,
+    slPts,
+    status: 'COMPLETED',
+    source: String(payload.source || payload.strategy || (liveExec.placedLive ? `${defaultSource} (SmartAPI Live)` : defaultSource)).slice(0, 48)
+  };
+  state.orders.unshift(newOrder);
+
+  // Update matching Watchlist strategy item if present
   if (wlItem) {
     wlItem.ltp = numericPrice;
     if (side === 'BUY') {
@@ -16370,10 +16975,26 @@ function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo 
   const copiedOrders = [];
   const shouldCopy = state.copyGroups?.status === 'ACTIVE' || Boolean(payload.forceCopy);
   if (shouldCopy && Array.isArray(state.copyGroups?.followers)) {
-    state.copyGroups.followers.filter(f => f.status === 'ACTIVE').forEach(fol => {
+    for (const fol of state.copyGroups.followers.filter(f => f.status === 'ACTIVE')) {
       const repQty = Math.max(1, Math.round(qty * (Number(fol.multiplier) || 1)));
+      const followerDemat = state.demats.find(d => d.clientCode === fol.accountCode && d.tradingActive);
+      let folLive = { placedLive: false };
+      if (followerDemat) {
+        folLive = await executeAngelOneSmartApiOrder(followerDemat, {
+          symbol: sym,
+          side,
+          qty: repQty,
+          orderType,
+          product,
+          numericPrice,
+          targetPts,
+          slPts
+        });
+      }
       const copyOrder = {
-        id: 'CPY-' + Math.floor(10000 + Math.random() * 90000),
+        id: folLive.placedLive ? folLive.brokerOrderId : ('CPY-' + Math.floor(10000 + Math.random() * 90000)),
+        brokerOrderId: folLive.brokerOrderId || null,
+        executionMode: folLive.placedLive ? 'ANGEL_SMARTAPI_LIVE' : 'OMS_BRIDGE',
         time: nowTime,
         timestamp: nowTime,
         broker: fol.broker || 'Angel One SmartAPI',
@@ -16388,7 +17009,7 @@ function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo 
       };
       state.orders.unshift(copyOrder);
       copiedOrders.push(copyOrder);
-    });
+    }
   }
 
   if (state.orders.length > 50) state.orders.length = 50;
@@ -16401,10 +17022,10 @@ app.post('/api/v1/bridge/order', async (req, res) => {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
     const payload = req.body || {};
-    const { orderId, newOrder, copiedOrders, wlItem } = processBridgeOrderAndCopy(state, payload, 'Manual Algo Execution');
+    const { orderId, newOrder, copiedOrders, wlItem } = await processBridgeOrderAndCopy(state, payload, 'Manual Algo Execution');
 
     await saveUserBridgeState(userObj, state);
-    appendAlgoAuditLog(`[ORDER_ROUTED] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY -> ${newOrder.broker} (${newOrder.account})`, true);
+    appendAlgoAuditLog(`[ORDER_ROUTED] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY -> ${newOrder.broker} (${newOrder.account}) [${newOrder.executionMode}]`, true);
     res.json({
       success: true,
       orderId,
@@ -16434,9 +17055,9 @@ app.post('/api/v1/bridge/webhook', async (req, res) => {
       }
     }
 
-    const { orderId, newOrder, copiedOrders } = processBridgeOrderAndCopy(state, payload, 'TradingView Webhook');
+    const { orderId, newOrder, copiedOrders } = await processBridgeOrderAndCopy(state, payload, 'TradingView Webhook');
     await saveUserBridgeState(userObj, state);
-    appendAlgoAuditLog(`[WEBHOOK_EXEC] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY via Webhook (${newOrder.account})`, true);
+    appendAlgoAuditLog(`[WEBHOOK_EXEC] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY via Webhook (${newOrder.account}) [${newOrder.executionMode}]`, true);
     res.json({
       success: true,
       orderId,
@@ -16541,7 +17162,7 @@ app.post('/api/v1/bridge/telegram/command', async (req, res) => {
       const side = cmd === '/buy' ? 'BUY' : 'SELL';
       const symArg = parts[1] || state.watchlist[0]?.symbol || 'NSE:RELIANCE';
       const qtyArg = Number(parts[2]) || state.watchlist[0]?.qty || 50;
-      const { newOrder } = processBridgeOrderAndCopy(state, {
+      const { newOrder } = await processBridgeOrderAndCopy(state, {
         symbol: symArg,
         side,
         qty: qtyArg,
@@ -17186,7 +17807,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       }
     }
 
-    // Compute per-user Algo spend and payment counts
+    // Compute per-user Algo spend and payment counts (exclude ADMIN_GRANT / ₹0 overrides from paid counts)
     const userAlgoPaidMap = new Map();
     const userAlgoPayCountMap = new Map();
     const userAlgoFailCountMap = new Map();
@@ -17195,8 +17816,8 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       if (!uidKey) continue;
       const st = String(p.status || '').toUpperCase();
       if (st === 'SUCCESS') {
-        userAlgoPayCountMap.set(uidKey, (userAlgoPayCountMap.get(uidKey) || 0) + 1);
-        if (p.paymentType !== 'ADMIN_GRANT') {
+        if (p.paymentType !== 'ADMIN_GRANT' && Number(p.amount || 0) > 0) {
+          userAlgoPayCountMap.set(uidKey, (userAlgoPayCountMap.get(uidKey) || 0) + 1);
           userAlgoPaidMap.set(uidKey, (userAlgoPaidMap.get(uidKey) || 0) + Number(p.amount || 0));
         }
       } else if (st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED') {
@@ -17208,7 +17829,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       const uid = String(u.id);
       const st = userBridgeStatesCache.get(uid) || null;
       const algoBal = Number(st?.config?.availableCredit || 0);
-      const userDemats = Array.isArray(st?.demats) ? st.demats : [];
+      const userDemats = (Array.isArray(st?.demats) ? st.demats : []).map(sanitizeDematForClient);
       const userIps = Array.isArray(st?.staticIps) ? st.staticIps : [];
       const userLinks = Array.isArray(st?.linkedUsers) ? st.linkedUsers : [];
       const userWatchlist = Array.isArray(st?.watchlist) ? st.watchlist : [];
@@ -17303,6 +17924,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     let totalRevenue = 0;
     let algoRevenue = 0;
     let successCount = 0;
+    let adminGrantsCount = 0;
     let failedCount = 0;
     let cancelledCount = 0;
     let initiatedCount = 0;
@@ -17310,8 +17932,10 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     for (const p of payments) {
       const st = String(p.status || '').toUpperCase();
       if (st === 'SUCCESS') {
-        successCount++;
-        if (p.paymentType !== 'ADMIN_GRANT') {
+        if (p.paymentType === 'ADMIN_GRANT' || Number(p.amount || 0) <= 0) {
+          adminGrantsCount++;
+        } else {
+          successCount++;
           totalRevenue += Number(p.amount || 0);
           algoRevenue += Number(p.amount || 0);
         }
@@ -17350,6 +17974,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         totalRevenue,
         algoRevenue,
         successPaymentsCount: successCount,
+        adminGrantsCount,
         failedPaymentsCount: failedCount + cancelledCount,
         cancelledPaymentsCount: cancelledCount,
         initiatedPaymentsCount: initiatedCount

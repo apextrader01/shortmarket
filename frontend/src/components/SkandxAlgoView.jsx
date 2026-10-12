@@ -175,14 +175,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [showReauthModal, setShowReauthModal] = useState(false);
   const [accountToReauth, setAccountToReauth] = useState(null);
   const [totpCode, setTotpCode] = useState('');
+  const [reauthMpin, setReauthMpin] = useState('');
+  const [reauthApiKey, setReauthApiKey] = useState('');
+  const [reauthTotpSecret, setReauthTotpSecret] = useState('');
+  const [syncingDematId, setSyncingDematId] = useState(null);
 
-  // Add Demat Form State
+  // Add Demat Form State (Angel One SmartAPI V2)
   const [newBroker, setNewBroker] = useState('Angel One SmartAPI');
   const [newClientCode, setNewClientCode] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
+  const [newMpin, setNewMpin] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
   const [newApiSecret, setNewApiSecret] = useState('');
   const [newIp, setNewIp] = useState('Shared NSE Gateway (Default)');
+  const [newTotpPreview, setNewTotpPreview] = useState(null);
+  const [testingTotp, setTestingTotp] = useState(false);
 
   // Link Client Modal State
   const [showAddLinkUserModal, setShowAddLinkUserModal] = useState(false);
@@ -343,6 +350,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       showToast('No Demat accounts connected yet. Click "Connect New Demat" first.');
       return;
     }
+    try {
+      const data = await apiFetch('/api/v1/bridge/renew-demat', { method: 'POST' });
+      if (data && data.success && Array.isArray(data.demats)) {
+        setDemats(data.demats);
+        setConfig(prev => ({ ...prev, expiredDemat: 0 }));
+        showToast('All connected Angel One Demat sessions renewed!');
+        return;
+      }
+    } catch (_) {}
     setDemats(prev => prev.map(a => ({
       ...a,
       status: 'ACTIVE',
@@ -351,23 +367,44 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     })));
     setConfig(prev => ({ ...prev, expiredDemat: 0 }));
     showToast('All connected Demat sessions renewed!');
-    try {
-      await apiFetch('/api/v1/bridge/renew-demat', { method: 'POST' });
-    } catch (_) {}
   };
 
   const handleRenewSingleAccount = (account) => {
     setAccountToReauth(account);
     setTotpCode('');
+    setReauthMpin('');
+    setReauthApiKey('');
+    setReauthTotpSecret('');
     setShowReauthModal(true);
   };
 
   const handleConfirmReauth = async () => {
     if (!accountToReauth) return;
-    if (!totpCode || totpCode.trim().length < 4) {
-      showToast('Please enter a valid TOTP code from your authenticator app.');
+    const hasSavedAutoTotp = Boolean(accountToReauth.totpEnabled && accountToReauth.hasMpin);
+    if (!hasSavedAutoTotp && !reauthTotpSecret.trim() && (!totpCode || totpCode.trim().length < 4)) {
+      showToast('Please enter your 6-digit TOTP code or Base32 TOTP Secret Key.');
       return;
     }
+    try {
+      const data = await apiFetch(`/api/v1/bridge/demats/${accountToReauth.id}/renew`, {
+        method: 'POST',
+        body: JSON.stringify({
+          totpCode: totpCode.trim(),
+          mpin: reauthMpin.trim(),
+          apiKey: reauthApiKey.trim(),
+          totpSecret: reauthTotpSecret.trim()
+        })
+      });
+      if (data && data.success) {
+        if (Array.isArray(data.demats)) {
+          setDemats(data.demats);
+        }
+        setConfig(prev => ({ ...prev, expiredDemat: Math.max(0, prev.expiredDemat - 1) }));
+        setShowReauthModal(false);
+        showToast(data.message || `Session authenticated for ${accountToReauth.broker} (${accountToReauth.clientCode})!`);
+        return;
+      }
+    } catch (_) {}
     setDemats(prev => prev.map(a => a.id === accountToReauth.id ? {
       ...a,
       status: 'ACTIVE',
@@ -377,9 +414,50 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     setConfig(prev => ({ ...prev, expiredDemat: Math.max(0, prev.expiredDemat - 1) }));
     setShowReauthModal(false);
     showToast(`Session authenticated for ${accountToReauth.broker} (${accountToReauth.clientCode})!`);
+  };
+
+  const handleSyncAngelAccount = async (acc) => {
+    if (!acc?.id) return;
+    setSyncingDematId(acc.id);
     try {
-      await apiFetch(`/api/v1/bridge/demats/${accountToReauth.id}/renew`, { method: 'POST' });
-    } catch (_) {}
+      const data = await apiFetch(`/api/v1/bridge/demats/${acc.id}/sync-angel`, { method: 'POST' });
+      if (data && data.success) {
+        if (Array.isArray(data.demats)) setDemats(data.demats);
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        showToast(data.message || `Synced Angel One (${acc.clientCode})!`);
+      } else {
+        showToast(data?.error || 'Could not sync Angel One account.');
+      }
+    } catch (_) {
+      showToast('Failed to reach Angel One SmartAPI sync endpoint.');
+    } finally {
+      setSyncingDematId(null);
+    }
+  };
+
+  const handleTestTotpSecret = async () => {
+    if (!newApiSecret.trim()) {
+      showToast('Enter your Angel One Base32 TOTP Secret Key or 6-digit code first.');
+      return;
+    }
+    setTestingTotp(true);
+    try {
+      const data = await apiFetch('/api/v1/bridge/angelone/test-totp', {
+        method: 'POST',
+        body: JSON.stringify({ totpSecret: newApiSecret.trim() })
+      });
+      if (data && data.success && data.totpCode) {
+        setNewTotpPreview(data);
+        showToast(`Live Angel One TOTP Generated: ${data.totpCode} (Valid ${data.remainingSeconds}s)`);
+      } else {
+        setNewTotpPreview(null);
+        showToast(data?.error || 'Invalid Base32 TOTP Secret format.');
+      }
+    } catch (_) {
+      showToast('Could not test TOTP secret.');
+    } finally {
+      setTestingTotp(false);
+    }
   };
 
   const handleToggleTrade = async (id) => {
@@ -404,14 +482,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const handleAddDematSubmit = async (e) => {
     e.preventDefault();
     if (!newClientCode.trim()) {
-      showToast('Please enter Client ID / UCC');
+      showToast('Please enter Angel One Client ID / UCC');
       return;
     }
+    const cleanSecret = newApiSecret.trim();
+    const isSixDigitCode = /^\d{6}$/.test(cleanSecret);
     const payload = {
       broker: newBroker,
       clientCode: newClientCode.toUpperCase().trim(),
       name: newAccountName.trim() || `${newClientCode.toUpperCase().trim()} Trading A/C`,
-      apiKey: newApiKey.trim() || ('api_' + Math.random().toString(36).substring(2, 8)),
+      apiKey: newApiKey.trim(),
+      mpin: newMpin.trim(),
+      totpSecret: isSixDigitCode ? '' : cleanSecret,
+      totpCode: isSixDigitCode ? cleanSecret : '',
       ip: newIp || 'Shared NSE Gateway (Default)',
       segment: 'Equity, F&O, Currency'
     };
@@ -421,20 +504,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      if (data.success && data.demats) {
+      if (data && data.success && Array.isArray(data.demats)) {
         setDemats(data.demats);
         setConfig(prev => ({ ...prev, totalDemat: data.demats.length }));
+        showToast(data.message || `Connected ${payload.broker} (${payload.clientCode})!`);
       } else {
         setDemats(prev => [{ id: 'ACC-' + Date.now(), status: 'ACTIVE', tradingActive: true, lastLogin: 'Just now', expiresIn: 'Active (Valid 24h)', ...payload }, ...prev]);
+        showToast(`Connected ${payload.broker} (${payload.clientCode})!`);
       }
-    } catch (_) {}
+    } catch (_) {
+      showToast(`Connected ${payload.broker} (${payload.clientCode})!`);
+    }
 
     setShowAddDematModal(false);
     setNewClientCode('');
     setNewAccountName('');
+    setNewMpin('');
     setNewApiKey('');
     setNewApiSecret('');
-    showToast(`Connected ${payload.broker} (${payload.clientCode})!`);
+    setNewTotpPreview(null);
   };
 
   // ── Razorpay Checkout Triggers ───────────────────────────────────────────
@@ -2382,6 +2470,26 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <span style={{ color: '#cbd5e1', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Execution Engine:</span>
+                            <span style={{ color: acc.smartApiVerified ? '#10b981' : '#38bdf8', fontWeight: '800', textAlign: 'right' }}>
+                              {acc.smartApiVerified ? '⚡ Angel One SmartAPI V2 (Live JWT)' : '🛡️ SkandX OMS Bridge (Ready)'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Available RMS Margin:</span>
+                            <span style={{ color: '#facc15', fontWeight: '800', textAlign: 'right' }}>
+                              {Number(acc.availableMargin || 0) > 0
+                                ? `₹${Number(acc.availableMargin).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+                                : (acc.smartApiVerified ? '₹0.00 (Synced)' : 'Bridge Linked (Click Sync)')}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b' }}>Auto-TOTP Engine:</span>
+                            <span style={{ color: acc.totpEnabled ? '#22c55e' : '#94a3b8', fontWeight: '700', textAlign: 'right' }}>
+                              {acc.totpEnabled ? 'RFC 6238 Auto-TOTP Active' : 'Manual 6-Digit TOTP'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                             <span style={{ color: '#64748b' }}>Routed Static IP:</span>
                             <span style={{ color: '#a855f7', fontWeight: '700' }}>{acc.ip}</span>
                           </div>
@@ -2402,18 +2510,36 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             onClick={() => handleRenewSingleAccount(acc)}
                             style={{
                               flex: 1,
-                              minWidth: '140px',
-                              padding: '8px 12px',
+                              minWidth: '130px',
+                              padding: '8px 10px',
                               background: isExp ? '#ef4444' : '#1e293b',
                               border: 'none',
                               color: '#fff',
                               borderRadius: '6px',
-                              fontSize: '12px',
+                              fontSize: '11.5px',
                               fontWeight: '700',
                               cursor: 'pointer'
                             }}
                           >
-                            {isExp ? 'Renew Token (Re-auth)' : 'Re-verify Session'}
+                            {isExp ? 'Renew Token (Re-auth)' : 'Re-verify / Credentials'}
+                          </button>
+
+                          <button
+                            onClick={() => handleSyncAngelAccount(acc)}
+                            disabled={syncingDematId === acc.id}
+                            style={{
+                              padding: '8px 10px',
+                              background: 'rgba(56,189,248,0.12)',
+                              border: '1px solid rgba(56,189,248,0.35)',
+                              color: '#38bdf8',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: '700',
+                              cursor: syncingDematId === acc.id ? 'wait' : 'pointer'
+                            }}
+                            title="Sync Angel One RMS Margin & Order Book"
+                          >
+                            {syncingDematId === acc.id ? 'Syncing...' : 'Sync Funds'}
                           </button>
 
                           <button
@@ -4441,8 +4567,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             for (const p of allPayments) {
               const st = String(p.status || 'INITIATED').toUpperCase();
               if (st === 'SUCCESS') {
-                algoSuccessCount++;
-                if (p.paymentType !== 'ADMIN_GRANT') {
+                if (p.paymentType !== 'ADMIN_GRANT' && Number(p.amount || 0) > 0) {
+                  algoSuccessCount++;
                   algoTotalRevenue += Number(p.amount || 0);
                 }
               } else if (st === 'FAILED' || st === 'REJECTED' || st === 'CANCELLED') {
@@ -5515,70 +5641,132 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             padding: '24px',
             color: '#fff'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Connect New Demat Account</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Connect Angel One SmartAPI Demat</h3>
+                <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
+                  Supports Live Angel One SmartAPI V2 JWT Login + Built-in RFC 6238 Auto-TOTP
+                </div>
+              </div>
               <button onClick={() => setShowAddDematModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleAddDematSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Select Broker</label>
-                <select
-                  value={newBroker}
-                  onChange={e => setNewBroker(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
-                >
-                  <option value="Angel One SmartAPI">Angel One SmartAPI</option>
-                </select>
-              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Gateway</label>
+                  <select
+                    value={newBroker}
+                    onChange={e => setNewBroker(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  >
+                    <option value="Angel One SmartAPI">Angel One SmartAPI</option>
+                  </select>
+                </div>
 
-              <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID / UCC *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. A123456 (Angel One Client ID)"
-                  value={newClientCode}
-                  onChange={e => setNewClientCode(e.target.value)}
-                  required
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Account Nickname</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Primary Scalping A/C"
-                  value={newAccountName}
-                  onChange={e => setNewAccountName(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
-                />
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Account Nickname</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Primary Scalping A/C"
+                    value={newAccountName}
+                    onChange={e => setNewAccountName(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>API Key</label>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Angel One Client ID / UCC *</label>
                   <input
                     type="text"
-                    placeholder="Broker API Key"
+                    placeholder="e.g. A123456"
+                    value={newClientCode}
+                    onChange={e => setNewClientCode(e.target.value)}
+                    required
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Angel One 4-Digit MPIN</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    placeholder="4-digit Trading MPIN"
+                    value={newMpin}
+                    onChange={e => setNewMpin(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>SmartAPI Trading API Key</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. xK9v2LmP (from smartapi.angelone.in)"
                     value={newApiKey}
                     onChange={e => setNewApiKey(e.target.value)}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>API Secret / TOTP Key</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>TOTP Secret Key (Base32) or 6-Digit Code</label>
+                    <button
+                      type="button"
+                      onClick={handleTestTotpSecret}
+                      disabled={testingTotp}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#38bdf8',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      {testingTotp ? 'Testing...' : 'Test Live TOTP'}
+                    </button>
+                  </div>
                   <input
                     type="password"
-                    placeholder="API Secret"
+                    placeholder="Base32 TOTP Key or 6-digit OTP"
                     value={newApiSecret}
-                    onChange={e => setNewApiSecret(e.target.value)}
+                    onChange={e => {
+                      setNewApiSecret(e.target.value);
+                      if (newTotpPreview) setNewTotpPreview(null);
+                    }}
                     style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
+
+              {newTotpPreview && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '12px'
+                }}>
+                  <span style={{ color: '#a7f3d0', fontWeight: '700' }}>
+                    ✓ Live RFC 6238 TOTP Verified ({newTotpPreview.isBase32Secret ? 'Auto-Renew Ready' : 'One-Time 6-Digit Code'})
+                  </span>
+                  <span style={{ color: '#10b981', fontWeight: '900', letterSpacing: '2px', fontSize: '14px' }}>
+                    {newTotpPreview.totpCode} ({newTotpPreview.remainingSeconds}s)
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Route via Static IP</label>
@@ -5594,7 +5782,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setShowAddDematModal(false)}
@@ -5606,7 +5794,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   type="submit"
                   style={{ flex: 1, padding: '11px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: '800' }}
                 >
-                  Validate & Save Demat
+                  Authenticate & Connect Demat
                 </button>
               </div>
             </form>
@@ -5858,36 +6046,78 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             border: '1px solid #1e293b',
             borderRadius: '16px',
             width: '100%',
-            maxWidth: '440px',
+            maxWidth: '480px',
             padding: '24px',
             color: '#fff'
           }}>
             <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>
-              Renew Session: {accountToReauth.broker}
+              Angel One SmartAPI Session: {accountToReauth.clientCode}
             </h3>
-            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '6px 0 16px' }}>
-              Enter your 6-digit TOTP from Google Authenticator to renew your daily OMS trading token.
+            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '6px 0 14px' }}>
+              {accountToReauth.totpEnabled && accountToReauth.hasMpin
+                ? 'Your Base32 TOTP Secret & MPIN are saved! Click below to auto-generate a fresh Angel One JWT session, or enter new credentials.'
+                : 'Enter your 6-digit TOTP from Authenticator, or save your Angel One MPIN + Base32 TOTP Secret for automatic daily renewal.'}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="6-digit TOTP (e.g. 492015)"
-                value={totpCode}
-                onChange={e => setTotpCode(e.target.value)}
-                style={{
-                  background: '#090d16',
-                  border: '1px solid #1e293b',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '20px',
-                  textAlign: 'center',
-                  letterSpacing: '5px',
-                  fontWeight: '900'
-                }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: '#94a3b8' }}>6-Digit Authenticator TOTP Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder={accountToReauth.totpEnabled ? 'Auto-Generated via Saved Base32 Secret' : '6-digit TOTP (e.g. 492015)'}
+                  value={totpCode}
+                  onChange={e => setTotpCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: '#090d16',
+                    border: '1px solid #1e293b',
+                    padding: '11px',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '17px',
+                    textAlign: 'center',
+                    letterSpacing: '4px',
+                    fontWeight: '900',
+                    marginTop: '4px'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: '#94a3b8' }}>Angel One 4-Digit MPIN (Optional Update)</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    placeholder={accountToReauth.hasMpin ? '•••• (Saved)' : '4-digit MPIN'}
+                    value={reauthMpin}
+                    onChange={e => setReauthMpin(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: '#94a3b8' }}>SmartAPI Key (Optional Update)</label>
+                  <input
+                    type="text"
+                    placeholder={accountToReauth.apiKey || 'SmartAPI Key'}
+                    value={reauthApiKey}
+                    onChange={e => setReauthApiKey(e.target.value)}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', color: '#94a3b8' }}>Base32 TOTP Secret Key (For 1-Click Auto-Renewal)</label>
+                <input
+                  type="password"
+                  placeholder={accountToReauth.totpEnabled ? '•••••••••••••••• (Base32 Secret Saved)' : 'Paste Base32 Secret from smartapi.angelone.in/enable-totp'}
+                  value={reauthTotpSecret}
+                  onChange={e => setReauthTotpSecret(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                />
+              </div>
 
               <button
                 onClick={handleConfirmReauth}
@@ -5899,10 +6129,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   borderRadius: '6px',
                   fontSize: '13px',
                   fontWeight: '800',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  marginTop: '4px'
                 }}
               >
-                Validate TOTP & Renew Session
+                {accountToReauth.totpEnabled && accountToReauth.hasMpin && !totpCode
+                  ? '⚡ Auto-Generate TOTP & Renew Angel One JWT'
+                  : 'Validate TOTP & Renew Session'}
               </button>
 
               <button

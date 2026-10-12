@@ -3,6 +3,8 @@ import { X, Zap } from 'lucide-react';
 import { useStore } from '../store';
 
 const POPULAR_INSTRUMENTS = [
+  { symbol: 'NSE:NIFTY50-INDEX', name: 'Nifty 50 Index', type: 'INDEX_FNO', ltp: 24850.00, lotSize: 75 },
+  { symbol: 'NSE:BANKNIFTY-INDEX', name: 'Nifty Bank Index', type: 'INDEX_FNO', ltp: 51240.00, lotSize: 30 },
   { symbol: 'NSE:RELIANCE', name: 'Reliance Industries', type: 'EQUITY', ltp: 1285.40, lotSize: 50 },
   { symbol: 'NSE:HDFCBANK', name: 'HDFC Bank Ltd', type: 'EQUITY', ltp: 1682.10, lotSize: 50 },
   { symbol: 'NSE:TCS', name: 'Tata Consultancy Services', type: 'EQUITY', ltp: 3940.00, lotSize: 25 },
