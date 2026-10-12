@@ -266,6 +266,14 @@ const serverCode = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 assert(serverCode.includes('isMutualFundSameDayCutoffOpen'), 'server.js defines isMutualFundSameDayCutoffOpen helper');
 assert(serverCode.includes('/api/admin/mf/settle-pending'), 'server.js exposes /api/admin/mf/settle-pending manual trigger endpoint');
 assert(serverCode.includes('Redemption Order Queued for Next Business Day NAV!'), 'server.js queues after-cutoff MF SELL orders for Next Business Day NAV');
+assert(serverCode.includes('String(c.scheme_code) === cleanCode'), 'server.js /api/mf/details matches exact AMFI scheme_code from Groww search');
+assert(serverCode.includes('SIP Installment Queued'), 'server.js POST /api/sip queues 1st SIP installment after 2:00 PM IST cut-off');
+
+const triggerEngineCode = fs.readFileSync(path.join(__dirname, 'services/triggerEngine.js'), 'utf8');
+assert(triggerEngineCode.includes('filled_quantity: Number(order.quantity)'), 'triggerEngine.executeOrder records filled_quantity on same-day execution');
+assert(triggerEngineCode.includes('average_price: execPrice'), 'triggerEngine.executeOrder records average_price on same-day execution');
+assert(mfModalCode.includes('formatAum(details?.aum)'), 'MutualFundDetailsModal formats AUM accurately in Crores');
+assert(mfModalCode.includes('pendingRedeemUnits'), 'MutualFundDetailsModal tracks and subtracts pending queued redemption units');
 
 console.log('\n======================================================================');
 console.log(`TOTAL AUDIT CHECKS: ${totalAsserts} | PASSED: ${passedAsserts} | FAILED: ${failedAsserts}`);

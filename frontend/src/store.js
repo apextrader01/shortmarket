@@ -1791,17 +1791,20 @@ export const useStore = create(persist((set, get) => ({
 
 
   fundDetailsCache: {},
-  fetchFundDetails: async (schemeName) => {
+  fetchFundDetails: async (schemeName, schemeCode = '') => {
       if (!schemeName) return null;
+      const cleanCode = schemeCode ? String(schemeCode).replace(/-MF$/i, '').trim() : '';
+      const cacheKey = cleanCode ? `${cleanCode}:${schemeName}` : schemeName;
       const currentCache = get().fundDetailsCache;
-      if (currentCache[schemeName] && (Date.now() - currentCache[schemeName].timestamp < 43200000)) {
-          return currentCache[schemeName].data;
+      if (currentCache[cacheKey] && (Date.now() - currentCache[cacheKey].timestamp < 43200000)) {
+          return currentCache[cacheKey].data;
       }
       try {
-          const res = await fetch(`${API}/api/mf/details?name=${encodeURIComponent(schemeName)}`, { credentials: 'include' });
+          const query = `name=${encodeURIComponent(schemeName)}${cleanCode ? `&schemeCode=${encodeURIComponent(cleanCode)}` : ''}`;
+          const res = await fetch(`${API}/api/mf/details?${query}`, { credentials: 'include' });
           if (!res.ok) return null;
           const data = await res.json();
-          set({ fundDetailsCache: { ...currentCache, [schemeName]: { timestamp: Date.now(), data } } });
+          set({ fundDetailsCache: { ...currentCache, [cacheKey]: { timestamp: Date.now(), data } } });
           return data;
       } catch (e) {
           console.error("Failed to fetch rich fund details:", e);

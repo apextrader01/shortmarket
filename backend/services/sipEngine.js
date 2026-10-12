@@ -237,7 +237,7 @@ class SIPEngine {
           pending_quantity: 0,
           price: nav,
           average_price: nav,
-          status: 'COMPLETED',
+          status: 'EXECUTED',
           order_variety: 'SIP',
           product_type: 'DEL',
           margin: actualDebitAmount,
@@ -306,7 +306,7 @@ class SIPEngine {
       });
 
       console.log(`[SIPEngine] ✅ Successfully executed SIP #${sip.id} (${sip.symbol}) for ${user.username}: ${units} ${isMf ? 'units' : 'shares'} @ ₹${nav} (debited: ₹${actualDebitAmount})`);
-      return { success: true, units, nav, amount: actualDebitAmount, nextExecutionDate: nextDate };
+      return { success: true, queued: !isSameDayNav, units, nav, amount: actualDebitAmount, nextExecutionDate: nextDate };
     });
   }
 

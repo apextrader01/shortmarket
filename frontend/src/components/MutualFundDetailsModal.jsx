@@ -34,11 +34,13 @@ const getAmcDefaultMinimums = (amcOrName = '') => {
 };
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, placeOrder, setupSip, holdings, user } = useStore(useShallow(state => ({ 
+    const { fetchFundDetails, placeOrder, setupSip, holdings, orders, fundHistoryCache, user } = useStore(useShallow(state => ({ 
         fetchFundDetails: state.fetchFundDetails, 
         placeOrder: state.placeOrder, 
         setupSip: state.setupSip,
         holdings: state.holdings,
+        orders: state.orders,
+        fundHistoryCache: state.fundHistoryCache,
         user: state.user
     })));
     
@@ -88,8 +90,9 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const [investmentYears, setInvestmentYears] = useState(5);
 
     // Uniquely identify Fund Symbol by ID/schemeCode to prevent AMC prefix collisions
-    const fundSymbol = `${fund.id || fund.schemeCode}-MF`;
-    const userHolding = holdings.find(h => 
+    const schemeCodeKey = String(fund.id || fund.schemeCode || '').replace(/-MF$/i, '');
+    const fundSymbol = `${schemeCodeKey}-MF`;
+    const userHolding = (holdings || []).find(h => 
         h.symbol === fundSymbol || 
         h.symbol === fund.symbol || 
         h.symbol === String(fund.id) || 
@@ -99,12 +102,29 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     );
     const actualSymbolToUse = userHolding?.symbol || fundSymbol;
 
+    // Calculate any units already reserved in pending/queued SELL orders
+    const pendingRedeemUnits = useMemo(() => {
+        if (!Array.isArray(orders)) return 0;
+        return orders.reduce((sum, o) => {
+            if (o.side !== 'SELL') return sum;
+            if (!['AMO_PENDING', 'PENDING', 'OPEN', 'PENDING_TRIGGER'].includes(o.status)) return sum;
+            const oSym = String(o.symbol || '');
+            const matches = oSym === actualSymbolToUse || oSym === fundSymbol || oSym === schemeCodeKey || oSym === `${schemeCodeKey}-MF`;
+            if (!matches) return sum;
+            const q = Number(o.pending_quantity !== undefined && o.pending_quantity !== null && Number(o.pending_quantity) > 0 ? o.pending_quantity : o.quantity) || 0;
+            return sum + q;
+        }, 0);
+    }, [orders, actualSymbolToUse, fundSymbol, schemeCodeKey]);
+
+    const totalHoldingUnits = Number(userHolding?.quantity || 0);
+    const availableUnits = Math.max(0, parseFloat((totalHoldingUnits - pendingRedeemUnits).toFixed(4)));
+
     useEffect(() => {
         let mounted = true;
         setLogoError(false);
         const load = async () => {
             setLoading(true);
-            const data = await fetchFundDetails(fund.name);
+            const data = await fetchFundDetails(fund.name, schemeCodeKey);
             if (mounted) {
                 setDetails(data);
                 setLoading(false);
@@ -120,25 +140,23 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         };
         load();
         return () => { mounted = false; };
-    }, [fund.name, fetchFundDetails]);
+    }, [fund.name, schemeCodeKey, fetchFundDetails]);
 
-    const formatCurrency = (val) => {
-        if (!val) return '₹0';
-        if (val >= 10000000) return `₹${(val/10000000).toFixed(2)} Cr`;
-        if (val >= 100000) return `₹${(val/100000).toFixed(2)} L`;
-        return `₹${val.toLocaleString()}`;
+    const formatAum = (val) => {
+        const num = Number(val);
+        if (!num || isNaN(num)) return 'N/A';
+        if (num >= 10000000) return `₹${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Cr`;
+        return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr`;
     };
 
     const cagr = details?.return_stats?.find(r => r.year === 3)?.fund_return || fund.return3y || 12;
 
     const calcResult = useMemo(() => {
         const rate = cagr / 100;
-        const months = investmentYears * 12;
         const amt = Number(amount) || 0;
         let invested = 0;
         let wealth = 0;
 
-        
         if (investType === 'MONTHLY_SIP' || investType === 'WEEKLY_SIP' || investType === 'DAILY_SIP') {
             let periodsPerYear = 12;
             if (investType === 'WEEKLY_SIP') periodsPerYear = 52;
@@ -150,19 +168,29 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
             invested = amt * n;
             wealth = amt * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
         } else {
-
             invested = amt;
             wealth = amt * Math.pow(1 + rate, investmentYears);
         }
         return { invested, wealth: Math.round(wealth), gain: Math.round(wealth - invested) };
     }, [cagr, investmentYears, amount, investType]);
 
+    const historyPoints = fundHistoryCache?.[schemeCodeKey] || fundHistoryCache?.[fund.id] || [];
+    const latestHistoryNav = Array.isArray(historyPoints) && historyPoints.length > 0
+        ? Number(historyPoints[historyPoints.length - 1]?.value || 0)
+        : 0;
+    const rawNav = Number(fund.nav || latestHistoryNav || details?.nav || userHolding?.ltp || userHolding?.average_price || 0);
+    const hasValidNav = rawNav > 0 && !isNaN(rawNav);
+    const holdingCurrentValue = userHolding ? (totalHoldingUnits * (rawNav || userHolding.ltp || userHolding.average_price || 0)) : 0;
+    const redeemableCurrentValue = userHolding ? (availableUnits * (rawNav || userHolding.ltp || userHolding.average_price || 0)) : 0;
+    const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * totalHoldingUnits : 0;
+    const holdingPnL = holdingCurrentValue - holdingInvested;
+    const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
+
     const handleAction = async () => {
         if (isInvesting) return;
         setIsInvesting(true);
         setOrderStatus(null);
 
-        const rawNav = Number(fund.nav || details?.nav || 0);
         if (!rawNav || rawNav <= 0 || isNaN(rawNav)) {
             setStatusMsg('Unable to process order: Latest NAV is currently unavailable. Please try again shortly.');
             setOrderStatus('error');
@@ -201,11 +229,13 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 }
             } else if (actionMode === 'REDEEM') {
                 if (!userHolding) throw new Error("No holdings to redeem.");
+                if (availableUnits <= 0) throw new Error("All your units in this fund are already queued for redemption.");
                 
-                let qtyToSell = Number(userHolding.quantity || 0);
+                let qtyToSell = availableUnits;
                 if (redeemType === 'CUSTOM') {
-                    qtyToSell = numAmount / currentNav;
-                    if (qtyToSell > Number(userHolding.quantity || 0)) throw new Error("Insufficient units to redeem.");
+                    if (numAmount <= 0) throw new Error("Please enter a valid redemption amount.");
+                    if (numAmount > redeemableCurrentValue + 1) throw new Error("Amount exceeds available redeemable value.");
+                    qtyToSell = Math.min(availableUnits, numAmount / currentNav);
                 }
 
                 res = await placeOrder({
@@ -267,13 +297,8 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         }
     }, []);
 
-    const rawNav = Number(fund.nav || details?.nav || 0);
-    const hasValidNav = rawNav > 0 && !isNaN(rawNav);
-    const holdingCurrentValue = userHolding ? (userHolding.quantity * (rawNav || userHolding.ltp || 0)) : 0;
-    const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * Number(userHolding.quantity || 0) : 0;
-    const holdingPnL = holdingCurrentValue - holdingInvested;
-    const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
-    const isSubmitDisabled = isInvesting || !hasValidNav || (actionMode === 'INVEST' && Number(amount) < minRequiredAmount) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue);
+    const effectiveRedeemAmount = redeemType === 'ALL' ? redeemableCurrentValue : (Number(amount) || 0);
+    const isSubmitDisabled = isInvesting || !hasValidNav || (actionMode === 'INVEST' && Number(amount) < minRequiredAmount) || (actionMode === 'REDEEM' && (availableUnits <= 0 || (redeemType === 'CUSTOM' && (Number(amount) <= 0 || Number(amount) > redeemableCurrentValue + 1))));
 
     return (
         <>
@@ -437,7 +462,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Current NAV</div>
                                 <div className="mf-nav-big" style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    ₹{fund.nav || details?.nav}
+                                    ₹{hasValidNav ? rawNav : '...'}
                                     {fund.dayChange !== undefined && (
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: fund.dayChange >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center' }}>
                                             {fund.dayChange >= 0 ? <TrendingUp size={16} style={{marginRight: '4px'}}/> : <TrendingUp size={16} style={{marginRight: '4px', transform: 'rotate(180deg)'}}/>}
@@ -456,7 +481,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             </div>
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Fund Size (AUM)</div>
-                                <div style={{ fontSize: '18px', fontWeight: '600' }}>{formatCurrency(details?.aum)}</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600' }}>{formatAum(details?.aum)}</div>
                             </div>
                         </div>
 
@@ -590,7 +615,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             }}>
                                 <div>
                                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Current NAV</div>
-                                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>₹{fund.nav || details?.nav}</div>
+                                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>₹{hasValidNav ? rawNav : '...'}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
                                     {userHolding && (
@@ -671,7 +696,14 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                                         <div>
                                             <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>₹{holdingCurrentValue.toLocaleString(undefined, {maximumFractionDigits:2})}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{Number(userHolding.quantity || 0).toFixed(4)} Units</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                {totalHoldingUnits.toFixed(4)} Units
+                                                {pendingRedeemUnits > 0 && (
+                                                    <span style={{ color: '#eab308', marginLeft: '6px', fontWeight: '600' }}>
+                                                        ({availableUnits.toFixed(4)} available • {pendingRedeemUnits.toFixed(4)} queued)
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <div style={{ fontSize: '15px', fontWeight: '600', color: holdingPnL >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -808,12 +840,17 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                         </div>
                                     ) : (
                                         <div style={{ flex: 1 }}>
+                                            {pendingRedeemUnits > 0 && (
+                                                <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#eab308', fontSize: '12px', lineHeight: '1.4' }}>
+                                                    <strong>{pendingRedeemUnits.toFixed(4)} units</strong> are already queued in an open redemption order. Available to redeem: <strong>{availableUnits.toFixed(4)} units</strong>.
+                                                </div>
+                                            )}
                                             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
                                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: redeemType === 'ALL' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                                    <input type="radio" checked={redeemType === 'ALL'} onChange={() => { setRedeemType('ALL'); setAmount(holdingCurrentValue.toFixed(0)); }} style={{ accentColor: 'var(--color-red)' }} /> Redeem All
+                                                    <input type="radio" checked={redeemType === 'ALL'} onChange={() => { setRedeemType('ALL'); setAmount(redeemableCurrentValue.toFixed(0)); }} style={{ accentColor: 'var(--color-red)' }} /> Redeem All
                                                 </label>
                                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: redeemType === 'CUSTOM' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                                    <input type="radio" checked={redeemType === 'CUSTOM'} onChange={() => setRedeemType('CUSTOM')} style={{ accentColor: 'var(--color-red)' }} /> Custom Amount
+                                                    <input type="radio" checked={redeemType === 'CUSTOM'} onChange={() => { setRedeemType('CUSTOM'); setAmount(redeemableCurrentValue.toFixed(0)); }} style={{ accentColor: 'var(--color-red)' }} /> Custom Amount
                                                 </label>
                                             </div>
 
@@ -823,15 +860,15 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                     <span style={{ fontSize: '24px', color: 'var(--text-secondary)', marginRight: '8px' }}>₹</span>
                                                     <input 
                                                         type="number" 
-                                                        value={redeemType === 'ALL' ? holdingCurrentValue.toFixed(0) : amount}
+                                                        value={redeemType === 'ALL' ? redeemableCurrentValue.toFixed(0) : amount}
                                                         onChange={(e) => setAmount(e.target.value)}
                                                         disabled={redeemType === 'ALL'}
                                                         style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '28px', fontWeight: '700', width: '100%', outline: 'none' }}
                                                     />
                                                 </div>
-                                                {redeemType === 'CUSTOM' && (Number(amount) > holdingCurrentValue) && (
+                                                {redeemType === 'CUSTOM' && (Number(amount) > redeemableCurrentValue + 1) && (
                                                     <div style={{ color: 'var(--color-red-light)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <XCircle size={12}/> Exceeds total invested value
+                                                        <XCircle size={12}/> Exceeds available redeemable value (₹{redeemableCurrentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })})
                                                     </div>
                                                 )}
                                             </div>
@@ -850,8 +887,8 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                     <span style={{ color: 'var(--color-yellow)', fontWeight: '600' }}>
                                                         {holdingPnL > 0 ? (
                                                             fund.category?.toLowerCase().includes('debt')
-                                                            ? `~₹${(holdingPnL * (Number(amount) / (holdingCurrentValue || 1)) * 0.01).toFixed(2)} (1% Debt)`
-                                                            : `~₹${(holdingPnL * (Number(amount) / (holdingCurrentValue || 1)) * 0.20).toFixed(2)} (20% STCG)`
+                                                            ? `~₹${(holdingPnL * (effectiveRedeemAmount / (holdingCurrentValue || 1)) * 0.01).toFixed(2)} (1% Debt)`
+                                                            : `~₹${(holdingPnL * (effectiveRedeemAmount / (holdingCurrentValue || 1)) * 0.20).toFixed(2)} (20% STCG)`
                                                         ) : '₹0.00 (No Profit)'}
                                                     </span>
                                                 </div>
@@ -907,7 +944,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             }}
                                         >
                                             {isInvesting ? <Activity size={20} className="spin" /> : null}
-                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : (mfCutoff.isSameDay ? "Pay Now (Today's NAV)" : "Place Order (Next Day NAV)")) : (mfCutoff.isSameDay ? "Redeem Now (Today's NAV)" : "Queue Redeem (Next Day NAV)"))}
+                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : (mfCutoff.isSameDay ? "Pay Now (Today's NAV)" : "Place Order (Next Day NAV)")) : (availableUnits <= 0 ? 'All Units Queued for Redemption' : (mfCutoff.isSameDay ? "Redeem Now (Today's NAV)" : "Queue Redeem (Next Day NAV)")))}
                                         </button>
                                     )}
                                 </div>

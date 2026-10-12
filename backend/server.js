@@ -7849,26 +7849,55 @@ app.post('/api/mf/by-ids', async (req, res) => {
 const mfDetailsCache = {};
 app.get('/api/mf/details', async (req, res) => {
     try {
-        const { name } = req.query;
+        const { name, schemeCode } = req.query;
         if (!name) return res.status(400).json({ error: 'Name required' });
+        const cleanCode = schemeCode ? String(schemeCode).replace(/-MF$/i, '').trim() : '';
+        const cacheKey = cleanCode ? `${cleanCode}:${name}` : name;
         
         // Check cache first
-        if (mfDetailsCache[name] && (Date.now() - mfDetailsCache[name].timestamp < 86400000)) { // 24 hours cache
+        if (mfDetailsCache[cacheKey] && (Date.now() - mfDetailsCache[cacheKey].timestamp < 86400000)) { // 24 hours cache
             res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-            return res.json(mfDetailsCache[name].data);
+            return res.json(mfDetailsCache[cacheKey].data);
         }
 
-        // 1. Get search ID
-        const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&size=5&q=${encodeURIComponent(name)}`;
+        // Clean up verbose AMFI prefixes like "HDFC Mutual Fund - HDFC Children's Fund"
+        const cleanedSearchQuery = String(name).replace(/^[^-]+Mutual Fund\s*-\s*/i, '').trim() || name;
+
+        // 1. Get search candidates from Groww
+        const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&size=15&q=${encodeURIComponent(cleanedSearchQuery)}`;
         const searchRes = await myFetch(searchUrl);
         const searchData = await searchRes.json();
         
-        if (!searchData || !searchData.content || searchData.content.length === 0) {
+        let candidates = (searchData && Array.isArray(searchData.content)) ? searchData.content : [];
+        if (candidates.length === 0 && cleanedSearchQuery !== name) {
+            const fallbackRes = await myFetch(`https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&size=15&q=${encodeURIComponent(name)}`);
+            const fallbackData = await fallbackRes.json();
+            candidates = (fallbackData && Array.isArray(fallbackData.content)) ? fallbackData.content : [];
+        }
+
+        if (candidates.length === 0) {
             return res.status(404).json({ error: 'Details not found for this fund' });
         }
         
-        // Take the first matching ID
-        const searchId = searchData.content[0].id;
+        // Prefer exact scheme_code match first, then best word-overlap match
+        let chosen = cleanCode ? candidates.find(c => String(c.scheme_code) === cleanCode) : null;
+        if (!chosen) {
+            const targetWords = cleanedSearchQuery.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && w !== 'direct' && w !== 'plan' && w !== 'fund');
+            let bestScore = -1;
+            for (const cand of candidates) {
+                const title = String(cand.title || cand.search_id || '').toLowerCase();
+                let score = 0;
+                for (const w of targetWords) {
+                    if (title.includes(w)) score += 2;
+                }
+                if (String(name).toLowerCase().includes('direct') && title.includes('direct')) score += 1;
+                if (score > bestScore) {
+                    bestScore = score;
+                    chosen = cand;
+                }
+            }
+        }
+        const searchId = (chosen || candidates[0]).id || (chosen || candidates[0]).search_id;
 
         // 2. Fetch full details using the search ID
         const detailsUrl = `https://groww.in/v1/api/data/mf/web/v2/scheme/search/${searchId}`;
@@ -7879,7 +7908,7 @@ app.get('/api/mf/details', async (req, res) => {
             return res.status(404).json({ error: detailsData.errorMessage || 'Details not found' });
         }
 
-        setLRUCache(mfDetailsCache, name, { timestamp: Date.now(), data: detailsData }, 100);
+        setLRUCache(mfDetailsCache, cacheKey, { timestamp: Date.now(), data: detailsData }, 200);
         res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
         res.json(detailsData);
     } catch (err) {
@@ -9031,6 +9060,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
               
               const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
               
+              if (Number(quantity) > totalAvailable && Number(quantity) <= totalAvailable + 0.0005 && totalAvailable > 0) {
+                  quantity = totalAvailable;
+              }
               if (Number(quantity) > totalAvailable) {
                   throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell${pendingSellQty > 0 ? ` (${pendingSellQty} shares reserved in open/AMO orders)` : ''}.`);
               }
@@ -9293,7 +9325,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       if (isMutualFund) {
         try {
           await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
-          const navPrice = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+          let navPrice = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+          if (!navPrice || navPrice <= 0) {
+            navPrice = await SIPEngine.getLatestNav(ord.symbol, priceCache);
+          }
           await triggerEngine.executeOrder(ord, navPrice);
         } catch (err) {
           console.error('Mutual fund direct execution error:', err);
@@ -9383,6 +9418,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       success: true, 
       orderId: ord.id, 
       status: finalStatus,
+      queued: finalStatus === 'AMO_PENDING',
       isSliced: Boolean(ord.slice_total > 1),
       slicesCount: ord.slice_total || 1,
       brokerage: ord.brokerage || 0
@@ -9424,9 +9460,10 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
     }
 
     const nextExecutionDate = SIPEngine.getNextExecutionDate(new Date(), frequency);
-    const isMf = Boolean(symbol.endsWith('-MF') || symbol.includes('MUTUALFUND'));
+    const isMf = Boolean(symbol.endsWith('-MF') || symbol.includes('MUTUALFUND') || /^\d+$/.test(symbol));
     const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
     const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    const isSameDayNav = isMf ? isMutualFundSameDayCutoffOpen() : true;
 
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
@@ -9445,7 +9482,9 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
           user_id: req.user.id,
           amount: -finalMargin,
           type: 'MARGIN_BLOCK',
-          description: `SIP Installment (${frequency || 'MONTHLY'}): Bought ${qty} units of ${symbol} @ ₹${execPrice.toFixed(2)}`
+          description: isSameDayNav
+            ? `SIP Installment (${frequency || 'MONTHLY'}): Bought ${qty} units of ${symbol} @ ₹${execPrice.toFixed(2)}`
+            : `SIP Installment Queued (${frequency || 'MONTHLY'}): ₹${finalMargin.toFixed(2)} for ${symbol} (Next Business Day NAV)`
       });
 
       const anchorDay = nextExecutionDate ? new Date(nextExecutionDate).getUTCDate() : new Date().getUTCDate();
@@ -9460,61 +9499,91 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
         failure_count: 0
       });
 
-      // Insert Executed Order Record
-      await trx('orders').insert({
-        user_id: req.user.id,
-        symbol,
-        type: 'MARKET',
-        side: 'BUY',
-        quantity: qty,
-        filled_quantity: qty,
-        pending_quantity: 0,
-        price: execPrice,
-        average_price: execPrice,
-        status: 'EXECUTED',
-        order_variety: 'SIP',
-        product_type: 'DEL',
-        margin: finalMargin,
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-
-      // Update or Insert Holding Directly
-      const existingHolding = await trx('holdings')
-        .where({ user_id: req.user.id })
-        .where(builder => {
-          builder.where({ symbol: symbol })
-                 .orWhere({ symbol: cleanSym })
-                 .orWhere({ symbol: `NSE:${cleanSym}` })
-                 .orWhere({ symbol: `BSE:${cleanSym}` });
-        })
-        .first();
-
-      if (existingHolding) {
-        const prevQty = parseFloat(existingHolding.quantity) || 0;
-        const prevAvg = parseFloat(existingHolding.average_price) || execPrice;
-        const totalQty = prevQty + qty;
-        const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (qty * execPrice)) / totalQty : execPrice;
-        await trx('holdings').where({ id: existingHolding.id }).update({
-          quantity: parseFloat(totalQty.toFixed(4)),
-          average_price: parseFloat(newAvg.toFixed(2)),
-          asset_class: assetClass,
-          updated_at: new Date()
-        });
-      } else {
-        await trx('holdings').insert({
+      if (isSameDayNav) {
+        // Insert Executed Order Record (Before 2:00 PM IST cut-off)
+        await trx('orders').insert({
           user_id: req.user.id,
           symbol,
+          type: 'MARKET',
+          side: 'BUY',
           quantity: qty,
-          average_price: parseFloat(execPrice.toFixed(2)),
-          asset_class: assetClass,
+          filled_quantity: qty,
+          pending_quantity: 0,
+          price: execPrice,
+          average_price: execPrice,
+          status: 'EXECUTED',
+          order_variety: 'SIP',
+          product_type: 'DEL',
+          margin: finalMargin,
+          remarks: `SIP Installment (${frequency || 'MONTHLY'}): Today's NAV (Before 2:00 PM Cut-off)`,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        // Update or Insert Holding Directly
+        const existingHolding = await trx('holdings')
+          .where({ user_id: req.user.id })
+          .where(builder => {
+            builder.where({ symbol: symbol })
+                   .orWhere({ symbol: cleanSym })
+                   .orWhere({ symbol: `NSE:${cleanSym}` })
+                   .orWhere({ symbol: `BSE:${cleanSym}` });
+          })
+          .first();
+
+        if (existingHolding) {
+          const prevQty = parseFloat(existingHolding.quantity) || 0;
+          const prevAvg = parseFloat(existingHolding.average_price) || execPrice;
+          const totalQty = prevQty + qty;
+          const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (qty * execPrice)) / totalQty : execPrice;
+          await trx('holdings').where({ id: existingHolding.id }).update({
+            quantity: parseFloat(totalQty.toFixed(4)),
+            average_price: parseFloat(newAvg.toFixed(isMf ? 4 : 2)),
+            asset_class: assetClass,
+            updated_at: new Date()
+          });
+        } else {
+          await trx('holdings').insert({
+            user_id: req.user.id,
+            symbol,
+            quantity: qty,
+            average_price: parseFloat(execPrice.toFixed(isMf ? 4 : 2)),
+            asset_class: assetClass,
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+        }
+      } else {
+        // After 2:00 PM IST cut-off -> Queue 1st SIP installment for Next Business Day NAV
+        await trx('orders').insert({
+          user_id: req.user.id,
+          symbol,
+          type: 'MARKET',
+          side: 'BUY',
+          quantity: qty,
+          filled_quantity: 0,
+          pending_quantity: qty,
+          price: execPrice,
+          average_price: null,
+          status: 'AMO_PENDING',
+          order_variety: 'AMO',
+          product_type: 'DEL',
+          margin: finalMargin,
+          remarks: `SIP Installment (${frequency || 'MONTHLY'}): Queued for Next Business Day NAV (After 2:00 PM Cut-off)`,
           created_at: new Date(),
           updated_at: new Date()
         });
       }
     });
 
-    res.json({ success: true, message: `SIP created and 1st installment executed successfully (${qty} units @ ₹${execPrice.toFixed(2)})` });
+    res.json({
+      success: true,
+      queued: !isSameDayNav,
+      status: isSameDayNav ? 'EXECUTED' : 'AMO_PENDING',
+      message: isSameDayNav
+        ? `SIP created and 1st installment executed successfully (${qty} units @ ₹${execPrice.toFixed(2)})`
+        : `SIP created! 1st installment (₹${finalMargin.toLocaleString('en-IN')}) queued for Next Business Day NAV.`
+    });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({ error: error.message, success: false });
@@ -9550,7 +9619,14 @@ app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
       }
       return res.status(500).json({ error: result.reason || 'Failed to execute SIP installment' });
     }
-    res.json({ success: true, message: `Successfully executed SIP installment! ${result.units} units credited @ NAV ₹${result.nav}`, data: result });
+    res.json({
+      success: true,
+      queued: Boolean(result.queued),
+      message: result.queued
+        ? `SIP installment (₹${result.amount}) queued for Next Business Day NAV!`
+        : `Successfully executed SIP installment! ${result.units} units credited @ NAV ₹${result.nav}`,
+      data: result
+    });
   } catch (error) {
     res.status(500).json({ error: error.message, success: false });
   }

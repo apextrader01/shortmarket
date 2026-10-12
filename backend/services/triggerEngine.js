@@ -459,11 +459,17 @@ class TriggerEngine {
             await trx('orders').where({ id: order.id }).update({ 
                 status: 'EXECUTED',
                 price: execPrice,
+                average_price: execPrice,
+                filled_quantity: Number(order.quantity),
+                pending_quantity: 0,
                 taxes: totalTaxes,
                 updated_at: new Date()
             });
             order.status = 'EXECUTED';
             order.price = execPrice;
+            order.average_price = execPrice;
+            order.filled_quantity = Number(order.quantity);
+            order.pending_quantity = 0;
             order.taxes = totalTaxes;
 
             // 2. Position Logic
@@ -512,11 +518,12 @@ class TriggerEngine {
                         const offsetQty = Math.min(Math.abs(remainingQty), Math.abs(hQty));
                         
                         // Deduct from holding or remove row if fully closed
-                        const newHoldingQty = isLongHoldingOffset ? (hQty - offsetQty) : (hQty + offsetQty);
-                        if (newHoldingQty === 0) {
+                        const rawNewHoldingQty = isLongHoldingOffset ? (hQty - offsetQty) : (hQty + offsetQty);
+                        const newHoldingQty = parseFloat(rawNewHoldingQty.toFixed(4));
+                        if (Math.abs(newHoldingQty) <= 0.0001) {
                             await trx('holdings').where({ id: holding.id }).del();
                         } else {
-                            await trx('holdings').where({ id: holding.id }).update({ quantity: newHoldingQty });
+                            await trx('holdings').where({ id: holding.id }).update({ quantity: newHoldingQty, updated_at: new Date() });
                         }
                         
                         // Create a CLOSED position record for today
@@ -569,15 +576,15 @@ class TriggerEngine {
                         }
                         
                         if (isLongHoldingOffset) {
-                            remainingQty += offsetQty; // e.g. -15 + 10 = -5
+                            remainingQty = parseFloat((remainingQty + offsetQty).toFixed(4)); // e.g. -15 + 10 = -5
                         } else {
-                            remainingQty -= offsetQty; // e.g. +15 - 10 = +5
+                            remainingQty = parseFloat((remainingQty - offsetQty).toFixed(4)); // e.g. +15 - 10 = +5
                         }
                     }
                 }
                 
                 // If there's still a remaining quantity, insert an OPEN position
-                if (remainingQty !== 0) {
+                if (Math.abs(remainingQty) > 0.0001) {
                     if (order.is_exit) {
                         console.warn(`[SAFEGUARD] Blocked exit/settlement order ${order.id} (${order.symbol}) from opening a new position with remainingQty: ${remainingQty}`);
                         return;
@@ -590,9 +597,12 @@ class TriggerEngine {
                     }
 
                     // MUTUAL FUNDS DELIVERY: Mutual fund purchases must directly enter Holdings as delivery assets (never open positions)
-                    if (remainingQty > 0 && (order.symbol.endsWith('-MF') || order.symbol.includes('MUTUALFUND'))) {
+                    if (remainingQty > 0 && (order.symbol.endsWith('-MF') || order.symbol.includes('MUTUALFUND') || /^\d+$/.test(order.symbol))) {
                         const existingHolding = await trx('holdings')
-                            .where({ user_id: order.user_id, symbol: order.symbol })
+                            .where({ user_id: order.user_id })
+                            .where(builder => {
+                                builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym });
+                            })
                             .first();
                         if (existingHolding) {
                             const prevQty = parseFloat(existingHolding.quantity) || 0;
@@ -601,7 +611,7 @@ class TriggerEngine {
                             const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (remainingQty * execPrice)) / totalQty : execPrice;
                             await trx('holdings').where({ id: existingHolding.id }).update({
                                 quantity: parseFloat(totalQty.toFixed(4)),
-                                average_price: parseFloat(newAvg.toFixed(2)),
+                                average_price: parseFloat(newAvg.toFixed(4)),
                                 asset_class: 'MUTUAL_FUND',
                                 updated_at: new Date()
                             });
@@ -610,7 +620,7 @@ class TriggerEngine {
                                 user_id: order.user_id,
                                 symbol: order.symbol,
                                 quantity: parseFloat(remainingQty.toFixed(4)),
-                                average_price: parseFloat(execPrice.toFixed(2)),
+                                average_price: parseFloat(execPrice.toFixed(4)),
                                 asset_class: 'MUTUAL_FUND',
                                 created_at: new Date(),
                                 updated_at: new Date()

@@ -815,25 +815,48 @@ export default function MutualFundsView() {
                 </div>
               ) : isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {finalInvestments.map(h => (
-                    <div key={h.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                        {mfNames[h.symbol] || h.symbol.replace('-MF', '')}
+                  {finalInvestments.map(h => {
+                    const cleanId = String(h.symbol || '').replace('-MF', '');
+                    const matchedFund = (mutualFunds || []).find(f => String(f.id) === cleanId) || mfWatchlistFunds?.[cleanId] || null;
+                    const displayName = mfNames[h.symbol] || matchedFund?.name || cleanId;
+                    const openModal = (initialMode) => {
+                      setSelectedFund({
+                        ...(matchedFund || {}),
+                        id: cleanId,
+                        schemeCode: cleanId,
+                        symbol: h.symbol,
+                        name: displayName,
+                        amc: matchedFund?.amc || displayName.split(' ')[0] || 'Mutual Fund',
+                        category: matchedFund?.category || 'Equity',
+                        risk: matchedFund?.risk || 'Moderate',
+                        nav: Number(matchedFund?.nav || h.ltp || h.average_price || 0),
+                        initialMode
+                      });
+                    };
+                    return (
+                      <div key={h.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {displayName}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Units</span>
+                          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{Number(h.quantity || 0).toFixed(4)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
+                          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{Number(h.average_price || 0).toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '14px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
+                          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => openModal('INVEST')} style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px', cursor: 'pointer' }}>+ Invest More</button>
+                          <button onClick={() => openModal('REDEEM')} style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px', fontWeight: '700', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', cursor: 'pointer' }}>Redeem</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Units</span>
-                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{Number(h.quantity || 0).toFixed(4)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
-                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{Number(h.average_price || 0).toFixed(2)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
-                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
@@ -844,17 +867,43 @@ export default function MutualFundsView() {
                         <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Units</th>
                         <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg NAV</th>
                         <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Invested Amount</th>
+                        <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {finalInvestments.map(h => (
-                        <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[h.symbol] || h.symbol.replace('-MF', '')}</td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>{Number(h.quantity || 0).toFixed(4)}</td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(h.average_price || 0).toFixed(2)}</td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</td>
-                        </tr>
-                      ))}
+                      {finalInvestments.map(h => {
+                        const cleanId = String(h.symbol || '').replace('-MF', '');
+                        const matchedFund = (mutualFunds || []).find(f => String(f.id) === cleanId) || mfWatchlistFunds?.[cleanId] || null;
+                        const displayName = mfNames[h.symbol] || matchedFund?.name || cleanId;
+                        const openModal = (initialMode) => {
+                          setSelectedFund({
+                            ...(matchedFund || {}),
+                            id: cleanId,
+                            schemeCode: cleanId,
+                            symbol: h.symbol,
+                            name: displayName,
+                            amc: matchedFund?.amc || displayName.split(' ')[0] || 'Mutual Fund',
+                            category: matchedFund?.category || 'Equity',
+                            risk: matchedFund?.risk || 'Moderate',
+                            nav: Number(matchedFund?.nav || h.ltp || h.average_price || 0),
+                            initialMode
+                          });
+                        };
+                        return (
+                          <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '16px', fontWeight: '600', cursor: 'pointer' }} onClick={() => openModal('INVEST')}>{displayName}</td>
+                            <td style={{ padding: '16px', textAlign: 'right' }}>{Number(h.quantity || 0).toFixed(4)}</td>
+                            <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(h.average_price || 0).toFixed(2)}</td>
+                            <td style={{ padding: '16px', textAlign: 'right' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</td>
+                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => openModal('INVEST')} style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', cursor: 'pointer' }}>Invest</button>
+                                <button onClick={() => openModal('REDEEM')} style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', cursor: 'pointer' }}>Redeem</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
