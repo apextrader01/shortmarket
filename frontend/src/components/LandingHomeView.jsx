@@ -13,6 +13,7 @@ import {
   Sliders, Target, Play
 } from 'lucide-react';
 import { useSocialLinks } from '../utils/socialLinks';
+import logoImg from '../assets/logo.png';
 
 export default function LandingHomeView({
   onOpenPaperTrading,
@@ -740,24 +741,23 @@ export default function LandingHomeView({
           width: '100%'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0 }} onClick={() => scrollToSection('hubs-command-center')}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #0284c7, #4f46e5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 18px rgba(56, 189, 248, 0.42)',
-              border: '1px solid rgba(125, 211, 252, 0.4)',
-              flexShrink: 0
-            }}>
-              <TrendingUp size={19} color="#ffffff" />
-            </div>
+            <img
+              src={logoImg}
+              alt="SkandX Logo"
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                boxShadow: '0 0 18px rgba(56, 189, 248, 0.42)',
+                border: '1px solid rgba(125, 211, 252, 0.4)',
+                flexShrink: 0,
+                objectFit: 'cover'
+              }}
+            />
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontWeight: '900', fontSize: '17px', letterSpacing: '0.5px', background: 'linear-gradient(to right, #38bdf8, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  SKANDX
+                <span style={{ fontWeight: '900', fontSize: '18px', letterSpacing: '-0.3px', color: '#ffffff', fontFamily: "'Outfit', Inter, sans-serif" }}>
+                  Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
                 </span>
                 <span style={{ fontSize: '9px', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', padding: '1px 5px', borderRadius: '4px', fontWeight: '800', whiteSpace: 'nowrap' }}>
                   PRO OS
@@ -2814,12 +2814,15 @@ export default function LandingHomeView({
             alignItems: 'center',
             gap: '12px'
           }}>
-            <div>
-              <div style={{ fontWeight: '800', color: '#f8fafc', fontSize: '12.5px', marginBottom: '2px' }}>
-                SKANDX PRO • High-Concurrency Trading &amp; Wealth Operating System
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>
-                Paper trading simulator uses virtual currency for educational purposes. Fully compliant with Indian regulatory guidelines.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img src={logoImg} alt="SkandX Logo" style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: '800', color: '#f8fafc', fontSize: '12.5px', marginBottom: '2px' }}>
+                  SKANDX PRO • High-Concurrency Trading &amp; Wealth Operating System
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  Paper trading simulator uses virtual currency for educational purposes. Fully compliant with Indian regulatory guidelines.
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', fontSize: '11.5px', flexWrap: 'wrap' }}>

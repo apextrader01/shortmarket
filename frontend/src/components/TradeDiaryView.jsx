@@ -61,6 +61,7 @@ import {
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
+import logoImg from '../assets/logo.png';
 
 // Available strategies and emotions for tag selection
 export const STRATEGY_TAGS = [
@@ -1893,26 +1894,26 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           borderBottom: `1px solid ${colors.borderColor}`,
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              backgroundColor: '#2563eb',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 2px 10px rgba(37, 99, 235, 0.4)'
-            }}>
-              <Check size={18} strokeWidth={3} />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: onBack ? 'pointer' : 'default' }} onClick={onBack}>
+            <img
+              src={logoImg}
+              alt="SkandX Logo"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)',
+                border: '1px solid rgba(125, 211, 252, 0.35)',
+                objectFit: 'cover',
+                flexShrink: 0
+              }}
+            />
             <div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                Trade Diary
+                SkandX Diary
               </div>
               <div style={{ fontSize: '10px', color: colors.textSecondary, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                JOURNAL & TERMINAL
+                JOURNAL &amp; TERMINAL
               </div>
             </div>
           </div>

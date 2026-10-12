@@ -9,6 +9,7 @@ import {
   Send, ArrowLeft, Layers, RefreshCw, Infinity as InfinityIcon,
   Bookmark, Copy
 } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 /**
  * ⚡ Browser-Side Adaptive 50MB -> ~40KB WebP Compressor
@@ -969,19 +970,19 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
             gap: '10px'
           }}>
             <div className="comm-header-title-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '9px',
-                background: 'linear-gradient(135deg, #2563eb, #38bdf8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 14px rgba(56, 189, 248, 0.35)',
-                flexShrink: 0
-              }}>
-                <Users size={18} color="#fff" />
-              </div>
+              <img
+                src={logoImg}
+                alt="SkandX Logo"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '9px',
+                  boxShadow: '0 0 14px rgba(56, 189, 248, 0.35)',
+                  border: '1px solid rgba(125, 211, 252, 0.35)',
+                  objectFit: 'cover',
+                  flexShrink: 0
+                }}
+              />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff', whiteSpace: 'nowrap' }}>

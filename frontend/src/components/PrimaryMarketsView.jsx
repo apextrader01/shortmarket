@@ -10,6 +10,7 @@ import {
   DollarSign, PieChart, Info
 } from 'lucide-react';
 import { API } from '../store';
+import logoImg from '../assets/logo.png';
 
 const SEED_BHAVCOPY_DATA = [
   // --- Banking & Financials (22) ---
@@ -1029,9 +1030,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             ← {isMobile ? 'Back' : 'Back to Hub'}
           </button>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: isMobile ? '17px' : '20px' }}>🏛️</span>
-              <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '20px', fontWeight: '800', letterSpacing: '-0.3px', lineHeight: 1.25 }}>Primary Markets & Institutional Intelligence</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <img src={logoImg} alt="SkandX Logo" style={{ width: isMobile ? '26px' : '30px', height: isMobile ? '26px' : '30px', borderRadius: '8px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)', border: '1px solid rgba(125, 211, 252, 0.35)', objectFit: 'cover', flexShrink: 0 }} />
+              <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '20px', fontWeight: '800', letterSpacing: '-0.3px', lineHeight: 1.25 }}>Primary Markets &amp; Institutional Intelligence</h1>
               <span style={{ fontSize: '9.5px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>Official Exchange Feed</span>
               <span style={{ fontSize: '9.5px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>130+ Stocks • 105+ Deals</span>
             </div>

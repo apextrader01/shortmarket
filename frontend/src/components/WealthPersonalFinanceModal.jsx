@@ -8,6 +8,7 @@ import {
   CheckCircle2, ArrowRight, TrendingUp, Scissors, HeartPulse,
   DollarSign, RefreshCw, HelpCircle, ChevronRight, ArrowLeft, Download, Printer, Calculator, Trash2
 } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function WealthPersonalFinanceModal({
   isOpen = true,
@@ -113,20 +114,19 @@ export default function WealthPersonalFinanceModal({
               <span>{isMobile ? 'Back' : 'Back to Home'}</span>
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <div style={{
-                width: isMobile ? '32px' : '38px',
-                height: isMobile ? '32px' : '38px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(56, 189, 248, 0.2))',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#10b981',
-                flexShrink: 0
-              }}>
-                <PieChart size={isMobile ? 16 : 20} />
-              </div>
+              <img
+                src={logoImg}
+                alt="SkandX Logo"
+                style={{
+                  width: isMobile ? '32px' : '38px',
+                  height: isMobile ? '32px' : '38px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(16, 185, 129, 0.45)',
+                  boxShadow: '0 0 14px rgba(56, 189, 248, 0.35)',
+                  objectFit: 'cover',
+                  flexShrink: 0
+                }}
+              />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '9.5px', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>

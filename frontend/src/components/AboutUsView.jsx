@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Phone, Mail, Globe, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSocialLinks } from '../utils/socialLinks';
+import logoImg from '../assets/logo.png';
 
 export default function AboutUsView({ setActiveTab }) {
   const [openPolicy, setOpenPolicy] = useState(null);
@@ -68,13 +69,17 @@ export default function AboutUsView({ setActiveTab }) {
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         {/* Brand Hero */}
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ 
-            width: '80px', height: '80px', borderRadius: '50%', background: '#3B82F6', 
-            margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '36px', fontWeight: '800', color: '#FFF'
-          }}>
-            S
-          </div>
+          <img
+            src={logoImg}
+            alt="SkandX Logo"
+            style={{
+              width: '80px', height: '80px', borderRadius: '20px',
+              margin: '0 auto 20px', display: 'block',
+              boxShadow: '0 0 24px rgba(56, 189, 248, 0.45)',
+              border: '1px solid rgba(125, 211, 252, 0.4)',
+              objectFit: 'cover'
+            }}
+          />
           <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>SkandX</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '40px' }}>Service Truly Personalised</p>
 
