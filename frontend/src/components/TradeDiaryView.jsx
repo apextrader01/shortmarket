@@ -1822,7 +1822,6 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     { id: 'AI_SUMMARIZER', label: 'AI Summarizer', icon: Sparkles },
     { id: 'REPORTS', label: 'Reports', icon: BarChart2 },
     { id: 'RISK_MANAGEMENT', label: 'Risk Management', icon: ShieldCheck },
-    { id: 'PAPER_TRADING', label: 'Paper trading', icon: Zap, badge: 'Live', isBridge: true },
     { id: 'COMMUNITY', label: 'Community', icon: Users },
     { id: 'CHALLENGE', label: 'Challenge', icon: Trophy },
     { id: 'CALENDAR', label: 'Calendar', icon: Calendar },
