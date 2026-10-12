@@ -1756,17 +1756,17 @@ function App() {
                 }}>
                   {[
                     { key: 'Home', label: 'Home' },
-                    { key: 'Markets', label: 'Paper Trading' },
                     { key: 'Algo', label: 'SkandX Algo' },
-                    { key: 'Community', label: 'Community' },
                     { key: 'TradeDiary', label: 'Trade Diary' },
+                    { key: 'Markets', label: 'Paper Trading' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
                     { key: 'Portfolio', label: 'Portfolio' },
                     { key: 'MutualFunds', label: 'Mutual Funds' },
-                    { key: 'Leaderboard', label: 'Leaderboard' },
                     { key: 'Journal', label: 'Trading Journal' },
-                    ...(user?.is_admin ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
+                    { key: 'Leaderboard', label: 'Leaderboard' },
+                    { key: 'Community', label: 'Community' },
+                    ...(Boolean(user?.is_admin) ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
                   ].map((tabItem) => (
                     <div
                       key={tabItem.key}
@@ -2140,25 +2140,25 @@ function App() {
           {[
             { label: 'Notifications', key: 'Notifications_Drawer', icon: Bell, badge: unreadNotificationsCount },
             { label: 'Home', key: 'Home', icon: Home },
-            { label: 'Paper Trading Terminal', key: 'Markets', icon: TrendingUp },
-            { label: 'SkandX Algo Hub', key: 'Algo', icon: Cpu },
-            { label: 'Financial Calculators', key: 'Calculators', icon: Calculator },
-            { label: 'Primary Markets & IPOs', key: 'PrimaryMarkets', icon: Building2 },
-            { label: 'Wealth & Tax Hub', key: 'WealthOS', icon: Sparkles },
-            { label: 'Traders Community & Clubs', key: 'Community', icon: Users },
+            { label: 'SkandX Algo', key: 'Algo', icon: Cpu },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
+            { label: 'Paper Trading', key: 'Markets', icon: TrendingUp },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
             { label: 'Portfolio', key: 'Portfolio', icon: Briefcase },
-            { label: 'Leaderboard', key: 'Leaderboard', icon: Trophy },
-            { label: 'Trading Journal', key: 'Journal', icon: BookOpen },
             { label: 'Mutual Funds', key: 'MutualFunds', icon: CircleDollarSign },
+            { label: 'Trading Journal', key: 'Journal', icon: BookOpen },
+            { label: 'Leaderboard', key: 'Leaderboard', icon: Trophy },
+            { label: 'Community', key: 'Community', icon: Users },
+            { label: 'Financial Calculators', key: 'Calculators', icon: Calculator },
+            { label: 'Primary Markets & IPOs', key: 'PrimaryMarkets', icon: Building2 },
+            { label: 'Wealth & Tax Hub', key: 'WealthOS', icon: Sparkles },
             { label: 'Reports', key: 'Reports', icon: FileText },
             { label: 'Referrals', key: 'Referrals', icon: Gift },
             { label: 'Pricing', key: 'Pricing', icon: Star },
             { label: 'About Us', key: 'AboutUs', icon: Info },
             { label: 'Privacy & Legal', key: 'Legal', icon: Shield },
-            ...(user?.is_admin ? [{ label: 'Admin Panel', key: 'AdminPanel', icon: ShieldCheck }] : [])
+            ...(Boolean(user?.is_admin) ? [{ label: 'Admin Panel', key: 'AdminPanel', icon: ShieldCheck }] : [])
           ].map(tab => (
             <div 
               key={tab.label} 
