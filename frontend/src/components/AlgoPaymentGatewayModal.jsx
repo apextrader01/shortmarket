@@ -233,6 +233,12 @@ export default function AlgoPaymentGatewayModal({
       }
 
       const verifyData = await verifyRes.json().catch(() => ({}));
+      if (verifyData && verifyData.cancelled) {
+        setIsProcessing(false);
+        setProcessStepText('');
+        notifyParent({ paymentFailed: true, transactions: verifyData?.transactions });
+        return;
+      }
       if (!verifyRes.ok || !verifyData.success) {
         throw new Error(verifyData.error || 'Cashfree payment verification failed or order was not completed.');
       }

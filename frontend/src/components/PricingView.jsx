@@ -161,6 +161,9 @@ export default function PricingView({ setActiveTab }) {
         alert(`🎉 Successfully activated ${planTitle}! Your subscription is now active.`);
         if (typeof setActiveTab === 'function') setActiveTab('ClientData');
         else window.location.href = '/clientdata';
+      } else if (verifyData && verifyData.cancelled) {
+        // User dismissed the Cashfree modal before paying; backend already logged CANCELLED
+        return;
       } else {
         await reportPaymentStatus('FAILED', verifyData.error || 'Payment not completed');
         alert('Payment verification failed: ' + (verifyData.error || 'Payment was not completed.'));

@@ -3488,13 +3488,25 @@ async function createCashfreeOrder({ orderId, amountInr, user, note, returnUrl, 
     order_meta: {
       return_url: returnUrl || 'https://www.skandx.in/?cf_order_id={order_id}'
     },
-    order_note: String(note || 'SkandX Platform Subscription').slice(0, 180)
+    order_note: String(note || 'SkandX Platform Subscription')
+      .replace(/₹/g, 'INR ')
+      .replace(/[^\w\s.-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 150)
   };
 
   const cleanTags = {};
   for (const [k, v] of Object.entries(tags || {})) {
-    if (v !== undefined && v !== null && String(v).trim() !== '') {
-      cleanTags[String(k).slice(0, 30)] = String(v).slice(0, 200);
+    const cleanKey = String(k || '').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
+    const cleanVal = String(v ?? '')
+      .replace(/₹/g, 'INR ')
+      .replace(/[^a-zA-Z0-9_ -]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 90);
+    if (cleanKey && cleanVal) {
+      cleanTags[cleanKey] = cleanVal;
     }
   }
   if (Object.keys(cleanTags).length > 0) {
@@ -3522,7 +3534,7 @@ async function createCashfreeOrder({ orderId, amountInr, user, note, returnUrl, 
   };
 }
 
-async function fetchCashfreeOrderStatus(orderId) {
+async function fetchCashfreeOrderStatus(orderId, retryIfActive = false) {
   const conf = await getCashfreeConfig();
   if (!conf.isConfigured || !orderId) {
     return { isPaid: false, isFailed: false, orderStatus: 'UNKNOWN', cfPaymentId: null, failureReason: null };
@@ -3536,22 +3548,35 @@ async function fetchCashfreeOrderStatus(orderId) {
   };
 
   const encodedId = encodeURIComponent(String(orderId).trim());
-  const [orderRes, paymentsRes] = await Promise.all([
-    axios.get(`${conf.baseUrl}/orders/${encodedId}`, { headers, timeout: 12000 }).catch(() => null),
-    axios.get(`${conf.baseUrl}/orders/${encodedId}/payments`, { headers, timeout: 12000 }).catch(() => null)
-  ]);
+  const queryGateway = async () => {
+    const [orderRes, paymentsRes] = await Promise.all([
+      axios.get(`${conf.baseUrl}/orders/${encodedId}`, { headers, timeout: 12000 }).catch(() => null),
+      axios.get(`${conf.baseUrl}/orders/${encodedId}/payments`, { headers, timeout: 12000 }).catch(() => null)
+    ]);
 
-  const orderData = orderRes?.data || {};
-  const paymentsList = Array.isArray(paymentsRes?.data)
-    ? paymentsRes.data
-    : (Array.isArray(paymentsRes?.data?.items) ? paymentsRes.data.items : []);
+    const orderData = orderRes?.data || {};
+    const paymentsList = Array.isArray(paymentsRes?.data)
+      ? paymentsRes.data
+      : (Array.isArray(paymentsRes?.data?.items) ? paymentsRes.data.items : []);
 
-  const successPayment = paymentsList.find(p => String(p?.payment_status || '').toUpperCase() === 'SUCCESS');
-  const failedPayment = paymentsList.find(p => ['FAILED', 'USER_DROPPED', 'CANCELLED', 'VOID'].includes(String(p?.payment_status || '').toUpperCase()));
+    const successPayment = paymentsList.find(p => String(p?.payment_status || '').toUpperCase() === 'SUCCESS');
+    const pendingPayment = paymentsList.find(p => ['PENDING', 'INITIALIZED', 'FLAGGED'].includes(String(p?.payment_status || '').toUpperCase()));
+    const failedPayment = paymentsList.find(p => ['FAILED', 'USER_DROPPED', 'CANCELLED', 'VOID'].includes(String(p?.payment_status || '').toUpperCase()));
 
-  const orderStatus = String(orderData?.order_status || '').toUpperCase();
-  const isPaid = orderStatus === 'PAID' || Boolean(successPayment);
-  const isFailed = !isPaid && (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED' || Boolean(failedPayment));
+    const orderStatus = String(orderData?.order_status || '').toUpperCase();
+    const isPaid = orderStatus === 'PAID' || Boolean(successPayment);
+    const isFailed = !isPaid && (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED' || Boolean(failedPayment));
+
+    return { orderData, paymentsList, successPayment, pendingPayment, failedPayment, orderStatus, isPaid, isFailed };
+  };
+
+  let snap = await queryGateway();
+  if (retryIfActive && !snap.isPaid && !snap.isFailed && snap.pendingPayment) {
+    await new Promise(r => setTimeout(r, 1500));
+    snap = await queryGateway();
+  }
+
+  const { orderData, paymentsList, successPayment, failedPayment, orderStatus, isPaid, isFailed } = snap;
 
   const cfPaymentId = successPayment?.cf_payment_id
     ? String(successPayment.cf_payment_id)
@@ -3565,6 +3590,7 @@ async function fetchCashfreeOrderStatus(orderId) {
   return {
     isPaid,
     isFailed,
+    isUserCancelled: !isPaid && !isFailed && paymentsList.length === 0,
     orderStatus: orderStatus || (isPaid ? 'PAID' : 'ACTIVE'),
     cfPaymentId,
     failureReason,
@@ -3998,7 +4024,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing order_id for payment verification' });
     }
 
-    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId);
+    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId, true);
     const txId = cfStatus.cfPaymentId || razorpay_payment_id || targetOrderId;
 
     if (cfStatus.isPaid) {
@@ -4058,7 +4084,8 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         message: 'Upgraded to PRO successfully!'
       });
     } else {
-      const failReason = cfStatus.failureReason || `Payment not completed (Order Status: ${cfStatus.orderStatus || 'PENDING'})`;
+      const isCancelled = !cfStatus.isFailed;
+      const failReason = cfStatus.failureReason || (isCancelled ? 'Checkout dismissed by user before completing payment' : `Payment not completed (Order Status: ${cfStatus.orderStatus || 'PENDING'})`);
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: meta.tier,
@@ -4069,7 +4096,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         razorpayPaymentId: cfStatus.cfPaymentId || null,
         failureReason: failReason
       });
-      return res.status(400).json({ error: failReason });
+      return res.status(400).json({ error: failReason, cancelled: isCancelled });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -7047,8 +7074,8 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     // Check subscription tier (Admin accounts have no limits or plan restrictions)
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user?.is_admin) {
-      const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-      const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME', 'YEARLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const isYearlyOrMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
       const limit = isHighest ? 5 : (isYearlyOrMonthly ? 4 : 2);
       const maxSymbols = isHighest ? 100 : (isYearlyOrMonthly ? 75 : 30);
       
@@ -10785,8 +10812,8 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
   // 🛡️ Subscription Tier Eligibility & Leg Limits for Basket Orders (Multi-Leg)
   const user = await db('users').where({ id: req.user.id }).first();
   const isAdmin = Boolean(user?.is_admin);
-  const isHighest = isAdmin || (['HIGHEST', 'FEATURE', 'VIP'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date()));
-  const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+  const isHighest = isAdmin || (['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date()));
+  const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
   const isPaidTier = isHighest || isYearlyOrMonthly;
 
   if (!isPaidTier) {
@@ -13600,7 +13627,7 @@ function applyTierFilterToQuery(query, accessTier) {
   } 
   // HIGHEST_ONLY / VIP: Feature Plan exclusive
   else if (tier === 'HIGHEST_ONLY' || tier === 'FEATURE_ONLY' || tier === 'VIP_ONLY') {
-    query.whereIn('users.subscription_tier', ['HIGHEST', 'FEATURE', 'VIP'])
+    query.whereIn('users.subscription_tier', ['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'])
          .where(builder => {
            builder.whereNull('users.subscription_expires').orWhere('users.subscription_expires', '>=', now);
          });
@@ -13762,8 +13789,8 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     const isExpired = user?.subscription_expires && new Date(user.subscription_expires) <= new Date();
     const activeTier = isExpired ? 'BASIC' : userTier;
     
-    const hasHighest = Boolean(user?.is_admin) || ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
-    const hasYearlyOrMonthly = hasHighest || ['YEARLY', 'MONTHLY', 'PRO', 'LIFETIME'].includes(activeTier);
+    const hasHighest = Boolean(user?.is_admin) || ['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeTier);
+    const hasYearlyOrMonthly = hasHighest || ['YEARLY', 'MONTHLY', 'PRO'].includes(activeTier);
     
     const allowedTiers = ['ALL'];
     if (hasYearlyOrMonthly) {
@@ -16605,11 +16632,12 @@ async function handleVerifyAlgoCashfreeOrder(req, res) {
       return res.status(400).json({ error: 'Missing required order_id for Cashfree verification.' });
     }
 
-    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId);
+    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId, true);
     const txId = cfStatus.cfPaymentId || razorpay_payment_id || targetOrderId;
 
     if (!cfStatus.isPaid) {
-      const failReason = cfStatus.failureReason || `Cashfree Order not paid (Status: ${cfStatus.orderStatus || 'PENDING'})`;
+      const isCancelled = !cfStatus.isFailed;
+      const failReason = cfStatus.failureReason || (isCancelled ? 'Checkout dismissed by user before completing payment' : `Cashfree Order not paid (Status: ${cfStatus.orderStatus || 'PENDING'})`);
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: resolved.planKey,
@@ -16620,7 +16648,7 @@ async function handleVerifyAlgoCashfreeOrder(req, res) {
         razorpayPaymentId: cfStatus.cfPaymentId || null,
         failureReason: failReason
       });
-      return res.status(400).json({ error: failReason });
+      return res.status(400).json({ error: failReason, cancelled: isCancelled });
     }
 
     const userObj = await resolveBridgeUser(req);
