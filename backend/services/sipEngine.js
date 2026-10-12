@@ -421,7 +421,171 @@ class SIPEngine {
             continue;
           }
 
-          const marginAmount = parseFloat(ord.margin || 0);
+          const isSell = String(ord.side || '').toUpperCase() === 'SELL';
+
+          if (isSell) {
+            const reqQty = parseFloat(ord.quantity || 0);
+            if (reqQty <= 0) continue;
+
+            let unitsRedeemed = 0;
+            await db.transaction(async (trx) => {
+              await trx.raw('SELECT pg_advisory_xact_lock(?)', [ord.user_id]);
+
+              const dbOrd = await trx('orders').where({ id: ord.id }).first();
+              if (!dbOrd || dbOrd.status !== 'AMO_PENDING') return;
+
+              const cleanSym = String(ord.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+              const schemeWithMf = `${cleanSym.replace('-MF', '')}-MF`;
+
+              const holding = await trx('holdings')
+                .where({ user_id: ord.user_id })
+                .where(builder => {
+                  builder.where({ symbol: ord.symbol })
+                         .orWhere({ symbol: cleanSym })
+                         .orWhere({ symbol: schemeWithMf });
+                })
+                .where('quantity', '>', 0)
+                .first();
+
+              const existingPos = await trx('positions')
+                .where({ user_id: ord.user_id })
+                .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+                .where(builder => {
+                  builder.where({ symbol: ord.symbol })
+                         .orWhere({ symbol: cleanSym })
+                         .orWhere({ symbol: schemeWithMf });
+                })
+                .where('quantity', '>', 0)
+                .first();
+
+              const hQty = holding ? parseFloat(holding.quantity || 0) : 0;
+              const hAvg = holding ? (Math.abs(parseFloat(holding.average_price || 0)) || nav) : nav;
+              const pQty = existingPos ? parseFloat(existingPos.quantity || 0) : 0;
+              const pAvg = existingPos ? (Math.abs(parseFloat(existingPos.average_price || 0)) || nav) : nav;
+
+              const totalAvail = parseFloat((hQty + pQty).toFixed(4));
+              if (totalAvail <= 0) {
+                await trx('orders').where({ id: ord.id }).update({
+                  status: 'CANCELLED',
+                  remarks: 'Cancelled: No mutual fund units available to redeem',
+                  updated_at: new Date()
+                });
+                return;
+              }
+
+              const unitsToSell = parseFloat(Math.min(reqQty, totalAvail).toFixed(4));
+              const fromHolding = parseFloat(Math.min(unitsToSell, hQty).toFixed(4));
+              const fromPos = parseFloat(Math.max(0, unitsToSell - fromHolding).toFixed(4));
+
+              if (fromHolding > 0 && holding) {
+                const remHolding = parseFloat((hQty - fromHolding).toFixed(4));
+                if (remHolding <= 0.0001) {
+                  await trx('holdings').where({ id: holding.id }).del();
+                } else {
+                  await trx('holdings').where({ id: holding.id }).update({
+                    quantity: remHolding,
+                    updated_at: new Date()
+                  });
+                }
+              }
+
+              if (fromPos > 0 && existingPos) {
+                const remPos = parseFloat((pQty - fromPos).toFixed(4));
+                const posRealizedPnl = Math.round(((nav - pAvg) * fromPos + Number.EPSILON) * 100) / 100;
+                await trx('positions').where({ id: existingPos.id }).update({
+                  quantity: remPos <= 0.0001 ? 0 : remPos,
+                  closed_quantity: parseFloat(((parseFloat(existingPos.closed_quantity || 0)) + fromPos).toFixed(4)),
+                  exit_price: nav,
+                  margin: remPos <= 0.0001 ? 0 : Math.max(0, Math.round(((parseFloat(existingPos.margin || 0)) * (remPos / pQty)) * 100) / 100),
+                  realized_pnl: (parseFloat(existingPos.realized_pnl || 0)) + posRealizedPnl,
+                  updated_at: new Date()
+                });
+              }
+
+              const avgBuyPrice = unitsToSell > 0 ? (((fromHolding * hAvg) + (fromPos * pAvg)) / unitsToSell) : nav;
+              const principalAmount = Math.round(((avgBuyPrice * unitsToSell) + Number.EPSILON) * 100) / 100;
+              const realizedPnl = Math.round(((nav - avgBuyPrice) * unitsToSell + Number.EPSILON) * 100) / 100;
+
+              let totalTaxes = 0;
+              try {
+                const LedgerService = require('./ledgerService');
+                totalTaxes = await LedgerService.chargeExecutionTaxes(
+                  trx,
+                  ord.user_id,
+                  ord.symbol,
+                  ord.product_type || 'DEL',
+                  'SELL',
+                  unitsToSell,
+                  nav
+                );
+              } catch (taxErr) {
+                console.warn(`[SIPEngine] Tax calculation warning for MF sell #${ord.id}:`, taxErr.message);
+              }
+
+              if (fromHolding > 0) {
+                await trx('positions').insert({
+                  user_id: ord.user_id,
+                  symbol: ord.symbol,
+                  quantity: 0,
+                  closed_quantity: fromHolding,
+                  average_price: hAvg,
+                  exit_price: nav,
+                  realized_pnl: Math.round(((nav - hAvg) * fromHolding + Number.EPSILON) * 100) / 100,
+                  product_type: ord.product_type || 'DEL',
+                  created_at: new Date(),
+                  updated_at: new Date()
+                });
+              }
+
+              const user = await trx('users').where({ id: ord.user_id }).forUpdate().first();
+              if (user) {
+                const credit = principalAmount + realizedPnl;
+                const updatedBalance = Math.round((Number(user.balance) + credit + Number.EPSILON) * 100) / 100;
+                await trx('users').where({ id: ord.user_id }).update({ balance: updatedBalance });
+              }
+
+              if (principalAmount > 0) {
+                await trx('ledger').insert({
+                  user_id: ord.user_id,
+                  amount: principalAmount,
+                  type: 'MARGIN_RELEASE',
+                  description: `Holding principal value released for ${unitsToSell} ${ord.symbol}`
+                });
+              }
+              if (realizedPnl !== 0) {
+                await trx('ledger').insert({
+                  user_id: ord.user_id,
+                  amount: realizedPnl,
+                  type: 'REALIZED_PNL',
+                  description: `Realized P&L for exiting holding ${unitsToSell} ${ord.symbol}`
+                });
+              }
+
+              await trx('orders').where({ id: ord.id }).update({
+                status: 'EXECUTED',
+                quantity: unitsToSell,
+                filled_quantity: unitsToSell,
+                pending_quantity: 0,
+                price: nav,
+                average_price: nav,
+                taxes: totalTaxes,
+                realized_pnl: realizedPnl,
+                remarks: `Redeemed @ Next Day NAV ₹${nav.toFixed(2)}`,
+                updated_at: new Date()
+              });
+
+              unitsRedeemed = unitsToSell;
+            });
+
+            if (unitsRedeemed > 0) {
+              settledCount++;
+              affectedUserIds.add(ord.user_id);
+              console.log(`[SIPEngine] 🟢 Settled MF Redemption Order #${ord.id}: Redeemed ${unitsRedeemed} units of ${ord.symbol} @ NAV ₹${nav}`);
+            }
+            continue;
+          }
+
+          const marginAmount = parseFloat(ord.margin || 0) || parseFloat((parseFloat(ord.quantity || 0) * parseFloat(ord.price || nav)).toFixed(2));
           if (marginAmount <= 0) continue;
 
           const units = parseFloat((marginAmount / nav).toFixed(4));

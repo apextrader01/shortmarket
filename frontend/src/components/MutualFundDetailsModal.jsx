@@ -221,9 +221,12 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
             if (res && res.success) {
                 setOrderStatus('success');
-                const successNotice = res.queued 
-                    ? "Order Queued for Next Business Day NAV! Units will be credited upon settlement." 
-                    : `Successfully ${actionMode === 'INVEST' ? (investType.includes('SIP') ? 'set up SIP' : 'invested with Today\'s NAV') : 'redeemed'}!`;
+                const isQueued = Boolean(res.queued || res.status === 'AMO_PENDING');
+                const successNotice = isQueued
+                    ? (actionMode === 'REDEEM'
+                        ? "Redemption Order Queued for Next Business Day NAV! Proceeds will be credited upon settlement."
+                        : "Order Queued for Next Business Day NAV! Units will be credited upon settlement.")
+                    : `Successfully ${actionMode === 'INVEST' ? (investType.includes('SIP') ? 'set up SIP' : 'invested with Today\'s NAV') : 'redeemed with Today\'s NAV'}!`;
                 setStatusMsg(res.message || successNotice);
                 setTimeout(() => onClose(), 2500);
             } else {
@@ -836,7 +839,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px dashed var(--border-color)', fontSize: '13px', color: 'var(--text-secondary)' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                                     <span>Applicable NAV Date</span>
-                                                    <span style={{ color: 'var(--text-primary)' }}>Today (EOD)</span>
+                                                    <span style={{ color: mfCutoff.isSameDay ? '#10b981' : '#eab308', fontWeight: '600' }}>{mfCutoff.label}</span>
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                                     <span>Est. Exit Load</span>
@@ -851,6 +854,27 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                             : `~₹${(holdingPnL * (Number(amount) / (holdingCurrentValue || 1)) * 0.20).toFixed(2)} (20% STCG)`
                                                         ) : '₹0.00 (No Profit)'}
                                                     </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Applicable NAV Cut-off Banner for Redemption */}
+                                            <div style={{
+                                                marginTop: '16px',
+                                                padding: '12px 14px',
+                                                borderRadius: '10px',
+                                                background: mfCutoff.isSameDay ? 'rgba(16, 185, 129, 0.08)' : 'rgba(234, 179, 8, 0.08)',
+                                                border: `1px solid ${mfCutoff.isSameDay ? 'rgba(16, 185, 129, 0.25)' : 'rgba(234, 179, 8, 0.25)'}`,
+                                                fontSize: '12.5px',
+                                                lineHeight: '1.5'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: mfCutoff.isSameDay ? '#10b981' : '#eab308', marginBottom: '3px' }}>
+                                                    <Clock size={14} />
+                                                    <span>Applicable NAV: {mfCutoff.label}</span>
+                                                </div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px' }}>
+                                                    {mfCutoff.isSameDay 
+                                                        ? "Redemption orders placed before 2:00 PM IST qualify for Today's NAV and proceeds are credited today." 
+                                                        : "Redemption orders placed after 2:00 PM IST (or weekends/holidays) are queued for Next Business Day's NAV. Orders are non-cancellable once placed."}
                                                 </div>
                                             </div>
                                         </div>
@@ -883,7 +907,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             }}
                                         >
                                             {isInvesting ? <Activity size={20} className="spin" /> : null}
-                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : (mfCutoff.isSameDay ? "Pay Now (Today's NAV)" : "Place Order (Next Day NAV)")) : 'Confirm Redeem')}
+                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : (mfCutoff.isSameDay ? "Pay Now (Today's NAV)" : "Place Order (Next Day NAV)")) : (mfCutoff.isSameDay ? "Redeem Now (Today's NAV)" : "Queue Redeem (Next Day NAV)"))}
                                         </button>
                                     )}
                                 </div>

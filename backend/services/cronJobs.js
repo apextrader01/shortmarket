@@ -191,6 +191,7 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine 
 
         let hasRestingTriggers = false;
         for (const ord of amoOrders) {
+            if (ord.symbol && (ord.symbol.endsWith('-MF') || ord.symbol.includes('MUTUALFUND'))) continue;
             const isCom = isCommoditySymbol(ord.symbol);
             if (segment === 'COMMODITY' && !isCom) continue;
             if (segment === 'EQUITY' && isCom) continue;

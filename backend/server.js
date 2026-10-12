@@ -8922,6 +8922,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         }
       }
     }
+  } else {
+    // Mutual Fund 02:00 PM IST Cut-off Enforcement (applies to both BUY & SELL / Redeem)
+    if (!isMutualFundSameDayCutoffOpen()) {
+      isAmo = true;
+    }
   }
 
   // Disallow Bracket Orders (BO) and Cover Orders (CO) for After Market Orders (AMO)
@@ -9121,7 +9126,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           }
           execPrice = execPrice > 0 ? execPrice : priceBasis;
           const { calculateRequiredMargin } = require('./services/marginEngine');
-          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, priceBasis);
+          finalMargin = (isMF && side === 'BUY' && Number(req.body.margin) > 0)
+              ? Math.round(Number(req.body.margin) * 100) / 100
+              : calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, priceBasis);
           if (finalMargin <= 0 && isDerivativeContract(symbol) && side === 'BUY') {
               throw new Error(`Unable to determine required margin for ${symbol}. Please specify a valid limit price.`);
           }
@@ -9168,7 +9175,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       // Ensure margin passed down to insert is the final margin
       const marginToSave = requiresMargin ? finalMargin : 0;
-      const baseRemarks = req.body.remarks || (req.body.is_exit ? 'Exit Position' : '');
+      const mfDefaultRemark = isMF
+        ? (isAmo
+            ? (side === 'SELL'
+                ? 'Mutual Fund Redemption: Queued for Next Business Day NAV (After 2:00 PM Cut-off)'
+                : 'Mutual Fund Order: Queued for Next Business Day NAV (After 2:00 PM Cut-off)')
+            : (side === 'SELL'
+                ? "Mutual Fund Redemption: Today's NAV (Before 2:00 PM Cut-off)"
+                : "Mutual Fund Purchase: Today's NAV (Before 2:00 PM Cut-off)"))
+        : (req.body.is_exit ? 'Exit Position' : '');
+      const baseRemarks = req.body.remarks || mfDefaultRemark;
       const orderRemarks = req.body.slice_group_id ? `Slice ${req.body.slice_index || 1}/${req.body.slice_total || 1} [${req.body.slice_group_id}]${baseRemarks ? ' ' + baseRemarks : ''}` : baseRemarks;
       const orderVariety = isCas ? 'CAS' : (isAmo ? 'AMO' : 'REGULAR');
       const initialStatus = (isAmo || isCas) ? 'AMO_PENDING' : status;
@@ -9218,9 +9234,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     if (req.orderToProcess.isAmo || req.orderToProcess.isCas) {
       const ord = req.orderToProcess;
       const isCasOrder = ord.isCas;
-      const msg = isCasOrder
-        ? 'Pre-Market CAS order placed! Will be matched at discovered equilibrium opening price at 09:08 AM.'
-        : 'After Market Order (AMO) placed! Will be executed via realistic volume matching at market open.';
+      const msg = isMF
+        ? (side === 'SELL'
+            ? 'Redemption Order Queued for Next Business Day NAV! Proceeds will be credited upon settlement.'
+            : 'Order Queued for Next Business Day NAV! Units will be credited upon settlement.')
+        : (isCasOrder
+            ? 'Pre-Market CAS order placed! Will be matched at discovered equilibrium opening price at 09:08 AM.'
+            : 'After Market Order (AMO) placed! Will be executed via realistic volume matching at market open.');
 
       const isSlicedChild = Boolean(req.body.slice_group_id && (Number(req.body.slice_total || 1) > 1));
       const isFirstSlice = Number(req.body.slice_index || 1) === 1;
@@ -9240,6 +9260,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       return res.json({
         success: true,
+        queued: true,
         orderId: ord.id,
         status: 'AMO_PENDING',
         order_variety: ord.order_variety,

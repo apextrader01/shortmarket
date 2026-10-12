@@ -201,6 +201,55 @@ assert(result2.updatedHoldings[0].quantity === 113.3333, 'Holding accumulated qu
 // Weighted average price: (10000 + 5000) / 113.3333 = 132.3529
 assert(Math.abs(result2.updatedHoldings[0].average_price - 132.3529) < 0.001, 'Weighted average price recalculated accurately');
 
+// Case 3: Queued Redemption (SELL) of 50 units at Next-Day NAV ₹160.00
+function simulateSettleRedeemOrder(order, latestNav, currentHoldings = []) {
+  const existingIdx = currentHoldings.findIndex(h => h.symbol === order.symbol);
+  let updatedHoldings = [...currentHoldings];
+  const holding = updatedHoldings[existingIdx];
+  const hQty = parseFloat(holding.quantity);
+  const hAvg = parseFloat(holding.average_price);
+  const unitsToSell = parseFloat(Math.min(parseFloat(order.quantity), hQty).toFixed(4));
+  const remQty = parseFloat((hQty - unitsToSell).toFixed(4));
+  const principalAmount = Math.round(((hAvg * unitsToSell) + Number.EPSILON) * 100) / 100;
+  const realizedPnl = Math.round(((latestNav - hAvg) * unitsToSell + Number.EPSILON) * 100) / 100;
+
+  if (remQty <= 0.0001) {
+    updatedHoldings.splice(existingIdx, 1);
+  } else {
+    updatedHoldings[existingIdx] = { ...holding, quantity: remQty };
+  }
+
+  const updatedOrder = {
+    ...order,
+    status: 'EXECUTED',
+    quantity: unitsToSell,
+    filled_quantity: unitsToSell,
+    pending_quantity: 0,
+    price: latestNav,
+    average_price: latestNav,
+    realized_pnl: realizedPnl,
+    remarks: `Redeemed @ Next Day NAV ₹${latestNav.toFixed(2)}`
+  };
+
+  return { updatedOrder, updatedHoldings, principalAmount, realizedPnl };
+}
+
+const queuedSellOrder = {
+  id: 3,
+  symbol: '120503-MF',
+  side: 'SELL',
+  quantity: 50.0000,
+  status: 'AMO_PENDING'
+};
+
+const result3 = simulateSettleRedeemOrder(queuedSellOrder, 160.00, result2.updatedHoldings);
+assert(result3.updatedOrder.status === 'EXECUTED', 'Queued SELL order transitions to EXECUTED on Next-Day NAV settlement');
+assert(result3.updatedOrder.price === 160.00, 'Redemption settled at Next-Day NAV ₹160.00');
+assert(Math.abs(result3.updatedHoldings[0].quantity - 63.3333) < 0.001, 'Remaining holding units accurately reduced from 113.3333 to 63.3333');
+assert(result3.realizedPnl > 0, 'Positive realized P&L calculated on Next-Day NAV redemption');
+assert(mfModalCode.includes("Redeem Now (Today's NAV)"), "MutualFundDetailsModal has Redeem Now (Today's NAV) button before 2 PM");
+assert(mfModalCode.includes("Queue Redeem (Next Day NAV)"), "MutualFundDetailsModal has Queue Redeem (Next Day NAV) button after 2 PM");
+
 
 // ─────────────────────────────────────────────────────────────────────────
 // MODULE 5: CRON SCHEDULES AUDIT (09:00 AM & 10:30 PM IST)
@@ -211,10 +260,12 @@ const sipEngineCode = fs.readFileSync(path.join(__dirname, 'services/sipEngine.j
 assert(sipEngineCode.includes("'0 9 * * 1-5'"), 'SIPEngine schedules morning Next-Day settlement cycle at 09:00 AM IST (Mon-Fri)');
 assert(sipEngineCode.includes("'30 22 * * 1-5'"), 'SIPEngine schedules evening Next-Day settlement cycle at 10:30 PM IST (Mon-Fri)');
 assert(sipEngineCode.includes('processPendingMutualFundOrders'), 'SIPEngine calls processPendingMutualFundOrders during cron cycles');
+assert(sipEngineCode.includes('Redeemed @ Next Day NAV'), 'SIPEngine settles queued SELL orders at Next Day NAV');
 
 const serverCode = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
 assert(serverCode.includes('isMutualFundSameDayCutoffOpen'), 'server.js defines isMutualFundSameDayCutoffOpen helper');
 assert(serverCode.includes('/api/admin/mf/settle-pending'), 'server.js exposes /api/admin/mf/settle-pending manual trigger endpoint');
+assert(serverCode.includes('Redemption Order Queued for Next Business Day NAV!'), 'server.js queues after-cutoff MF SELL orders for Next Business Day NAV');
 
 console.log('\n======================================================================');
 console.log(`TOTAL AUDIT CHECKS: ${totalAsserts} | PASSED: ${passedAsserts} | FAILED: ${failedAsserts}`);

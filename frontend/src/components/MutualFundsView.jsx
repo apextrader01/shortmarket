@@ -659,7 +659,7 @@ export default function MutualFundsView() {
                         </span>
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                        These orders were placed after the 2:00 PM cut-off. Funds are debited/blocked, and units will be allocated at the next business day's official NAV during automated settlement (10:30 PM / 09:00 AM IST).
+                        These buy &amp; redeem orders were placed after the 2:00 PM cut-off and will be settled at the next business day's official NAV during automated settlement (10:30 PM / 09:00 AM IST).
                       </p>
                     </div>
                   </div>
@@ -669,6 +669,7 @@ export default function MutualFundsView() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {queuedMfOrders.map(order => {
                       const fundName = mfNames[order.symbol] || order.symbol.replace('-MF', '');
+                      const isSell = String(order.side || '').toUpperCase() === 'SELL';
                       const orderAmt = Number(order.margin || (order.quantity * order.price) || 0);
                       const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Today';
                       return (
@@ -677,13 +678,18 @@ export default function MutualFundsView() {
                             <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)', flex: 1, paddingRight: '8px' }}>
                               {fundName}
                             </div>
-                            <span style={{ fontSize: '10.5px', background: 'rgba(234, 179, 8, 0.15)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                              QUEUED (AMO)
-                            </span>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', background: isSell ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)', color: isSell ? 'var(--color-red-light)' : 'var(--color-green-light)', border: `1px solid ${isSell ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`, padding: '2px 6px', borderRadius: '4px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                {isSell ? 'REDEEM' : 'BUY'}
+                              </span>
+                              <span style={{ fontSize: '10.5px', background: 'rgba(234, 179, 8, 0.15)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                QUEUED (AMO)
+                              </span>
+                            </div>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px' }}>
                             <div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Amount Debited</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{isSell ? `Est. Redeem (${Number(order.quantity || 0).toFixed(3)} units)` : 'Amount Debited'}</div>
                               <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{orderAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -709,7 +715,8 @@ export default function MutualFundsView() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(234, 179, 8, 0.2)', color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'left' }}>
                           <th style={{ padding: '12px 16px', fontWeight: '600' }}>Fund Name</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Investment Amount</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Type</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Amount / Value</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Approx NAV</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Placed Time</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Status</th>
@@ -719,6 +726,7 @@ export default function MutualFundsView() {
                       <tbody>
                         {queuedMfOrders.map(order => {
                           const fundName = mfNames[order.symbol] || order.symbol.replace('-MF', '');
+                          const isSell = String(order.side || '').toUpperCase() === 'SELL';
                           const orderAmt = Number(order.margin || (order.quantity * order.price) || 0);
                           const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Today';
                           return (
@@ -729,8 +737,18 @@ export default function MutualFundsView() {
                                   <Lock size={11} color="var(--color-yellow)" /> Order #{order.id} • Non-cancellable
                                 </div>
                               </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                <span style={{ display: 'inline-block', background: isSell ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)', color: isSell ? 'var(--color-red-light)' : 'var(--color-green-light)', border: `1px solid ${isSell ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`, padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                  {isSell ? 'REDEEM (SELL)' : 'INVEST (BUY)'}
+                                </span>
+                              </td>
                               <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                ₹{orderAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                <div>₹{orderAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                {isSell && (
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                    {Number(order.quantity || 0).toFixed(4)} units
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '14px 16px', textAlign: 'right', color: 'var(--text-secondary)' }}>
                                 ₹{Number(order.price || 0).toFixed(2)}
