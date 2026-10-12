@@ -3353,6 +3353,7 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
 
 // ─── Cashfree Payment Gateway Integration (PG v3 API 2023-08-01) ─────────────
 const crypto = require('crypto');
+const axios = require('axios');
 
 function sanitizeCashfreePhone(rawPhone) {
   const digits = String(rawPhone || '').replace(/\D/g, '');
