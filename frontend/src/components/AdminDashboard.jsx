@@ -1428,9 +1428,10 @@ export default function AdminDashboard() {
     fetchAdminAdConfig();
   }, []);
 
-  // Razorpay Gateway Admin State
+  // Cashfree Gateway Admin State
   const [rzpKeyId, setRzpKeyId] = useState('');
   const [rzpKeySecret, setRzpKeySecret] = useState('');
+  const [rzpEnvironment, setRzpEnvironment] = useState('PRODUCTION');
   const [rzpHasSecret, setRzpHasSecret] = useState(false);
   const [rzpLoading, setRzpLoading] = useState(false);
   const [rzpSaving, setRzpSaving] = useState(false);
@@ -1441,16 +1442,17 @@ export default function AdminDashboard() {
     try {
       const API_URL = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/api/admin/razorpay/credentials`, {
+      const res = await fetch(`${API_URL}/api/admin/cashfree/credentials`, {
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
       if (data && data.success) {
-        setRzpKeyId(data.key_id || '');
-        setRzpHasSecret(!!data.has_key_secret);
+        setRzpKeyId(data.app_id || data.key_id || '');
+        setRzpEnvironment(data.environment || 'PRODUCTION');
+        setRzpHasSecret(!!(data.has_secret_key || data.has_key_secret));
       }
     } catch (e) {
-      console.warn('Failed to fetch Razorpay credentials:', e);
+      console.warn('Failed to fetch Cashfree credentials:', e);
     } finally {
       setRzpLoading(false);
     }
@@ -1459,7 +1461,7 @@ export default function AdminDashboard() {
   const handleSaveRazorpayCreds = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     if (!rzpKeyId.trim()) {
-      alert('Please enter your Razorpay Key ID (rzp_live_... or rzp_test_...)');
+      alert('Please enter your Cashfree App ID');
       return;
     }
     setRzpSaving(true);
@@ -1467,27 +1469,28 @@ export default function AdminDashboard() {
     try {
       const API_URL = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/api/admin/razorpay/credentials`, {
+      const res = await fetch(`${API_URL}/api/admin/cashfree/credentials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          key_id: rzpKeyId.trim(),
-          key_secret: rzpKeySecret.trim()
+          app_id: rzpKeyId.trim(),
+          secret_key: rzpKeySecret.trim(),
+          environment: rzpEnvironment
         })
       });
       const data = await res.json();
       if (data && data.success) {
-        setRzpStatusMsg({ type: 'success', text: '✅ Razorpay credentials updated and active! Plans are now live for ₹199, ₹1,999, and ₹2,999 with instant activation (NO trial delay).' });
+        setRzpStatusMsg({ type: 'success', text: `✅ Cashfree (${rzpEnvironment}) credentials updated and active! Plans are now live for ₹199, ₹1,999, ₹2,999, ₹9,999, and ₹24,999 with instant activation.` });
         setRzpKeySecret('');
         setRzpHasSecret(true);
       } else {
-        setRzpStatusMsg({ type: 'error', text: data.error || 'Failed to save credentials' });
+        setRzpStatusMsg({ type: 'error', text: data.error || 'Failed to save Cashfree credentials' });
       }
     } catch (err) {
-      setRzpStatusMsg({ type: 'error', text: err.message || 'Network error saving keys' });
+      setRzpStatusMsg({ type: 'error', text: err.message || 'Network error saving Cashfree keys' });
     } finally {
       setRzpSaving(false);
     }
@@ -3511,7 +3514,7 @@ export default function AdminDashboard() {
           onClick={() => { setActiveTab('razorpay'); fetchRazorpayCreds?.(); }} 
           style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'razorpay' ? '2px solid #10b981' : '2px solid transparent', color: activeTab === 'razorpay' ? '#10b981' : 'var(--text-secondary)', fontWeight: activeTab === 'razorpay' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          💳 Razorpay Gateway
+          💳 Cashfree Gateway
         </button>
         <button 
           onClick={() => { setActiveTab('ads'); fetchAdminAdConfig?.(); }} 
@@ -3587,7 +3590,7 @@ export default function AdminDashboard() {
                     gap: '6px'
                   }}
                 >
-                  <Zap size={13} /> {subSyncing ? 'Syncing Razorpay...' : 'Sync from Razorpay'}
+                  <Zap size={13} /> {subSyncing ? 'Syncing Cashfree...' : 'Sync from Cashfree'}
                 </button>
               </div>
             </div>
@@ -4638,10 +4641,10 @@ export default function AdminDashboard() {
               gap: '16px'
             }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <CreditCard size={22} color="#10b981" />
                   <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#fff' }}>
-                    Razorpay Payment Gateway Setup
+                    Cashfree Payment Gateway Setup
                   </h2>
                   <span style={{
                     fontSize: '11px',
@@ -4652,11 +4655,11 @@ export default function AdminDashboard() {
                     borderRadius: '20px',
                     padding: '2px 10px'
                   }}>
-                    {rzpHasSecret ? '● ACTIVE' : '○ NOT CONFIGURED'}
+                    {rzpHasSecret ? `● ACTIVE (${rzpEnvironment})` : '○ NOT CONFIGURED'}
                   </span>
                 </div>
                 <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Configure live Razorpay API Keys to accept instant payments for ₹199 (Monthly), ₹1,999 (Yearly), and ₹2,999 (VIP). Direct one-time payment with instant activation — NO trial delay, NO e-mandate.
+                  Configure Cashfree API Keys (PG v3) to accept instant UPI, QR, Cards, and NetBanking payments for ₹199 (Monthly), ₹1,999 (Yearly), ₹2,999 (VIP), ₹9,999 (Masterclass), and ₹24,999 (Lifetime).
                 </p>
               </div>
               <button
@@ -4709,20 +4712,45 @@ export default function AdminDashboard() {
                 gap: '16px'
               }}>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Key size={16} color="#38bdf8" /> API Credentials
+                  <Key size={16} color="#38bdf8" /> Cashfree PG v3 API Credentials
                 </h3>
                 <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                  Find your credentials in your Razorpay Dashboard under <b>Accounts & Settings → API Keys → Generate Key</b>. You can use Live keys (starts with <code>rzp_live_</code>) or Test keys (starts with <code>rzp_test_</code>).
+                  Find your credentials in your <b>Cashfree Merchant Dashboard → Developers → API Keys → Payment Gateway</b>. Copy your <b>App ID</b> and <b>Secret Key</b> below.
                 </p>
 
                 <form onSubmit={handleSaveRazorpayCreds} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Key ID (Required)
+                      Gateway Environment
+                    </label>
+                    <select
+                      value={rzpEnvironment}
+                      onChange={(e) => setRzpEnvironment(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="PRODUCTION" style={{ background: '#0f172a', color: '#fff' }}>PRODUCTION (Live Payments — api.cashfree.com)</option>
+                      <option value="SANDBOX" style={{ background: '#0f172a', color: '#fff' }}>SANDBOX (Test Mode — sandbox.cashfree.com)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Cashfree App ID (Required)
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. rzp_live_xxxxxxxxxxxxxxxx or rzp_test_xxxxxxxxxxxxxxxx"
+                      placeholder="e.g. 649823xxxxxxxxxxxxxxxxxxxxxxxx or TEST102938xxxx"
                       value={rzpKeyId}
                       onChange={(e) => setRzpKeyId(e.target.value)}
                       style={{
@@ -4742,11 +4770,11 @@ export default function AdminDashboard() {
 
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Key Secret {rzpHasSecret ? '(Leave blank to keep existing saved secret)' : '(Required)'}
+                      Cashfree Secret Key {rzpHasSecret ? '(Leave blank to keep existing saved secret)' : '(Required)'}
                     </label>
                     <input
                       type="password"
-                      placeholder={rzpHasSecret ? '•••••••••••••••••••••••• (Secret already configured)' : 'Paste your Razorpay Key Secret'}
+                      placeholder={rzpHasSecret ? '•••••••••••••••••••••••• (Secret already configured)' : 'Paste your Cashfree Secret Key (cfsk_ma_prod_... or cfsk_ma_test_...)'}
                       value={rzpKeySecret}
                       onChange={(e) => setRzpKeySecret(e.target.value)}
                       style={{
@@ -4784,7 +4812,7 @@ export default function AdminDashboard() {
                       }}
                     >
                       {rzpSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      {rzpSaving ? 'Saving Keys...' : 'Save & Activate Gateway'}
+                      {rzpSaving ? 'Saving Keys...' : 'Save & Activate Cashfree Gateway'}
                     </button>
                   </div>
                 </form>

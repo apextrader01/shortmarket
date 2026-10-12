@@ -448,7 +448,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'WALLET_RECHARGE',
       title: 'SkandX Algo Wallet Top-Up',
       amount: 500,
-      subtitle: 'Instant credit via Razorpay Official Gateway (UPI, QR, Cards, NetBanking)'
+      subtitle: 'Instant credit via Cashfree Official Gateway (UPI, QR, Cards, NetBanking)'
     });
   };
 
@@ -466,7 +466,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'LINK_USER',
       title: '1 Linked Client Demat Slot',
       amount: 250,
-      subtitle: '1 Month Demat copy trading follower slot'
+      subtitle: '1 Month Multi-Account API Sync Slot'
     });
   };
 
@@ -521,9 +521,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     }
 
     if (result.item?.type === 'STATIC_IP') {
-      showToast('⚡ Dedicated Mumbai BKC Static IP (₹350/mo) provisioned via Razorpay!');
+      showToast('⚡ Dedicated Mumbai BKC Static IP (₹350/mo) provisioned via Cashfree!');
     } else if (result.item?.type === 'LINK_USER') {
-      showToast('👥 Linked Client Demat Slot (₹250/mo) activated via Razorpay!');
+      showToast('👥 Linked Client Demat Slot (₹250/mo) activated via Cashfree!');
     } else if (result.item?.type === 'WALLET_RECHARGE') {
       showToast(`💰 ₹${Number(result.amount || 0).toLocaleString('en-IN')} added to your SkandX Algo Wallet!`);
     } else if (String(result.item?.type || '').startsWith('PLAN')) {
@@ -1051,12 +1051,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     if (!isAdmin) return;
     setLoadingAdminStats(true);
     try {
-      const query = syncRazorpay === true ? '?syncRazorpay=true' : '';
+      const query = syncRazorpay === true ? '?syncCashfree=true' : '';
       const data = await apiFetch(`/api/v1/bridge/admin/system-stats${query}`);
       if (data.success) {
         setAdminStats(data);
         if (syncRazorpay === true) {
-          showToast('Synced live Razorpay payments & refreshed all Algo accounts!');
+          showToast('Synced live Cashfree payments & refreshed all Algo accounts!');
         }
       }
     } catch (_) {}
@@ -1851,7 +1851,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     ₹{Number(config.availableCredit || 0).toFixed(0)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px', fontWeight: '700' }}>
-                    + Add Funds via Razorpay
+                    + Add Funds via Cashfree
                   </div>
                 </div>
 
@@ -2487,7 +2487,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     cursor: 'pointer'
                   }}
                 >
-                  <Plus size={15} /> Buy Static IP via Razorpay (₹350/mo)
+                  <Plus size={15} /> Buy Static IP via Cashfree (₹350/mo)
                 </button>
               </div>
 
@@ -2513,7 +2513,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.25)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>NSE BKC ROUTE</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
-                      Clean, unshared IPv4 proxy with 0% risk of IP blacklisting or broker 403 API lockouts. Instant provisioning via Razorpay.
+                      Clean, unshared IPv4 proxy with 0% risk of IP blacklisting or broker 403 API lockouts. Instant provisioning via Cashfree.
                     </div>
                   </div>
                 </div>
@@ -2784,13 +2784,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                   <div>
                     <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span>Link User Slot: ₹250 / Month per Client</span>
+                      <span>Link User Slot: ₹250 / Month per Account</span>
                       <span style={{ fontSize: '10.5px', background: 'rgba(37, 99, 235, 0.25)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>
                         {linkedUsers.length} / {config.totalLinkSlots || 1} SLOTS USED
                       </span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
-                      Link your advisory or copy-trading clients with custom lot multipliers and instant Razorpay slot expansion.
+                      Link additional broker accounts with custom lot multipliers and instant Cashfree slot expansion.
                     </div>
                   </div>
                 </div>
@@ -2807,7 +2807,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     cursor: 'pointer'
                   }}
                 >
-                  + Add 1 Slot via Razorpay (₹250)
+                  + Add 1 Slot via Cashfree (₹250)
                 </button>
               </div>
 
@@ -4127,7 +4127,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Institutional Algo Trading Plans & Add-ons
                   </h2>
                   <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
-                    Activate instantly using your <b>SkandX Algo Wallet Credit</b> or via official <b>Razorpay Checkout</b>.
+                    Activate instantly using your <b>SkandX Algo Wallet Credit</b> or via official <b>Cashfree Checkout</b>.
                   </p>
                 </div>
 
@@ -4258,25 +4258,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   >
                     {config.activePlan === 'PRO'
                       ? 'Renew Pro Plan (₹999/mo)'
-                      : (Number(config.availableCredit || 0) >= 999 ? 'Activate with Wallet / Razorpay (₹999)' : 'Upgrade with Razorpay (₹999/mo)')}
+                      : (Number(config.availableCredit || 0) >= 999 ? 'Activate with Wallet / Cashfree (₹999)' : 'Upgrade with Cashfree (₹999/mo)')}
                   </button>
                 </div>
 
-                {/* Plan 3: Institutional Copy Master */}
+                {/* Plan 3: Institutional Multi-Account Master */}
                 <div style={{ background: '#101726', border: config.activePlan === 'INSTITUTIONAL' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#a855f7', letterSpacing: '0.5px' }}>INSTITUTIONAL</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Copy Trading Master Suite</h3>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Multi-Account Sync Suite</h3>
                   <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
                     ₹2,499 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
-                    Institutional multi-account copy trading engine with BKC colocation proximity routing.
+                    Institutional multi-account API execution engine with BKC colocation proximity routing.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Unlimited Demat Accounts</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 15 Follower Demat Slots Included</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Master-to-Slave Sub-20ms Copy Engine</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 15 Linked Account Slots Included</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Sub-20ms Multi-Account API Sync Engine</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 2 Dedicated BKC Static IPs Included</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Emergency Global Kill Switch Suite</div>
                   </div>
@@ -4285,9 +4285,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     onClick={() => handleOpenCheckout({
                       type: 'PLAN_INSTITUTIONAL',
                       id: 'INSTITUTIONAL',
-                      title: 'Institutional Copy Master',
+                      title: 'Institutional Multi-Account Suite',
                       amount: 2499,
-                      subtitle: '1 Month Master Demat Multi-Account Copy Trading Suite'
+                      subtitle: '1 Month Multi-Account API Execution Suite'
                     })}
                     style={{
                       width: '100%',
@@ -4303,7 +4303,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   >
                     {config.activePlan === 'INSTITUTIONAL'
                       ? 'Renew Institutional (₹2,499/mo)'
-                      : (Number(config.availableCredit || 0) >= 2499 ? 'Activate with Wallet / Razorpay (₹2,499)' : 'Get Institutional via Razorpay (₹2,499/mo)')}
+                      : (Number(config.availableCredit || 0) >= 2499 ? 'Activate with Wallet / Cashfree (₹2,499)' : 'Get Institutional via Cashfree (₹2,499/mo)')}
                   </button>
                 </div>
               </div>
@@ -4328,25 +4328,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handlePurchaseStaticIp}
                       style={{ marginTop: '14px', padding: '9px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      {Number(config.availableCredit || 0) >= 350 ? 'Buy Static IP via Wallet / Razorpay (₹350)' : 'Buy Static IP via Razorpay (₹350)'}
+                      {Number(config.availableCredit || 0) >= 350 ? 'Buy Static IP via Wallet / Cashfree (₹350)' : 'Buy Static IP via Cashfree (₹350)'}
                     </button>
                   </div>
 
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Client Demat Slot</div>
+                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Linked Account Slot</div>
                         <span style={{ fontSize: '14px', fontWeight: '900', color: '#38bdf8' }}>₹250 / mo</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        1 Additional client or follower slot for copy trading and multi-account trade replication.
+                        1 Additional linked account slot for multi-account API order synchronization.
                       </div>
                     </div>
                     <button
                       onClick={handlePurchaseLinkSlot}
                       style={{ marginTop: '14px', padding: '9px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      {Number(config.availableCredit || 0) >= 250 ? 'Buy Client Slot via Wallet / Razorpay (₹250)' : 'Buy Client Slot via Razorpay (₹250)'}
+                      {Number(config.availableCredit || 0) >= 250 ? 'Buy Slot via Wallet / Cashfree (₹250)' : 'Buy Slot via Cashfree (₹250)'}
                     </button>
                   </div>
 
@@ -4357,14 +4357,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>INSTANT</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        Top up your SkandX Algo Wallet via Razorpay UPI, Cards, or NetBanking for instant 1-click renewals.
+                        Top up your SkandX Algo Wallet via Cashfree UPI, Cards, or NetBanking for instant 1-click renewals.
                       </div>
                     </div>
                     <button
                       onClick={handleOpenAddFundsRazorpay}
                       style={{ marginTop: '14px', padding: '9px', background: '#7c3aed', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      + Top Up Wallet via Razorpay
+                      + Top Up Wallet via Cashfree
                     </button>
                   </div>
                 </div>
@@ -4373,7 +4373,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               {/* Payment & Wallet Transaction History */}
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
                 <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
-                  Your Razorpay & Wallet Transaction History ({transactions.length})
+                  Your Cashfree & Wallet Transaction History ({transactions.length})
                 </div>
                 {transactions.length === 0 ? (
                   <div style={{ fontSize: '12.5px', color: '#64748b', padding: '12px 0' }}>
@@ -4520,7 +4520,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </h2>
                     </div>
                     <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                      Dedicated 100% SkandX Algo control center — manage Algo accounts, Algo Wallet money, Successful & Rejected Algo Razorpay payments, Demats, Static IPs & OMS Gateways.
+                      Dedicated 100% SkandX Algo control center — manage Algo accounts, Algo Wallet money, Successful & Rejected Algo Cashfree payments, Demats, Static IPs & OMS Gateways.
                     </p>
                   </div>
 
@@ -4542,7 +4542,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         cursor: 'pointer'
                       }}
                     >
-                      <RefreshCw size={13} /> {loadingAdminStats ? 'Syncing...' : 'Sync Razorpay & Algo Accounts'}
+                      <RefreshCw size={13} /> {loadingAdminStats ? 'Syncing...' : 'Sync Cashfree & Algo Accounts'}
                     </button>
 
                     <button
@@ -4980,7 +4980,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
                         <thead>
                           <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
-                            <th style={{ padding: '10px 12px' }}>Ref / Razorpay ID</th>
+                            <th style={{ padding: '10px 12px' }}>Ref / Cashfree ID</th>
                             <th style={{ padding: '10px 12px' }}>Algo Account (User / Email)</th>
                             <th style={{ padding: '10px 12px' }}>SkandX Algo Service / Plan</th>
                             <th style={{ padding: '10px 12px' }}>Amount</th>
@@ -5038,7 +5038,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     </span>
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '11.5px', color: (isFailed || isCancelled) ? '#fca5a5' : '#94a3b8', maxWidth: '260px' }}>
-                                    {p.failureReason || (isSuccess ? 'Razorpay Signature Verified & Algo Service Provisioned' : 'Awaiting gateway completion')}
+                                    {p.failureReason || (isSuccess ? 'Cashfree Payment Verified & Algo Service Provisioned' : 'Awaiting gateway completion')}
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
                                     {formatAlgoPaymentDate(p.createdAt)}

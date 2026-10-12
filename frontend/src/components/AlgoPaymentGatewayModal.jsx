@@ -6,20 +6,20 @@ import {
 import { useStore, API } from '../store';
 import logoImg from '../assets/logo.png';
 
-const loadRazorpayScript = () => {
+const loadCashfreeScript = () => {
   return new Promise((resolve) => {
-    if (window.Razorpay) {
+    if (window.Cashfree) {
       resolve(true);
       return;
     }
-    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    const existing = document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
     if (existing) {
       existing.addEventListener('load', () => resolve(true));
       existing.addEventListener('error', () => resolve(false));
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
@@ -43,7 +43,7 @@ export default function AlgoPaymentGatewayModal({
   const user = useStore(s => s.user);
   const isWalletRecharge = item?.type === 'WALLET_RECHARGE';
 
-  const [paymentTab, setPaymentTab] = useState('RAZORPAY'); // 'RAZORPAY' | 'WALLET'
+  const [paymentTab, setPaymentTab] = useState('CASHFREE'); // 'CASHFREE' | 'WALLET'
   const [customAmount, setCustomAmount] = useState(Number(item?.amount || 500));
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStepText, setProcessStepText] = useState('');
@@ -58,9 +58,9 @@ export default function AlgoPaymentGatewayModal({
       setErrorMsg('');
       const itemPrice = Number(item?.amount || 0);
       const canUseWallet = item?.type !== 'WALLET_RECHARGE' && itemPrice > 0 && Number(walletBalance || 0) >= itemPrice;
-      setPaymentTab(canUseWallet ? 'WALLET' : 'RAZORPAY');
+      setPaymentTab(canUseWallet ? 'WALLET' : 'CASHFREE');
       setCustomAmount(Number(item?.amount || 500));
-      loadRazorpayScript();
+      loadCashfreeScript();
     }
   }, [isOpen, item, walletBalance]);
 
@@ -87,7 +87,7 @@ export default function AlgoPaymentGatewayModal({
     };
   };
 
-  const handleRazorpayPayment = async () => {
+  const handleCashfreePayment = async () => {
     setErrorMsg('');
     if (!effectiveAmount || effectiveAmount < 1) {
       setErrorMsg('Please enter a valid amount (minimum ₹1).');
@@ -101,17 +101,17 @@ export default function AlgoPaymentGatewayModal({
     }
 
     setIsProcessing(true);
-    setProcessStepText('Loading Razorpay Secure Gateway...');
+    setProcessStepText('Loading Cashfree Secure Gateway...');
 
-    const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded || !window.Razorpay) {
+    const scriptLoaded = await loadCashfreeScript();
+    if (!scriptLoaded || !window.Cashfree) {
       setIsProcessing(false);
-      setErrorMsg('Unable to load Razorpay Checkout SDK. Please check your internet connection.');
+      setErrorMsg('Unable to load Cashfree Checkout SDK. Please check your internet connection.');
       return;
     }
 
     try {
-      setProcessStepText('Creating encrypted Razorpay order...');
+      setProcessStepText('Creating encrypted Cashfree order...');
       const orderPayload = {
         plan: item?.type || 'STATIC_IP',
         itemType: item?.type || 'STATIC_IP',
@@ -120,7 +120,7 @@ export default function AlgoPaymentGatewayModal({
         title: isWalletRecharge ? `SkandX Algo Wallet Recharge (₹${effectiveAmount})` : (item?.title || 'SkandX Algo Service')
       };
 
-      let orderRes = await fetch(`${API}/api/v1/bridge/razorpay/create-order`, {
+      let orderRes = await fetch(`${API}/api/v1/bridge/cashfree/create-order`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(orderPayload)
@@ -136,148 +136,38 @@ export default function AlgoPaymentGatewayModal({
 
       const orderData = await orderRes.json().catch(() => ({}));
       const resolvedOrderId = orderData?.order_id || orderData?.id;
-      if (!orderRes.ok || !resolvedOrderId || !orderData?.key_id) {
-        throw new Error(orderData?.error || 'Could not initialize Razorpay order.');
+      if (!orderRes.ok || !resolvedOrderId || !orderData?.payment_session_id) {
+        throw new Error(orderData?.error || 'Could not initialize Cashfree order.');
       }
 
-      setProcessStepText('Awaiting payment confirmation in Razorpay...');
+      setProcessStepText('Awaiting payment confirmation in Cashfree...');
 
-      let paymentCompleted = false;
-      let paymentFailedReported = false;
+      const cfMode = String(orderData.environment || 'PRODUCTION').toUpperCase() === 'SANDBOX' ? 'sandbox' : 'production';
+      const cashfree = window.Cashfree({ mode: cfMode });
 
-      const options = {
-        key: orderData.key_id,
-        amount: orderData.amount,
-        currency: orderData.currency || 'INR',
-        name: 'SkandX Algo Hub',
-        description: isWalletRecharge
-          ? `Algo Wallet Top-Up • ₹${effectiveAmount}`
-          : (item?.title || 'SkandX Algo Multi-Broker Service'),
-        image: 'https://www.skandx.in/skandx-playstore-icon.png',
-        order_id: resolvedOrderId,
-        prefill: {
-          name: user?.full_name || user?.name || user?.username || '',
-          email: user?.email || '',
-          contact: user?.mobile || user?.phone || ''
-        },
-        notes: {
-          item_type: item?.type || 'STATIC_IP',
-          client_id: user?.client_id || ''
-        },
-        theme: {
-          color: '#0284c7'
-        },
-        modal: {
-          ondismiss: async () => {
-            setIsProcessing(false);
-            setProcessStepText('');
-            if (!paymentCompleted && !paymentFailedReported) {
-              try {
-                const failPayload = {
-                  razorpay_order_id: resolvedOrderId,
-                  error_description: 'Checkout dismissed by user before completing payment',
-                  error_reason: 'user_cancelled',
-                  status: 'CANCELLED',
-                  plan: item?.type || 'STATIC_IP',
-                  itemType: item?.type || 'STATIC_IP',
-                  amount: effectiveAmount,
-                  failure_reason: 'Checkout dismissed by user before completing payment',
-                  title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
-                };
-                let failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
-                  method: 'POST',
-                  headers: getAuthHeaders(),
-                  body: JSON.stringify(failPayload)
-                });
-                if (failRes.status === 404) {
-                  failRes = await fetch(`${API}/api/payment/report-failure`, {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(failPayload)
-                  });
-                }
-                const failData = await failRes.json().catch(() => ({}));
-                notifyParent({ paymentFailed: true, transactions: failData?.transactions });
-              } catch (_) {}
-            }
-          }
-        },
-        handler: async (response) => {
-          paymentCompleted = true;
-          try {
-            setIsProcessing(true);
-            setProcessStepText('Verifying Razorpay signature & provisioning service...');
+      const result = await cashfree.checkout({
+        paymentSessionId: orderData.payment_session_id,
+        redirectTarget: '_modal'
+      });
 
-            const verifyPayload = {
-              razorpay_order_id: response.razorpay_order_id || resolvedOrderId,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              plan: item?.type || 'STATIC_IP',
-              itemType: item?.type || 'STATIC_IP',
-              itemId: item?.id || item?.type || 'STATIC_IP',
-              amount: effectiveAmount,
-              title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
-            };
-
-            let verifyRes = await fetch(`${API}/api/v1/bridge/razorpay/verify`, {
-              method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify(verifyPayload)
-            });
-
-            if (verifyRes.status === 404) {
-              verifyRes = await fetch(`${API}/api/payment/verify`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(verifyPayload)
-              });
-            }
-
-            const verifyData = await verifyRes.json().catch(() => ({}));
-            if (!verifyRes.ok || !verifyData.success) {
-              throw new Error(verifyData.error || 'Payment signature verification failed.');
-            }
-
-            setIsProcessing(false);
-            setIsSuccess(true);
-            setSuccessTxId(response.razorpay_payment_id || verifyData.transactionId);
-
-            notifyParent({
-              ...verifyData,
-              transactionId: response.razorpay_payment_id || verifyData.transactionId,
-              amount: effectiveAmount,
-              item: {
-                ...item,
-                amount: effectiveAmount
-              }
-            });
-          } catch (verifyErr) {
-            setIsProcessing(false);
-            setErrorMsg(verifyErr.message || 'Verification failed. Contact support with your payment ID.');
-          }
-        }
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', async (resp) => {
-        paymentFailedReported = true;
+      if (result && result.error) {
         setIsProcessing(false);
-        const failDesc = resp?.error?.description || resp?.error?.reason || 'Payment failed or was declined by the bank.';
-        setErrorMsg(failDesc);
+        setProcessStepText('');
+        const failDesc = result.error.message || 'Checkout dismissed by user before completing payment';
         try {
           const failPayload = {
-            razorpay_order_id: resp?.error?.metadata?.order_id || resolvedOrderId,
-            razorpay_payment_id: resp?.error?.metadata?.payment_id || null,
+            order_id: resolvedOrderId,
+            razorpay_order_id: resolvedOrderId,
             error_description: failDesc,
-            error_reason: resp?.error?.reason || 'payment_failed',
-            status: 'FAILED',
+            error_reason: result.error.code || 'user_cancelled',
+            status: 'CANCELLED',
             plan: item?.type || 'STATIC_IP',
             itemType: item?.type || 'STATIC_IP',
             amount: effectiveAmount,
             failure_reason: failDesc,
             title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
           };
-          let failRes = await fetch(`${API}/api/v1/bridge/razorpay/fail`, {
+          let failRes = await fetch(`${API}/api/v1/bridge/cashfree/fail`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(failPayload)
@@ -292,18 +182,65 @@ export default function AlgoPaymentGatewayModal({
           const failData = await failRes.json().catch(() => ({}));
           notifyParent({ paymentFailed: true, transactions: failData?.transactions });
         } catch (_) {}
+        return;
+      }
+
+      // Verify order status directly with Cashfree backend API
+      setIsProcessing(true);
+      setProcessStepText('Verifying Cashfree payment & provisioning service...');
+
+      const verifyPayload = {
+        order_id: resolvedOrderId,
+        razorpay_order_id: resolvedOrderId,
+        plan: item?.type || 'STATIC_IP',
+        itemType: item?.type || 'STATIC_IP',
+        itemId: item?.id || item?.type || 'STATIC_IP',
+        amount: effectiveAmount,
+        title: isWalletRecharge ? `Algo Wallet Recharge (₹${effectiveAmount})` : item?.title
+      };
+
+      let verifyRes = await fetch(`${API}/api/v1/bridge/cashfree/verify`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(verifyPayload)
       });
-      rzp.open();
+
+      if (verifyRes.status === 404) {
+        verifyRes = await fetch(`${API}/api/payment/verify`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(verifyPayload)
+        });
+      }
+
+      const verifyData = await verifyRes.json().catch(() => ({}));
+      if (!verifyRes.ok || !verifyData.success) {
+        throw new Error(verifyData.error || 'Cashfree payment verification failed or order was not completed.');
+      }
+
+      setIsProcessing(false);
+      setIsSuccess(true);
+      setSuccessTxId(verifyData.transactionId || resolvedOrderId);
+
+      notifyParent({
+        ...verifyData,
+        transactionId: verifyData.transactionId || resolvedOrderId,
+        amount: effectiveAmount,
+        item: {
+          ...item,
+          amount: effectiveAmount
+        }
+      });
     } catch (err) {
       setIsProcessing(false);
-      setErrorMsg(err.message || 'Unable to connect to Razorpay gateway.');
+      setErrorMsg(err.message || 'Unable to connect to Cashfree gateway.');
     }
   };
 
   const handleWalletPayment = async () => {
     setErrorMsg('');
     if (walletBalance < effectiveAmount) {
-      setErrorMsg(`Insufficient Algo Wallet credit. Please recharge or pay via Razorpay.`);
+      setErrorMsg(`Insufficient Algo Wallet credit. Please recharge or pay via Cashfree.`);
       return;
     }
 
@@ -394,13 +331,13 @@ export default function AlgoPaymentGatewayModal({
             />
             <div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> × Razorpay Checkout</span>
+                <span>Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> × Cashfree Checkout</span>
                 <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
                   LIVE GATEWAY
                 </span>
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Lock size={10} color="#10b981" /> Official Razorpay 256-Bit PCI-DSS • Instant Activation
+                <Lock size={10} color="#10b981" /> Official Cashfree 256-Bit PCI-DSS • Instant Activation
               </div>
             </div>
           </div>
@@ -450,7 +387,7 @@ export default function AlgoPaymentGatewayModal({
                 Payment Verified & Activated!
               </h3>
               <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>
-                Your transaction has been verified via Razorpay and provisioned on your account.
+                Your transaction has been verified via Cashfree Payments and provisioned on your account.
               </p>
             </div>
 
@@ -516,13 +453,13 @@ export default function AlgoPaymentGatewayModal({
             }} />
             <div>
               <h4 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: '800', color: '#fff' }}>
-                Connecting to Razorpay Gateway
+                Connecting to Cashfree Gateway
               </h4>
               <p style={{ margin: 0, fontSize: '13px', color: '#38bdf8' }}>
                 {processStepText}
               </p>
               <div style={{ fontSize: '11px', color: '#64748b', marginTop: '12px' }}>
-                Complete the payment inside the official Razorpay window...
+                Complete the payment inside the official Cashfree window...
               </div>
             </div>
           </div>
@@ -610,18 +547,18 @@ export default function AlgoPaymentGatewayModal({
               </div>
             )}
 
-            {/* Payment Source Selector (Razorpay vs Algo Wallet for non-recharge items) */}
+            {/* Payment Source Selector (Cashfree vs Algo Wallet for non-recharge items) */}
             {!isWalletRecharge && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => { setPaymentTab('RAZORPAY'); setErrorMsg(''); }}
+                  onClick={() => { setPaymentTab('CASHFREE'); setErrorMsg(''); }}
                   style={{
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    background: paymentTab === 'RAZORPAY' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.03)',
-                    border: paymentTab === 'RAZORPAY' ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
-                    color: paymentTab === 'RAZORPAY' ? '#38bdf8' : '#94a3b8',
+                    background: paymentTab === 'CASHFREE' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.03)',
+                    border: paymentTab === 'CASHFREE' ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: paymentTab === 'CASHFREE' ? '#38bdf8' : '#94a3b8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -631,7 +568,7 @@ export default function AlgoPaymentGatewayModal({
                     cursor: 'pointer'
                   }}
                 >
-                  <CreditCard size={16} /> Razorpay Gateway
+                  <CreditCard size={16} /> Cashfree Gateway
                 </button>
                 <button
                   type="button"
@@ -674,7 +611,7 @@ export default function AlgoPaymentGatewayModal({
             )}
 
             {/* Payment Details Box */}
-            {paymentTab === 'RAZORPAY' || isWalletRecharge ? (
+            {paymentTab === 'CASHFREE' || isWalletRecharge ? (
               <div style={{
                 background: '#090d16',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -704,7 +641,7 @@ export default function AlgoPaymentGatewayModal({
 
                 <button
                   type="button"
-                  onClick={handleRazorpayPayment}
+                  onClick={handleCashfreePayment}
                   style={{
                     width: '100%',
                     padding: '13px 16px',
@@ -722,11 +659,11 @@ export default function AlgoPaymentGatewayModal({
                     boxShadow: '0 6px 20px rgba(2, 132, 199, 0.35)'
                   }}
                 >
-                  <Zap size={16} /> Pay ₹{effectiveAmount.toLocaleString('en-IN')} with Razorpay <ArrowRight size={16} />
+                  <Zap size={16} /> Pay ₹{effectiveAmount.toLocaleString('en-IN')} with Cashfree <ArrowRight size={16} />
                 </button>
 
                 <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
-                  Verified by Razorpay HMAC-SHA256 Signature • Instant Automated Provisioning
+                  Verified by Cashfree PG v3 Server Verification • Instant Automated Provisioning
                 </div>
               </div>
             ) : (
@@ -757,11 +694,11 @@ export default function AlgoPaymentGatewayModal({
                 {walletBalance < effectiveAmount ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-                      Wallet balance is short by ₹{(effectiveAmount - walletBalance).toFixed(2)}. Pay directly via Razorpay instead.
+                      Wallet balance is short by ₹{(effectiveAmount - walletBalance).toFixed(2)}. Pay directly via Cashfree instead.
                     </div>
                     <button
                       type="button"
-                      onClick={() => setPaymentTab('RAZORPAY')}
+                      onClick={() => setPaymentTab('CASHFREE')}
                       style={{
                         width: '100%',
                         padding: '12px',
@@ -774,7 +711,7 @@ export default function AlgoPaymentGatewayModal({
                         cursor: 'pointer'
                       }}
                     >
-                      Switch to Razorpay Checkout
+                      Switch to Cashfree Checkout
                     </button>
                   </div>
                 ) : (

@@ -3333,31 +3333,201 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Razorpay Payment Integration ───────────────────────────────────────────
-const Razorpay = require('razorpay');
+// ─── Cashfree Payment Gateway Integration (PG v3 API 2023-08-01) ─────────────
 const crypto = require('crypto');
 
-async function getRazorpayConfig() {
-  let key_id = process.env.RAZORPAY_KEY_ID;
-  let key_secret = process.env.RAZORPAY_KEY_SECRET;
+function sanitizeCashfreePhone(rawPhone) {
+  const digits = String(rawPhone || '').replace(/\D/g, '');
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    if (/^[6-9]\d{9}$/.test(last10)) return last10;
+  }
+  return '9876543210';
+}
+
+async function getCashfreeConfig() {
+  let app_id = process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || '';
+  let secret_key = process.env.CASHFREE_SECRET_KEY || process.env.CASHFREE_CLIENT_SECRET || '';
+  let environment = process.env.CASHFREE_ENV || '';
+
   try {
-    const rowId = await db('system_settings').where({ key: 'razorpay_key_id' }).first();
-    const rowSec = await db('system_settings').where({ key: 'razorpay_key_secret' }).first();
-    if (rowId && rowId.value) key_id = rowId.value.trim();
-    if (rowSec && rowSec.value) key_secret = rowSec.value.trim();
+    const rows = await db('system_settings')
+      .whereIn('key', [
+        'cashfree_app_id',
+        'cashfree_secret_key',
+        'cashfree_env',
+        'razorpay_key_id',
+        'razorpay_key_secret'
+      ])
+      .select('key', 'value');
+
+    const map = {};
+    for (const r of rows) {
+      if (r && r.key) map[r.key] = String(r.value || '').trim();
+    }
+
+    if (map.cashfree_app_id) app_id = map.cashfree_app_id;
+    else if (!app_id && map.razorpay_key_id && !map.razorpay_key_id.startsWith('rzp_')) {
+      app_id = map.razorpay_key_id;
+    }
+
+    if (map.cashfree_secret_key) secret_key = map.cashfree_secret_key;
+    else if (!secret_key && map.razorpay_key_secret && map.razorpay_key_secret !== 'secret_placeholder') {
+      secret_key = map.razorpay_key_secret;
+    }
+
+    if (map.cashfree_env) environment = map.cashfree_env.toUpperCase();
   } catch (_) {}
+
+  const cleanAppId = String(app_id || '').trim();
+  const cleanSecret = String(secret_key || '').trim();
+
+  let resolvedEnv = String(environment || '').toUpperCase();
+  if (resolvedEnv !== 'SANDBOX' && resolvedEnv !== 'PRODUCTION') {
+    if (
+      cleanSecret.toLowerCase().includes('_test_') ||
+      cleanSecret.startsWith('TEST') ||
+      cleanAppId.startsWith('TEST')
+    ) {
+      resolvedEnv = 'SANDBOX';
+    } else {
+      resolvedEnv = 'PRODUCTION';
+    }
+  }
+
+  const baseUrl = resolvedEnv === 'SANDBOX'
+    ? 'https://sandbox.cashfree.com/pg'
+    : 'https://api.cashfree.com/pg';
+
+  const isConfigured = Boolean(
+    cleanAppId &&
+    cleanSecret &&
+    cleanAppId !== 'cf_test_placeholder' &&
+    cleanAppId !== 'rzp_test_placeholder' &&
+    cleanSecret !== 'secret_placeholder'
+  );
+
   return {
-    key_id: key_id || 'rzp_test_placeholder',
-    key_secret: key_secret || 'secret_placeholder'
+    app_id: cleanAppId,
+    secret_key: cleanSecret,
+    key_id: cleanAppId,
+    key_secret: cleanSecret,
+    environment: resolvedEnv,
+    baseUrl,
+    isConfigured
   };
 }
 
-async function getRazorpayClient() {
-  const conf = await getRazorpayConfig();
+async function createCashfreeOrder({ orderId, amountInr, user, note, returnUrl, tags = {} }) {
+  const conf = await getCashfreeConfig();
+  if (!conf.isConfigured) {
+    const err = new Error('Cashfree API keys not configured. Please add Cashfree App ID and Secret Key in Admin Panel or .env');
+    err.code = 'CASHFREE_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const customerId = String(`skandx_u_${user?.id || 'guest'}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 45);
+  const customerName = String(user?.username || user?.name || 'SkandX Member').replace(/[^\w\s.-]/g, '').trim().slice(0, 50) || 'SkandX Member';
+  const customerEmail = (user?.email && String(user.email).includes('@'))
+    ? String(user.email).trim()
+    : 'support@skandx.in';
+  const customerPhone = sanitizeCashfreePhone(user?.phone);
+
+  const payload = {
+    order_id: orderId,
+    order_amount: Number(Number(amountInr).toFixed(2)),
+    order_currency: 'INR',
+    customer_details: {
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone
+    },
+    order_meta: {
+      return_url: returnUrl || 'https://www.skandx.in/?cf_order_id={order_id}'
+    },
+    order_note: String(note || 'SkandX Platform Subscription').slice(0, 180)
+  };
+
+  const cleanTags = {};
+  for (const [k, v] of Object.entries(tags || {})) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      cleanTags[String(k).slice(0, 30)] = String(v).slice(0, 200);
+    }
+  }
+  if (Object.keys(cleanTags).length > 0) {
+    payload.order_tags = cleanTags;
+  }
+
+  const response = await axios.post(`${conf.baseUrl}/orders`, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-version': '2023-08-01',
+      'x-client-id': conf.app_id,
+      'x-client-secret': conf.secret_key
+    },
+    timeout: 15000
+  });
+
+  const data = response.data || {};
   return {
-    client: new Razorpay({ key_id: conf.key_id, key_secret: conf.key_secret }),
-    key_id: conf.key_id,
-    key_secret: conf.key_secret
+    ...data,
+    order_id: data.order_id || orderId,
+    cf_order_id: data.cf_order_id || data.order_id || orderId,
+    payment_session_id: data.payment_session_id,
+    environment: conf.environment,
+    app_id: conf.app_id
+  };
+}
+
+async function fetchCashfreeOrderStatus(orderId) {
+  const conf = await getCashfreeConfig();
+  if (!conf.isConfigured || !orderId) {
+    return { isPaid: false, isFailed: false, orderStatus: 'UNKNOWN', cfPaymentId: null, failureReason: null };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-version': '2023-08-01',
+    'x-client-id': conf.app_id,
+    'x-client-secret': conf.secret_key
+  };
+
+  const encodedId = encodeURIComponent(String(orderId).trim());
+  const [orderRes, paymentsRes] = await Promise.all([
+    axios.get(`${conf.baseUrl}/orders/${encodedId}`, { headers, timeout: 12000 }).catch(() => null),
+    axios.get(`${conf.baseUrl}/orders/${encodedId}/payments`, { headers, timeout: 12000 }).catch(() => null)
+  ]);
+
+  const orderData = orderRes?.data || {};
+  const paymentsList = Array.isArray(paymentsRes?.data)
+    ? paymentsRes.data
+    : (Array.isArray(paymentsRes?.data?.items) ? paymentsRes.data.items : []);
+
+  const successPayment = paymentsList.find(p => String(p?.payment_status || '').toUpperCase() === 'SUCCESS');
+  const failedPayment = paymentsList.find(p => ['FAILED', 'USER_DROPPED', 'CANCELLED', 'VOID'].includes(String(p?.payment_status || '').toUpperCase()));
+
+  const orderStatus = String(orderData?.order_status || '').toUpperCase();
+  const isPaid = orderStatus === 'PAID' || Boolean(successPayment);
+  const isFailed = !isPaid && (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED' || Boolean(failedPayment));
+
+  const cfPaymentId = successPayment?.cf_payment_id
+    ? String(successPayment.cf_payment_id)
+    : (failedPayment?.cf_payment_id ? String(failedPayment.cf_payment_id) : (orderData?.cf_order_id ? String(orderData.cf_order_id) : null));
+
+  const failureReason = failedPayment?.payment_message ||
+    failedPayment?.error_details?.error_description ||
+    failedPayment?.error_details?.error_reason ||
+    (orderStatus === 'EXPIRED' ? 'Cashfree order expired before payment completion' : null);
+
+  return {
+    isPaid,
+    isFailed,
+    orderStatus: orderStatus || (isPaid ? 'PAID' : 'ACTIVE'),
+    cfPaymentId,
+    failureReason,
+    orderData,
+    payments: paymentsList
   };
 }
 
@@ -3388,7 +3558,7 @@ function resolvePlanMeta(plan) {
     return { tier: 'ALGO_PRO', amountInr: 999, label: 'Pro Algo Trader Plan (₹999/mo)' };
   }
   if (p === 'algo_institutional' || p === 'plan_institutional') {
-    return { tier: 'ALGO_INSTITUTIONAL', amountInr: 2499, label: 'Institutional Copy Master (₹2,499/mo)' };
+    return { tier: 'ALGO_INSTITUTIONAL', amountInr: 2499, label: 'Multi-Account Sync Suite (₹2,499/mo)' };
   }
   if (p === 'algo_wallet' || p === 'wallet_recharge') {
     return { tier: 'ALGO_WALLET', amountInr: 500, label: 'SkandX Algo Wallet Top-Up' };
@@ -3494,7 +3664,7 @@ async function healAndSeparateSubscriptionPayments() {
       .select('id', 'plan', 'amount', 'payment_type', 'razorpay_subscription_id', 'failure_reason', 'created_at')
       .catch(() => []);
 
-    const algoLaunchCutoffMs = new Date('2026-10-11T16:00:00.000Z').getTime(); // ~9:30 PM IST on Oct 11, 2026 (when SkandX Algo Razorpay launched)
+    const algoLaunchCutoffMs = new Date('2026-10-11T16:00:00.000Z').getTime();
     const paperStandardAmounts = new Set([199, 1999, 2999, 9999, 24999]);
 
     for (const r of algoRows) {
@@ -3558,7 +3728,7 @@ async function healAndSeparateSubscriptionPayments() {
       .whereNot('plan', 'ALGO_INSTITUTIONAL')
       .update({ plan: 'ALGO_INSTITUTIONAL' });
 
-    // 3. Auto-resolve any INITIATED rows (both Paper Trading and Algo) older than 2 minutes
+    // 3. Auto-resolve any INITIATED rows older than 2 minutes via Cashfree order check
     const pendingRows = await db('subscription_payments')
       .where({ status: 'INITIATED' })
       .orderBy('created_at', 'desc')
@@ -3566,45 +3736,35 @@ async function healAndSeparateSubscriptionPayments() {
       .catch(() => []);
 
     if (pendingRows.length > 0) {
-      let rzpClient = null;
-      try {
-        const { client, key_id, key_secret } = await getRazorpayClient();
-        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
-          rzpClient = client;
-        }
-      } catch (_) {}
-
+      const cfConf = await getCashfreeConfig();
       const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
       for (const row of pendingRows) {
-        let resolvedViaRzp = false;
-        if (rzpClient && row.razorpay_order_id) {
+        let resolvedViaGateway = false;
+        if (cfConf.isConfigured && row.razorpay_order_id) {
           try {
-            const orderPayments = await rzpClient.orders.fetchPayments(row.razorpay_order_id).catch(() => null);
-            const items = Array.isArray(orderPayments?.items) ? orderPayments.items : [];
-            const capturedPay = items.find(ip => ip.status === 'captured' || ip.status === 'authorized');
-            const failedPay = items.find(ip => ip.status === 'failed');
-            if (capturedPay) {
+            const cfStatus = await fetchCashfreeOrderStatus(row.razorpay_order_id);
+            if (cfStatus.isPaid) {
               await db('subscription_payments').where({ id: row.id }).update({
                 status: 'SUCCESS',
-                razorpay_payment_id: capturedPay.id,
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
                 failure_reason: null,
                 updated_at: new Date()
               });
-              resolvedViaRzp = true;
-            } else if (failedPay) {
+              resolvedViaGateway = true;
+            } else if (cfStatus.isFailed) {
               await db('subscription_payments').where({ id: row.id }).update({
                 status: 'FAILED',
-                razorpay_payment_id: failedPay.id,
-                failure_reason: failedPay.error_description || failedPay.error_reason || 'Payment declined at Razorpay gateway',
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                failure_reason: cfStatus.failureReason || 'Payment declined at Cashfree gateway',
                 updated_at: new Date()
               });
-              resolvedViaRzp = true;
+              resolvedViaGateway = true;
             }
           } catch (_) {}
         }
 
         const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-        if (!resolvedViaRzp && (!createdMs || createdMs < twoMinsAgoMs)) {
+        if (!resolvedViaGateway && (!createdMs || createdMs < twoMinsAgoMs)) {
           await db('subscription_payments').where({ id: row.id }).update({
             status: 'CANCELLED',
             failure_reason: 'Checkout dismissed or timed out before payment completion',
@@ -3616,179 +3776,191 @@ async function healAndSeparateSubscriptionPayments() {
   } catch (_) {}
 }
 
-// 1. Direct Instant Payment (No Trial) - Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999 & Algo Add-ons
-app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
+async function activateUserPlanSubscription(userId, planStr) {
+  let computedExpires = null;
+  let targetTier = 'MONTHLY';
+
+  await db.transaction(async (trx) => {
+    const user = await trx('users').where({ id: userId }).forUpdate().first();
+    if (!user) throw new Error('User not found');
+
+    const now = new Date();
+    const baseDate = (user.subscription_expires && new Date(user.subscription_expires) > now)
+      ? new Date(user.subscription_expires)
+      : now;
+    const expires = new Date(baseDate.getTime());
+    const selectedPlan = String(planStr || '').toLowerCase();
+
+    if (selectedPlan === 'lifetime' || selectedPlan === 'elite_lifetime') {
+      targetTier = 'LIFETIME';
+      expires.setFullYear(expires.getFullYear() + 100);
+    } else if (selectedPlan === 'masterclass' || selectedPlan === 'course') {
+      targetTier = 'MASTERCLASS';
+      expires.setFullYear(expires.getFullYear() + 1);
+    } else if (selectedPlan === 'highest' || selectedPlan === 'feature' || selectedPlan === 'vip') {
+      targetTier = 'HIGHEST';
+      expires.setFullYear(expires.getFullYear() + 1);
+    } else if (selectedPlan === 'yearly') {
+      targetTier = 'YEARLY';
+      expires.setFullYear(expires.getFullYear() + 1);
+    } else {
+      targetTier = 'MONTHLY';
+      expires.setMonth(expires.getMonth() + 1);
+    }
+    computedExpires = expires;
+
+    await trx('users').where({ id: userId }).update({
+      subscription_tier: targetTier,
+      subscription_expires: expires
+    });
+
+    // --- Referral Reward Logic (Atomic) ---
+    try {
+      const pendingRef = await trx('referrals')
+        .where({ referred_user_id: userId, status: 'pending' })
+        .forUpdate()
+        .first();
+
+      if (pendingRef) {
+        let rewardAmount = 9.9;
+        if (targetTier === 'LIFETIME') rewardAmount = 999.0;
+        else if (targetTier === 'MASTERCLASS') rewardAmount = 499.0;
+        else if (targetTier === 'HIGHEST') rewardAmount = 99.9;
+        else if (targetTier === 'YEARLY') rewardAmount = 49.9;
+
+        await trx('referrals')
+          .where({ id: pendingRef.id })
+          .update({ status: 'completed', reward_amount: rewardAmount });
+
+        await trx('users')
+          .where({ id: pendingRef.referrer_id })
+          .increment('balance', rewardAmount);
+
+        await trx('ledger').insert({
+          user_id: pendingRef.referrer_id,
+          amount: rewardAmount,
+          type: 'DEPOSIT',
+          description: `Referral reward bonus for user ${user.username || userId} ${targetTier} upgrade`
+        });
+      }
+    } catch (e) {
+      console.error('Failed to process referral reward', e);
+    }
+  });
+
+  return { targetTier, computedExpires };
+}
+
+async function handleCreateCashfreePlanOrder(req, res) {
   const { plan, itemType, amount: customAmount } = req.body || {};
   const meta = resolvePlanMeta(plan || itemType);
   const finalAmountInr = (customAmount && Number(customAmount) >= 1) ? Math.round(Number(customAmount)) : meta.amountInr;
-  const amount = finalAmountInr * 100;
+  const amountPaise = finalAmountInr * 100;
+
   try {
-    const { client, key_id, key_secret } = await getRazorpayClient();
-    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
-      await logSubscriptionAttempt({
-        userId: req.user.id,
-        plan: meta.tier,
-        amount: finalAmountInr,
-        paymentType: 'ONE_TIME',
-        status: 'FAILED',
-        failureReason: 'Razorpay keys not configured on server'
-      });
-      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
-    }
-
-    const options = {
-      amount,
-      currency: "INR",
-      receipt: ("receipt_order_" + req.user.id + "_" + Date.now()).slice(0, 40)
-    };
-    const order = await client.orders.create(options);
-    await logSubscriptionAttempt({
-      userId: req.user.id,
-      plan: meta.tier,
-      amount: finalAmountInr,
-      paymentType: 'ONE_TIME',
-      status: 'INITIATED',
-      razorpayOrderId: order.id
-    });
-    res.json({ success: true, ...order, id: order.id, order_id: order.id, key_id, amount, currency: "INR" });
-  } catch (error) {
-    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
-    await logSubscriptionAttempt({
-      userId: req.user.id,
-      plan: meta.tier,
-      amount: finalAmountInr,
-      paymentType: 'ONE_TIME',
-      status: 'FAILED',
-      failureReason: 'Razorpay Order Creation Rejected: ' + errMsg
-    });
-    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
-  }
-});
-
-// Official Razorpay Plan IDs for AutoPay recurring mandates
-const RAZORPAY_PLAN_MAP = {
-  monthly: 'plan_Tjwq81Q691SX5t',   // ₹199 Every Month
-  yearly: 'plan_Tjwr3Kfn0d8JuL',    // ₹1,999 Every Year
-  highest: 'plan_Tjws5S02DWgWE5',   // ₹2,999 Every Year (VIP Tier)
-  feature: 'plan_Tjws5S02DWgWE5',
-  vip: 'plan_Tjws5S02DWgWE5'
-};
-
-// AutoPay recurring subscription mandate endpoint
-app.post('/api/payment/create-subscription', authenticateToken, async (req, res) => {
-  const { plan } = req.body || {};
-  const selectedPlan = (plan || 'monthly').toLowerCase();
-  const meta = resolvePlanMeta(selectedPlan);
-  try {
-    const planId = RAZORPAY_PLAN_MAP[selectedPlan];
-
-    if (!planId) {
-      return res.status(400).json({ error: `AutoPay is not supported for "${plan}". Please use one-time payment.` });
-    }
-
-    const { client, key_id, key_secret } = await getRazorpayClient();
-    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
-      await logSubscriptionAttempt({
-        userId: req.user.id,
-        plan: meta.tier,
-        amount: meta.amountInr,
-        paymentType: 'AUTOPAY',
-        status: 'FAILED',
-        failureReason: 'Razorpay keys not configured on server'
-      });
-      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel.' });
-    }
-
-    // Determine billing cycles (e.g. 60 months = 5 years, 5 years for yearly)
-    const totalCount = selectedPlan === 'monthly' ? 60 : 5;
-
-    const subscription = await client.subscriptions.create({
-      plan_id: planId,
-      total_count: totalCount,
-      quantity: 1,
-      customer_notify: 1, // Razorpay automatically dispatches mandatory RBI pre-debit notifications
-      notes: {
+    const userRow = await db('users').where({ id: req.user.id }).first().catch(() => req.user);
+    const orderId = `cf_ord_${req.user.id}_${Date.now()}`.slice(0, 45);
+    const cfOrder = await createCashfreeOrder({
+      orderId,
+      amountInr: finalAmountInr,
+      user: userRow || req.user,
+      note: `SkandX ${meta.label}`,
+      tags: {
         user_id: String(req.user.id),
-        plan: selectedPlan
+        plan: String(plan || itemType || meta.tier).toLowerCase(),
+        tier: meta.tier
       }
     });
 
     await logSubscriptionAttempt({
       userId: req.user.id,
       plan: meta.tier,
-      amount: meta.amountInr,
-      paymentType: 'AUTOPAY',
+      amount: finalAmountInr,
+      paymentType: 'ONE_TIME',
       status: 'INITIATED',
-      razorpaySubscriptionId: subscription.id
+      razorpayOrderId: cfOrder.order_id
     });
 
     res.json({
-      ...subscription,
-      subscription_id: subscription.id,
-      key_id,
-      is_subscription: true
+      success: true,
+      gateway: 'CASHFREE',
+      environment: cfOrder.environment,
+      payment_session_id: cfOrder.payment_session_id,
+      id: cfOrder.order_id,
+      order_id: cfOrder.order_id,
+      cf_order_id: cfOrder.cf_order_id,
+      key_id: cfOrder.app_id,
+      amount: amountPaise,
+      amountInr: finalAmountInr,
+      currency: 'INR'
     });
   } catch (error) {
-    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    const errMsg = error.response?.data?.message || error.message || 'Unknown Cashfree error';
     await logSubscriptionAttempt({
       userId: req.user.id,
       plan: meta.tier,
-      amount: meta.amountInr,
-      paymentType: 'AUTOPAY',
+      amount: finalAmountInr,
+      paymentType: 'ONE_TIME',
       status: 'FAILED',
-      failureReason: 'Razorpay AutoPay Creation Rejected: ' + errMsg
+      failureReason: error.code === 'CASHFREE_NOT_CONFIGURED'
+        ? 'Cashfree keys not configured on server'
+        : ('Cashfree Order Creation Rejected: ' + errMsg)
     });
-    res.status(500).json({ error: 'Razorpay AutoPay Rejected: ' + errMsg });
+    const statusCode = error.code === 'CASHFREE_NOT_CONFIGURED' ? 503 : 500;
+    res.status(statusCode).json({ error: errMsg });
   }
-});
+}
 
+// 1. Direct Instant Payment via Cashfree (Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999 & Algo Add-ons)
+app.post('/api/payment/create-order', authenticateToken, handleCreateCashfreePlanOrder);
+app.post('/api/payment/create-subscription', authenticateToken, handleCreateCashfreePlanOrder);
+
+// 2. Verify Cashfree Order & Activate Plan / Provision Algo Item
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan, itemType, amount, title } = req.body || {};
+    const {
+      order_id,
+      cf_order_id,
+      razorpay_order_id,
+      razorpay_subscription_id,
+      razorpay_payment_id,
+      plan,
+      itemType,
+      amount,
+      title
+    } = req.body || {};
+
+    const targetOrderId = order_id || cf_order_id || razorpay_order_id || razorpay_subscription_id;
     const meta = resolvePlanMeta(plan || itemType);
     const isAlgoPayment = Boolean(itemType) || String(meta.tier || '').startsWith('ALGO_');
-    const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
-    
-    const { key_secret: secret } = await getRazorpayConfig();
-    if (!secret || secret === 'secret_placeholder') {
-      return res.status(503).json({ error: 'Payment gateway configuration is incomplete. Please add Razorpay Key Secret.' });
+    const resolvedAmt = (amount && Number(amount) >= 1) ? Math.round(Number(amount)) : meta.amountInr;
+
+    const cfConf = await getCashfreeConfig();
+    if (!cfConf.isConfigured) {
+      return res.status(503).json({ error: 'Cashfree gateway configuration is incomplete. Please add Cashfree App ID & Secret Key in Admin Panel.' });
     }
 
-    if (!razorpay_payment_id || !razorpay_signature) {
+    if (!targetOrderId) {
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: meta.tier,
-        amount: (amount && Number(amount) >= 1) ? Math.round(Number(amount)) : meta.amountInr,
-        paymentType,
+        amount: resolvedAmt,
+        paymentType: 'ONE_TIME',
         status: 'FAILED',
-        razorpayOrderId: razorpay_order_id || null,
-        razorpaySubscriptionId: razorpay_subscription_id || null,
-        razorpayPaymentId: razorpay_payment_id || null,
-        failureReason: 'Missing required payment verification parameters'
+        failureReason: 'Missing order_id for Cashfree verification'
       });
-      return res.status(400).json({ error: 'Missing required payment verification parameters' });
+      return res.status(400).json({ error: 'Missing order_id for payment verification' });
     }
 
-    // For normal orders, body is order_id + '|' + payment_id
-    // For subscriptions, body is payment_id + '|' + subscription_id
-    let body = (razorpay_order_id || '') + "|" + razorpay_payment_id;
-    if (razorpay_subscription_id) {
-      body = razorpay_payment_id + "|" + razorpay_subscription_id;
-    }
-    
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(body.toString())
-      .digest('hex');
-      
-    const isAuthentic = expectedSignature.length === razorpay_signature.length &&
-      crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
-    if (isAuthentic) {
+    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId);
+    const txId = cfStatus.cfPaymentId || razorpay_payment_id || targetOrderId;
+
+    if (cfStatus.isPaid) {
       if (isAlgoPayment) {
         const resolved = resolveAlgoPaymentItem({ itemType: itemType || plan, amount, title });
         const userObj = await resolveBridgeUser(req);
         const state = await getUserBridgeState(userObj);
-        const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified', razorpay_order_id);
+        const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, txId, 'Cashfree Verified', targetOrderId);
         await saveUserBridgeState(userObj, state);
 
         await logSubscriptionAttempt({
@@ -3797,16 +3969,16 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
           amount: resolved.amountInr,
           paymentType: 'ONE_TIME',
           status: 'SUCCESS',
-          razorpayOrderId: razorpay_order_id || null,
-          razorpayPaymentId: razorpay_payment_id || null,
+          razorpayOrderId: targetOrderId,
+          razorpayPaymentId: txId,
           failureReason: null
         });
 
-        appendAlgoAuditLog(`[RAZORPAY_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${razorpay_payment_id}]`, true);
+        appendAlgoAuditLog(`[CASHFREE_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${txId}]`, true);
 
         return res.json({
           success: true,
-          transactionId: razorpay_payment_id,
+          transactionId: txId,
           txRecord,
           provisionedData,
           newBalance: state.config.availableCredit,
@@ -3820,120 +3992,86 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         });
       }
 
-      let computedExpires = null;
-      await db.transaction(async (trx) => {
-        const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
-        if (!user) throw new Error('User not found');
-
-        const now = new Date();
-        const baseDate = (user.subscription_expires && new Date(user.subscription_expires) > now) 
-          ? new Date(user.subscription_expires) 
-          : now;
-        const expires = new Date(baseDate.getTime());
-        const selectedPlan = (plan || '').toLowerCase();
-        let targetTier = 'MONTHLY';
-        if (selectedPlan === 'lifetime' || selectedPlan === 'elite_lifetime') {
-          targetTier = 'LIFETIME';
-          expires.setFullYear(expires.getFullYear() + 100);
-        } else if (selectedPlan === 'masterclass' || selectedPlan === 'course') {
-          targetTier = 'MASTERCLASS';
-          expires.setFullYear(expires.getFullYear() + 1);
-        } else if (selectedPlan === 'highest' || selectedPlan === 'feature') {
-          targetTier = 'HIGHEST';
-          expires.setFullYear(expires.getFullYear() + 1);
-        } else if (selectedPlan === 'yearly') {
-          targetTier = 'YEARLY';
-          expires.setFullYear(expires.getFullYear() + 1);
-        } else {
-          targetTier = 'MONTHLY';
-          expires.setMonth(expires.getMonth() + 1);
-        }
-        computedExpires = expires;
-
-        await trx('users').where({ id: req.user.id }).update({
-          subscription_tier: targetTier,
-          subscription_expires: expires
-        });
-
-        // --- Referral Reward Logic (Atomic) ---
-        try {
-          const pendingRef = await trx('referrals')
-            .where({ referred_user_id: req.user.id, status: 'pending' })
-            .forUpdate()
-            .first();
-
-          if (pendingRef) {
-            let rewardAmount = 9.9;
-            if (selectedPlan === 'lifetime' || selectedPlan === 'elite_lifetime') {
-              rewardAmount = 999.0;
-            } else if (selectedPlan === 'masterclass' || selectedPlan === 'course') {
-              rewardAmount = 499.0;
-            } else if (selectedPlan === 'highest' || selectedPlan === 'feature') {
-              rewardAmount = 99.9;
-            } else if (selectedPlan === 'yearly') {
-              rewardAmount = 49.9;
-            }
-            
-            // Mark as completed
-            await trx('referrals')
-              .where({ id: pendingRef.id })
-              .update({ status: 'completed', reward_amount: rewardAmount });
-            
-            // Credit referrer
-            await trx('users')
-              .where({ id: pendingRef.referrer_id })
-              .increment('balance', rewardAmount);
-
-            // Audit ledger entry for referral credit
-            await trx('ledger').insert({
-              user_id: pendingRef.referrer_id,
-              amount: rewardAmount,
-              type: 'DEPOSIT',
-              description: `Referral reward bonus for user ${user.username || req.user.id} ${targetTier} upgrade`
-            });
-          }
-        } catch (e) {
-          console.error('Failed to process referral reward', e);
-        }
-      });
+      const { computedExpires } = await activateUserPlanSubscription(req.user.id, plan || meta.tier);
 
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: meta.tier,
         amount: meta.amountInr,
-        paymentType,
+        paymentType: 'ONE_TIME',
         status: 'SUCCESS',
-        razorpayOrderId: razorpay_order_id || null,
-        razorpaySubscriptionId: razorpay_subscription_id || null,
-        razorpayPaymentId: razorpay_payment_id || null,
+        razorpayOrderId: targetOrderId,
+        razorpayPaymentId: txId,
         failureReason: null,
         expiresAt: computedExpires
       });
 
-      res.json({ success: true, message: 'Upgraded to PRO successfully!' });
+      return res.json({
+        success: true,
+        transactionId: txId,
+        message: 'Upgraded to PRO successfully!'
+      });
     } else {
+      const failReason = cfStatus.failureReason || `Payment not completed (Order Status: ${cfStatus.orderStatus || 'PENDING'})`;
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: meta.tier,
-        amount: meta.amountInr,
-        paymentType,
-        status: 'FAILED',
-        razorpayOrderId: razorpay_order_id || null,
-        razorpaySubscriptionId: razorpay_subscription_id || null,
-        razorpayPaymentId: razorpay_payment_id || null,
-        failureReason: 'Invalid Payment Signature'
+        amount: resolvedAmt,
+        paymentType: 'ONE_TIME',
+        status: cfStatus.isFailed ? 'FAILED' : 'CANCELLED',
+        razorpayOrderId: targetOrderId,
+        razorpayPaymentId: cfStatus.cfPaymentId || null,
+        failureReason: failReason
       });
-      res.status(400).json({ error: 'Invalid Payment Signature' });
+      return res.status(400).json({ error: failReason });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Report failed or cancelled payment attempt from Razorpay checkout modal
+// 2b. Cashfree Server Webhook (Auto-activates plan if browser closes during UPI payment)
+app.post('/api/payment/cashfree/webhook', async (req, res) => {
+  try {
+    const orderObj = req.body?.data?.order || {};
+    const paymentObj = req.body?.data?.payment || {};
+    const orderId = orderObj.order_id;
+    if (!orderId) return res.status(200).json({ received: true });
+
+    const cfStatus = await fetchCashfreeOrderStatus(orderId);
+    if (!cfStatus.isPaid) return res.status(200).json({ received: true });
+
+    const existingRow = await db('subscription_payments')
+      .where({ razorpay_order_id: orderId })
+      .orderBy('id', 'desc')
+      .first()
+      .catch(() => null);
+
+    if (existingRow && existingRow.status !== 'SUCCESS' && existingRow.user_id) {
+      const planStr = String(existingRow.plan || 'MONTHLY');
+      if (!planStr.toUpperCase().startsWith('ALGO_')) {
+        const { computedExpires } = await activateUserPlanSubscription(existingRow.user_id, planStr);
+        await db('subscription_payments').where({ id: existingRow.id }).update({
+          status: 'SUCCESS',
+          razorpay_payment_id: cfStatus.cfPaymentId || String(paymentObj.cf_payment_id || orderId),
+          failure_reason: null,
+          expires_at: computedExpires,
+          updated_at: new Date()
+        });
+      }
+    }
+    res.status(200).json({ received: true, verified: true });
+  } catch (err) {
+    res.status(200).json({ received: true });
+  }
+});
+
+// 3. Report failed or cancelled payment attempt from Cashfree checkout modal
 app.post('/api/payment/report-failure', authenticateToken, async (req, res) => {
   try {
     const {
+      order_id,
+      cf_order_id,
       razorpay_order_id,
       razorpay_subscription_id,
       razorpay_payment_id,
@@ -3944,21 +4082,31 @@ app.post('/api/payment/report-failure', authenticateToken, async (req, res) => {
       failure_reason,
       error_description
     } = req.body || {};
+
+    const targetOrderId = order_id || cf_order_id || razorpay_order_id || null;
     const meta = resolvePlanMeta(plan || itemType);
     const finalAmount = (customAmount && Number(customAmount) >= 1) ? Math.round(Number(customAmount)) : meta.amountInr;
-    const paymentType = razorpay_subscription_id ? 'AUTOPAY' : 'ONE_TIME';
+
+    // Double-check Cashfree server status before marking cancelled/failed
+    if (targetOrderId) {
+      const cfStatus = await fetchCashfreeOrderStatus(targetOrderId).catch(() => null);
+      if (cfStatus && cfStatus.isPaid) {
+        return res.json({ success: true, alreadyPaid: true });
+      }
+    }
+
     const normalizedStatus = String(status || 'FAILED').toUpperCase() === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
 
     await logSubscriptionAttempt({
       userId: req.user.id,
       plan: meta.tier,
       amount: finalAmount,
-      paymentType,
+      paymentType: 'ONE_TIME',
       status: normalizedStatus,
-      razorpayOrderId: razorpay_order_id || null,
+      razorpayOrderId: targetOrderId,
       razorpaySubscriptionId: razorpay_subscription_id || null,
       razorpayPaymentId: razorpay_payment_id || null,
-      failureReason: failure_reason || error_description || (normalizedStatus === 'CANCELLED' ? 'Checkout closed by user before completing payment' : 'Payment failed at gateway')
+      failureReason: failure_reason || error_description || (normalizedStatus === 'CANCELLED' ? 'Checkout closed by user before completing payment' : 'Payment failed at Cashfree gateway')
     });
 
     res.json({ success: true });
@@ -5885,89 +6033,45 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       console.warn('[SUBSCRIPTIONS] Backfill note:', bfErr.message);
     }
 
-    // 2. Optional live Razorpay gateway sync (?syncRazorpay=true)
-    if (req.query.syncRazorpay === 'true') {
+    // 2. Optional live Cashfree gateway sync (?syncCashfree=true or ?syncRazorpay=true)
+    if (req.query.syncCashfree === 'true' || req.query.syncRazorpay === 'true') {
       try {
-        const { client, key_id, key_secret } = await getRazorpayClient();
-        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
-          const rzpPayments = await client.payments.all({ count: 50 }).catch(() => null);
-          if (rzpPayments && Array.isArray(rzpPayments.items)) {
-            for (const p of rzpPayments.items) {
-              const exists = await db('subscription_payments')
-                .where({ razorpay_payment_id: p.id })
-                .orWhere(builder => {
-                  if (p.order_id) builder.where({ razorpay_order_id: p.order_id });
-                })
-                .first();
+        const cfConf = await getCashfreeConfig();
+        if (cfConf.isConfigured) {
+          const recentOrders = await db('subscription_payments')
+            .whereNotNull('razorpay_order_id')
+            .whereIn('status', ['INITIATED', 'CANCELLED', 'FAILED'])
+            .orderBy('created_at', 'desc')
+            .limit(40)
+            .catch(() => []);
 
-              const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
-              const amountInr = Math.round((Number(p.amount) || 0) / 100);
-              const noteItemType = String(p.notes?.item_type || '').toUpperCase();
-              const descLower = String(p.description || p.notes?.title || '').toLowerCase();
-              const isAlgoPayment =
-                Boolean(noteItemType) ||
-                descLower.includes('algo') ||
-                descLower.includes('static ip') ||
-                descLower.includes('demat slot') ||
-                [250, 350, 500, 999, 2499].includes(amountInr);
+          for (const row of recentOrders) {
+            if (!row.razorpay_order_id) continue;
+            const cfStatus = await fetchCashfreeOrderStatus(row.razorpay_order_id).catch(() => null);
+            if (!cfStatus) continue;
 
-              let inferredPlan = 'MONTHLY';
-              if (isAlgoPayment) {
-                if (noteItemType === 'STATIC_IP' || amountInr === 350) inferredPlan = 'ALGO_STATIC_IP';
-                else if (noteItemType === 'LINK_USER' || amountInr === 250) inferredPlan = 'ALGO_LINK_USER';
-                else if (noteItemType === 'PLAN_PRO' || amountInr === 999) inferredPlan = 'ALGO_PRO';
-                else if (noteItemType === 'PLAN_INSTITUTIONAL' || amountInr === 2499) inferredPlan = 'ALGO_INSTITUTIONAL';
-                else inferredPlan = 'ALGO_WALLET';
-              } else {
-                if (amountInr >= 20000) inferredPlan = 'LIFETIME';
-                else if (amountInr >= 8000) inferredPlan = 'MASTERCLASS';
-                else if (amountInr >= 2500) inferredPlan = 'HIGHEST';
-                else if (amountInr >= 1500) inferredPlan = 'YEARLY';
+            if (cfStatus.isPaid && row.status !== 'SUCCESS') {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'SUCCESS',
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                failure_reason: null,
+                updated_at: new Date()
+              });
+              if (row.user_id && !String(row.plan || '').toUpperCase().startsWith('ALGO_')) {
+                await activateUserPlanSubscription(row.user_id, row.plan).catch(() => {});
               }
-
-              const failMsg = p.error_description || p.error_reason || null;
-
-              if (exists) {
-                if (exists.status !== 'SUCCESS' && rzpStatus === 'SUCCESS') {
-                  await db('subscription_payments').where({ id: exists.id }).update({
-                    status: 'SUCCESS',
-                    razorpay_payment_id: p.id,
-                    updated_at: new Date()
-                  });
-                } else if ((exists.status === 'INITIATED' || exists.status === 'CANCELLED') && rzpStatus === 'FAILED') {
-                  await db('subscription_payments').where({ id: exists.id }).update({
-                    status: 'FAILED',
-                    razorpay_payment_id: p.id,
-                    failure_reason: failMsg || exists.failure_reason,
-                    updated_at: new Date()
-                  });
-                }
-              } else {
-                const matchedUser = p.email
-                  ? await db('users').whereRaw('LOWER(email) = ?', [String(p.email).toLowerCase().trim()]).first().catch(() => null)
-                  : null;
-                await db('subscription_payments').insert({
-                  user_id: matchedUser?.id || (p.notes?.user_id ? Number(p.notes.user_id) : null),
-                  username: matchedUser?.username || null,
-                  email: matchedUser?.email || p.email || null,
-                  phone: matchedUser?.phone || p.contact || null,
-                  client_id: matchedUser?.client_id || null,
-                  plan: isAlgoPayment ? inferredPlan : (p.notes?.plan ? resolvePlanMeta(p.notes.plan).tier : inferredPlan),
-                  amount: amountInr,
-                  payment_type: p.invoice_id ? 'AUTOPAY' : 'ONE_TIME',
-                  status: rzpStatus,
-                  razorpay_order_id: p.order_id || null,
-                  razorpay_payment_id: p.id,
-                  failure_reason: failMsg,
-                  created_at: p.created_at ? new Date(p.created_at * 1000) : new Date(),
-                  updated_at: new Date()
-                }).catch(() => {});
-              }
+            } else if (cfStatus.isFailed && (row.status === 'INITIATED' || row.status === 'CANCELLED')) {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'FAILED',
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                failure_reason: cfStatus.failureReason || row.failure_reason || 'Payment declined at Cashfree gateway',
+                updated_at: new Date()
+              });
             }
           }
         }
       } catch (syncErr) {
-        console.warn('[SUBSCRIPTIONS] Razorpay sync note:', syncErr.message);
+        console.warn('[SUBSCRIPTIONS] Cashfree sync note:', syncErr.message);
       }
     }
 
@@ -12650,41 +12754,65 @@ app.post('/api/fyers/verify', async (req, res) => {
   }
 });
 
-app.get('/api/admin/razorpay/credentials', authenticateToken, async (req, res) => {
+async function handleGetGatewayCredentials(req, res) {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-    const rowId = await db('system_settings').where({ key: 'razorpay_key_id' }).first();
-    const rowSec = await db('system_settings').where({ key: 'razorpay_key_secret' }).first();
-    const key_id = rowId?.value || process.env.RAZORPAY_KEY_ID || '';
-    const key_secret = rowSec?.value || process.env.RAZORPAY_KEY_SECRET || '';
+    const conf = await getCashfreeConfig();
     res.json({
       success: true,
-      key_id,
-      has_key_id: !!(key_id && key_id !== 'rzp_test_placeholder'),
-      has_key_secret: !!(key_secret && key_secret !== 'secret_placeholder')
+      gateway: 'CASHFREE',
+      app_id: conf.app_id,
+      key_id: conf.app_id,
+      environment: conf.environment,
+      has_app_id: Boolean(conf.app_id),
+      has_key_id: Boolean(conf.app_id),
+      has_secret_key: Boolean(conf.secret_key),
+      has_key_secret: Boolean(conf.secret_key),
+      is_configured: conf.isConfigured
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
 
-app.post('/api/admin/razorpay/credentials', authenticateToken, async (req, res) => {
+async function handleSaveGatewayCredentials(req, res) {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-    const { key_id, key_secret } = req.body;
-    if (key_id !== undefined) {
-      await db('system_settings').insert({ key: 'razorpay_key_id', value: key_id.trim(), updated_at: new Date() }).onConflict('key').merge();
+    const { app_id, secret_key, key_id, key_secret, environment } = req.body || {};
+    const resolvedAppId = app_id !== undefined ? app_id : key_id;
+    const resolvedSecret = secret_key !== undefined ? secret_key : key_secret;
+
+    if (resolvedAppId !== undefined) {
+      await db('system_settings')
+        .insert({ key: 'cashfree_app_id', value: String(resolvedAppId).trim(), updated_at: new Date() })
+        .onConflict('key')
+        .merge();
     }
-    if (key_secret !== undefined && key_secret.trim() !== '') {
-      await db('system_settings').insert({ key: 'razorpay_key_secret', value: key_secret.trim(), updated_at: new Date() }).onConflict('key').merge();
+    if (resolvedSecret !== undefined && String(resolvedSecret).trim() !== '') {
+      await db('system_settings')
+        .insert({ key: 'cashfree_secret_key', value: String(resolvedSecret).trim(), updated_at: new Date() })
+        .onConflict('key')
+        .merge();
     }
-    res.json({ success: true, message: 'Razorpay keys saved successfully' });
+    if (environment !== undefined && String(environment).trim() !== '') {
+      const cleanEnv = String(environment).trim().toUpperCase() === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION';
+      await db('system_settings')
+        .insert({ key: 'cashfree_env', value: cleanEnv, updated_at: new Date() })
+        .onConflict('key')
+        .merge();
+    }
+    res.json({ success: true, message: 'Cashfree Payment Gateway credentials saved and activated!' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+app.get('/api/admin/cashfree/credentials', authenticateToken, handleGetGatewayCredentials);
+app.post('/api/admin/cashfree/credentials', authenticateToken, handleSaveGatewayCredentials);
+app.get('/api/admin/razorpay/credentials', authenticateToken, handleGetGatewayCredentials);
+app.post('/api/admin/razorpay/credentials', authenticateToken, handleSaveGatewayCredentials);
 
 // ─── Ad Monetization & 30-Second Rewarded Video Ad Engine (Multi-Worker Safe) ───
 let adConfigCache = {
@@ -16201,13 +16329,13 @@ app.post('/api/v1/bridge/plan/select', async (req, res) => {
       await saveUserBridgeState(userObj, state);
       return res.json({ success: true, activePlan: 'STARTER', stats: state.config });
     }
-    res.status(400).json({ error: 'Paid plans require activation via Wallet or Razorpay.' });
+    res.status(400).json({ error: 'Paid plans require activation via Wallet or Cashfree.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 9. Official Razorpay Checkout & Verification for Algo Hub (Static IP ₹350, Link Slot ₹250, Plans ₹999/₹2499, Wallet Recharge)
+// 9. Official Cashfree Checkout & Verification for Algo Hub (Static IP ₹350, Link Slot ₹250, Plans ₹999/₹2499, Wallet Recharge)
 function resolveAlgoPaymentItem(body = {}) {
   const itemType = String(body.itemType || 'STATIC_IP').toUpperCase();
   if (itemType === 'STATIC_IP') {
@@ -16217,7 +16345,7 @@ function resolveAlgoPaymentItem(body = {}) {
     return { itemType: 'LINK_USER', planKey: 'ALGO_LINK_USER', amountInr: 250, title: '1 Linked Client Demat Slot (1 Month)' };
   }
   if (itemType === 'PLAN_INSTITUTIONAL' || (itemType === 'PLAN' && Number(body.amount) >= 2000)) {
-    return { itemType: 'PLAN_INSTITUTIONAL', planKey: 'ALGO_INSTITUTIONAL', amountInr: 2499, title: 'Institutional Copy Trading Master Suite (1 Month)' };
+    return { itemType: 'PLAN_INSTITUTIONAL', planKey: 'ALGO_INSTITUTIONAL', amountInr: 2499, title: 'Multi-Account Trade Sync Suite (1 Month)' };
   }
   if (itemType === 'PLAN_PRO' || itemType === 'PLAN') {
     return { itemType: 'PLAN_PRO', planKey: 'ALGO_PRO', amountInr: 999, title: 'Pro Multi-Broker Algo Trader Plan (1 Month)' };
@@ -16230,7 +16358,7 @@ function resolveAlgoPaymentItem(body = {}) {
   return { itemType, planKey: 'ALGO_ADDON', amountInr: fallbackAmt, title: String(body.title || 'SkandX Algo Service') };
 }
 
-function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Razorpay Secure Checkout', orderId = null) {
+function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Cashfree Secure Checkout', orderId = null) {
   const { itemType, amountInr, title } = resolvedItem;
   let provisionedData = {};
 
@@ -16320,31 +16448,21 @@ function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Ra
   return { txRecord, provisionedData };
 }
 
-app.post('/api/v1/bridge/razorpay/create-order', authenticateToken, async (req, res) => {
+async function handleCreateAlgoCashfreeOrder(req, res) {
   const resolved = resolveAlgoPaymentItem(req.body);
   const amountPaise = resolved.amountInr * 100;
   try {
-    const { client, key_id, key_secret } = await getRazorpayClient();
-    if (!key_secret || key_secret === 'secret_placeholder' || key_id === 'rzp_test_placeholder') {
-      await logSubscriptionAttempt({
-        userId: req.user.id,
-        plan: resolved.planKey,
-        amount: resolved.amountInr,
-        paymentType: 'ONE_TIME',
-        status: 'FAILED',
-        failureReason: 'Razorpay keys not configured on server'
-      });
-      return res.status(503).json({ error: 'Razorpay keys not configured. Please add Key ID and Key Secret in Admin Panel or .env' });
-    }
-
-    const receiptStr = `algo_${req.user.id}_${Date.now()}`.slice(0, 40);
-    const order = await client.orders.create({
-      amount: amountPaise,
-      currency: 'INR',
-      receipt: receiptStr,
-      notes: {
+    const userRow = await db('users').where({ id: req.user.id }).first().catch(() => req.user);
+    const orderId = `cf_algo_${req.user.id}_${Date.now()}`.slice(0, 45);
+    const cfOrder = await createCashfreeOrder({
+      orderId,
+      amountInr: resolved.amountInr,
+      user: userRow || req.user,
+      note: resolved.title,
+      tags: {
         user_id: String(req.user.id),
         item_type: resolved.itemType,
+        plan_key: resolved.planKey,
         title: resolved.title
       }
     });
@@ -16355,15 +16473,18 @@ app.post('/api/v1/bridge/razorpay/create-order', authenticateToken, async (req, 
       amount: resolved.amountInr,
       paymentType: 'ONE_TIME',
       status: 'INITIATED',
-      razorpayOrderId: order.id
+      razorpayOrderId: cfOrder.order_id
     });
 
     res.json({
       success: true,
-      ...order,
-      id: order.id,
-      order_id: order.id,
-      key_id,
+      gateway: 'CASHFREE',
+      environment: cfOrder.environment,
+      payment_session_id: cfOrder.payment_session_id,
+      id: cfOrder.order_id,
+      order_id: cfOrder.order_id,
+      cf_order_id: cfOrder.cf_order_id,
+      key_id: cfOrder.app_id,
       amount: amountPaise,
       amountInr: resolved.amountInr,
       currency: 'INR',
@@ -16371,55 +16492,61 @@ app.post('/api/v1/bridge/razorpay/create-order', authenticateToken, async (req, 
       title: resolved.title
     });
   } catch (error) {
-    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    const errMsg = error.response?.data?.message || error.message || 'Unknown Cashfree error';
     await logSubscriptionAttempt({
       userId: req.user.id,
       plan: resolved.planKey,
       amount: resolved.amountInr,
       paymentType: 'ONE_TIME',
       status: 'FAILED',
-      failureReason: 'Razorpay Algo Order Rejected: ' + errMsg
+      failureReason: error.code === 'CASHFREE_NOT_CONFIGURED'
+        ? 'Cashfree keys not configured on server'
+        : ('Cashfree Algo Order Rejected: ' + errMsg)
     });
-    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
+    const statusCode = error.code === 'CASHFREE_NOT_CONFIGURED' ? 503 : 500;
+    res.status(statusCode).json({ error: errMsg });
   }
-});
+}
 
-app.post('/api/v1/bridge/razorpay/verify', authenticateToken, async (req, res) => {
+app.post('/api/v1/bridge/cashfree/create-order', authenticateToken, handleCreateAlgoCashfreeOrder);
+app.post('/api/v1/bridge/razorpay/create-order', authenticateToken, handleCreateAlgoCashfreeOrder);
+
+async function handleVerifyAlgoCashfreeOrder(req, res) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, itemType, amount, title } = req.body || {};
+    const { order_id, cf_order_id, razorpay_order_id, razorpay_payment_id, itemType, amount, title } = req.body || {};
+    const targetOrderId = order_id || cf_order_id || razorpay_order_id;
     const resolved = resolveAlgoPaymentItem({ itemType, amount, title });
 
-    const { key_secret: secret } = await getRazorpayConfig();
-    if (!secret || secret === 'secret_placeholder') {
-      return res.status(503).json({ error: 'Payment gateway configuration is incomplete.' });
+    const cfConf = await getCashfreeConfig();
+    if (!cfConf.isConfigured) {
+      return res.status(503).json({ error: 'Cashfree gateway configuration is incomplete.' });
     }
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: 'Missing required Razorpay verification parameters.' });
+    if (!targetOrderId) {
+      return res.status(400).json({ error: 'Missing required order_id for Cashfree verification.' });
     }
 
-    const bodyStr = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expectedSignature = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');
-    const isAuthentic = expectedSignature.length === razorpay_signature.length &&
-      crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
+    const cfStatus = await fetchCashfreeOrderStatus(targetOrderId);
+    const txId = cfStatus.cfPaymentId || razorpay_payment_id || targetOrderId;
 
-    if (!isAuthentic) {
+    if (!cfStatus.isPaid) {
+      const failReason = cfStatus.failureReason || `Cashfree Order not paid (Status: ${cfStatus.orderStatus || 'PENDING'})`;
       await logSubscriptionAttempt({
         userId: req.user.id,
         plan: resolved.planKey,
         amount: resolved.amountInr,
         paymentType: 'ONE_TIME',
-        status: 'FAILED',
-        razorpayOrderId: razorpay_order_id,
-        razorpayPaymentId: razorpay_payment_id,
-        failureReason: 'Invalid Razorpay Payment Signature'
+        status: cfStatus.isFailed ? 'FAILED' : 'CANCELLED',
+        razorpayOrderId: targetOrderId,
+        razorpayPaymentId: cfStatus.cfPaymentId || null,
+        failureReason: failReason
       });
-      return res.status(400).json({ error: 'Invalid Payment Signature' });
+      return res.status(400).json({ error: failReason });
     }
 
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, razorpay_payment_id, 'Razorpay Verified', razorpay_order_id);
+    const { txRecord, provisionedData } = provisionAlgoItemIntoState(state, resolved, txId, 'Cashfree Verified', targetOrderId);
     await saveUserBridgeState(userObj, state);
 
     await logSubscriptionAttempt({
@@ -16428,16 +16555,16 @@ app.post('/api/v1/bridge/razorpay/verify', authenticateToken, async (req, res) =
       amount: resolved.amountInr,
       paymentType: 'ONE_TIME',
       status: 'SUCCESS',
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
+      razorpayOrderId: targetOrderId,
+      razorpayPaymentId: txId,
       failureReason: null
     });
 
-    appendAlgoAuditLog(`[RAZORPAY_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${razorpay_payment_id}]`, true);
+    appendAlgoAuditLog(`[CASHFREE_VERIFIED] ${userObj.email || userObj.username} purchased ${resolved.title} (₹${resolved.amountInr}) [${txId}]`, true);
 
     res.json({
       success: true,
-      transactionId: razorpay_payment_id,
+      transactionId: txId,
       txRecord,
       provisionedData,
       newBalance: state.config.availableCredit,
@@ -16452,14 +16579,17 @@ app.post('/api/v1/bridge/razorpay/verify', authenticateToken, async (req, res) =
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
 
-// Deduct from existing Algo Wallet Credit (for users who recharged their wallet via Razorpay)
+app.post('/api/v1/bridge/cashfree/verify', authenticateToken, handleVerifyAlgoCashfreeOrder);
+app.post('/api/v1/bridge/razorpay/verify', authenticateToken, handleVerifyAlgoCashfreeOrder);
+
+// Deduct from existing Algo Wallet Credit (for users who recharged their wallet via Cashfree)
 app.post('/api/v1/bridge/wallet/pay', authenticateToken, async (req, res) => {
   try {
     const resolved = resolveAlgoPaymentItem(req.body);
     if (resolved.itemType === 'WALLET_RECHARGE') {
-      return res.status(400).json({ error: 'Wallet recharge must be completed via Razorpay checkout.' });
+      return res.status(400).json({ error: 'Wallet recharge must be completed via Cashfree checkout.' });
     }
 
     const userObj = await resolveBridgeUser(req);
@@ -16468,7 +16598,7 @@ app.post('/api/v1/bridge/wallet/pay', authenticateToken, async (req, res) => {
 
     if (currentBal < resolved.amountInr) {
       return res.status(400).json({
-        error: `Insufficient Algo Wallet balance (Available: ₹${currentBal.toFixed(2)}, Required: ₹${resolved.amountInr}). Please pay via Razorpay or add funds first.`
+        error: `Insufficient Algo Wallet balance (Available: ₹${currentBal.toFixed(2)}, Required: ₹${resolved.amountInr}). Please pay via Cashfree or add funds first.`
       });
     }
 
@@ -16496,11 +16626,20 @@ app.post('/api/v1/bridge/wallet/pay', authenticateToken, async (req, res) => {
   }
 });
 
-// Record Failed / Rejected / Cancelled Razorpay Checkout Attempts
-app.post('/api/v1/bridge/razorpay/fail', authenticateToken, async (req, res) => {
+// Record Failed / Rejected / Cancelled Cashfree Checkout Attempts
+async function handleFailAlgoCashfreeOrder(req, res) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, error_description, error_reason, status: reqStatus, itemType, amount, title } = req.body || {};
+    const { order_id, cf_order_id, razorpay_order_id, razorpay_payment_id, error_description, error_reason, status: reqStatus, itemType, amount, title } = req.body || {};
+    const targetOrderId = order_id || cf_order_id || razorpay_order_id || null;
     const resolved = resolveAlgoPaymentItem({ itemType, amount, title });
+
+    if (targetOrderId) {
+      const cfStatus = await fetchCashfreeOrderStatus(targetOrderId).catch(() => null);
+      if (cfStatus && cfStatus.isPaid) {
+        return res.json({ success: true, alreadyPaid: true });
+      }
+    }
+
     const finalStatus = reqStatus === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
     const failReason = String(error_description || error_reason || (finalStatus === 'CANCELLED' ? 'Checkout dismissed by user' : 'Payment declined by bank / UPI gateway')).slice(0, 240);
 
@@ -16510,31 +16649,31 @@ app.post('/api/v1/bridge/razorpay/fail', authenticateToken, async (req, res) => 
       amount: resolved.amountInr,
       paymentType: 'ONE_TIME',
       status: finalStatus,
-      razorpayOrderId: razorpay_order_id || null,
+      razorpayOrderId: targetOrderId,
       razorpayPaymentId: razorpay_payment_id || null,
       failureReason: failReason
     });
 
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const txId = razorpay_payment_id || razorpay_order_id || ('REJ_' + Math.floor(100000 + Math.random() * 900000));
+    const txId = razorpay_payment_id || targetOrderId || ('REJ_' + Math.floor(100000 + Math.random() * 900000));
     const txRecord = {
       id: txId,
-      orderId: razorpay_order_id || null,
+      orderId: targetOrderId,
       date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       createdAtIso: new Date().toISOString(),
       type: 'REJECTED',
       itemTitle: resolved.title,
       planKey: resolved.planKey,
       amount: resolved.amountInr,
-      method: `Razorpay (${finalStatus}) • ${resolved.title} — ${failReason}`,
+      method: `Cashfree (${finalStatus}) • ${resolved.title} — ${failReason}`,
       status: finalStatus,
       failureReason: failReason
     };
 
     const existingIdx = (state.transactions || []).findIndex(t =>
       t && (
-        (razorpay_order_id && (t.id === razorpay_order_id || t.orderId === razorpay_order_id)) ||
+        (targetOrderId && (t.id === targetOrderId || t.orderId === targetOrderId)) ||
         (razorpay_payment_id && t.id === razorpay_payment_id)
       )
     );
@@ -16560,7 +16699,10 @@ app.post('/api/v1/bridge/razorpay/fail', authenticateToken, async (req, res) => 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+app.post('/api/v1/bridge/cashfree/fail', authenticateToken, handleFailAlgoCashfreeOrder);
+app.post('/api/v1/bridge/razorpay/fail', authenticateToken, handleFailAlgoCashfreeOrder);
 
 // 10. Institutional Algo Admin Suite Endpoints (STRICTLY ADMIN-ONLY!)
 let globalAlgoFreezeActive = false;
@@ -16585,7 +16727,7 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
     } catch (_) {}
 
     // 1b. Heal & strictly separate Paper Trading vs SkandX Algo rows,
-    // and resolve any INITIATED / CANCELLED Algo orders by checking Razorpay or auto-cancelling after 2 minutes.
+    // and resolve any INITIATED / CANCELLED Algo orders by checking Cashfree or auto-cancelling after 2 minutes.
     await healAndSeparateSubscriptionPayments();
 
     try {
@@ -16601,45 +16743,35 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
         .catch(() => []);
 
       if (pendingAlgoRows.length > 0) {
-        let rzpClient = null;
-        try {
-          const { client, key_id, key_secret } = await getRazorpayClient();
-          if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
-            rzpClient = client;
-          }
-        } catch (_) {}
-
+        const cfConf = await getCashfreeConfig();
         const twoMinsAgoMs = Date.now() - 2 * 60 * 1000;
         for (const row of pendingAlgoRows) {
-          let resolvedViaRzp = false;
-          if (rzpClient && row.razorpay_order_id) {
+          let resolvedViaGateway = false;
+          if (cfConf.isConfigured && row.razorpay_order_id) {
             try {
-              const orderPayments = await rzpClient.orders.fetchPayments(row.razorpay_order_id).catch(() => null);
-              const items = Array.isArray(orderPayments?.items) ? orderPayments.items : [];
-              const capturedPay = items.find(ip => ip.status === 'captured' || ip.status === 'authorized');
-              const failedPay = items.find(ip => ip.status === 'failed');
-              if (capturedPay) {
+              const cfStatus = await fetchCashfreeOrderStatus(row.razorpay_order_id);
+              if (cfStatus.isPaid) {
                 await db('subscription_payments').where({ id: row.id }).update({
                   status: 'SUCCESS',
-                  razorpay_payment_id: capturedPay.id,
+                  razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
                   failure_reason: null,
                   updated_at: new Date()
                 });
-                resolvedViaRzp = true;
-              } else if (failedPay) {
+                resolvedViaGateway = true;
+              } else if (cfStatus.isFailed) {
                 await db('subscription_payments').where({ id: row.id }).update({
                   status: 'FAILED',
-                  razorpay_payment_id: failedPay.id,
-                  failure_reason: failedPay.error_description || failedPay.error_reason || 'Payment declined at Razorpay gateway',
+                  razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                  failure_reason: cfStatus.failureReason || 'Payment declined at Cashfree gateway',
                   updated_at: new Date()
                 });
-                resolvedViaRzp = true;
+                resolvedViaGateway = true;
               }
             } catch (_) {}
           }
 
           const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-          if (!resolvedViaRzp && row.status === 'INITIATED' && (!createdMs || createdMs < twoMinsAgoMs)) {
+          if (!resolvedViaGateway && row.status === 'INITIATED' && (!createdMs || createdMs < twoMinsAgoMs)) {
             await db('subscription_payments').where({ id: row.id }).update({
               status: 'CANCELLED',
               failure_reason: 'Checkout dismissed or timed out before payment completion',
@@ -16650,38 +16782,35 @@ app.get('/api/v1/bridge/admin/system-stats', authenticateToken, requireAdmin, as
       }
     } catch (_) {}
 
-    // 2. Optional live Razorpay sync (?syncRazorpay=true)
-    if (req.query.syncRazorpay === 'true') {
+    // 2. Optional live Cashfree sync (?syncCashfree=true or ?syncRazorpay=true)
+    if (req.query.syncCashfree === 'true' || req.query.syncRazorpay === 'true') {
       try {
-        const { client, key_id, key_secret } = await getRazorpayClient();
-        if (key_secret && key_secret !== 'secret_placeholder' && key_id !== 'rzp_test_placeholder') {
-          const rzpPayments = await client.payments.all({ count: 50 }).catch(() => null);
-          if (rzpPayments && Array.isArray(rzpPayments.items)) {
-            for (const p of rzpPayments.items) {
-              const exists = await db('subscription_payments')
-                .where({ razorpay_payment_id: p.id })
-                .orWhere(builder => {
-                  if (p.order_id) builder.where({ razorpay_order_id: p.order_id });
-                })
-                .first();
-              const rzpStatus = (p.status === 'captured' || p.status === 'authorized') ? 'SUCCESS' : (p.status === 'failed' ? 'FAILED' : 'INITIATED');
-              const failMsg = p.error_description || p.error_reason || null;
-              if (exists) {
-                if (exists.status !== 'SUCCESS' && rzpStatus === 'SUCCESS') {
-                  await db('subscription_payments').where({ id: exists.id }).update({
-                    status: 'SUCCESS',
-                    razorpay_payment_id: p.id,
-                    updated_at: new Date()
-                  });
-                } else if ((exists.status === 'INITIATED' || exists.status === 'CANCELLED') && rzpStatus === 'FAILED') {
-                  await db('subscription_payments').where({ id: exists.id }).update({
-                    status: 'FAILED',
-                    razorpay_payment_id: p.id,
-                    failure_reason: failMsg || exists.failure_reason,
-                    updated_at: new Date()
-                  });
-                }
-              }
+        const cfConf = await getCashfreeConfig();
+        if (cfConf.isConfigured) {
+          const recentAlgoOrders = await db('subscription_payments')
+            .whereNotNull('razorpay_order_id')
+            .whereIn('status', ['INITIATED', 'CANCELLED', 'FAILED'])
+            .orderBy('created_at', 'desc')
+            .limit(30)
+            .catch(() => []);
+          for (const row of recentAlgoOrders) {
+            if (!row.razorpay_order_id) continue;
+            const cfStatus = await fetchCashfreeOrderStatus(row.razorpay_order_id).catch(() => null);
+            if (!cfStatus) continue;
+            if (cfStatus.isPaid && row.status !== 'SUCCESS') {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'SUCCESS',
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                failure_reason: null,
+                updated_at: new Date()
+              });
+            } else if (cfStatus.isFailed && (row.status === 'INITIATED' || row.status === 'CANCELLED')) {
+              await db('subscription_payments').where({ id: row.id }).update({
+                status: 'FAILED',
+                razorpay_payment_id: cfStatus.cfPaymentId || row.razorpay_payment_id,
+                failure_reason: cfStatus.failureReason || row.failure_reason || 'Payment declined at Cashfree gateway',
+                updated_at: new Date()
+              });
             }
           }
         }

@@ -14,61 +14,87 @@ export default function PricingView({ setActiveTab }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const loadRazorpay = () => {
+  const loadCashfree = () => {
     return new Promise((resolve) => {
-      if (window.Razorpay) return resolve(true);
+      if (window.Cashfree) return resolve(true);
+      const existing = document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true));
+        existing.addEventListener('error', () => resolve(false));
+        return;
+      }
       const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+      script.async = true;
       script.onload = () => resolve(true);
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
   };
 
+  useEffect(() => {
+    loadCashfree();
+    const params = new URLSearchParams(window.location.search);
+    const cfReturnOrderId = params.get('cf_order_id');
+    const savedPlan = sessionStorage.getItem('skandx_pending_cf_plan') || 'monthly';
+    if (cfReturnOrderId) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        fetch(`${API}/api/payment/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ order_id: cfReturnOrderId, plan: savedPlan })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.success) {
+              alert('🎉 Payment verified! Your SkandX subscription is now active.');
+              window.history.replaceState({}, document.title, window.location.pathname);
+              if (typeof setActiveTab === 'function') setActiveTab('ClientData');
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [setActiveTab]);
+
   const handleUpgrade = async (plan) => {
     setLoading(plan);
     try {
-      const res = await loadRazorpay();
-      if (!res) {
-        alert('Razorpay SDK failed to load. Are you online?');
+      const res = await loadCashfree();
+      if (!res || !window.Cashfree) {
+        alert('Cashfree Checkout SDK failed to load. Please check your internet connection.');
         setLoading(false);
         return;
       }
 
       const token = localStorage.getItem('token');
-      const isAutoPayPlan = plan === 'monthly' || plan === 'yearly' || plan === 'highest';
-      const endpoint = isAutoPayPlan ? `${API}/api/payment/create-subscription` : `${API}/api/payment/create-order`;
+      sessionStorage.setItem('skandx_pending_cf_plan', plan);
 
-      const orderRes = await fetch(endpoint, {
+      const orderRes = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create payment order');
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create Cashfree payment order');
 
       const planTitles = {
         lifetime: 'Lifetime All-Inclusive Elite (₹24,999)',
         masterclass: 'Stock Market Masterclass: Basic to Advanced (₹9,999)',
-        highest: 'Feature Plan VIP (₹2,999/yr AutoPay)',
-        yearly: 'Yearly Elite (₹1,999/yr AutoPay)',
-        monthly: 'Pro Monthly (₹199/mo AutoPay)'
+        highest: 'Feature Plan VIP (₹2,999/yr)',
+        yearly: 'Yearly Elite (₹1,999/yr)',
+        monthly: 'Pro Monthly (₹199/mo)'
       };
       const planTitle = planTitles[plan] || 'Pro Plan';
 
-      const themeColors = {
-        lifetime: '#E11D48',
-        masterclass: '#0D9488',
-        highest: '#8B5CF6',
-        yearly: '#F59E0B',
-        monthly: '#3B82F6'
-      };
-
-      let paymentCompleted = false;
-      const reportPaymentStatus = async (status, reason, paymentId = null) => {
+      const reportPaymentStatus = async (status, reason) => {
         try {
           await fetch(`${API}/api/payment/report-failure`, {
             method: 'POST',
@@ -77,9 +103,7 @@ export default function PricingView({ setActiveTab }) {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              razorpay_order_id: orderData.id || null,
-              razorpay_subscription_id: orderData.subscription_id || null,
-              razorpay_payment_id: paymentId,
+              order_id: orderData.order_id || orderData.id || null,
               plan,
               status,
               failure_reason: reason
@@ -88,82 +112,41 @@ export default function PricingView({ setActiveTab }) {
         } catch (_) {}
       };
 
-      const options = {
-        key: orderData.key_id,
-        name: 'SkandX',
-        description: `Subscribe to ${planTitle}`,
-        image: 'https://skandx.in/skandx-playstore-icon.png',
-        handler: async function (response) {
-          paymentCompleted = true;
-          try {
-            const verifyPayload = {
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              plan: plan
-            };
-            if (response.razorpay_subscription_id || orderData.subscription_id) {
-              verifyPayload.razorpay_subscription_id = response.razorpay_subscription_id || orderData.subscription_id;
-            } else {
-              verifyPayload.razorpay_order_id = response.razorpay_order_id || orderData.id;
-            }
+      const cfMode = String(orderData.environment || 'PRODUCTION').toUpperCase() === 'SANDBOX' ? 'sandbox' : 'production';
+      const cashfree = window.Cashfree({ mode: cfMode });
 
-            const verifyRes = await fetch(`${API}/api/payment/verify`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(verifyPayload)
-            });
-            const verifyData = await verifyRes.json();
-            if (verifyData.success) {
-              alert(`🎉 Successfully activated ${planTitle}! Your AutoPay subscription is now active.`);
-              if (typeof setActiveTab === 'function') setActiveTab('ClientData');
-              else window.location.href = '/clientdata';
-            } else {
-              alert('Payment verification failed: ' + (verifyData.error || 'Please contact support.'));
-            }
-          } catch (err) {
-            alert('Error verifying payment: ' + err.message);
-          }
-        },
-        modal: {
-          ondismiss: function () {
-            if (!paymentCompleted) {
-              reportPaymentStatus('CANCELLED', 'User closed Razorpay checkout window before completing payment');
-            }
-          }
-        },
-        prefill: {
-          name: user?.name || user?.username || '',
-          email: user?.email || '',
-          contact: user?.phone || ''
-        },
-        theme: { color: themeColors[plan] || '#3B82F6' }
-      };
+      const result = await cashfree.checkout({
+        paymentSessionId: orderData.payment_session_id,
+        redirectTarget: '_modal'
+      });
 
-      // AutoPay subscriptions pass subscription_id; one-time orders pass order_id + amount
-      if (orderData.subscription_id) {
-        options.subscription_id = orderData.subscription_id;
-      } else {
-        options.order_id = orderData.id;
-        options.amount = orderData.amount;
-        options.currency = orderData.currency || 'INR';
+      if (result && result.error) {
+        const errMsg = result.error.message || 'Checkout closed before completing payment';
+        await reportPaymentStatus('CANCELLED', errMsg);
+        return;
       }
 
-      const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function (response) {
-        const errObj = response?.error || {};
-        const reasonParts = [
-          errObj.description,
-          errObj.reason ? `Reason: ${errObj.reason}` : null,
-          errObj.step ? `Step: ${errObj.step}` : null
-        ].filter(Boolean);
-        const failMsg = reasonParts.join(' | ') || 'Payment failed at gateway';
-        reportPaymentStatus('FAILED', failMsg, errObj.metadata?.payment_id || null);
-        alert(errObj.description || 'Payment cancelled or failed');
+      // Verify order status directly with backend Cashfree verification API
+      const verifyRes = await fetch(`${API}/api/payment/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          order_id: orderData.order_id || orderData.id,
+          plan
+        })
       });
-      rzp.open();
+      const verifyData = await verifyRes.json();
+      if (verifyRes.ok && verifyData.success) {
+        alert(`🎉 Successfully activated ${planTitle}! Your subscription is now active.`);
+        if (typeof setActiveTab === 'function') setActiveTab('ClientData');
+        else window.location.href = '/clientdata';
+      } else {
+        await reportPaymentStatus('FAILED', verifyData.error || 'Payment not completed');
+        alert('Payment verification failed: ' + (verifyData.error || 'Payment was not completed.'));
+      }
     } catch (err) {
       alert(err.message);
     } finally {
@@ -195,8 +178,8 @@ export default function PricingView({ setActiveTab }) {
       { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 15 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: '—', lifetime: 'Up to 15 legs' },
       { name: 'Portfolio Balance Resets', normal: '1 every 30 days', monthly: '10 resets / month', yearly: '10 resets / month', highest: 'Unlimited instant resets', masterclass: '1 every 30 days', lifetime: '10 resets / month (Forever)' }
     ]},
-    { category: 'Mentorship, Education & Research Reports', items: [
-      { name: 'Daily Pre-Market Report', normal: '—', monthly: '✓ Daily Morning Outlook', yearly: '✓ Daily Morning Outlook', highest: '✓ Priority Outlook & Levels', masterclass: '—', lifetime: '✓ Daily Morning Outlook (Forever)' },
+    { category: 'Mentorship, Education & Market Study Notes', items: [
+      { name: 'Daily Market Structure Study', normal: '—', monthly: '✓ Daily Educational Study', yearly: '✓ Daily Educational Study', highest: '✓ Priority Chart Structure Study', masterclass: '—', lifetime: '✓ Daily Educational Study (Forever)' },
       { name: 'Live Classes by NISM Mentor', normal: '—', monthly: '—', yearly: '—', highest: 'Webinars (Basics to Adv)', masterclass: '✓ Full Live Batches (NISM Mentor)', lifetime: '✓ Full Live Batches (NISM Mentor)' },
       { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Direct Q&A with NISM Mentor', lifetime: '✓ Direct Q&A + 1-on-1 Mentor Calls' },
       { name: 'Study Materials & Recording Vault', normal: '—', monthly: '—', yearly: '—', highest: '—', masterclass: '✓ Full Vault & NISM Prep Notes', lifetime: '✓ Full Vault & NISM Prep Notes' }
@@ -204,10 +187,10 @@ export default function PricingView({ setActiveTab }) {
     { category: 'Alerts & Intelligence', items: [
       { name: 'Active Price Alerts', normal: '3 Alerts', monthly: '25 Alerts', yearly: '25 Alerts', highest: 'Unlimited Alerts', masterclass: '3 Alerts', lifetime: '25 Alerts (Forever)' },
       { name: 'Instant Push & Telegram Alerts', normal: '—', monthly: 'Web Push + SMS', yearly: 'Web Push + SMS', highest: 'Instant Push + Telegram VIP', masterclass: '—', lifetime: 'Web Push + SMS' },
-      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Win-rate Heatmaps & Tags', yearly: 'Win-rate Heatmaps & Tags', highest: 'AI Trade Strategy Audit', masterclass: 'Basic Ledger', lifetime: 'Win-rate Heatmaps & Tags' }
+      { name: 'Trading Journal & Audit', normal: 'Basic Ledger', monthly: 'Win-rate Heatmaps & Tags', yearly: 'Win-rate Heatmaps & Tags', highest: 'Paper Trade Strategy Analytics', masterclass: 'Basic Ledger', lifetime: 'Win-rate Heatmaps & Tags' }
     ]},
     { category: 'Validity, Prestige & Support', items: [
-      { name: 'Platform Trading Access Duration', normal: 'Free Tier', monthly: '30 Days (AutoPay)', yearly: '365 Days (AutoPay)', highest: '365 Days (AutoPay)', masterclass: 'Standard Free Tier (No Sub)', lifetime: '👑 Permanent Lifetime (Never Expires)' },
+      { name: 'Platform Trading Access Duration', normal: 'Free Tier', monthly: '30 Days Access', yearly: '365 Days Access', highest: '365 Days Access', masterclass: 'Standard Free Tier (No Sub)', lifetime: '👑 Permanent Lifetime (Never Expires)' },
       { name: 'Masterclass Coaching Access', normal: '—', monthly: '—', yearly: '—', highest: '—', masterclass: '✓ Full 1-Year Batches & Vault', lifetime: '✓ All Batches & Lifetime Vault' },
       { name: 'Tournament Eligibility', normal: 'Open Tournaments', monthly: 'Yearly+, Monthly+ & Open', yearly: 'Yearly+, Monthly+ & Open', highest: '👑 VIP Exclusives + All', masterclass: 'Open Tournaments', lifetime: '👑 Yearly+, Monthly+ & Open (Forever)' },
       { name: 'Leaderboard Badge', normal: 'Starter', monthly: '⚡ PRO', yearly: '⭐ YEARLY', highest: '👑 VIP Gold Crown', masterclass: '🎓 MASTERCLASS SCHOLAR', lifetime: '👑 LIFETIME ELITE' },
@@ -278,7 +261,7 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> 3 Active Price Alerts</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> 1 Portfolio Reset / month</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> Open / Free Tournaments</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}><X size={16} style={{ opacity: 0.3, flexShrink: 0 }}/> <s style={{ opacity: 0.6 }}>Daily Pre-Market Report</s></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}><X size={16} style={{ opacity: 0.3, flexShrink: 0 }}/> <s style={{ opacity: 0.6 }}>Daily Market Structure Study</s></li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}><X size={16} style={{ opacity: 0.3, flexShrink: 0 }}/> <s style={{ opacity: 0.6 }}>Live Classes by NISM Mentor</s></li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}><X size={16} style={{ opacity: 0.3, flexShrink: 0 }}/> <s style={{ opacity: 0.6 }}>VIP Exclusive Tournaments</s></li>
           </ul>
@@ -315,7 +298,7 @@ export default function PricingView({ setActiveTab }) {
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#93C5FD' }}><FileText size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Key Levels)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#93C5FD' }}><FileText size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>Daily Market Structure Study</strong> (Chart Notes)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> <strong>4 Watchlists</strong> (75 symbols/list)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> 500 Orders / day limit</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#3B82F6', flexShrink: 0 }}/> Full 20-Depth Market Depth (Level 2)</li>
@@ -373,7 +356,7 @@ export default function PricingView({ setActiveTab }) {
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#FDE047' }}><FileText size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Key Levels)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#FDE047' }}><FileText size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> <strong>Daily Market Structure Study</strong> (Chart Notes)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> <strong>4 Watchlists</strong> (75 symbols/list)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> 500 Orders / day limit</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' }}><Check size={16} style={{ color: '#F59E0B', flexShrink: 0 }}/> Full 20-Depth Market Depth (Level 2)</li>
@@ -433,7 +416,7 @@ export default function PricingView({ setActiveTab }) {
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><GraduationCap size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Webinar Sessions</strong> (Basics to Adv)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FDE047' }}><Award size={16} style={{ color: '#FCD34D', flexShrink: 0 }}/> <strong>Doubt Clearing by NISM-Certified Mentor</strong></li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><FileText size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>Daily Pre-Market Report</strong> (Priority Levels)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><FileText size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>Daily Market Structure Study</strong> (Priority Notes)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Crown size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> <strong>5 Watchlists</strong> (100 symbols/list - Maximum)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Unlimited Orders / day (No limit)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#E9D5FF' }}><Check size={16} style={{ color: '#C084FC', flexShrink: 0 }}/> Full 20-Depth Market Depth (Level 2)</li>
@@ -557,8 +540,8 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '700', color: '#FECDD3' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> <strong>FULL STOCK MARKET MASTERCLASS INCLUDED</strong></li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Live Classes & Doubt Sessions by NISM Mentor</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Lifetime Recording Vault & Study Notes</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> 1-on-1 Personal Mentorship & Portfolio Reviews</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Daily Pre-Market Reports & 25 Price Alerts (Lifetime)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> 1-on-1 Platform Guidance & Paper Trade Review</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Daily Market Structure Study & 25 Price Alerts (Lifetime)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Yearly+ & Monthly+ Tournaments Forever</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#FB7185', flexShrink: 0 }}/> Dedicated 24/7 VIP Concierge Support</li>
           </ul>

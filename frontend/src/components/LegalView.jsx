@@ -369,13 +369,13 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                     </tr>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Banking & Financial</td>
-                      <td style={{ padding: '10px' }}>Bank Account Number, IFSC Code, UPI ID, Razorpay Transaction Reference IDs</td>
-                      <td style={{ padding: '10px' }}>Fund deposit / payout requests</td>
+                      <td style={{ padding: '10px' }}>Bank Account Number, IFSC Code, UPI ID, Cashfree Transaction Reference IDs</td>
+                      <td style={{ padding: '10px' }}>Subscription & contest reward processing</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Trading & Activity</td>
-                      <td style={{ padding: '10px' }}>Order history, positions, executions, margins, realized P&L, trading journal entries</td>
-                      <td style={{ padding: '10px' }}>Generated through order routing and matching</td>
+                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Simulation & Activity</td>
+                      <td style={{ padding: '10px' }}>Simulated paper order history, virtual positions, virtual P&L, trading journal entries</td>
+                      <td style={{ padding: '10px' }}>Generated through educational paper trading simulator</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Technical & Security</td>
@@ -388,10 +388,10 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>3. Lawful Basis and Purpose of Processing</h2>
               <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                <li><strong>Contractual Performance:</strong> Providing algorithmic order routing, options chains, paper trading simulations, and trade ledger updates.</li>
-                <li><strong>Statutory & Regulatory Obligations:</strong> Compliance with the Prevention of Money Laundering Act (PMLA), 2002, SEBI regulatory record-keeping rules, and Income Tax Department TDS requirements.</li>
-                <li><strong>Security & Legitimate Use:</strong> Detecting multi-accounting, preventing unauthorized brute-force logins, enforcing advisory locks against double-spending, and maintaining trade audit logs.</li>
-                <li><strong>Explicit Consent:</strong> Optional product announcements, research updates, and performance telemetry (can be withdrawn at any time).</li>
+                <li><strong>Contractual Performance:</strong> Providing educational market structure analytics, options chain study tools, virtual paper trading simulations, and software access.</li>
+                <li><strong>Statutory & Regulatory Obligations:</strong> Compliance with the Digital Personal Data Protection (DPDP) Act, 2023, Information Technology Act, 2000, and applicable Indian tax laws.</li>
+                <li><strong>Security & Legitimate Use:</strong> Detecting multi-accounting, preventing unauthorized brute-force logins, enforcing database locks, and maintaining system audit logs.</li>
+                <li><strong>Explicit Consent:</strong> Optional product announcements, educational study notes, and performance telemetry (can be withdrawn at any time).</li>
               </ul>
               <p style={{ fontWeight: '700', color: '#10b981', marginTop: '8px' }}>
                 SkandX NEVER sells, monetizes, or rents personal data to third-party advertising brokers.
@@ -399,8 +399,8 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>4. Data Retention Schedule</h2>
               <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                <li><strong>Active User Accounts:</strong> Maintained for the lifetime of your active trading relationship.</li>
-                <li><strong>Financial & Trade Ledgers:</strong> Retained for a mandatory statutory duration of <strong>8 years</strong> under the Prevention of Money Laundering (Maintenance of Records) Rules, 2005.</li>
+                <li><strong>Active User Accounts:</strong> Maintained for the lifetime of your active platform membership.</li>
+                <li><strong>Subscription & Billing Ledgers:</strong> Retained for a mandatory statutory duration of <strong>8 years</strong> under applicable Indian tax and accounting record-keeping rules.</li>
                 <li><strong>Session & Security Logs:</strong> Retained on a rolling 180-day window in compliance with CERT-In directions.</li>
                 <li><strong>Deactivated Accounts:</strong> Personal identification data is erased following statutory audit clearances, subject to mandatory regulatory retention requirements.</li>
               </ul>
@@ -409,8 +409,8 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
               <p>We work exclusively with ISO-27001 and SOC-2 compliant technical data processors:</p>
               <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
                 <li><strong>Google Cloud Platform & Firebase:</strong> VPC infrastructure hosting, PostgreSQL storage, and SMS One-Time Passwords.</li>
-                <li><strong>Razorpay Software Pvt. Ltd.:</strong> PCI-DSS Level 1 certified payment gateway (card numbers are never stored on SkandX servers).</li>
-                <li><strong>Fyers API / Exchange Gateways:</strong> Official authorized gateways for live market tick feeds (NSE, BSE, MCX).</li>
+                <li><strong>Cashfree Payments India Pvt. Ltd.:</strong> RBI-authorized Payment Aggregator and PCI-DSS Level 1 certified payment gateway (card/UPI credentials are never stored on SkandX servers).</li>
+                <li><strong>Market Data Providers:</strong> Authorized data feeds for delayed/educational market chart visualization.</li>
               </ul>
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>6. Data Principal Rights (Under DPDP Act 2023 & GDPR)</h2>
@@ -477,12 +477,12 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>1. Acceptance of Terms</h2>
               <p>
-                By accessing or using the SkandX website (https://skandx.in), our mobile applications, or APIs, you agree to be bound by these Terms of Service. If you do not agree to these terms in full, you must discontinue platform use immediately.
+                By accessing or using the SkandX website (https://skandx.in), our mobile applications, or software tools, you agree to be bound by these Terms of Service. If you do not agree to these terms in full, you must discontinue platform use immediately.
               </p>
 
-              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>2. Platform Nature & Algorithmic Simulator</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>2. Platform Nature, Educational Paper Trading Simulator & Non-Advisory Disclaimer</h2>
               <p>
-                SkandX provides algorithmic order routing tools, technical analytics, and educational market simulation terminals. Simulated funds, paper trading portfolios, and virtual wallets do not represent legal tender or real money balances.
+                SkandX is strictly an <strong>educational virtual paper trading simulator, market analytics software, and financial literacy platform</strong>. Simulated funds, paper trading portfolios, and virtual wallets on SkandX are 100% virtual and do not represent real money, deposits, or securities trading. SkandX is <strong>NOT</strong> a stockbroker, sub-broker, investment adviser (IA), or research analyst (RA), and does not provide any investment advice, stock tips, buy/sell recommendations, or portfolio management services. All subscription fees are charged solely for software platform access and educational masterclass training.
               </p>
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>3. User Responsibilities & Account Security</h2>
