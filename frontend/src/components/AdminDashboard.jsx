@@ -1429,10 +1429,10 @@ export default function AdminDashboard() {
   }, []);
 
   // Cashfree Gateway Admin State
-  const [rzpKeyId, setRzpKeyId] = useState('');
+  const [rzpKeyId, setRzpKeyId] = useState('1452861a6397bf879fcc16adc0b1682541');
   const [rzpKeySecret, setRzpKeySecret] = useState('');
   const [rzpEnvironment, setRzpEnvironment] = useState('PRODUCTION');
-  const [rzpHasSecret, setRzpHasSecret] = useState(false);
+  const [rzpHasSecret, setRzpHasSecret] = useState(true);
   const [rzpLoading, setRzpLoading] = useState(false);
   const [rzpSaving, setRzpSaving] = useState(false);
   const [rzpStatusMsg, setRzpStatusMsg] = useState({ type: '', text: '' });
