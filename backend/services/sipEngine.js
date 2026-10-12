@@ -544,9 +544,19 @@ class SIPEngine {
     }, { timezone: 'Asia/Kolkata' });
 
     // Initial check on server startup (delayed 8-10 seconds for DB/network warmup)
+    // Guarded to daytime hours (09:00 AM - 10:59 PM IST) so midnight restarts don't trigger SIPs before morning cron
     setTimeout(() => {
-      SIPEngine.processDueSips(priceCache);
-      SIPEngine.processPendingMutualFundOrders(priceCache);
+      const istHour = Number(
+        new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          hour12: false
+        }).format(new Date())
+      );
+      if (istHour >= 9 && istHour < 23) {
+        SIPEngine.processDueSips(priceCache);
+        SIPEngine.processPendingMutualFundOrders(priceCache);
+      }
     }, 8000);
   }
 }

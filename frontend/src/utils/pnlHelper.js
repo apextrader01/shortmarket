@@ -28,8 +28,8 @@ const istTimeFormatter = new Intl.DateTimeFormat('en-CA', {
 });
 
 /**
- * Returns the timestamp marking the start of the current trading session (07:55 AM IST).
- * Any trade between 07:55 AM today and 07:54:59 AM tomorrow belongs to the same trading day.
+ * Returns the timestamp marking the start of the current trading session (08:05 AM IST - Morning Cron Job).
+ * Any trade between 08:05 AM today and 08:04:59 AM tomorrow belongs to the same trading day.
  */
 export const getTradingSessionStartIST = (refDate = new Date()) => {
   const d = new Date(refDate);
@@ -41,9 +41,9 @@ export const getTradingSessionStartIST = (refDate = new Date()) => {
   const hour = parseInt(getPart('hour') || '0', 10);
   const minute = parseInt(getPart('minute') || '0', 10);
 
-  let sessionStart = new Date(`${year}-${month}-${day}T07:55:00+05:30`);
-  // Before 07:55 AM IST, the active trading session belongs to yesterday's cycle
-  if (hour < 7 || (hour === 7 && minute < 55)) {
+  let sessionStart = new Date(`${year}-${month}-${day}T08:05:00+05:30`);
+  // Before 08:05 AM IST (Morning Cron Job), the active trading session belongs to yesterday's cycle
+  if (hour < 8 || (hour === 8 && minute < 5)) {
     sessionStart = new Date(sessionStart.getTime() - 24 * 60 * 60 * 1000);
   }
   return sessionStart;
@@ -68,7 +68,7 @@ export const isToday = (dateString) => {
   const sessionStart = getTradingSessionStartIST(now);
   const nextSessionStart = new Date(sessionStart.getTime() + 24 * 60 * 60 * 1000);
   
-  // Active trading day: From 07:55 AM today until 07:55 AM tomorrow
+  // Active trading day: From 08:05 AM today until 08:05 AM tomorrow
   return d.getTime() >= sessionStart.getTime() && d.getTime() < nextSessionStart.getTime();
 };
 
