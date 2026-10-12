@@ -9912,6 +9912,88 @@ app.post('/api/telegram/test', authenticateToken, async (req, res) => {
   }
 });
 
+// 🌐 Official Social Media & Support Channels Configuration (Instagram, Facebook, WhatsApp, Telegram)
+const DEFAULT_SOCIAL_LINKS = {
+  instagram: 'https://www.instagram.com/skandx.in',
+  facebook: 'https://www.facebook.com/skandx.in',
+  whatsapp: 'https://wa.me/919497861379?text=Hello%20SkandX%20Team%2C%20I%20need%20help%20with%20my%20account.',
+  whatsappNumber: '+919497861379',
+  telegram: 'https://t.me/skandx_official',
+  telegramBot: 'https://t.me/SkandXAlerts_bot'
+};
+let cachedSocialLinks = null;
+let cachedSocialLinksAt = 0;
+
+async function getPlatformSocialLinks() {
+  const now = Date.now();
+  if (cachedSocialLinks && now - cachedSocialLinksAt < 60000) {
+    return cachedSocialLinks;
+  }
+  try {
+    const row = await db('system_settings').where({ key: 'platform_social_links' }).first();
+    if (row && row.value) {
+      const parsed = JSON.parse(row.value);
+      cachedSocialLinks = { ...DEFAULT_SOCIAL_LINKS, ...parsed };
+      cachedSocialLinksAt = now;
+      return cachedSocialLinks;
+    }
+  } catch (e) {}
+  cachedSocialLinks = { ...DEFAULT_SOCIAL_LINKS };
+  cachedSocialLinksAt = now;
+  return cachedSocialLinks;
+}
+
+app.get('/api/social-links', async (req, res) => {
+  try {
+    const links = await getPlatformSocialLinks();
+    res.json({ success: true, links });
+  } catch (err) {
+    res.json({ success: true, links: DEFAULT_SOCIAL_LINKS });
+  }
+});
+
+app.post('/api/admin/social-links', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+
+    const current = await getPlatformSocialLinks();
+    const { instagram, facebook, whatsapp, whatsappNumber, telegram, telegramBot } = req.body || {};
+
+    let cleanWa = whatsapp !== undefined ? String(whatsapp).trim() : current.whatsapp;
+    const cleanWaNum = whatsappNumber !== undefined ? String(whatsappNumber).trim() : current.whatsappNumber;
+    if (whatsappNumber && (!whatsapp || whatsapp === current.whatsapp)) {
+      const digits = cleanWaNum.replace(/[^0-9]/g, '');
+      if (digits.length >= 10) {
+        cleanWa = `https://wa.me/${digits}?text=Hello%20SkandX%20Team%2C%20I%20need%20help%20with%20my%20account.`;
+      }
+    }
+
+    const updated = {
+      instagram: instagram !== undefined && String(instagram).trim() ? String(instagram).trim() : current.instagram,
+      facebook: facebook !== undefined && String(facebook).trim() ? String(facebook).trim() : current.facebook,
+      whatsapp: cleanWa || DEFAULT_SOCIAL_LINKS.whatsapp,
+      whatsappNumber: cleanWaNum || DEFAULT_SOCIAL_LINKS.whatsappNumber,
+      telegram: telegram !== undefined && String(telegram).trim() ? String(telegram).trim() : current.telegram,
+      telegramBot: telegramBot !== undefined && String(telegramBot).trim() ? String(telegramBot).trim() : current.telegramBot
+    };
+
+    const payload = JSON.stringify(updated);
+    const exists = await db('system_settings').where({ key: 'platform_social_links' }).first();
+    if (exists) {
+      await db('system_settings').where({ key: 'platform_social_links' }).update({ value: payload, updated_at: new Date() });
+    } else {
+      await db('system_settings').insert({ key: 'platform_social_links', value: payload, updated_at: new Date() });
+    }
+
+    cachedSocialLinks = updated;
+    cachedSocialLinksAt = Date.now();
+    res.json({ success: true, message: 'Social & Support links updated across SkandX!', links: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 🛡️ Admin Telegram Traffic & Peak Protection Endpoints
 app.get('/api/admin/telegram/config', authenticateToken, async (req, res) => {
   try {

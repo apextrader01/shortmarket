@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { playTargetHitSound } from './utils/soundManager';
 import { applyDynamicSEO } from './utils/seoEngine';
+import { useSocialLinks } from './utils/socialLinks';
 import logoImg from './assets/logo.png';
 
 // ⚡ Resilient Lazy Loader: Auto-reloads on deployment chunk hash changes
@@ -449,6 +450,7 @@ function App() {
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const { links: socialLinks } = useSocialLinks();
   const [showCalculatorsModal, setShowCalculatorsModal] = useState(false);
   const [calculatorsInitialTab, setCalculatorsInitialTab] = useState('SIP');
   const [calculatorsInitialType, setCalculatorsInitialType] = useState(() => {
@@ -2191,6 +2193,25 @@ function App() {
               )}
             </div>
           ))}
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-color)', marginTop: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Official Channels &amp; Support
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(225, 48, 108, 0.14)', border: '1px solid rgba(225, 48, 108, 0.35)', color: '#f472b6', fontSize: '11.5px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📸</span> Instagram
+              </a>
+              <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(24, 119, 242, 0.14)', border: '1px solid rgba(24, 119, 242, 0.35)', color: '#60a5fa', fontSize: '11.5px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📘</span> Facebook
+              </a>
+              <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(37, 211, 102, 0.14)', border: '1px solid rgba(37, 211, 102, 0.35)', color: '#4ade80', fontSize: '11.5px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>💬</span> WhatsApp
+              </a>
+              <a href={socialLinks.telegram} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 136, 204, 0.15)', border: '1px solid rgba(0, 136, 204, 0.35)', color: '#38bdf8', fontSize: '11.5px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>✈️</span> Telegram
+              </a>
+            </div>
+          </div>
           <div className="mobile-menu-item" onClick={logout} style={{ color: 'var(--color-red)', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
             <LogOut size={20} />
             Logout

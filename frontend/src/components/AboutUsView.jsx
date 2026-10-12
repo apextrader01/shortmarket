@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Phone, Mail, Globe, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { useSocialLinks } from '../utils/socialLinks';
 
 export default function AboutUsView({ setActiveTab }) {
   const [openPolicy, setOpenPolicy] = useState(null);
+  const { links: socialLinks } = useSocialLinks();
 
   const togglePolicy = (index) => {
     setOpenPolicy(openPolicy === index ? null : index);
@@ -93,7 +95,7 @@ export default function AboutUsView({ setActiveTab }) {
         </div>
 
         {/* Contact Info */}
-        <div style={{ marginBottom: '40px' }}>
+        <div style={{ marginBottom: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <Phone size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
@@ -132,6 +134,117 @@ export default function AboutUsView({ setActiveTab }) {
                 SkandX, Trivandrum, Kerala
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Official Social Channels & Direct Support */}
+        <div className="glass-panel" style={{ padding: '22px', marginBottom: '36px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-primary)' }}>
+            Official Channels &amp; Direct Support
+          </h3>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', marginTop: 0 }}>
+            Follow our official channels for daily market analysis, option setups, and instant 1-on-1 trader support:
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+            <a
+              href={socialLinks.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(225, 48, 108, 0.16), rgba(131, 58, 180, 0.16))',
+                border: '1px solid rgba(225, 48, 108, 0.4)',
+                color: '#f472b6',
+                textDecoration: 'none',
+                fontWeight: '700',
+                fontSize: '13px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>📸</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: '800' }}>Instagram</div>
+                <div style={{ fontSize: '11px', color: '#f472b6' }}>Follow Channel →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(24, 119, 242, 0.14)',
+                border: '1px solid rgba(24, 119, 242, 0.4)',
+                color: '#60a5fa',
+                textDecoration: 'none',
+                fontWeight: '700',
+                fontSize: '13px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>📘</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: '800' }}>Facebook Page</div>
+                <div style={{ fontSize: '11px', color: '#60a5fa' }}>Visit Official Page →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(37, 211, 102, 0.14)',
+                border: '1px solid rgba(37, 211, 102, 0.4)',
+                color: '#4ade80',
+                textDecoration: 'none',
+                fontWeight: '700',
+                fontSize: '13px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>💬</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: '800' }}>WhatsApp Desk</div>
+                <div style={{ fontSize: '11px', color: '#4ade80' }}>{socialLinks.whatsappNumber || '+91 9497861379'} →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.telegram}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(0, 136, 204, 0.16)',
+                border: '1px solid rgba(0, 136, 204, 0.4)',
+                color: '#38bdf8',
+                textDecoration: 'none',
+                fontWeight: '700',
+                fontSize: '13px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>✈️</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: '800' }}>Telegram</div>
+                <div style={{ fontSize: '11px', color: '#38bdf8' }}>Join Channel →</div>
+              </div>
+            </a>
           </div>
         </div>
 

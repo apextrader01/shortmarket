@@ -7,6 +7,7 @@ import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Key
 import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
+import { useSocialLinks } from '../utils/socialLinks';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
@@ -29,6 +30,8 @@ function Card({ title, desc, icon: Icon, color, onClick, badge }) {
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const { links: socialLinks } = useSocialLinks();
+  const [showSupportChannelsModal, setShowSupportChannelsModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -1051,25 +1054,140 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
         </div>
 
+        {/* Official Social Channels & Instant Connect */}
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>
+            Official Channels &amp; Direct Support
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px' }}>
+            <a
+              href={socialLinks.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-panel hoverable"
+              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', border: '1px solid rgba(225, 48, 108, 0.35)' }}
+            >
+              <div style={{ background: 'rgba(225, 48, 108, 0.15)', padding: '10px', borderRadius: '8px', fontSize: '18px' }}>📸</div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>Instagram Channel</div>
+                <div style={{ fontSize: '11px', color: '#f472b6', fontWeight: '600' }}>Follow Official Updates →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-panel hoverable"
+              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', border: '1px solid rgba(24, 119, 242, 0.35)' }}
+            >
+              <div style={{ background: 'rgba(24, 119, 242, 0.15)', padding: '10px', borderRadius: '8px', fontSize: '18px' }}>📘</div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>Facebook Page</div>
+                <div style={{ fontSize: '11px', color: '#60a5fa', fontWeight: '600' }}>Join Facebook Community →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-panel hoverable"
+              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', border: '1px solid rgba(37, 211, 102, 0.35)' }}
+            >
+              <div style={{ background: 'rgba(37, 211, 102, 0.15)', padding: '10px', borderRadius: '8px', fontSize: '18px' }}>💬</div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>WhatsApp Account</div>
+                <div style={{ fontSize: '11px', color: '#4ade80', fontWeight: '600' }}>Chat on {socialLinks.whatsappNumber || '+91 9497861379'} →</div>
+              </div>
+            </a>
+
+            <a
+              href={socialLinks.telegram}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-panel hoverable"
+              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', border: '1px solid rgba(0, 136, 204, 0.35)' }}
+            >
+              <div style={{ background: 'rgba(0, 136, 204, 0.15)', padding: '10px', borderRadius: '8px', fontSize: '18px' }}>✈️</div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>Telegram Channel</div>
+                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Join Live Signals &amp; Alerts →</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
         {/* OneHelp */}
-        <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
+        <div
+          className="glass-panel hoverable"
+          onClick={() => setShowSupportChannelsModal(true)}
+          style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}
+        >
           <div>
             <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              OneHelp
+              OneHelp &amp; Direct Connect
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Connect with us on WhatsApp, Telegram, Instagram or Facebook</div>
           </div>
-          <button style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-            KNOW MORE
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowSupportChannelsModal(true); }}
+            style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+          >
+            CONNECT NOW
           </button>
         </div>
       </div>
       
-      {/* Floating Ask Angel / Support Button */}
-      <div className="support-fab" style={{ position: 'fixed', bottom: isMobile ? '70px' : '30px', right: isMobile ? '16px' : '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
+      {/* Floating Ask Support Button */}
+      <div
+        className="support-fab"
+        onClick={() => setShowSupportChannelsModal(true)}
+        style={{ position: 'fixed', bottom: isMobile ? '70px' : '30px', right: isMobile ? '16px' : '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}
+      >
         <HelpCircle size={18} />
         <span style={{ fontSize: '13px', fontWeight: '700' }}>Ask Support</span>
       </div>
+
+      {/* Support & Social Channels Modal */}
+      {showSupportChannelsModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '22px', position: 'relative', borderRadius: '14px' }}>
+            <button
+              onClick={() => setShowSupportChannelsModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}
+            >&times;</button>
+            <h3 style={{ fontSize: '17px', fontWeight: '800', marginBottom: '6px', color: 'var(--text-primary)' }}>
+              Connect with SkandX Official Channels
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Reach our team on WhatsApp or follow our official Telegram, Instagram, and Facebook channels:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(37, 211, 102, 0.14)', border: '1px solid rgba(37, 211, 102, 0.4)', color: '#4ade80', textDecoration: 'none', fontWeight: '800', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>💬 WhatsApp Support ({socialLinks.whatsappNumber || '+91 9497861379'})</span>
+                <span>Open ↗</span>
+              </a>
+              <a href={socialLinks.telegram} target="_blank" rel="noopener noreferrer" style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(0, 136, 204, 0.16)', border: '1px solid rgba(0, 136, 204, 0.4)', color: '#38bdf8', textDecoration: 'none', fontWeight: '800', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>✈️ Official Telegram Channel</span>
+                <span>Join ↗</span>
+              </a>
+              <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(225, 48, 108, 0.15)', border: '1px solid rgba(225, 48, 108, 0.4)', color: '#f472b6', textDecoration: 'none', fontWeight: '800', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>📸 Official Instagram Channel</span>
+                <span>Follow ↗</span>
+              </a>
+              <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(24, 119, 242, 0.15)', border: '1px solid rgba(24, 119, 242, 0.4)', color: '#60a5fa', textDecoration: 'none', fontWeight: '800', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>📘 Official Facebook Page</span>
+                <span>Visit ↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Hotkeys Modal */}
       {showHotkeysModal && (

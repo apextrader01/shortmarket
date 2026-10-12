@@ -12,6 +12,7 @@ import {
   Search, ChevronDown, Activity, ArrowUpRight,
   Sliders, Target, Play
 } from 'lucide-react';
+import { useSocialLinks } from '../utils/socialLinks';
 
 export default function LandingHomeView({
   onOpenPaperTrading,
@@ -26,6 +27,7 @@ export default function LandingHomeView({
   onOpenLeaderboard,
   onOpenAlgoBridge
 }) {
+  const { links: socialLinks } = useSocialLinks();
   // ─── Category & Hub Search State ───
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -2827,6 +2829,110 @@ export default function LandingHomeView({
               <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenCalculators('all')}>Calculators</span>
               <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onOpenWealthFinance('NET_WORTH')}>Wealth OS &amp; Tax</span>
               <span style={{ cursor: 'pointer', color: '#38bdf8' }} onClick={() => onOpenAlgoBridge('Dashboard')}>SkandX Algo</span>
+            </div>
+          </div>
+
+          {/* Official Social Channels & Direct Connect Bar */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            padding: '12px 14px',
+            background: 'rgba(15, 23, 42, 0.78)',
+            border: '1px solid rgba(56, 189, 248, 0.2)',
+            borderRadius: '12px'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#38bdf8' }}>🌐 Connect with SkandX Official Channels:</span>
+              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '500' }}>Live Market Updates, Signals &amp; 24/7 Trader Support</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <a
+                href={socialLinks.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(225, 48, 108, 0.2), rgba(131, 58, 180, 0.2))',
+                  border: '1px solid rgba(225, 48, 108, 0.45)',
+                  color: '#f472b6',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  textDecoration: 'none'
+                }}
+              >
+                <span>📸</span>
+                <span>Instagram</span>
+              </a>
+              <a
+                href={socialLinks.facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(24, 119, 242, 0.16)',
+                  border: '1px solid rgba(24, 119, 242, 0.45)',
+                  color: '#60a5fa',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  textDecoration: 'none'
+                }}
+              >
+                <span>📘</span>
+                <span>Facebook</span>
+              </a>
+              <a
+                href={socialLinks.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(37, 211, 102, 0.16)',
+                  border: '1px solid rgba(37, 211, 102, 0.45)',
+                  color: '#4ade80',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  textDecoration: 'none'
+                }}
+              >
+                <span>💬</span>
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href={socialLinks.telegram}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 136, 204, 0.18)',
+                  border: '1px solid rgba(0, 136, 204, 0.45)',
+                  color: '#38bdf8',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  textDecoration: 'none'
+                }}
+              >
+                <span>✈️</span>
+                <span>Telegram</span>
+              </a>
             </div>
           </div>
 

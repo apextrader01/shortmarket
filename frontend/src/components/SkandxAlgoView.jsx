@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore, API } from '../store';
 import AlgoPaymentGatewayModal from './AlgoPaymentGatewayModal';
 import DeployAlgoModal from './DeployAlgoModal';
+import { useSocialLinks } from '../utils/socialLinks';
 import logoImg from '../assets/logo.png';
 import {
   X, Layers, ShieldCheck, Zap, Copy, RefreshCw, Send, CheckCircle2,
@@ -34,6 +35,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const user = useStore(state => state.user);
   const marketStocks = useStore(state => state.stocks);
   const isAdmin = Boolean(user?.is_admin);
+  const { links: socialLinks, saveSocialLinks } = useSocialLinks();
+  const [socialForm, setSocialForm] = useState(socialLinks);
+
+  useEffect(() => {
+    setSocialForm(socialLinks);
+  }, [socialLinks]);
 
   // Active Navigation Tab
   const [activeMenu, setActiveMenu] = useState(() => {
@@ -1465,10 +1472,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </>
             )}
 
-            <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b' }}>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Broker Gateway</div>
-              <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
-                Angel One SmartAPI
+            <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Broker Gateway</div>
+                <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
+                  Angel One SmartAPI
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" title="Instagram Channel" style={{ background: 'rgba(225,48,108,0.14)', border: '1px solid rgba(225,48,108,0.35)', borderRadius: '6px', padding: '6px 0', textAlign: 'center', textDecoration: 'none', fontSize: '13px' }}>📸</a>
+                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" title="Facebook Page" style={{ background: 'rgba(24,119,242,0.14)', border: '1px solid rgba(24,119,242,0.35)', borderRadius: '6px', padding: '6px 0', textAlign: 'center', textDecoration: 'none', fontSize: '13px' }}>📘</a>
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" title="WhatsApp Support" style={{ background: 'rgba(37,211,102,0.14)', border: '1px solid rgba(37,211,102,0.35)', borderRadius: '6px', padding: '6px 0', textAlign: 'center', textDecoration: 'none', fontSize: '13px' }}>💬</a>
+                <a href={socialLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram Channel" style={{ background: 'rgba(0,136,204,0.15)', border: '1px solid rgba(0,136,204,0.35)', borderRadius: '6px', padding: '6px 0', textAlign: 'center', textDecoration: 'none', fontSize: '13px' }}>✈️</a>
               </div>
             </div>
           </nav>
@@ -4461,6 +4476,71 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           🔄 Force Reset All Expired Sessions
                         </button>
                       </div>
+                    </div>
+
+                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '4px' }}>
+                        🌐 Official Social Media &amp; Support Channels (Instagram, Facebook, WhatsApp, Telegram)
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '14px' }}>
+                        Update your official channel links here — changes apply live across the Home Page, About Us, Profile, Mobile Menu, and Algo Suite.
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#f472b6', fontWeight: '700' }}>📸 Instagram Channel URL</label>
+                          <input
+                            type="url"
+                            value={socialForm.instagram || ''}
+                            onChange={e => setSocialForm(prev => ({ ...prev, instagram: e.target.value }))}
+                            placeholder="https://www.instagram.com/your_channel"
+                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#60a5fa', fontWeight: '700' }}>📘 Facebook Page URL</label>
+                          <input
+                            type="url"
+                            value={socialForm.facebook || ''}
+                            onChange={e => setSocialForm(prev => ({ ...prev, facebook: e.target.value }))}
+                            placeholder="https://www.facebook.com/your_page"
+                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#4ade80', fontWeight: '700' }}>💬 WhatsApp Account Link / Number</label>
+                          <input
+                            type="text"
+                            value={socialForm.whatsapp || ''}
+                            onChange={e => setSocialForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                            placeholder="https://wa.me/919497861379"
+                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '700' }}>✈️ Telegram Channel URL</label>
+                          <input
+                            type="url"
+                            value={socialForm.telegram || ''}
+                            onChange={e => setSocialForm(prev => ({ ...prev, telegram: e.target.value }))}
+                            placeholder="https://t.me/your_channel"
+                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await saveSocialLinks(socialForm);
+                            showToast('Social & Support channel links updated across SkandX!');
+                          } catch (err) {
+                            showToast(err.message || 'Failed to save social links', 'error');
+                          }
+                        }}
+                        style={{ padding: '10px 18px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                      >
+                        💾 Save Social &amp; Support Links
+                      </button>
                     </div>
                   </>
                 )}
