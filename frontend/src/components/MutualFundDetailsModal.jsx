@@ -4,6 +4,35 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
 
+const getAmcDefaultMinimums = (amcOrName = '') => {
+    const str = String(amcOrName || '').toLowerCase();
+    if (str.includes('hdfc')) return { minSip: 100, minLumpsum: 100 };
+    if (str.includes('icici')) return { minSip: 100, minLumpsum: 5000 };
+    if (str.includes('sbi')) return { minSip: 500, minLumpsum: 5000 };
+    if (str.includes('nippon')) return { minSip: 100, minLumpsum: 500 };
+    if (str.includes('parag parikh') || str.includes('ppfas')) return { minSip: 1000, minLumpsum: 1000 };
+    if (str.includes('quant')) return { minSip: 1000, minLumpsum: 5000 };
+    if (str.includes('mirae')) return { minSip: 500, minLumpsum: 5000 };
+    if (str.includes('motilal')) return { minSip: 500, minLumpsum: 500 };
+    if (str.includes('axis')) return { minSip: 100, minLumpsum: 500 };
+    if (str.includes('kotak')) return { minSip: 100, minLumpsum: 100 };
+    if (str.includes('tata')) return { minSip: 150, minLumpsum: 5000 };
+    if (str.includes('uti')) return { minSip: 500, minLumpsum: 5000 };
+    if (str.includes('aditya birla') || str.includes('absl')) return { minSip: 100, minLumpsum: 1000 };
+    if (str.includes('dsp')) return { minSip: 100, minLumpsum: 100 };
+    if (str.includes('bandhan') || str.includes('idfc')) return { minSip: 100, minLumpsum: 1000 };
+    if (str.includes('canara')) return { minSip: 1000, minLumpsum: 5000 };
+    if (str.includes('edelweiss')) return { minSip: 100, minLumpsum: 100 };
+    if (str.includes('franklin')) return { minSip: 500, minLumpsum: 5000 };
+    if (str.includes('invesco')) return { minSip: 500, minLumpsum: 1000 };
+    if (str.includes('lic')) return { minSip: 1000, minLumpsum: 5000 };
+    if (str.includes('sundaram')) return { minSip: 100, minLumpsum: 100 };
+    if (str.includes('hsbc')) return { minSip: 500, minLumpsum: 5000 };
+    if (str.includes('bajaj')) return { minSip: 500, minLumpsum: 500 };
+    if (str.includes('zerodha') || str.includes('navi') || str.includes('groww')) return { minSip: 100, minLumpsum: 100 };
+    return { minSip: 500, minLumpsum: 500 };
+};
+
 export default function MutualFundDetailsModal({ fund, onClose }) {
     const { fetchFundDetails, placeOrder, setupSip, holdings, user } = useStore(useShallow(state => ({ 
         fetchFundDetails: state.fetchFundDetails, 
@@ -15,6 +44,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [logoError, setLogoError] = useState(false);
     const [isInvesting, setIsInvesting] = useState(false);
     const [orderStatus, setOrderStatus] = useState(null); // null, 'success', 'error'
     const [statusMsg, setStatusMsg] = useState('');
@@ -23,9 +53,26 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const [actionMode, setActionMode] = useState(fund?.initialMode || 'INVEST'); // 'INVEST' | 'REDEEM'
     const [investType, setInvestType] = useState('MONTHLY_SIP'); // 'MONTHLY_SIP' | 'WEEKLY_SIP' | 'DAILY_SIP' | 'LUMPSUM'
     
-    // Inputs
-    const [amount, setAmount] = useState('5000');
+    const amcDefaults = useMemo(() => getAmcDefaultMinimums(`${fund?.amc || ''} ${fund?.name || ''}`), [fund?.amc, fund?.name]);
+    const minSipAmount = Math.max(1, Number(details?.min_sip_investment || fund?.min_sip_investment || fund?.minSip || amcDefaults.minSip || 500));
+    const minLumpsumAmount = Math.max(1, Number(details?.min_investment_amount || fund?.min_investment_amount || fund?.minLumpsum || details?.min_sip_investment || amcDefaults.minLumpsum || 500));
+    const isSipMode = investType === 'MONTHLY_SIP' || investType === 'WEEKLY_SIP' || investType === 'DAILY_SIP';
+    const minRequiredAmount = isSipMode ? minSipAmount : minLumpsumAmount;
+
+    // Inputs (linked dynamically to the AMC/fund minimum amount)
+    const [amount, setAmount] = useState(() => String(minSipAmount));
+    const [hasUserEditedAmount, setHasUserEditedAmount] = useState(false);
     const [redeemType, setRedeemType] = useState('ALL'); // 'ALL' | 'CUSTOM'
+
+    const handleInvestTypeChange = (nextType) => {
+        setInvestType(nextType);
+        const nextIsSip = nextType === 'MONTHLY_SIP' || nextType === 'WEEKLY_SIP' || nextType === 'DAILY_SIP';
+        const nextMin = nextIsSip ? minSipAmount : minLumpsumAmount;
+        if (!hasUserEditedAmount || Number(amount) < nextMin) {
+            setAmount(String(nextMin));
+            setHasUserEditedAmount(false);
+        }
+    };
     
     // Mobile responsive tab state
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -54,12 +101,21 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
     useEffect(() => {
         let mounted = true;
+        setLogoError(false);
         const load = async () => {
             setLoading(true);
             const data = await fetchFundDetails(fund.name);
             if (mounted) {
                 setDetails(data);
                 setLoading(false);
+                if (data) {
+                    const resolvedSipMin = Math.max(1, Number(data.min_sip_investment || fund?.min_sip_investment || fund?.minSip || amcDefaults.minSip || 500));
+                    const resolvedLumpMin = Math.max(1, Number(data.min_investment_amount || fund?.min_investment_amount || fund?.minLumpsum || data.min_sip_investment || amcDefaults.minLumpsum || 500));
+                    setAmount(prev => {
+                        if (hasUserEditedAmount) return prev;
+                        return String(isSipMode ? resolvedSipMin : resolvedLumpMin);
+                    });
+                }
             }
         };
         load();
@@ -119,7 +175,9 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
         try {
             if (actionMode === 'INVEST') {
-                if (numAmount < 100) throw new Error("Minimum investment is ₹100");
+                if (numAmount < minRequiredAmount) {
+                    throw new Error(`Minimum ${isSipMode ? 'SIP installment' : 'One-time investment'} for this fund is ₹${minRequiredAmount.toLocaleString('en-IN')}`);
+                }
                 
                 const qty = numAmount / currentNav;
                 
@@ -212,7 +270,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * Number(userHolding.quantity || 0) : 0;
     const holdingPnL = holdingCurrentValue - holdingInvested;
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
-    const isSubmitDisabled = isInvesting || !hasValidNav || (actionMode === 'INVEST' && Number(amount) < 100) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue);
+    const isSubmitDisabled = isInvesting || !hasValidNav || (actionMode === 'INVEST' && Number(amount) < minRequiredAmount) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue);
 
     return (
         <>
@@ -271,8 +329,8 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 {/* Header */}
                 <div className="mf-header" style={{ padding: isMobile ? '14px 16px' : '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
                     <div style={{ display: 'flex', gap: isMobile ? '12px' : '20px', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                        {details?.logo_url ? (
-                            <img src={details.logo_url} alt="AMC" style={{ width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', borderRadius: '8px', background: '#fff', padding: '4px', flexShrink: 0 }} />
+                        {details?.logo_url && !logoError ? (
+                            <img src={details.logo_url} alt="AMC" onError={() => setLogoError(true)} style={{ width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', borderRadius: '8px', background: '#fff', padding: '4px', flexShrink: 0, objectFit: 'contain' }} />
                         ) : (
                             <div style={{ width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', borderRadius: '8px', background: 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
                                 <TrendingUp size={isMobile ? 20 : 24} />
@@ -372,7 +430,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                     {(!isMobile || mobileTab === 'overview') && (
                     <div className="mf-modal-left" style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px' : '32px' }}>
                         {/* NAV & Key Metrics */}
-                        <div className="mf-metrics-grid" style={{ display: 'flex', gap: '48px', marginBottom: '32px' }}>
+                        <div className="mf-metrics-grid" style={{ display: 'flex', gap: '32px', marginBottom: '32px', flexWrap: 'wrap' }}>
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Current NAV</div>
                                 <div className="mf-nav-big" style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -387,7 +445,11 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             </div>
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Min SIP Amount</div>
-                                <div style={{ fontSize: '18px', fontWeight: '600' }}>₹{details?.min_sip_investment || 500}</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600' }}>₹{minSipAmount.toLocaleString('en-IN')}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Min One-Time</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600' }}>₹{minLumpsumAmount.toLocaleString('en-IN')}</div>
                             </div>
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Fund Size (AUM)</div>
@@ -632,32 +694,56 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                     {/* Sub Tabs */}
                                     <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'MONTHLY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                        <input type="radio" checked={investType === 'MONTHLY_SIP'} onChange={() => setInvestType('MONTHLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Monthly SIP
+                                        <input type="radio" checked={investType === 'MONTHLY_SIP'} onChange={() => handleInvestTypeChange('MONTHLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Monthly SIP
                                     </label>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'WEEKLY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                        <input type="radio" checked={investType === 'WEEKLY_SIP'} onChange={() => setInvestType('WEEKLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Weekly SIP
+                                        <input type="radio" checked={investType === 'WEEKLY_SIP'} onChange={() => handleInvestTypeChange('WEEKLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Weekly SIP
                                     </label>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'DAILY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                        <input type="radio" checked={investType === 'DAILY_SIP'} onChange={() => setInvestType('DAILY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Daily SIP
+                                        <input type="radio" checked={investType === 'DAILY_SIP'} onChange={() => handleInvestTypeChange('DAILY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Daily SIP
                                     </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'LUMPSUM' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                            <input type="radio" checked={investType === 'LUMPSUM'} onChange={() => setInvestType('LUMPSUM')} style={{ accentColor: 'var(--color-blue)' }} /> One-time
+                                            <input type="radio" checked={investType === 'LUMPSUM'} onChange={() => handleInvestTypeChange('LUMPSUM')} style={{ accentColor: 'var(--color-blue)' }} /> One-time
                                         </label>
                                     </div>
 
                                     {/* Input Amount */}
                                     <div style={{ marginBottom: '32px' }}>
-                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>{investType.includes('SIP') ? 'Installment Amount' : 'Investment Amount'}</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', transition: 'border-color 0.2s' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{investType.includes('SIP') ? 'Installment Amount' : 'Investment Amount'}</div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setAmount(String(minRequiredAmount)); setHasUserEditedAmount(false); }}
+                                                style={{
+                                                    fontSize: '11.5px',
+                                                    color: 'var(--color-blue-light, #60a5fa)',
+                                                    background: 'rgba(59, 130, 246, 0.12)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 8px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Min {isSipMode ? 'SIP' : 'One-time'}: ₹{minRequiredAmount.toLocaleString('en-IN')}
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-dark)', border: `1px solid ${Number(amount) < minRequiredAmount ? 'var(--color-red-light, #ef4444)' : 'var(--border-color)'}`, borderRadius: '12px', padding: '16px 20px', transition: 'border-color 0.2s' }}>
                                             <span style={{ fontSize: '24px', color: 'var(--text-secondary)', marginRight: '8px' }}>₹</span>
                                             <input 
                                                 type="number" 
+                                                min={minRequiredAmount}
                                                 value={amount}
-                                                onChange={(e) => setAmount(e.target.value)}
+                                                onChange={(e) => { setAmount(e.target.value); setHasUserEditedAmount(true); }}
                                                 style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '28px', fontWeight: '700', width: '100%', outline: 'none' }}
-                                                placeholder="5000"
+                                                placeholder={String(minRequiredAmount)}
                                             />
                                         </div>
+                                        {Number(amount) < minRequiredAmount && (
+                                            <div style={{ color: 'var(--color-red-light)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <XCircle size={12}/> Minimum {isSipMode ? 'SIP installment' : 'One-time investment'} for this fund is ₹{minRequiredAmount.toLocaleString('en-IN')}
+                                            </div>
+                                        )}
                                         {user && (Number(amount) > user.balance) && (
                                             <div style={{ color: 'var(--color-red-light)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <XCircle size={12}/> Insufficient Balance (Available: ₹{user.balance?.toLocaleString()})
