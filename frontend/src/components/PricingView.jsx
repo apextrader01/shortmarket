@@ -16,19 +16,24 @@ export default function PricingView({ setActiveTab }) {
 
   const loadCashfree = () => {
     return new Promise((resolve) => {
-      if (window.Cashfree) return resolve(true);
-      const existing = document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
+      if (typeof window.Cashfree === 'function') return resolve(true);
+      const existing = document.querySelector('script[src*="sdk.cashfree.com/js/v3/cashfree.js"]');
       if (existing) {
-        existing.addEventListener('load', () => resolve(true));
-        existing.addEventListener('error', () => resolve(false));
-        return;
+        try { existing.remove(); } catch (_) {}
       }
       const script = document.createElement('script');
       script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
       script.async = true;
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
+      const timer = setTimeout(() => resolve(typeof window.Cashfree === 'function'), 8000);
+      script.onload = () => {
+        clearTimeout(timer);
+        resolve(typeof window.Cashfree === 'function');
+      };
+      script.onerror = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
+      document.head.appendChild(script);
     });
   };
 
@@ -49,8 +54,12 @@ export default function PricingView({ setActiveTab }) {
           body: JSON.stringify({ order_id: cfReturnOrderId, plan: savedPlan })
         })
           .then(r => r.json())
-          .then(data => {
+          .then(async (data) => {
             if (data && data.success) {
+              try {
+                window._activeFetchUserDataPromise = null;
+                await useStore.getState().fetchUserData?.();
+              } catch (_) {}
               alert('🎉 Payment verified! Your SkandX subscription is now active.');
               window.history.replaceState({}, document.title, window.location.pathname);
               if (typeof setActiveTab === 'function') setActiveTab('ClientData');
@@ -65,13 +74,18 @@ export default function PricingView({ setActiveTab }) {
     setLoading(plan);
     try {
       const res = await loadCashfree();
-      if (!res || !window.Cashfree) {
-        alert('Cashfree Checkout SDK failed to load. Please check your internet connection.');
+      if (!res || typeof window.Cashfree !== 'function') {
+        alert('Cashfree Checkout SDK failed to load. Please refresh the page and try again.');
         setLoading(false);
         return;
       }
 
       const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Please sign in to your SkandX account first to subscribe.');
+        setLoading(false);
+        return;
+      }
       sessionStorage.setItem('skandx_pending_cf_plan', plan);
 
       const orderRes = await fetch(`${API}/api/payment/create-order`, {
@@ -140,6 +154,10 @@ export default function PricingView({ setActiveTab }) {
       });
       const verifyData = await verifyRes.json();
       if (verifyRes.ok && verifyData.success) {
+        try {
+          window._activeFetchUserDataPromise = null;
+          await useStore.getState().fetchUserData?.();
+        } catch (_) {}
         alert(`🎉 Successfully activated ${planTitle}! Your subscription is now active.`);
         if (typeof setActiveTab === 'function') setActiveTab('ClientData');
         else window.location.href = '/clientdata';

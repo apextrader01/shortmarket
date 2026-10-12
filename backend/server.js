@@ -785,6 +785,8 @@ app.use(helmet({
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
+        "https://sdk.cashfree.com",
+        "https://*.cashfree.com",
         "https://checkout.razorpay.com",
         "https://www.googletagmanager.com",
         "https://www.google-analytics.com",
@@ -805,17 +807,21 @@ app.use(helmet({
         "'self'",
         "'unsafe-inline'",
         "https://fonts.googleapis.com",
+        "https://sdk.cashfree.com",
+        "https://*.cashfree.com",
         "https://checkout.razorpay.com"
       ],
       fontSrc: [
         "'self'",
         "data:",
-        "https://fonts.gstatic.com"
+        "https://fonts.gstatic.com",
+        "https://*.cashfree.com"
       ],
       imgSrc: [
         "'self'",
         "data:",
         "blob:",
+        "https://*.cashfree.com",
         "https://*.razorpay.com",
         "https://*.googleusercontent.com",
         "https://*.gstatic.com",
@@ -834,6 +840,12 @@ app.use(helmet({
         "'self'",
         "https://skandx.in",
         "https://*.skandx.in",
+        "https://sdk.cashfree.com",
+        "https://api.cashfree.com",
+        "https://sandbox.cashfree.com",
+        "https://payments.cashfree.com",
+        "https://payments-test.cashfree.com",
+        "https://*.cashfree.com",
         "https://api.razorpay.com",
         "https://checkout.razorpay.com",
         "https://*.firebaseio.com",
@@ -857,6 +869,12 @@ app.use(helmet({
       ],
       frameSrc: [
         "'self'",
+        "https://sdk.cashfree.com",
+        "https://api.cashfree.com",
+        "https://sandbox.cashfree.com",
+        "https://payments.cashfree.com",
+        "https://payments-test.cashfree.com",
+        "https://*.cashfree.com",
         "https://api.razorpay.com",
         "https://checkout.razorpay.com",
         "https://*.firebaseapp.com",
@@ -872,7 +890,7 @@ app.use(helmet({
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
-      formAction: ["'self'"],
+      formAction: ["'self'", "https://*.cashfree.com", "https:"],
       frameAncestors: ["'none'"],
       upgradeInsecureRequests: []
     }

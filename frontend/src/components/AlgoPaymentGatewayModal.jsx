@@ -8,22 +8,37 @@ import logoImg from '../assets/logo.png';
 
 const loadCashfreeScript = () => {
   return new Promise((resolve) => {
-    if (window.Cashfree) {
+    if (typeof window.Cashfree === 'function') {
       resolve(true);
       return;
     }
     const existing = document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
     if (existing) {
-      existing.addEventListener('load', () => resolve(true));
-      existing.addEventListener('error', () => resolve(false));
-      return;
+      existing.remove();
     }
+    let settled = false;
+    const finish = (ok) => {
+      if (!settled) {
+        settled = true;
+        resolve(ok);
+      }
+    };
+    const timeoutId = setTimeout(() => {
+      finish(typeof window.Cashfree === 'function');
+    }, 8000);
     const script = document.createElement('script');
     script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
     script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+    script.onload = () => {
+      clearTimeout(timeoutId);
+      finish(typeof window.Cashfree === 'function');
+    };
+    script.onerror = () => {
+      clearTimeout(timeoutId);
+      script.remove();
+      finish(false);
+    };
+    document.head.appendChild(script);
   });
 };
 
