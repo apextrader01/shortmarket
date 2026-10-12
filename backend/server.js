@@ -3549,6 +3549,26 @@ async function fetchCashfreeOrderStatus(orderId, retryIfActive = false) {
   };
 
   const encodedId = encodeURIComponent(String(orderId).trim());
+  const isSubscriptionId = String(orderId).startsWith('cf_sub_');
+
+  if (isSubscriptionId) {
+    const subRes = await axios.get(`${conf.baseUrl}/subscriptions/${encodedId}`, { headers, timeout: 12000 }).catch(() => null);
+    const subData = subRes?.data || {};
+    const subStatus = String(subData?.subscription_status || '').toUpperCase();
+    const isPaid = ['ACTIVE', 'BANK_APPROVAL_PENDING', 'COMPLETED'].includes(subStatus);
+    const isFailed = ['CANCELLED', 'CUSTOMER_CANCELLED', 'EXPIRED', 'LINK_EXPIRED'].includes(subStatus);
+    return {
+      isPaid,
+      isFailed,
+      isUserCancelled: !isPaid && !isFailed,
+      orderStatus: subStatus || 'INITIALIZED',
+      cfPaymentId: subData?.cf_subscription_id ? String(subData.cf_subscription_id) : String(orderId),
+      failureReason: isFailed ? `Subscription status: ${subStatus}` : null,
+      orderData: subData,
+      payments: []
+    };
+  }
+
   const queryGateway = async () => {
     const [orderRes, paymentsRes] = await Promise.all([
       axios.get(`${conf.baseUrl}/orders/${encodedId}`, { headers, timeout: 12000 }).catch(() => null),
@@ -3600,42 +3620,124 @@ async function fetchCashfreeOrderStatus(orderId, retryIfActive = false) {
   };
 }
 
+async function createCashfreeSubscription({ subscriptionId, meta, amountInr, user, returnUrl }) {
+  const conf = await getCashfreeConfig();
+  if (!conf.isConfigured) {
+    const err = new Error('Cashfree API keys not configured.');
+    err.code = 'CASHFREE_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const customerId = String(`skandx_u_${user?.id || 'guest'}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 45);
+  const customerName = String(user?.username || user?.name || 'SkandX Member').replace(/[^\w\s.-]/g, '').trim().slice(0, 50) || 'SkandX Member';
+  const customerEmail = (user?.email && String(user.email).includes('@'))
+    ? String(user.email).trim()
+    : 'support@skandx.in';
+  const customerPhone = sanitizeCashfreePhone(user?.phone);
+
+  const payload = {
+    subscription_id: subscriptionId,
+    customer_details: {
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone
+    },
+    plan_details: {
+      plan_name: String(meta.label || 'SkandX Subscription').replace(/₹/g, 'INR ').replace(/[^\w\s.-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 45),
+      plan_type: 'PERIODIC',
+      plan_currency: 'INR',
+      plan_amount: Number(Number(amountInr).toFixed(2)),
+      plan_max_amount: Number(Number(amountInr).toFixed(2)),
+      plan_intervals: meta.intervals || 1,
+      plan_interval_type: meta.intervalType || 'MONTH'
+    },
+    subscription_meta: {
+      return_url: returnUrl || 'https://www.skandx.in/?cf_order_id={subscription_id}'
+    }
+  };
+
+  const response = await axios.post(`${conf.baseUrl}/subscriptions`, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-version': '2023-08-01',
+      'x-client-id': conf.app_id,
+      'x-client-secret': conf.secret_key
+    },
+    timeout: 12000
+  });
+
+  const data = response.data || {};
+  return {
+    ...data,
+    subscription_id: data.subscription_id || subscriptionId,
+    cf_subscription_id: data.cf_subscription_id || data.subscription_id || subscriptionId,
+    subs_session_id: data.subs_session_id || data.subscription_session_id,
+    environment: conf.environment,
+    app_id: conf.app_id
+  };
+}
+
 function resolvePlanMeta(plan) {
   const p = String(plan || 'monthly').toLowerCase().trim();
   if (p === 'basic' || p === 'free' || p === 'normal') {
-    return { tier: 'BASIC', amountInr: 0, label: 'Basic Free Tier (₹0)' };
+    return { tier: 'BASIC', amountInr: 0, label: 'Basic Free Tier (₹0)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'lifetime' || p === 'elite_lifetime') {
-    return { tier: 'LIFETIME', amountInr: 24999, label: 'Lifetime Elite (₹24,999)' };
+    return { tier: 'LIFETIME', amountInr: 24999, label: 'Lifetime Elite (₹24,999 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'masterclass' || p === 'course') {
-    return { tier: 'MASTERCLASS', amountInr: 9999, label: 'Stock Market Masterclass (₹9,999)' };
+    return { tier: 'MASTERCLASS', amountInr: 9999, label: 'Stock Market Masterclass (₹9,999 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'highest' || p === 'feature' || p === 'vip' || p === 'elite') {
-    return { tier: 'HIGHEST', amountInr: 2999, label: 'VIP Feature Plan (₹2,999/yr)' };
+    return {
+      tier: 'HIGHEST',
+      amountInr: 2999,
+      label: 'VIP Feature Plan Yearly Subscription (₹2,999/yr)',
+      isRecurringSubscription: true,
+      intervalType: 'YEAR',
+      intervals: 1,
+      paymentType: 'AUTOPAY'
+    };
   }
   if (p === 'yearly') {
-    return { tier: 'YEARLY', amountInr: 1999, label: 'Yearly Elite (₹1,999/yr)' };
+    return {
+      tier: 'YEARLY',
+      amountInr: 1999,
+      label: 'Yearly Elite Subscription (₹1,999/yr)',
+      isRecurringSubscription: true,
+      intervalType: 'YEAR',
+      intervals: 1,
+      paymentType: 'AUTOPAY'
+    };
   }
   if (p === 'algo_static_ip' || p === 'static_ip') {
-    return { tier: 'ALGO_STATIC_IP', amountInr: 350, label: 'Dedicated BKC Static IP (₹350/mo)' };
+    return { tier: 'ALGO_STATIC_IP', amountInr: 350, label: 'Dedicated BKC Static IP (₹350 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'algo_link_user' || p === 'algo_link_slot' || p === 'link_user') {
-    return { tier: 'ALGO_LINK_USER', amountInr: 250, label: 'Linked Client Demat Slot (₹250/mo)' };
+    return { tier: 'ALGO_LINK_USER', amountInr: 250, label: 'Linked Client Demat Slot (₹250 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'algo_pro' || p === 'plan_pro') {
-    return { tier: 'ALGO_PRO', amountInr: 999, label: 'Pro Algo Trader Plan (₹999/mo)' };
+    return { tier: 'ALGO_PRO', amountInr: 999, label: 'Pro Algo Trader Plan (₹999 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'algo_institutional' || p === 'plan_institutional') {
-    return { tier: 'ALGO_INSTITUTIONAL', amountInr: 2499, label: 'Multi-Account Sync Suite (₹2,499/mo)' };
+    return { tier: 'ALGO_INSTITUTIONAL', amountInr: 2499, label: 'Multi-Account Sync Suite (₹2,499 One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'algo_wallet' || p === 'wallet_recharge') {
-    return { tier: 'ALGO_WALLET', amountInr: 500, label: 'SkandX Algo Wallet Top-Up' };
+    return { tier: 'ALGO_WALLET', amountInr: 500, label: 'SkandX Algo Wallet Top-Up (One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
   if (p === 'algo_addon' || p.startsWith('algo_')) {
-    return { tier: p.toUpperCase(), amountInr: 350, label: 'SkandX Algo Service' };
+    return { tier: p.toUpperCase(), amountInr: 350, label: 'SkandX Algo Service (One-Time)', isRecurringSubscription: false, paymentType: 'ONE_TIME' };
   }
-  return { tier: 'MONTHLY', amountInr: 199, label: 'Pro Monthly (₹199/mo)' };
+  return {
+    tier: 'MONTHLY',
+    amountInr: 199,
+    label: 'Pro Monthly Subscription (₹199/mo)',
+    isRecurringSubscription: true,
+    intervalType: 'MONTH',
+    intervals: 1,
+    paymentType: 'AUTOPAY'
+  };
 }
 
 async function logSubscriptionAttempt({
@@ -3929,9 +4031,58 @@ async function handleCreateCashfreePlanOrder(req, res) {
   const meta = resolvePlanMeta(plan || itemType);
   const finalAmountInr = (customAmount && Number(customAmount) >= 1) ? Math.round(Number(customAmount)) : meta.amountInr;
   const amountPaise = finalAmountInr * 100;
+  const resolvedPaymentType = meta.paymentType || (meta.isRecurringSubscription ? 'AUTOPAY' : 'ONE_TIME');
 
   try {
     const userRow = await db('users').where({ id: req.user.id }).first().catch(() => req.user);
+
+    // For ₹199 (Monthly Subscription), ₹1,999 (Yearly Subscription), and ₹2,999 (Yearly VIP Subscription):
+    // Attempt Cashfree Recurring Subscription first; if merchant Subscriptions module is not yet active (profile_inactive),
+    // automatically fall back to Cashfree Order so checkout still succeeds seamlessly.
+    if (meta.isRecurringSubscription && !itemType) {
+      try {
+        const subscriptionId = `cf_sub_${req.user.id}_${Date.now()}`.slice(0, 45);
+        const cfSub = await createCashfreeSubscription({
+          subscriptionId,
+          meta,
+          amountInr: finalAmountInr,
+          user: userRow || req.user
+        });
+        if (cfSub && cfSub.subs_session_id) {
+          await logSubscriptionAttempt({
+            userId: req.user.id,
+            plan: meta.tier,
+            amount: finalAmountInr,
+            paymentType: resolvedPaymentType,
+            status: 'INITIATED',
+            razorpayOrderId: cfSub.subscription_id,
+            razorpaySubscriptionId: cfSub.cf_subscription_id
+          });
+
+          return res.json({
+            success: true,
+            gateway: 'CASHFREE',
+            checkout_type: 'SUBSCRIPTION',
+            environment: cfSub.environment,
+            subs_session_id: cfSub.subs_session_id,
+            payment_session_id: cfSub.subs_session_id,
+            id: cfSub.subscription_id,
+            order_id: cfSub.subscription_id,
+            subscription_id: cfSub.subscription_id,
+            cf_subscription_id: cfSub.cf_subscription_id,
+            key_id: cfSub.app_id,
+            amount: amountPaise,
+            amountInr: finalAmountInr,
+            currency: 'INR',
+            intervalType: meta.intervalType,
+            intervals: meta.intervals
+          });
+        }
+      } catch (_) {
+        // Cashfree Subscriptions profile_inactive -> fall back to Cashfree PG v3 Order for the subscription period
+      }
+    }
+
     const orderId = `cf_ord_${req.user.id}_${Date.now()}`.slice(0, 45);
     const cfOrder = await createCashfreeOrder({
       orderId,
@@ -3941,7 +4092,8 @@ async function handleCreateCashfreePlanOrder(req, res) {
       tags: {
         user_id: String(req.user.id),
         plan: String(plan || itemType || meta.tier).toLowerCase(),
-        tier: meta.tier
+        tier: meta.tier,
+        billing_type: resolvedPaymentType
       }
     });
 
@@ -3949,7 +4101,7 @@ async function handleCreateCashfreePlanOrder(req, res) {
       userId: req.user.id,
       plan: meta.tier,
       amount: finalAmountInr,
-      paymentType: 'ONE_TIME',
+      paymentType: resolvedPaymentType,
       status: 'INITIATED',
       razorpayOrderId: cfOrder.order_id
     });
@@ -3957,6 +4109,7 @@ async function handleCreateCashfreePlanOrder(req, res) {
     res.json({
       success: true,
       gateway: 'CASHFREE',
+      checkout_type: 'ORDER',
       environment: cfOrder.environment,
       payment_session_id: cfOrder.payment_session_id,
       id: cfOrder.order_id,
@@ -3965,7 +4118,9 @@ async function handleCreateCashfreePlanOrder(req, res) {
       key_id: cfOrder.app_id,
       amount: amountPaise,
       amountInr: finalAmountInr,
-      currency: 'INR'
+      currency: 'INR',
+      paymentType: resolvedPaymentType,
+      intervalType: meta.intervalType || null
     });
   } catch (error) {
     const errMsg = error.response?.data?.message || error.message || 'Unknown Cashfree error';
@@ -3973,7 +4128,7 @@ async function handleCreateCashfreePlanOrder(req, res) {
       userId: req.user.id,
       plan: meta.tier,
       amount: finalAmountInr,
-      paymentType: 'ONE_TIME',
+      paymentType: resolvedPaymentType,
       status: 'FAILED',
       failureReason: error.code === 'CASHFREE_NOT_CONFIGURED'
         ? 'Cashfree keys not configured on server'
@@ -3984,11 +4139,11 @@ async function handleCreateCashfreePlanOrder(req, res) {
   }
 }
 
-// 1. Direct Instant Payment via Cashfree (Supports ₹199, ₹1,999, ₹2,999, ₹9,999, ₹24,999 & Algo Add-ons)
+// 1. Direct Instant Payment & Subscription via Cashfree (Supports ₹199/mo, ₹1,999/yr, ₹2,999/yr, ₹9,999 One-Time, ₹24,999 One-Time & Algo Add-ons)
 app.post('/api/payment/create-order', authenticateToken, handleCreateCashfreePlanOrder);
 app.post('/api/payment/create-subscription', authenticateToken, handleCreateCashfreePlanOrder);
 
-// 2. Verify Cashfree Order & Activate Plan / Provision Algo Item
+// 2. Verify Cashfree Order/Subscription & Activate Plan / Provision Algo Item
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
     const {
@@ -4007,6 +4162,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
     const meta = resolvePlanMeta(plan || itemType);
     const isAlgoPayment = Boolean(itemType) || String(meta.tier || '').startsWith('ALGO_');
     const resolvedAmt = (amount && Number(amount) >= 1) ? Math.round(Number(amount)) : meta.amountInr;
+    const resolvedPaymentType = isAlgoPayment ? 'ONE_TIME' : (meta.paymentType || 'ONE_TIME');
 
     const cfConf = await getCashfreeConfig();
     if (!cfConf.isConfigured) {
@@ -4018,7 +4174,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         userId: req.user.id,
         plan: meta.tier,
         amount: resolvedAmt,
-        paymentType: 'ONE_TIME',
+        paymentType: resolvedPaymentType,
         status: 'FAILED',
         failureReason: 'Missing order_id for Cashfree verification'
       });
@@ -4071,7 +4227,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         userId: req.user.id,
         plan: meta.tier,
         amount: meta.amountInr,
-        paymentType: 'ONE_TIME',
+        paymentType: resolvedPaymentType,
         status: 'SUCCESS',
         razorpayOrderId: targetOrderId,
         razorpayPaymentId: txId,
@@ -4091,7 +4247,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         userId: req.user.id,
         plan: meta.tier,
         amount: resolvedAmt,
-        paymentType: 'ONE_TIME',
+        paymentType: resolvedPaymentType,
         status: cfStatus.isFailed ? 'FAILED' : 'CANCELLED',
         razorpayOrderId: targetOrderId,
         razorpayPaymentId: cfStatus.cfPaymentId || null,

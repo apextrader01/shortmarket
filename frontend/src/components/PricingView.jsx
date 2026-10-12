@@ -88,7 +88,12 @@ export default function PricingView({ setActiveTab }) {
       }
       sessionStorage.setItem('skandx_pending_cf_plan', plan);
 
-      const orderRes = await fetch(`${API}/api/payment/create-order`, {
+      const isRecurringPlan = ['monthly', 'yearly', 'highest'].includes(String(plan || '').toLowerCase());
+      const createEndpoint = isRecurringPlan
+        ? `${API}/api/payment/create-subscription`
+        : `${API}/api/payment/create-order`;
+
+      const orderRes = await fetch(createEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,14 +102,14 @@ export default function PricingView({ setActiveTab }) {
         body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create Cashfree payment order');
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create Cashfree payment session');
 
       const planTitles = {
-        lifetime: 'Lifetime All-Inclusive Elite (₹24,999)',
-        masterclass: 'Stock Market Masterclass: Basic to Advanced (₹9,999)',
-        highest: 'Feature Plan VIP (₹2,999/yr)',
-        yearly: 'Yearly Elite (₹1,999/yr)',
-        monthly: 'Pro Monthly (₹199/mo)'
+        lifetime: 'Lifetime All-Inclusive Elite (₹24,999 One-Time)',
+        masterclass: 'Stock Market Masterclass: Basic to Advanced (₹9,999 One-Time)',
+        highest: 'Feature Plan VIP Yearly Subscription (₹2,999/yr)',
+        yearly: 'Yearly Elite Subscription (₹1,999/yr)',
+        monthly: 'Pro Monthly Subscription (₹199/mo)'
       };
       const planTitle = planTitles[plan] || 'Pro Plan';
 
@@ -117,7 +122,7 @@ export default function PricingView({ setActiveTab }) {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              order_id: orderData.order_id || orderData.id || null,
+              order_id: orderData.order_id || orderData.subscription_id || orderData.id || null,
               plan,
               status,
               failure_reason: reason
@@ -129,10 +134,18 @@ export default function PricingView({ setActiveTab }) {
       const cfMode = String(orderData.environment || 'PRODUCTION').toUpperCase() === 'SANDBOX' ? 'sandbox' : 'production';
       const cashfree = window.Cashfree({ mode: cfMode });
 
-      const result = await cashfree.checkout({
-        paymentSessionId: orderData.payment_session_id,
-        redirectTarget: '_modal'
-      });
+      let result;
+      if (orderData.checkout_type === 'SUBSCRIPTION' && orderData.subs_session_id && typeof cashfree.subscriptionsCheckout === 'function') {
+        result = await cashfree.subscriptionsCheckout({
+          subsSessionId: orderData.subs_session_id,
+          redirectTarget: '_modal'
+        });
+      } else {
+        result = await cashfree.checkout({
+          paymentSessionId: orderData.payment_session_id,
+          redirectTarget: '_modal'
+        });
+      }
 
       if (result && result.error) {
         const errMsg = result.error.message || 'Checkout closed before completing payment';
