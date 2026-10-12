@@ -7003,6 +7003,9 @@ app.get('/api/market-calendar/today', (req, res) => {
 
 // 🏛️ Primary Markets & Institutional Intelligence (₹0 Architecture)
 const primaryMarketsService = require('./services/primaryMarketsService');
+if (typeof primaryMarketsService.setPriceCacheRef === 'function') {
+  primaryMarketsService.setPriceCacheRef(priceCache);
+}
 if (typeof primaryMarketsService.initPrimaryMarketCrons === 'function') {
   primaryMarketsService.initPrimaryMarketCrons();
 }
@@ -7010,8 +7013,20 @@ if (typeof primaryMarketsService.initPrimaryMarketCrons === 'function') {
 app.get('/api/bhavcopy/delivery', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
-    const list = primaryMarketsService.getBhavcopyDeliveryScreener(req.query);
-    res.json({ success: true, count: list.length, data: list });
+    const result = primaryMarketsService.getBhavcopyDeliveryScreener(req.query);
+    if (Array.isArray(result)) {
+      return res.json({ success: true, count: result.length, data: result });
+    }
+    res.json({
+      success: true,
+      count: result.totalFiltered,
+      totalFiltered: result.totalFiltered,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+      stats: result.stats,
+      data: result.data
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -7020,8 +7035,20 @@ app.get('/api/bhavcopy/delivery', apiLimiter, (req, res) => {
 app.get('/api/market-deals', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
-    const list = primaryMarketsService.getMarketDeals(req.query.type || 'ALL');
-    res.json({ success: true, count: list.length, deals: list });
+    const result = primaryMarketsService.getMarketDeals(req.query);
+    if (Array.isArray(result)) {
+      return res.json({ success: true, count: result.length, deals: result });
+    }
+    res.json({
+      success: true,
+      count: result.totalFiltered,
+      totalFiltered: result.totalFiltered,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+      stats: result.stats,
+      deals: result.deals
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
