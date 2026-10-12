@@ -4091,11 +4091,29 @@ app.post('/api/payment/cashfree/webhook', async (req, res) => {
 
     if (existingRow && existingRow.status !== 'SUCCESS' && existingRow.user_id) {
       const planStr = String(existingRow.plan || 'MONTHLY');
-      if (!planStr.toUpperCase().startsWith('ALGO_')) {
+      const txId = cfStatus.cfPaymentId || String(paymentObj.cf_payment_id || orderId);
+      if (planStr.toUpperCase().startsWith('ALGO_')) {
+        const userRow = await db('users').where({ id: existingRow.user_id }).first().catch(() => null);
+        if (userRow) {
+          const resolved = resolveAlgoPaymentItem({
+            itemType: planStr,
+            amount: existingRow.amount
+          });
+          const state = await getUserBridgeState(userRow);
+          provisionAlgoItemIntoState(state, resolved, txId, 'Cashfree Webhook Verified', orderId);
+          await saveUserBridgeState(userRow, state);
+        }
+        await db('subscription_payments').where({ id: existingRow.id }).update({
+          status: 'SUCCESS',
+          razorpay_payment_id: txId,
+          failure_reason: null,
+          updated_at: new Date()
+        });
+      } else {
         const { computedExpires } = await activateUserPlanSubscription(existingRow.user_id, planStr);
         await db('subscription_payments').where({ id: existingRow.id }).update({
           status: 'SUCCESS',
-          razorpay_payment_id: cfStatus.cfPaymentId || String(paymentObj.cf_payment_id || orderId),
+          razorpay_payment_id: txId,
           failure_reason: null,
           expires_at: computedExpires,
           updated_at: new Date()
@@ -16380,19 +16398,19 @@ app.post('/api/v1/bridge/plan/select', async (req, res) => {
 // 9. Official Cashfree Checkout & Verification for Algo Hub (Static IP ₹350, Link Slot ₹250, Plans ₹999/₹2499, Wallet Recharge)
 function resolveAlgoPaymentItem(body = {}) {
   const itemType = String(body.itemType || 'STATIC_IP').toUpperCase();
-  if (itemType === 'STATIC_IP') {
+  if (itemType === 'STATIC_IP' || itemType === 'ALGO_STATIC_IP') {
     return { itemType: 'STATIC_IP', planKey: 'ALGO_STATIC_IP', amountInr: 350, title: 'Dedicated Mumbai BKC Static IP (1 Month)' };
   }
-  if (itemType === 'LINK_USER') {
+  if (itemType === 'LINK_USER' || itemType === 'ALGO_LINK_USER') {
     return { itemType: 'LINK_USER', planKey: 'ALGO_LINK_USER', amountInr: 250, title: '1 Linked Client Demat Slot (1 Month)' };
   }
-  if (itemType === 'PLAN_INSTITUTIONAL' || (itemType === 'PLAN' && Number(body.amount) >= 2000)) {
+  if (itemType === 'PLAN_INSTITUTIONAL' || itemType === 'ALGO_INSTITUTIONAL' || (itemType === 'PLAN' && Number(body.amount) >= 2000)) {
     return { itemType: 'PLAN_INSTITUTIONAL', planKey: 'ALGO_INSTITUTIONAL', amountInr: 2499, title: 'Multi-Account Trade Sync Suite (1 Month)' };
   }
-  if (itemType === 'PLAN_PRO' || itemType === 'PLAN') {
+  if (itemType === 'PLAN_PRO' || itemType === 'ALGO_PRO' || itemType === 'PLAN') {
     return { itemType: 'PLAN_PRO', planKey: 'ALGO_PRO', amountInr: 999, title: 'Pro Multi-Broker Algo Trader Plan (1 Month)' };
   }
-  if (itemType === 'WALLET_RECHARGE') {
+  if (itemType === 'WALLET_RECHARGE' || itemType === 'ALGO_WALLET') {
     const customAmt = Math.max(1, Math.min(500000, Math.round(Number(body.amount) || 500)));
     return { itemType: 'WALLET_RECHARGE', planKey: 'ALGO_WALLET', amountInr: customAmt, title: `SkandX Algo Wallet Credit (+₹${customAmt})` };
   }
@@ -16401,6 +16419,17 @@ function resolveAlgoPaymentItem(body = {}) {
 }
 
 function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Cashfree Secure Checkout', orderId = null) {
+  if (Array.isArray(state.transactions)) {
+    const existingSuccess = state.transactions.find(t =>
+      t && t.status === 'SUCCESS' && (
+        (orderId && (t.id === orderId || t.orderId === orderId)) ||
+        (txId && t.id === txId)
+      )
+    );
+    if (existingSuccess) {
+      return { txRecord: existingSuccess, provisionedData: {}, alreadyProvisioned: true };
+    }
+  }
   const { itemType, amountInr, title } = resolvedItem;
   let provisionedData = {};
 
