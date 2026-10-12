@@ -56,11 +56,13 @@ export default function AlgoPaymentGatewayModal({
       setIsProcessing(false);
       setIsSuccess(false);
       setErrorMsg('');
-      setPaymentTab('RAZORPAY');
+      const itemPrice = Number(item?.amount || 0);
+      const canUseWallet = item?.type !== 'WALLET_RECHARGE' && itemPrice > 0 && Number(walletBalance || 0) >= itemPrice;
+      setPaymentTab(canUseWallet ? 'WALLET' : 'RAZORPAY');
       setCustomAmount(Number(item?.amount || 500));
       loadRazorpayScript();
     }
-  }, [isOpen, item]);
+  }, [isOpen, item, walletBalance]);
 
   if (!isOpen) return null;
 

@@ -14734,7 +14734,7 @@ Key rules:
 // ─────────────────────────────────────────────────────────────────────────────
 function maskBrokerApiKey(rawKey) {
   const clean = String(rawKey || '').trim();
-  if (!clean) return 'kite_••••382b';
+  if (!clean) return 'agl_••••382b';
   if (clean.includes('••••')) return clean;
   if (clean.length <= 6) return clean.slice(0, 2) + '••••';
   return `${clean.slice(0, 4)}••••${clean.slice(-4)}`;
@@ -14812,6 +14812,9 @@ async function resolveBridgeUser(req) {
   }
 }
 
+const LEGACY_SEEDED_WATCHLIST_IDS = new Set(['WL-01', 'WL-02', 'WL-03']);
+const LEGACY_SEEDED_SYMBOLS = new Set(['NSE:NIFTY24OCTFUT', 'NSE:BANKNIFTY51500CE', 'NSE:BANKNIFTY24OCTFUT']);
+
 function createDefaultUserBridgeState(userObj) {
   const clientTag = String(userObj.client_id || userObj.id || 'trader').toLowerCase().replace(/[^a-z0-9]/g, '');
   const displayName = userObj.username || (userObj.email ? userObj.email.split('@')[0] : 'Trader');
@@ -14819,10 +14822,12 @@ function createDefaultUserBridgeState(userObj) {
     ownerId: userObj.id,
     ownerEmail: userObj.email || '',
     ownerName: displayName,
+    watchlistCleanedV2: true,
     config: {
       allowConnectAccount: true,
       allowPurchaseIp: true,
       connectionToken: `skandx_demat_${clientTag}`,
+      webhookSecret: `SKANDX_WH_${clientTag.toUpperCase()}`,
       availableCredit: 0,
       totalDemat: 0,
       disconnectedDemat: 0,
@@ -14833,7 +14838,8 @@ function createDefaultUserBridgeState(userObj) {
       usedLinkSlots: 0,
       staticIpMonthlyRate: 350,
       linkUserMonthlyRate: 250,
-      currentPlan: 'STARTER'
+      currentPlan: 'STARTER',
+      activePlan: 'STARTER'
     },
     platformFeatures: {
       watchlist: true,
@@ -14843,8 +14849,13 @@ function createDefaultUserBridgeState(userObj) {
     },
     telegramConfig: {
       botConnected: false,
+      connected: false,
       chatId: '',
       botUsername: '@SkandXAlgoBot',
+      notifyFills: true,
+      notifyRejections: true,
+      notifyCopyTrades: true,
+      notifyDailyPnl: true,
       alerts: {
         orderFills: true,
         slTargetHits: true,
@@ -14855,71 +14866,10 @@ function createDefaultUserBridgeState(userObj) {
     demats: [],
     staticIps: [],
     linkedUsers: [],
-    watchlist: [
-      {
-        id: 'WL-01',
-        symbol: 'NSE:NIFTY24OCTFUT',
-        ltp: priceCache['NSE:NIFTY50-INDEX']?.ltp || 25014.60,
-        change: '+0.42%',
-        isUp: true,
-        high: 25080.00,
-        low: 24920.00,
-        algoStrategy: 'EMA 9/21 Trend Scalper',
-        algoActive: true,
-        mode: 'SANDBOX',
-        status: 'WAITING_TRIGGER',
-        lots: 1,
-        qty: 75,
-        targetPts: 60,
-        slPts: 25,
-        trailingSl: true,
-        autoSquareOff: '15:15',
-        realizedPnl: 0
-      },
-      {
-        id: 'WL-02',
-        symbol: 'NSE:BANKNIFTY51500CE',
-        ltp: 342.50,
-        change: '+1.85%',
-        isUp: true,
-        high: 380.00,
-        low: 260.00,
-        algoStrategy: '9:20 AM Short Straddle',
-        algoActive: false,
-        mode: 'SANDBOX',
-        status: 'PAUSED',
-        lots: 1,
-        qty: 30,
-        targetPts: 110,
-        slPts: 55,
-        trailingSl: true,
-        autoSquareOff: '15:15',
-        realizedPnl: 0
-      },
-      {
-        id: 'WL-03',
-        symbol: 'NSE:RELIANCE',
-        ltp: priceCache['NSE:RELIANCE']?.ltp || 2985.40,
-        change: '-0.43%',
-        isUp: false,
-        high: 3012.00,
-        low: 2975.00,
-        algoStrategy: 'VWAP Mean Reversion',
-        algoActive: false,
-        mode: 'SANDBOX',
-        status: 'PAUSED',
-        lots: 1,
-        qty: 50,
-        targetPts: 25,
-        slPts: 12,
-        trailingSl: false,
-        autoSquareOff: '15:15',
-        realizedPnl: 0
-      }
-    ],
+    watchlist: [],
     copyGroups: {
       groupName: `${displayName} Mirror Group`,
-      masterAccount: '',
+      masterAccount: 'UNASSIGNED',
       status: 'PAUSED',
       maxLossLimit: 15000,
       followers: []
@@ -14938,20 +14888,73 @@ function recalculateBridgeStats(state) {
   state.orders = Array.isArray(state.orders) ? state.orders : [];
   state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
 
+  // Strip legacy auto-seeded demo watchlist items (WL-01, WL-02, WL-03) once so existing accounts don't show fake 2024 shares
+  if (!state.watchlistCleanedV2) {
+    state.watchlist = state.watchlist.filter(w => {
+      if (!w) return false;
+      if (LEGACY_SEEDED_WATCHLIST_IDS.has(String(w.id)) || LEGACY_SEEDED_SYMBOLS.has(String(w.symbol || '').toUpperCase())) {
+        return false;
+      }
+      return true;
+    });
+    state.watchlistCleanedV2 = true;
+  }
+
+  // Ensure all demats, linked users, and copy group followers use Angel One SmartAPI
+  state.demats.forEach(d => {
+    if (!d.broker || !String(d.broker).toLowerCase().includes('angel')) {
+      d.broker = 'Angel One SmartAPI';
+    }
+  });
+  state.linkedUsers.forEach(u => {
+    if (!u.broker || !String(u.broker).toLowerCase().includes('angel')) {
+      u.broker = 'Angel One SmartAPI';
+    }
+  });
+  if (state.copyGroups && Array.isArray(state.copyGroups.followers)) {
+    state.copyGroups.followers.forEach(f => {
+      if (!f.broker || !String(f.broker).toLowerCase().includes('angel')) {
+        f.broker = 'Angel One SmartAPI';
+      }
+    });
+  }
+
   // Refresh watchlist LTP from live priceCache when available
   state.watchlist.forEach(w => {
     if (w.mode === 'PAPER') w.mode = 'SANDBOX';
     const cleanSym = String(w.symbol || '').toUpperCase();
-    const cachedTick = priceCache[cleanSym] || (cleanSym.includes('NIFTY') && !cleanSym.includes('BANK') && !cleanSym.includes('FIN') ? priceCache['NSE:NIFTY50-INDEX'] : null);
-    if (cachedTick && Number(cachedTick.ltp) > 0 && !cleanSym.endsWith('CE') && !cleanSym.endsWith('PE')) {
-      w.ltp = Number(cachedTick.ltp);
-      if (cachedTick.chp !== undefined) {
-        const chpNum = Number(cachedTick.chp) || 0;
+    const cachedPrice = getLtpFromPriceCache(cleanSym) ||
+      (cleanSym.includes('NIFTY') && !cleanSym.includes('BANK') && !cleanSym.includes('FIN') ? getLtpFromPriceCache('NSE:NIFTY50-INDEX') : 0) ||
+      (cleanSym.includes('BANKNIFTY') ? getLtpFromPriceCache('NSE:NIFTYBANK-INDEX') : 0);
+    const cachedTick = getPriceDataFromCache(cleanSym);
+    if (cachedPrice > 0 && !cleanSym.endsWith('CE') && !cleanSym.endsWith('PE')) {
+      w.ltp = Number(cachedPrice);
+      const pctVal = cachedTick?.pct ?? cachedTick?.chp;
+      if (pctVal !== undefined) {
+        const chpNum = Number(pctVal) || 0;
         w.isUp = chpNum >= 0;
         w.change = `${chpNum >= 0 ? '+' : ''}${chpNum.toFixed(2)}%`;
       }
+      if (Number(cachedTick?.high) > 0) w.high = Number(cachedTick.high);
+      if (Number(cachedTick?.low) > 0) w.low = Number(cachedTick.low);
     }
   });
+
+  // Keep activePlan and currentPlan in sync
+  const resolvedPlan = String(state.config.activePlan || state.config.currentPlan || 'STARTER').toUpperCase();
+  state.config.activePlan = ['STARTER', 'PRO', 'INSTITUTIONAL'].includes(resolvedPlan) ? resolvedPlan : 'STARTER';
+  state.config.currentPlan = state.config.activePlan;
+
+  if (!state.config.webhookSecret) {
+    const suffix = String(state.config.connectionToken || 'live').replace(/^skandx_demat_/i, '').toUpperCase() || 'LIVE';
+    state.config.webhookSecret = `SKANDX_WH_${suffix}`;
+  }
+
+  if (state.telegramConfig) {
+    const hasChat = Boolean(String(state.telegramConfig.chatId || '').trim());
+    state.telegramConfig.connected = hasChat;
+    state.telegramConfig.botConnected = hasChat;
+  }
 
   state.config.totalDemat = state.demats.length;
   state.config.expiredDemat = state.demats.filter(a => a.status === 'EXPIRED').length;
@@ -14979,6 +14982,7 @@ async function getUserBridgeState(userObj) {
         const parsed = JSON.parse(row.value);
         if (parsed && typeof parsed === 'object') {
           const def = createDefaultUserBridgeState(userObj);
+          const hadLegacySeeded = !parsed.watchlistCleanedV2;
           const merged = {
             ...def,
             ...parsed,
@@ -14993,6 +14997,9 @@ async function getUserBridgeState(userObj) {
           };
           recalculateBridgeStats(merged);
           userBridgeStatesCache.set(key, merged);
+          if (hadLegacySeeded) {
+            saveUserBridgeState(userObj, merged).catch(() => {});
+          }
           return merged;
         }
       }
@@ -15025,12 +15032,12 @@ async function saveUserBridgeState(userObj, state) {
   return state;
 }
 
-// Helper to find a referrer's bridge state by connectionToken (for client onboarding links)
+// Helper to find a user's bridge state by connectionToken or webhookSecret
 async function findBridgeStateByToken(refToken) {
   if (!refToken) return null;
   const cleanRef = String(refToken).trim();
   for (const [, st] of userBridgeStatesCache.entries()) {
-    if (st?.config?.connectionToken === cleanRef) {
+    if (st?.config?.connectionToken === cleanRef || st?.config?.webhookSecret === cleanRef) {
       return st;
     }
   }
@@ -15039,8 +15046,9 @@ async function findBridgeStateByToken(refToken) {
     for (const r of rows) {
       try {
         const parsed = JSON.parse(r.value);
-        if (parsed?.config?.connectionToken === cleanRef) {
+        if (parsed?.config?.connectionToken === cleanRef || parsed?.config?.webhookSecret === cleanRef) {
           const uid = r.key.replace('algo_hub_state_u_', '');
+          recalculateBridgeStats(parsed);
           userBridgeStatesCache.set(uid, parsed);
           return parsed;
         }
@@ -15050,11 +15058,51 @@ async function findBridgeStateByToken(refToken) {
   return null;
 }
 
+function getLiveBridgeSymbolTick(symbolStr) {
+  const raw = String(symbolStr || '').trim().toUpperCase();
+  if (!raw) return null;
+  const clean = raw.includes(':') ? raw.split(':')[1] : raw;
+  const candidates = [
+    raw,
+    `NSE:${clean}`,
+    clean,
+    clean.replace(/-EQ$/i, ''),
+    `NSE:${clean.replace(/-EQ$/i, '')}`
+  ];
+  for (const key of candidates) {
+    const tick = priceCache[key];
+    if (tick && Number(tick.ltp || tick.price) > 0) {
+      const ltp = Number(tick.ltp || tick.price);
+      const changePct = Number(tick.changePercent ?? tick.change ?? 0);
+      return {
+        ltp,
+        change: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`,
+        isUp: changePct >= 0,
+        high: Number(tick.high) || Number((ltp * 1.012).toFixed(2)),
+        low: Number(tick.low) || Number((ltp * 0.988).toFixed(2))
+      };
+    }
+  }
+  return null;
+}
+
 // 1. Unified per-user state endpoint
 app.get('/api/v1/bridge/all', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
+    if (Array.isArray(state.watchlist)) {
+      state.watchlist.forEach(item => {
+        const tick = getLiveBridgeSymbolTick(item.symbol);
+        if (tick) {
+          item.ltp = tick.ltp;
+          item.change = tick.change;
+          item.isUp = tick.isUp;
+          item.high = tick.high;
+          item.low = tick.low;
+        }
+      });
+    }
     res.json({
       success: true,
       isAdmin: Boolean(userObj.is_admin),
@@ -15067,6 +15115,7 @@ app.get('/api/v1/bridge/all', async (req, res) => {
       },
       stats: state.config,
       platformFeatures: state.platformFeatures,
+      telegram: state.telegramConfig,
       telegramConfig: state.telegramConfig,
       demats: state.demats,
       staticIps: state.staticIps,
@@ -15095,11 +15144,12 @@ app.post(['/api/v1/bridge/config', '/api/v1/bridge/settings/update'], async (req
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { allowConnectAccount, allowPurchaseIp, connectionToken, platformFeatures, telegramConfig } = req.body || {};
+    const { allowConnectAccount, allowPurchaseIp, connectionToken, webhookSecret, platformFeatures, telegramConfig } = req.body || {};
 
     if (allowConnectAccount !== undefined) state.config.allowConnectAccount = Boolean(allowConnectAccount);
     if (allowPurchaseIp !== undefined) state.config.allowPurchaseIp = Boolean(allowPurchaseIp);
     if (connectionToken) state.config.connectionToken = String(connectionToken).slice(0, 64);
+    if (webhookSecret) state.config.webhookSecret = String(webhookSecret).slice(0, 64);
     if (platformFeatures && typeof platformFeatures === 'object') {
       state.platformFeatures = { ...state.platformFeatures, ...platformFeatures };
     }
@@ -15116,6 +15166,7 @@ app.post(['/api/v1/bridge/config', '/api/v1/bridge/settings/update'], async (req
       success: true,
       stats: state.config,
       platformFeatures: state.platformFeatures,
+      telegram: state.telegramConfig,
       telegramConfig: state.telegramConfig
     });
   } catch (err) {
@@ -15129,8 +15180,9 @@ app.post('/api/v1/bridge/regenerate-token', async (req, res) => {
     const state = await getUserBridgeState(userObj);
     const clientTag = String(userObj.client_id || userObj.id || 'trd').toLowerCase().replace(/[^a-z0-9]/g, '');
     state.config.connectionToken = `skandx_demat_${clientTag}_${crypto.randomBytes(4).toString('hex')}`;
+    state.config.webhookSecret = `SKANDX_WH_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     await saveUserBridgeState(userObj, state);
-    res.json({ success: true, token: state.config.connectionToken, stats: state.config });
+    res.json({ success: true, token: state.config.connectionToken, webhookSecret: state.config.webhookSecret, stats: state.config });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -15150,7 +15202,7 @@ app.post('/api/v1/bridge/demats', async (req, res) => {
 
     const newAcc = {
       id: 'ACC-' + Math.floor(100 + Math.random() * 900),
-      broker: String(broker || 'Angel One SmartAPI').slice(0, 48),
+      broker: 'Angel One SmartAPI',
       brokerKey: 'angel',
       clientCode: safeClientCode,
       name: String(name || `${safeClientCode} Trading A/C`).slice(0, 48),
@@ -15170,11 +15222,11 @@ app.post('/api/v1/bridge/demats', async (req, res) => {
     const matchedIp = state.staticIps.find(item => item.ip === chosenIp);
     if (matchedIp) {
       matchedIp.status = 'WHITELISTED';
-      matchedIp.assignedTo = `${safeClientCode} (${newAcc.broker.split(' ')[0]})`;
+      matchedIp.assignedTo = `${safeClientCode} (Angel One)`;
     }
 
     // Set default Master Account for Copy Group if none set
-    if (!state.copyGroups.masterAccount) {
+    if (!state.copyGroups.masterAccount || state.copyGroups.masterAccount === 'UNASSIGNED') {
       state.copyGroups.masterAccount = safeClientCode;
     }
 
@@ -15240,9 +15292,12 @@ app.delete('/api/v1/bridge/demats/:id', async (req, res) => {
           ipItem.status = 'AVAILABLE';
         }
       });
+      if (state.copyGroups.masterAccount === target.clientCode) {
+        state.copyGroups.masterAccount = state.demats[0]?.clientCode || '';
+      }
     }
     await saveUserBridgeState(userObj, state);
-    res.json({ success: true, demats: state.demats, staticIps: state.staticIps, stats: state.config });
+    res.json({ success: true, demats: state.demats, staticIps: state.staticIps, copyGroups: state.copyGroups, stats: state.config });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15280,7 +15335,7 @@ app.post('/api/v1/bridge/ips/:id/bind', async (req, res) => {
       const acc = state.demats.find(d => d.id === dematId || d.clientCode === dematId);
       if (!acc) return res.status(404).json({ error: 'Demat account not found' });
       acc.ip = ipObj.ip;
-      ipObj.assignedTo = `${acc.clientCode} (${acc.broker.split(' ')[0]})`;
+      ipObj.assignedTo = `${acc.clientCode} (Angel One)`;
       ipObj.status = 'WHITELISTED';
     }
 
@@ -15317,7 +15372,7 @@ app.post('/api/v1/bridge/ips/purchase', async (req, res) => {
 // 4. Link Users (Client Onboarding & Management)
 app.post('/api/v1/bridge/link-users/add', async (req, res) => {
   try {
-    const { refToken, clientName, email, broker, clientCode, copyRatio } = req.body || {};
+    const { refToken, clientName, email, clientCode, copyRatio } = req.body || {};
     let userObj = await resolveBridgeUser(req);
     let state = await getUserBridgeState(userObj);
 
@@ -15344,12 +15399,13 @@ app.post('/api/v1/bridge/link-users/add', async (req, res) => {
       return res.status(400).json({ error: 'Client Name and Broker Client ID (UCC) are required.' });
     }
 
+    const cleanCode = String(clientCode).trim().toUpperCase().slice(0, 24);
     const newLinked = {
       id: 'LNK-' + Math.floor(100 + Math.random() * 900),
       clientName: String(clientName).trim().slice(0, 48),
       email: String(email || 'client@skandx.in').trim().slice(0, 64),
-      broker: String(broker || 'Angel One').trim().slice(0, 48),
-      clientCode: String(clientCode).trim().toUpperCase().slice(0, 24),
+      broker: 'Angel One SmartAPI',
+      clientCode: cleanCode,
       connectedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       status: 'CONNECTED',
       allowTrading: true,
@@ -15357,9 +15413,25 @@ app.post('/api/v1/bridge/link-users/add', async (req, res) => {
     };
 
     state.linkedUsers.unshift(newLinked);
+
+    // Also auto-sync to Copy Group followers if not already present
+    state.copyGroups.followers = Array.isArray(state.copyGroups.followers) ? state.copyGroups.followers : [];
+    if (!state.copyGroups.followers.some(f => f.accountCode === cleanCode)) {
+      const parsedMult = parseFloat(String(copyRatio || '1.0').replace(/[^0-9.]/g, '')) || 1.0;
+      state.copyGroups.followers.push({
+        id: 'FOL-' + Math.floor(100 + Math.random() * 900),
+        accountCode: cleanCode,
+        clientName: newLinked.clientName,
+        broker: 'Angel One SmartAPI',
+        multiplier: parsedMult,
+        maxRiskPerTrade: 3000,
+        status: 'ACTIVE'
+      });
+    }
+
     await saveUserBridgeState(userObj, state);
     appendAlgoAuditLog(`[CLIENT_LINKED] ${newLinked.clientName} (${newLinked.clientCode}) linked to ${userObj.email || userObj.username}`, true);
-    res.json({ success: true, linkedUser: newLinked, linkedUsers: state.linkedUsers, stats: state.config });
+    res.json({ success: true, linkedUser: newLinked, linkedUsers: state.linkedUsers, copyGroups: state.copyGroups, stats: state.config });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15424,29 +15496,36 @@ app.post('/api/v1/bridge/watchlist/add', async (req, res) => {
 
     const cleanSym = String(body.symbol).trim().toUpperCase().slice(0, 36);
     const formattedSym = cleanSym.includes(':') ? cleanSym : `NSE:${cleanSym}`;
-    const liveTick = priceCache[formattedSym];
-    const resolvedLtp = Number(body.ltp) || (liveTick && Number(liveTick.ltp)) || 2450.00;
+    const liveTick = getLiveBridgeSymbolTick(formattedSym);
+    const resolvedLtp = (liveTick && liveTick.ltp) || Number(body.ltp) || 1000.00;
 
-    const existingIdx = body.id ? state.watchlist.findIndex(w => w.id === body.id) : -1;
+    let existingIdx = body.id ? state.watchlist.findIndex(w => w.id === body.id) : -1;
+    if (existingIdx === -1) {
+      existingIdx = state.watchlist.findIndex(w => String(w.symbol).toUpperCase() === formattedSym);
+    }
+    const prevItem = existingIdx !== -1 ? state.watchlist[existingIdx] : null;
+    const isAlgoActive = body.algoActive !== undefined ? Boolean(body.algoActive) : (prevItem ? prevItem.algoActive : true);
+
     const item = {
-      id: body.id || ('WL-' + Math.floor(100 + Math.random() * 900)),
+      id: body.id || (prevItem ? prevItem.id : ('WL-' + Math.floor(100 + Math.random() * 900))),
       symbol: formattedSym,
       ltp: resolvedLtp,
-      change: body.change || '+0.65%',
-      isUp: body.isUp !== undefined ? Boolean(body.isUp) : true,
-      high: Number(body.high) || Number((resolvedLtp * 1.01).toFixed(2)),
-      low: Number(body.low) || Number((resolvedLtp * 0.99).toFixed(2)),
-      algoStrategy: String(body.algoStrategy || 'EMA 9/21 Trend Scalper').slice(0, 48),
-      algoActive: body.algoActive !== undefined ? Boolean(body.algoActive) : true,
+      change: (liveTick && liveTick.change) || body.change || '+0.00%',
+      isUp: liveTick ? liveTick.isUp : (body.isUp !== undefined ? Boolean(body.isUp) : true),
+      high: (liveTick && liveTick.high) || Number(body.high) || Number((resolvedLtp * 1.012).toFixed(2)),
+      low: (liveTick && liveTick.low) || Number(body.low) || Number((resolvedLtp * 0.988).toFixed(2)),
+      algoStrategy: String(body.algoStrategy || prevItem?.algoStrategy || 'EMA 9/21 Trend Scalper').slice(0, 48),
+      algoActive: isAlgoActive,
       mode: (body.mode === 'SANDBOX' || body.mode === 'PAPER') ? 'SANDBOX' : 'LIVE',
-      status: body.status || (body.algoActive === false ? 'PAUSED' : 'WAITING_TRIGGER'),
-      lots: Math.max(1, Number(body.lots) || 1),
-      qty: Math.max(1, Number(body.qty) || 50),
-      targetPts: Math.max(1, Number(body.targetPts) || 60),
-      slPts: Math.max(1, Number(body.slPts) || 25),
-      trailingSl: body.trailingSl !== undefined ? Boolean(body.trailingSl) : true,
-      autoSquareOff: String(body.autoSquareOff || '15:15').slice(0, 12),
-      realizedPnl: Number(body.realizedPnl) || 0
+      status: !isAlgoActive ? 'PAUSED' : (body.status && body.status !== 'IN_POSITION_LONG' ? body.status : (prevItem?.status || 'WAITING_TRIGGER')),
+      lots: Math.max(1, Number(body.lots) || prevItem?.lots || 1),
+      qty: Math.max(1, Number(body.qty) || prevItem?.qty || 50),
+      targetPts: Math.max(1, Number(body.targetPts) || prevItem?.targetPts || 60),
+      slPts: Math.max(1, Number(body.slPts) || prevItem?.slPts || 25),
+      trailingSl: body.trailingSl !== undefined ? Boolean(body.trailingSl) : (prevItem?.trailingSl ?? true),
+      autoSquareOff: String(body.autoSquareOff || prevItem?.autoSquareOff || '15:15').slice(0, 12),
+      entryPrice: prevItem?.entryPrice || null,
+      realizedPnl: Number(body.realizedPnl ?? prevItem?.realizedPnl ?? 0)
     };
 
     if (existingIdx !== -1) {
@@ -15486,7 +15565,11 @@ app.post('/api/v1/bridge/watchlist/:id/toggle', async (req, res) => {
     const item = state.watchlist.find(w => w.id === req.params.id);
     if (item) {
       item.algoActive = !item.algoActive;
-      item.status = item.algoActive ? 'WAITING_TRIGGER' : 'PAUSED';
+      if (!item.algoActive) {
+        item.status = 'PAUSED';
+      } else if (item.status === 'PAUSED') {
+        item.status = 'WAITING_TRIGGER';
+      }
       await saveUserBridgeState(userObj, state);
       return res.json({ success: true, item, watchlist: state.watchlist });
     }
@@ -15502,25 +15585,49 @@ app.post('/api/v1/bridge/watchlist/:id/square-off', async (req, res) => {
     const state = await getUserBridgeState(userObj);
     const item = state.watchlist.find(w => w.id === req.params.id);
     if (item) {
-      item.status = 'WAITING_TRIGGER';
-      const primaryDemat = state.demats[0];
+      const liveTick = getLiveBridgeSymbolTick(item.symbol);
+      const exitLtp = (liveTick && liveTick.ltp) || Number(item.ltp) || 0;
+      item.ltp = exitLtp;
+
+      let tradePnl = 0;
+      const entryPx = Number(item.entryPrice) || exitLtp;
+      const qty = Math.max(1, Number(item.qty) || 50);
+      if (item.status === 'IN_POSITION_LONG' && entryPx > 0) {
+        tradePnl = Number(((exitLtp - entryPx) * qty).toFixed(2));
+      } else if (item.status === 'IN_POSITION_SHORT' && entryPx > 0) {
+        tradePnl = Number(((entryPx - exitLtp) * qty).toFixed(2));
+      }
+      item.realizedPnl = Number((Number(item.realizedPnl || 0) + tradePnl).toFixed(2));
+      item.entryPrice = null;
+      item.status = item.algoActive ? 'WAITING_TRIGGER' : 'PAUSED';
+
+      const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+      const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       const exitOrder = {
         id: 'BO-' + Math.floor(10000 + Math.random() * 90000),
-        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        broker: primaryDemat ? primaryDemat.broker : (item.mode === 'PAPER' ? 'SkandX Algo Simulator' : 'Primary Broker'),
-        account: primaryDemat ? primaryDemat.clientCode : (item.mode === 'PAPER' ? 'ALGO-SIM' : 'MASTER'),
+        time: nowTime,
+        timestamp: nowTime,
+        broker: primaryDemat ? primaryDemat.broker : 'SkandX Algo Simulator',
+        account: primaryDemat ? primaryDemat.clientCode : 'ALGO-SIM',
         symbol: item.symbol,
         side: 'SQUARE_OFF',
-        qty: item.qty || 50,
-        price: `₹${Number(item.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        qty,
+        price: `₹${Number(exitLtp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        pnl: tradePnl,
         status: 'COMPLETED',
         source: '1-Click Algo Position Exit'
       };
       state.orders.unshift(exitOrder);
       if (state.orders.length > 50) state.orders.pop();
       await saveUserBridgeState(userObj, state);
-      return res.json({ success: true, message: `Squared off position for ${item.symbol}`, item, order: exitOrder, watchlist: state.watchlist, orders: state.orders });
+      return res.json({
+        success: true,
+        message: `Squared off ${item.symbol} @ ₹${exitLtp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}${tradePnl ? ` (P&L: ${tradePnl >= 0 ? '+' : ''}₹${tradePnl.toLocaleString('en-IN')})` : ''}`,
+        item,
+        order: exitOrder,
+        watchlist: state.watchlist,
+        orders: state.orders
+      });
     }
     res.status(404).json({ error: 'Watchlist item not found' });
   } catch (err) {
@@ -15546,10 +15653,18 @@ app.post('/api/v1/bridge/copy-group/update', async (req, res) => {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
     const { groupName, masterAccount, status, maxLossLimit } = req.body || {};
-    if (groupName !== undefined) state.copyGroups.groupName = String(groupName).slice(0, 64);
+    if (groupName !== undefined) state.copyGroups.groupName = String(groupName).trim().slice(0, 64) || 'Primary Alpha Copy Cluster';
     if (masterAccount !== undefined) state.copyGroups.masterAccount = String(masterAccount).slice(0, 32);
-    if (status !== undefined) state.copyGroups.status = status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED';
     if (maxLossLimit !== undefined) state.copyGroups.maxLossLimit = Math.max(0, Number(maxLossLimit) || 15000);
+    if (status !== undefined) {
+      const nextStatus = (status === 'ACTIVE' || status === 'RUNNING') ? 'ACTIVE' : 'PAUSED';
+      if (nextStatus === 'ACTIVE' && (!state.copyGroups.masterAccount || state.copyGroups.masterAccount === 'UNASSIGNED')) {
+        if (state.demats[0]?.clientCode) {
+          state.copyGroups.masterAccount = state.demats[0].clientCode;
+        }
+      }
+      state.copyGroups.status = nextStatus;
+    }
     await saveUserBridgeState(userObj, state);
     res.json({ success: true, copyGroups: state.copyGroups });
   } catch (err) {
@@ -15561,22 +15676,70 @@ app.post('/api/v1/bridge/copy-group/followers/add', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { accountCode, broker, multiplier, maxRiskPerTrade } = req.body || {};
-    if (!accountCode) return res.status(400).json({ error: 'Follower Account Code is required' });
+    const { accountCode, clientName, multiplier, maxRiskPerTrade } = req.body || {};
+    if (!accountCode) return res.status(400).json({ error: 'Follower Account Code (UCC) is required' });
+
+    const cleanCode = String(accountCode).trim().toUpperCase().slice(0, 24);
+    state.copyGroups.followers = Array.isArray(state.copyGroups.followers) ? state.copyGroups.followers : [];
+    const existing = state.copyGroups.followers.find(f => f.accountCode === cleanCode);
+    if (existing) {
+      existing.multiplier = Math.max(0.1, Math.min(50, Number(multiplier) || existing.multiplier || 1.0));
+      existing.maxRiskPerTrade = Math.max(100, Number(maxRiskPerTrade) || existing.maxRiskPerTrade || 3000);
+      existing.status = 'ACTIVE';
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, follower: existing, copyGroups: state.copyGroups });
+    }
 
     const newFollower = {
       id: 'FOL-' + Math.floor(100 + Math.random() * 900),
-      accountCode: String(accountCode).trim().toUpperCase().slice(0, 24),
-      broker: String(broker || 'Zerodha Kite').trim().slice(0, 36),
+      accountCode: cleanCode,
+      clientName: String(clientName || `${cleanCode} Follower`).trim().slice(0, 48),
+      broker: 'Angel One SmartAPI',
       multiplier: Math.max(0.1, Math.min(50, Number(multiplier) || 1.0)),
       maxRiskPerTrade: Math.max(100, Number(maxRiskPerTrade) || 3000),
       status: 'ACTIVE'
     };
 
-    state.copyGroups.followers = Array.isArray(state.copyGroups.followers) ? state.copyGroups.followers : [];
     state.copyGroups.followers.push(newFollower);
     await saveUserBridgeState(userObj, state);
     res.json({ success: true, follower: newFollower, copyGroups: state.copyGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/copy-group/sync-linked', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    state.copyGroups.followers = Array.isArray(state.copyGroups.followers) ? state.copyGroups.followers : [];
+    let addedCount = 0;
+
+    (state.linkedUsers || []).forEach(lu => {
+      const code = String(lu.clientCode || '').trim().toUpperCase();
+      if (!code) return;
+      if (!state.copyGroups.followers.some(f => f.accountCode === code)) {
+        const mult = parseFloat(String(lu.copyRatio || '1.0').replace(/[^0-9.]/g, '')) || 1.0;
+        state.copyGroups.followers.push({
+          id: 'FOL-' + Math.floor(100 + Math.random() * 900),
+          accountCode: code,
+          clientName: lu.clientName || `${code} Client`,
+          broker: 'Angel One SmartAPI',
+          multiplier: mult,
+          maxRiskPerTrade: 3000,
+          status: lu.allowTrading !== false ? 'ACTIVE' : 'PAUSED'
+        });
+        addedCount++;
+      }
+    });
+
+    await saveUserBridgeState(userObj, state);
+    res.json({
+      success: true,
+      addedCount,
+      message: addedCount > 0 ? `Synced ${addedCount} Linked Client(s) into Copy Group Followers.` : 'All Linked Clients are already in your Copy Group.',
+      copyGroups: state.copyGroups
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -15620,7 +15783,7 @@ app.post('/api/v1/bridge/kill-switch', async (req, res) => {
     const state = await getUserBridgeState(userObj);
     state.copyGroups.status = 'PAUSED';
     state.demats.forEach(a => { a.tradingActive = false; });
-    state.watchlist.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; });
+    state.watchlist.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; w.entryPrice = null; });
     const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const killOrder = {
       id: 'KILL-' + Math.floor(1000 + Math.random() * 9000),
@@ -15652,60 +15815,111 @@ app.post('/api/v1/bridge/kill-switch', async (req, res) => {
   }
 });
 
+// Helper to apply order state updates to Watchlist and replicate to Copy Group followers
+function processBridgeOrderAndCopy(state, payload, defaultSource = 'Manual Algo Execution') {
+  const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
+  const rawSym = String(payload.symbol || 'NSE:NIFTY50-INDEX').trim().toUpperCase().slice(0, 36);
+  const sym = rawSym.includes(':') ? rawSym : `NSE:${rawSym}`;
+  const liveTick = getLiveBridgeSymbolTick(sym);
+  const rawPrice = String(payload.price || '').replace(/[₹,\s]/g, '');
+  const numericPrice = Number(rawPrice) || (liveTick && liveTick.ltp) || 24500.00;
+  const side = String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase();
+  const qty = Math.max(1, Math.min(100000, Number(payload.qty) || 50));
+  const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+
+  const newOrder = {
+    id: orderId,
+    time: nowTime,
+    timestamp: nowTime,
+    broker: String(payload.broker || primaryDemat?.broker || 'SkandX Algo Simulator').slice(0, 36),
+    account: String(payload.account || state.copyGroups?.masterAccount || primaryDemat?.clientCode || 'ALGO-SIM').slice(0, 24),
+    symbol: sym,
+    side,
+    qty,
+    orderType: String(payload.orderType || payload.order_type || 'MARKET').slice(0, 12).toUpperCase(),
+    price: `₹${numericPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    targetPts: Number(payload.targetPts ?? payload.target_points ?? 0) || 0,
+    slPts: Number(payload.slPts ?? payload.sl_points ?? 0) || 0,
+    status: 'COMPLETED',
+    source: String(payload.source || payload.strategy || defaultSource).slice(0, 48)
+  };
+  state.orders.unshift(newOrder);
+
+  // Update matching Watchlist strategy item if present
+  const wlItem = (state.watchlist || []).find(w =>
+    (payload.watchlistId && w.id === payload.watchlistId) ||
+    String(w.symbol).toUpperCase() === sym
+  );
+  if (wlItem) {
+    wlItem.ltp = numericPrice;
+    if (side === 'BUY') {
+      wlItem.status = 'IN_POSITION_LONG';
+      wlItem.entryPrice = numericPrice;
+      wlItem.algoActive = true;
+    } else if (side === 'SELL') {
+      wlItem.status = 'IN_POSITION_SHORT';
+      wlItem.entryPrice = numericPrice;
+      wlItem.algoActive = true;
+    } else if (side === 'EXIT' || side === 'SQUARE_OFF') {
+      const entryPx = Number(wlItem.entryPrice) || numericPrice;
+      let pnl = 0;
+      if (wlItem.status === 'IN_POSITION_LONG') pnl = (numericPrice - entryPx) * (wlItem.qty || qty);
+      if (wlItem.status === 'IN_POSITION_SHORT') pnl = (entryPx - numericPrice) * (wlItem.qty || qty);
+      wlItem.realizedPnl = Number((Number(wlItem.realizedPnl || 0) + pnl).toFixed(2));
+      wlItem.entryPrice = null;
+      wlItem.status = wlItem.algoActive ? 'WAITING_TRIGGER' : 'PAUSED';
+    }
+  }
+
+  // Replicate across active followers if Copy Group is ACTIVE or forceCopy is requested
+  const copiedOrders = [];
+  const shouldCopy = state.copyGroups?.status === 'ACTIVE' || Boolean(payload.forceCopy);
+  if (shouldCopy && Array.isArray(state.copyGroups?.followers)) {
+    state.copyGroups.followers.filter(f => f.status === 'ACTIVE').forEach(fol => {
+      const repQty = Math.max(1, Math.round(qty * (Number(fol.multiplier) || 1)));
+      const copyOrder = {
+        id: 'CPY-' + Math.floor(10000 + Math.random() * 90000),
+        time: nowTime,
+        timestamp: nowTime,
+        broker: fol.broker || 'Angel One SmartAPI',
+        account: fol.accountCode,
+        symbol: sym,
+        side,
+        qty: repQty,
+        orderType: newOrder.orderType,
+        price: newOrder.price,
+        status: 'COMPLETED',
+        source: `Copy Trade (${fol.multiplier}x from ${newOrder.account})`
+      };
+      state.orders.unshift(copyOrder);
+      copiedOrders.push(copyOrder);
+    });
+  }
+
+  if (state.orders.length > 50) state.orders.length = 50;
+  return { orderId, newOrder, copiedOrders, wlItem };
+}
+
 // 8. Order Placement, Webhook Trigger & Telegram Bot
 app.post('/api/v1/bridge/order', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
     const payload = req.body || {};
-    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
-    const rawPrice = String(payload.price || '').replace(/[₹,\s]/g, '');
-    const numericPrice = Number(rawPrice) || 25014.60;
+    const { orderId, newOrder, copiedOrders, wlItem } = processBridgeOrderAndCopy(state, payload, 'Manual Algo Execution');
 
-    const newOrder = {
-      id: orderId,
-      time: nowTime,
-      timestamp: nowTime,
-      broker: String(payload.broker || state.demats[0]?.broker || 'SkandX Algo Simulator').slice(0, 36),
-      account: String(payload.account || state.demats[0]?.clientCode || 'ALGO-SIM').slice(0, 24),
-      symbol: String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 36),
-      side: String(payload.side || payload.action || 'BUY').slice(0, 12).toUpperCase(),
-      qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
-      orderType: String(payload.orderType || 'MARKET').slice(0, 12),
-      price: `₹${numericPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      targetPts: Number(payload.targetPts) || 0,
-      slPts: Number(payload.slPts) || 0,
-      status: 'COMPLETED',
-      source: String(payload.source || 'Manual Algo Execution').slice(0, 48)
-    };
-    state.orders.unshift(newOrder);
-
-    // Replicate across active followers if Copy Group is ACTIVE or routeAll is true
-    if (state.copyGroups.status === 'ACTIVE' && Array.isArray(state.copyGroups.followers)) {
-      state.copyGroups.followers.filter(f => f.status === 'ACTIVE').forEach(fol => {
-        const repQty = Math.max(1, Math.round(newOrder.qty * (Number(fol.multiplier) || 1)));
-        state.orders.unshift({
-          id: 'CPY-' + Math.floor(10000 + Math.random() * 90000),
-          time: nowTime,
-          timestamp: nowTime,
-          broker: fol.broker,
-          account: fol.accountCode,
-          symbol: newOrder.symbol,
-          side: newOrder.side,
-          qty: repQty,
-          orderType: newOrder.orderType,
-          price: newOrder.price,
-          status: 'COMPLETED',
-          source: `Copy Trade (${fol.multiplier}x)`
-        });
-      });
-    }
-
-    if (state.orders.length > 50) state.orders.length = 50;
     await saveUserBridgeState(userObj, state);
     appendAlgoAuditLog(`[ORDER_ROUTED] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY -> ${newOrder.broker} (${newOrder.account})`, true);
-    res.json({ success: true, orderId, order: newOrder, orders: state.orders });
+    res.json({
+      success: true,
+      orderId,
+      order: newOrder,
+      copiedOrders,
+      watchlistItem: wlItem,
+      watchlist: state.watchlist,
+      orders: state.orders
+    });
   } catch (err) {
     res.status(400).json({ error: 'Invalid order payload' });
   }
@@ -15713,33 +15927,31 @@ app.post('/api/v1/bridge/order', async (req, res) => {
 
 app.post('/api/v1/bridge/webhook', async (req, res) => {
   try {
-    const userObj = await resolveBridgeUser(req);
-    const state = await getUserBridgeState(userObj);
     const payload = req.body || {};
-    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const orderId = 'BO-' + Math.floor(10000 + Math.random() * 90000);
-    const sym = String(payload.symbol || 'NSE:NIFTY24OCTFUT').slice(0, 36).toUpperCase();
-    const livePrice = priceCache[sym]?.ltp || Number(payload.price) || 25014.60;
-    const primaryDemat = state.demats.find(d => d.tradingActive) || state.demats[0];
+    let userObj = await resolveBridgeUser(req);
+    let state = await getUserBridgeState(userObj);
 
-    const newOrder = {
-      id: orderId,
-      time: nowTime,
-      timestamp: nowTime,
-      broker: String(payload.broker || primaryDemat?.broker || 'SkandX Algo Simulator').slice(0, 36),
-      account: String(payload.account || primaryDemat?.clientCode || 'ALGO-SIM').slice(0, 24),
-      symbol: sym,
-      side: String(payload.action || payload.side || 'BUY').slice(0, 12).toUpperCase(),
-      qty: Math.max(1, Math.min(100000, Number(payload.qty) || 50)),
-      price: `₹${Number(livePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      status: 'COMPLETED',
-      source: 'TradingView Webhook'
-    };
-    state.orders.unshift(newOrder);
-    if (state.orders.length > 50) state.orders.pop();
+    // If external webhook (e.g. TradingView/Chartink) has no JWT cookie/header, match by secret or token
+    if (userObj.isGuest && (payload.secret || payload.token)) {
+      const matchedState = await findBridgeStateByToken(payload.secret || payload.token);
+      if (matchedState && matchedState.ownerId) {
+        state = matchedState;
+        userObj = { id: matchedState.ownerId, email: matchedState.ownerEmail, username: matchedState.ownerName, isGuest: false };
+      }
+    }
+
+    const { orderId, newOrder, copiedOrders } = processBridgeOrderAndCopy(state, payload, 'TradingView Webhook');
     await saveUserBridgeState(userObj, state);
-    appendAlgoAuditLog(`[WEBHOOK_EXEC] ${sym} ${newOrder.side} ${newOrder.qty} QTY via Webhook (${newOrder.account})`, true);
-    res.json({ success: true, orderId, status: 'ORDER_PLACED', order: newOrder, orders: state.orders });
+    appendAlgoAuditLog(`[WEBHOOK_EXEC] ${newOrder.symbol} ${newOrder.side} ${newOrder.qty} QTY via Webhook (${newOrder.account})`, true);
+    res.json({
+      success: true,
+      orderId,
+      status: 'ORDER_PLACED',
+      order: newOrder,
+      copiedCount: copiedOrders.length,
+      watchlist: state.watchlist,
+      orders: state.orders
+    });
   } catch (err) {
     res.status(400).json({ success: false, error: 'Invalid webhook payload' });
   }
@@ -15749,11 +15961,15 @@ app.post('/api/v1/bridge/telegram/save', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
-    const { chatId, botUsername, notifyFills, notifyRejections, notifyCopyTrades, notifyDailyPnl, alerts } = req.body || {};
+    const { chatId, botUsername, notifyFills, notifyRejections, notifyCopyTrades, notifyDailyPnl, alerts, connected } = req.body || {};
     if (chatId !== undefined) {
       state.telegramConfig.chatId = String(chatId).trim().slice(0, 64);
-      state.telegramConfig.botConnected = Boolean(state.telegramConfig.chatId);
-      state.telegramConfig.connected = Boolean(state.telegramConfig.chatId);
+      const isConn = connected !== undefined ? Boolean(connected) : Boolean(state.telegramConfig.chatId);
+      state.telegramConfig.botConnected = isConn;
+      state.telegramConfig.connected = isConn;
+    } else if (connected !== undefined) {
+      state.telegramConfig.botConnected = Boolean(connected);
+      state.telegramConfig.connected = Boolean(connected);
     }
     if (botUsername !== undefined) {
       state.telegramConfig.botUsername = String(botUsername).trim().slice(0, 48) || '@SkandXAlgoBot';
@@ -15776,11 +15992,98 @@ app.post('/api/v1/bridge/telegram/test', async (req, res) => {
   try {
     const userObj = await resolveBridgeUser(req);
     const state = await getUserBridgeState(userObj);
+    const inputChatId = req.body?.chatId ? String(req.body.chatId).trim().slice(0, 64) : '';
+    if (inputChatId) {
+      state.telegramConfig.chatId = inputChatId;
+      state.telegramConfig.connected = true;
+      state.telegramConfig.botConnected = true;
+      await saveUserBridgeState(userObj, state);
+    }
     const targetChat = state.telegramConfig?.chatId || '@SkandXAlgoBot';
     res.json({
       success: true,
-      message: `🔔 [SkandX Telegram Bot] Test alert dispatched to ${targetChat}: OMS Gateway Latency 1.8ms OK`
+      telegram: state.telegramConfig,
+      telegramConfig: state.telegramConfig,
+      message: `🔔 [SkandX Telegram Bot] Test alert dispatched to Chat ID ${targetChat}: OMS Gateway Latency 1.8ms OK`
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/telegram/command', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const rawCmd = String(req.body?.command || '/positions').trim();
+    const parts = rawCmd.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+
+    if (cmd === '/kill') {
+      state.copyGroups.status = 'PAUSED';
+      state.demats.forEach(a => { a.tradingActive = false; });
+      state.watchlist.forEach(w => { w.algoActive = false; w.status = 'PAUSED'; w.entryPrice = null; });
+      await saveUserBridgeState(userObj, state);
+      return res.json({
+        success: true,
+        reply: '🚨 [Telegram /kill] Emergency Kill Switch executed! All strategies & copy followers paused.',
+        demats: state.demats,
+        watchlist: state.watchlist,
+        copyGroups: state.copyGroups,
+        orders: state.orders
+      });
+    }
+
+    if (cmd === '/positions') {
+      const openList = (state.watchlist || []).filter(w => w.status === 'IN_POSITION_LONG' || w.status === 'IN_POSITION_SHORT');
+      const totalRealized = (state.watchlist || []).reduce((acc, w) => acc + (Number(w.realizedPnl) || 0), 0);
+      const summary = openList.length > 0
+        ? `📊 [Telegram /positions] ${openList.length} Open Algo Position(s): ${openList.map(w => `${w.symbol} (${w.status === 'IN_POSITION_LONG' ? 'LONG' : 'SHORT'} ${w.qty} Qty)`).join(', ')} | Realized P&L: ₹${totalRealized.toLocaleString('en-IN')}`
+        : `📊 [Telegram /positions] No open algo positions. Watching ${(state.watchlist || []).length} symbol(s) | Realized P&L: ₹${totalRealized.toLocaleString('en-IN')}`;
+      return res.json({ success: true, reply: summary, watchlist: state.watchlist });
+    }
+
+    if (cmd === '/buy' || cmd === '/sell') {
+      const side = cmd === '/buy' ? 'BUY' : 'SELL';
+      const symArg = parts[1] || state.watchlist[0]?.symbol || 'NSE:RELIANCE';
+      const qtyArg = Number(parts[2]) || state.watchlist[0]?.qty || 50;
+      const { newOrder } = processBridgeOrderAndCopy(state, {
+        symbol: symArg,
+        side,
+        qty: qtyArg,
+        source: `Telegram Bot (${cmd})`
+      }, `Telegram Bot (${cmd})`);
+      await saveUserBridgeState(userObj, state);
+      return res.json({
+        success: true,
+        reply: `✅ [Telegram ${cmd}] Executed ${side} ${newOrder.qty} Qty of ${newOrder.symbol} @ ${newOrder.price} (${newOrder.account})`,
+        order: newOrder,
+        watchlist: state.watchlist,
+        orders: state.orders
+      });
+    }
+
+    res.json({
+      success: true,
+      reply: `🤖 [SkandX Bot] Executed ${rawCmd} — OMS Gateway Status: ONLINE (1.8ms)`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v1/bridge/plan/select', async (req, res) => {
+  try {
+    const userObj = await resolveBridgeUser(req);
+    const state = await getUserBridgeState(userObj);
+    const plan = String(req.body?.plan || 'STARTER').toUpperCase();
+    if (plan === 'STARTER') {
+      state.config.currentPlan = 'STARTER';
+      state.config.activePlan = 'STARTER';
+      await saveUserBridgeState(userObj, state);
+      return res.json({ success: true, activePlan: 'STARTER', stats: state.config });
+    }
+    res.status(400).json({ error: 'Paid plans require activation via Wallet or Razorpay.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

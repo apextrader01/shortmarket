@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { X, Zap, Cpu, ShieldCheck, Play, Sliders, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Zap } from 'lucide-react';
+import { useStore } from '../store';
 
 const POPULAR_INSTRUMENTS = [
-  { symbol: 'NSE:NIFTY24OCTFUT', name: 'Nifty 50 Futures', type: 'INDEX_FUT', ltp: 25014.60, lotSize: 75 },
-  { symbol: 'NSE:BANKNIFTY51500CE', name: 'BankNifty 51500 Call', type: 'OPT_CE', ltp: 342.50, lotSize: 15 },
-  { symbol: 'NSE:FINNIFTY23800PE', name: 'FinNifty 23800 Put', type: 'OPT_PE', ltp: 112.80, lotSize: 65 },
-  { symbol: 'NSE:SENSEX74000CE', name: 'Sensex 74000 Call', type: 'BSE_OPT', ltp: 215.00, lotSize: 10 },
-  { symbol: 'NSE:RELIANCE', name: 'Reliance Industries', type: 'EQUITY', ltp: 2985.40, lotSize: 1 },
-  { symbol: 'NSE:HDFCBANK', name: 'HDFC Bank Ltd', type: 'EQUITY', ltp: 1682.10, lotSize: 1 },
-  { symbol: 'MCX:GOLD26OCTFUT', name: 'MCX Gold Futures', type: 'COMMODITY', ltp: 76450.00, lotSize: 1 }
+  { symbol: 'NSE:RELIANCE', name: 'Reliance Industries', type: 'EQUITY', ltp: 1285.40, lotSize: 50 },
+  { symbol: 'NSE:HDFCBANK', name: 'HDFC Bank Ltd', type: 'EQUITY', ltp: 1682.10, lotSize: 50 },
+  { symbol: 'NSE:TCS', name: 'Tata Consultancy Services', type: 'EQUITY', ltp: 3940.00, lotSize: 25 },
+  { symbol: 'NSE:INFY', name: 'Infosys Ltd', type: 'EQUITY', ltp: 1860.50, lotSize: 50 },
+  { symbol: 'NSE:ICICIBANK', name: 'ICICI Bank Ltd', type: 'EQUITY', ltp: 1265.00, lotSize: 50 },
+  { symbol: 'NSE:SBIN', name: 'State Bank of India', type: 'EQUITY', ltp: 815.20, lotSize: 100 },
+  { symbol: 'NSE:TATAMOTORS', name: 'Tata Motors Ltd', type: 'EQUITY', ltp: 785.00, lotSize: 100 },
+  { symbol: 'NSE:AXISBANK', name: 'Axis Bank Ltd', type: 'EQUITY', ltp: 1145.00, lotSize: 50 }
 ];
 
 const STRATEGY_TEMPLATES = [
@@ -22,7 +24,9 @@ const STRATEGY_TEMPLATES = [
 
 export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem = null, editingAlgo = null }) {
   const activeEditing = editingItem || editingAlgo;
-  const [symbol, setSymbol] = useState('NSE:NIFTY24OCTFUT');
+  const marketStocks = useStore(s => s.stocks);
+  const [symbol, setSymbol] = useState('NSE:RELIANCE');
+  const [customSymbol, setCustomSymbol] = useState('');
   const [strategy, setStrategy] = useState('EMA 9/21 Trend Scalper');
   const [mode, setMode] = useState('LIVE');
   const [lots, setLots] = useState(1);
@@ -31,9 +35,28 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
   const [trailingSl, setTrailingSl] = useState(true);
   const [autoSquareOff, setAutoSquareOff] = useState('15:15');
 
+  const instrumentList = useMemo(() => {
+    return POPULAR_INSTRUMENTS.map(inst => {
+      const clean = inst.symbol.split(':')[1] || inst.symbol;
+      const live = Array.isArray(marketStocks)
+        ? marketStocks.find(s => String(s.symbol || '').toUpperCase() === clean)
+        : null;
+      if (live && Number(live.price || live.ltp) > 0) {
+        return {
+          ...inst,
+          ltp: Number(live.price || live.ltp),
+          change: `${Number(live.changePercent || 0) >= 0 ? '+' : ''}${Number(live.changePercent || 0).toFixed(2)}%`,
+          isUp: Number(live.changePercent || 0) >= 0
+        };
+      }
+      return inst;
+    });
+  }, [marketStocks]);
+
   useEffect(() => {
     if (activeEditing) {
-      setSymbol(activeEditing.symbol || 'NSE:NIFTY24OCTFUT');
+      setSymbol(activeEditing.symbol || 'NSE:RELIANCE');
+      setCustomSymbol('');
       setStrategy(activeEditing.algoStrategy || 'EMA 9/21 Trend Scalper');
       setMode(activeEditing.mode === 'PAPER' ? 'SANDBOX' : (activeEditing.mode || 'LIVE'));
       setLots(activeEditing.lots || 1);
@@ -42,7 +65,8 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
       setTrailingSl(activeEditing.trailingSl !== false);
       setAutoSquareOff(activeEditing.autoSquareOff || '15:15');
     } else {
-      setSymbol('NSE:NIFTY24OCTFUT');
+      setSymbol('NSE:RELIANCE');
+      setCustomSymbol('');
       setStrategy('EMA 9/21 Trend Scalper');
       setMode('LIVE');
       setLots(1);
@@ -64,22 +88,30 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const inst = POPULAR_INSTRUMENTS.find(i => i.symbol === symbol) || { ltp: 25000, lotSize: 50 };
+    const rawSym = (customSymbol.trim() || symbol || 'NSE:RELIANCE').toUpperCase();
+    const finalSym = rawSym.includes(':') ? rawSym : `NSE:${rawSym}`;
+    const cleanSym = finalSym.split(':')[1] || finalSym;
+    const liveMatch = Array.isArray(marketStocks)
+      ? marketStocks.find(s => String(s.symbol || '').toUpperCase() === cleanSym)
+      : null;
+    const inst = instrumentList.find(i => i.symbol === finalSym) || { ltp: 1250, lotSize: 50 };
+    const resolvedLtp = (liveMatch && Number(liveMatch.price || liveMatch.ltp)) || activeEditing?.ltp || inst.ltp;
+
     const newAlgo = {
-      id: activeEditing?.id || ('WL-' + Math.floor(10 + Math.random() * 90)),
-      symbol,
-      ltp: activeEditing?.ltp || inst.ltp,
-      change: activeEditing?.change || '+0.42%',
-      isUp: activeEditing?.isUp !== undefined ? activeEditing.isUp : true,
-      high: activeEditing?.high || inst.ltp * 1.01,
-      low: activeEditing?.low || inst.ltp * 0.99,
+      id: activeEditing?.id || ('WL-' + Math.floor(100 + Math.random() * 900)),
+      symbol: finalSym,
+      ltp: resolvedLtp,
+      change: inst.change || activeEditing?.change || '+0.00%',
+      isUp: inst.isUp !== undefined ? inst.isUp : (activeEditing?.isUp !== undefined ? activeEditing.isUp : true),
+      high: activeEditing?.high || Number((resolvedLtp * 1.012).toFixed(2)),
+      low: activeEditing?.low || Number((resolvedLtp * 0.988).toFixed(2)),
       algoStrategy: strategy,
-      algoActive: true,
+      algoActive: activeEditing ? activeEditing.algoActive : true,
       mode,
-      status: mode === 'LIVE' ? 'IN_POSITION_LONG' : 'WAITING_TRIGGER',
+      status: activeEditing?.status || 'WAITING_TRIGGER',
       lots: Number(lots) || 1,
       qty: (Number(lots) || 1) * (inst.lotSize || 50),
-      targetPts: Number(targetPts) || 50,
+      targetPts: Number(targetPts) || 60,
       slPts: Number(slPts) || 25,
       trailingSl,
       autoSquareOff,
@@ -141,7 +173,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 {activeEditing ? 'Configure Algo Parameters' : 'Deploy New Algo Strategy'}
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                Multi-Broker Execution Engine • Sub-15ms Route
+                Angel One SmartAPI Execution Engine • Sub-15ms Route
               </div>
             </div>
           </div>
@@ -155,28 +187,49 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
           {/* Select Instrument */}
           <div>
             <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
-              SELECT INSTRUMENT / SYMBOL
+              SELECT INSTRUMENT OR ENTER CUSTOM NSE SYMBOL
             </label>
-            <select
-              value={symbol}
-              onChange={e => setSymbol(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                background: '#121826',
-                border: '1px solid #1e293b',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: '600'
-              }}
-            >
-              {POPULAR_INSTRUMENTS.map(i => (
-                <option key={i.symbol} value={i.symbol} style={{ background: '#0f172a', color: '#fff' }}>
-                  {i.symbol} — {i.name} (₹{i.ltp})
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '8px' }}>
+              <select
+                value={symbol}
+                onChange={e => {
+                  setSymbol(e.target.value);
+                  setCustomSymbol('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: '#121826',
+                  border: '1px solid #1e293b',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}
+              >
+                {instrumentList.map(i => (
+                  <option key={i.symbol} value={i.symbol} style={{ background: '#0f172a', color: '#fff' }}>
+                    {i.symbol} (₹{Number(i.ltp).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Or custom (e.g. WIPRO)"
+                value={customSymbol}
+                onChange={e => setCustomSymbol(e.target.value.toUpperCase())}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: '#121826',
+                  border: '1px solid #1e293b',
+                  borderRadius: '8px',
+                  color: '#38bdf8',
+                  fontSize: '12.5px',
+                  fontWeight: '700'
+                }}
+              />
+            </div>
           </div>
 
           {/* Strategy Template */}

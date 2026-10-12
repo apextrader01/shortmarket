@@ -114,11 +114,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [demats, setDemats] = useState([]);
   const [staticIps, setStaticIps] = useState([]);
   const [linkedUsers, setLinkedUsers] = useState([]);
-  const [watchlist, setWatchlist] = useState([
-    { id: 'WL-01', symbol: 'NSE:NIFTY24OCTFUT', ltp: 25014.60, change: '+104.20 (+0.42%)', isUp: true, high: 25080.00, low: 24920.00, algoStrategy: 'EMA 9/21 Trend Scalper', algoActive: true, mode: 'SANDBOX', status: 'WAITING_TRIGGER', lots: 1, qty: 75, targetPts: 60, slPts: 25, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
-    { id: 'WL-02', symbol: 'NSE:BANKNIFTY24OCTFUT', ltp: 51462.10, change: '+318.50 (+0.62%)', isUp: true, high: 51600.00, low: 51210.00, algoStrategy: 'Supertrend 7/3 Breakout', algoActive: true, mode: 'SANDBOX', status: 'WAITING_TRIGGER', lots: 1, qty: 15, targetPts: 80, slPts: 35, trailingSl: true, autoSquareOff: '15:15', realizedPnl: 0 },
-    { id: 'WL-03', symbol: 'NSE:RELIANCE', ltp: 2985.40, change: '-12.80 (-0.43%)', isUp: false, high: 3012.00, low: 2975.00, algoStrategy: 'VWAP Mean Reversion', algoActive: false, mode: 'SANDBOX', status: 'PAUSED', lots: 1, qty: 10, targetPts: 25, slPts: 12, trailingSl: false, autoSquareOff: '15:15', realizedPnl: 0 }
-  ]);
+  const [watchlist, setWatchlist] = useState([]);
   const [copyGroup, setCopyGroup] = useState({
     groupName: 'SkandX High-Alpha Mirror Group',
     masterAccount: 'UNASSIGNED',
@@ -137,6 +133,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     notifyCopyTrades: true,
     notifyDailyPnl: true
   });
+  const [botCommandReply, setBotCommandReply] = useState('');
 
   // Modals
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -191,13 +188,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   const [showAddLinkUserModal, setShowAddLinkUserModal] = useState(false);
   const [newLinkClientName, setNewLinkClientName] = useState('');
   const [newLinkEmail, setNewLinkEmail] = useState('');
-  const [newLinkBroker, setNewLinkBroker] = useState('Angel One');
+  const [newLinkBroker, setNewLinkBroker] = useState('Angel One SmartAPI');
   const [newLinkClientCode, setNewLinkClientCode] = useState('');
   const [newLinkCopyRatio, setNewLinkCopyRatio] = useState('1.0x');
 
   // Group Copy Add Follower Modal State
   const [showAddFollowerModal, setShowAddFollowerModal] = useState(false);
-  const [newFollowerBroker, setNewFollowerBroker] = useState('Angel One');
+  const [newFollowerBroker, setNewFollowerBroker] = useState('Angel One SmartAPI');
   const [newFollowerCode, setNewFollowerCode] = useState('');
   const [newFollowerMultiplier, setNewFollowerMultiplier] = useState(1.0);
   const [newFollowerMaxRisk, setNewFollowerMaxRisk] = useState(3000);
@@ -210,19 +207,58 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
   // Webhook Builder State
   const [whAction, setWhAction] = useState('BUY');
-  const [whSymbol, setWhSymbol] = useState('NSE:NIFTY24OCTFUT');
+  const [whSymbol, setWhSymbol] = useState('NSE:RELIANCE');
   const [whQty, setWhQty] = useState(50);
   const [whType, setWhType] = useState('MARKET');
   const [whProduct, setWhProduct] = useState('MIS');
-  const [whTarget, setWhTarget] = useState(100);
-  const [whSl, setWhSl] = useState(50);
+  const [whTarget, setWhTarget] = useState(60);
+  const [whSl, setWhSl] = useState(25);
+
+  const resolveSymbolLiveQuote = useCallback((symbolInput) => {
+    const raw = String(symbolInput || '').trim().toUpperCase();
+    const clean = raw.includes(':') ? raw.split(':')[1] : raw;
+    const base = clean.replace(/-EQ$|-INDEX$|\d{2}[A-Z]{3}FUT$|\d+(CE|PE)$/i, '');
+    if (Array.isArray(marketStocks) && marketStocks.length > 0) {
+      const matched = marketStocks.find(s => {
+        const sSym = String(s.symbol || '').toUpperCase();
+        const sClean = sSym.includes(':') ? sSym.split(':')[1] : sSym;
+        return (
+          sSym === raw ||
+          sClean === clean ||
+          sClean === base ||
+          (base === 'NIFTY' && (sClean.includes('NIFTY 50') || sClean === 'NIFTY50-INDEX')) ||
+          (base === 'BANKNIFTY' && (sClean.includes('NIFTY BANK') || sClean.includes('BANKNIFTY')))
+        );
+      });
+      if (matched && Number(matched.price || matched.ltp) > 0) {
+        const ltp = Number(matched.price || matched.ltp);
+        const pct = Number(matched.changePercent ?? matched.change ?? 0);
+        const isUp = pct >= 0;
+        return {
+          ltp,
+          isUp,
+          change: `${isUp ? '+' : ''}${pct.toFixed(2)}%`,
+          high: Number(matched.high) || Number((ltp * 1.012).toFixed(2)),
+          low: Number(matched.low) || Number((ltp * 0.988).toFixed(2))
+        };
+      }
+    }
+    return null;
+  }, [marketStocks]);
 
   // Fetch per-user state from backend on mount and when logged-in user changes
   const fetchBridgeState = useCallback(async () => {
     try {
       const d = await apiFetch('/api/v1/bridge/all');
       if (d && d.success) {
-        if (d.stats) setConfig(prev => ({ ...prev, ...d.stats }));
+        if (d.stats) {
+          setConfig(prev => ({
+            ...prev,
+            ...d.stats,
+            activePlan: d.stats.activePlan || d.stats.currentPlan || prev.activePlan || 'STARTER',
+            currentPlan: d.stats.currentPlan || d.stats.activePlan || prev.currentPlan || 'STARTER'
+          }));
+        }
         if (d.platformFeatures) setPlatformFeatures(prev => ({ ...prev, ...d.platformFeatures }));
         if (Array.isArray(d.demats)) setDemats(d.demats);
         if (Array.isArray(d.staticIps)) setStaticIps(d.staticIps);
@@ -231,7 +267,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         if (d.copyGroups) setCopyGroup(d.copyGroups);
         if (Array.isArray(d.orders)) setOrders(d.orders);
         if (Array.isArray(d.transactions)) setTransactions(d.transactions);
-        if (d.telegram) setTelegramConfig(prev => ({ ...prev, ...d.telegram }));
+        const tg = d.telegramConfig || d.telegram;
+        if (tg) setTelegramConfig(prev => ({ ...prev, ...tg }));
       }
     } catch (_) {}
   }, [apiFetch]);
@@ -244,25 +281,20 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   useEffect(() => {
     if (!Array.isArray(marketStocks) || marketStocks.length === 0) return;
     setWatchlist(prev => prev.map(w => {
-      const rawSym = String(w.symbol || '').split(':').pop().replace(/\d+OCTFUT|\d+NOVFUT|\d+DECFUT/i, '');
-      const matched = marketStocks.find(s => {
-        const sSym = String(s.symbol || '').toUpperCase();
-        return sSym === rawSym || (rawSym === 'NIFTY' && sSym.includes('NIFTY 50')) || (rawSym === 'BANKNIFTY' && sSym.includes('BANK'));
-      });
-      if (matched && Number(matched.price) > 0) {
-        const price = Number(matched.price);
-        const pct = Number(matched.changePercent || matched.change || 0);
-        const isUp = pct >= 0;
+      const quote = resolveSymbolLiveQuote(w.symbol);
+      if (quote) {
         return {
           ...w,
-          ltp: price,
-          isUp,
-          change: `${isUp ? '+' : ''}${pct.toFixed(2)}%`
+          ltp: quote.ltp,
+          isUp: quote.isUp,
+          change: quote.change,
+          high: quote.high,
+          low: quote.low
         };
       }
       return w;
     }));
-  }, [marketStocks]);
+  }, [marketStocks, resolveSymbolLiveQuote]);
 
   const shareUrl = `https://www.skandx.in/algo?tab=LinkUser&ref=${config.connectionToken}`;
 
@@ -275,8 +307,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     try {
       const data = await apiFetch('/api/v1/bridge/regenerate-token', { method: 'POST' });
       if (data.success && data.token) {
-        setConfig(prev => ({ ...prev, connectionToken: data.token }));
-        showToast('Regenerated new Demat connection link!');
+        setConfig(prev => ({
+          ...prev,
+          connectionToken: data.token,
+          webhookSecret: data.webhookSecret || prev.webhookSecret
+        }));
+        showToast('Regenerated new Demat connection link & Webhook Secret!');
         return;
       }
     } catch (_) {}
@@ -573,28 +609,39 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
   // ── Watchlist & Strategy Handlers ────────────────────────────────────────
   const handleDeployAlgo = async (newAlgo) => {
-    const isExisting = watchlist.some(w => w.id === newAlgo.id);
+    const liveQuote = resolveSymbolLiveQuote(newAlgo.symbol);
+    const enrichedAlgo = {
+      ...newAlgo,
+      ltp: liveQuote ? liveQuote.ltp : (Number(newAlgo.ltp) || 2450.00),
+      change: liveQuote ? liveQuote.change : (newAlgo.change || '+0.00%'),
+      isUp: liveQuote ? liveQuote.isUp : (newAlgo.isUp ?? true),
+      high: liveQuote ? liveQuote.high : (newAlgo.high || 2480.00),
+      low: liveQuote ? liveQuote.low : (newAlgo.low || 2420.00)
+    };
+    const isExisting = watchlist.some(w => w.id === enrichedAlgo.id);
     setWatchlist(prev => {
-      const idx = prev.findIndex(w => w.id === newAlgo.id);
+      const idx = prev.findIndex(w => w.id === enrichedAlgo.id || String(w.symbol).toUpperCase() === String(enrichedAlgo.symbol).toUpperCase());
       if (idx !== -1) {
         const next = [...prev];
-        next[idx] = newAlgo;
+        next[idx] = { ...prev[idx], ...enrichedAlgo, id: prev[idx].id };
         return next;
       }
-      return [newAlgo, ...prev];
+      return [enrichedAlgo, ...prev];
     });
-    showToast(`${isExisting ? 'Updated' : 'Deployed'} ${newAlgo.symbol} (${newAlgo.algoStrategy})!`);
+    showToast(`${isExisting ? 'Updated' : 'Deployed'} ${enrichedAlgo.symbol} (${enrichedAlgo.algoStrategy})!`);
     try {
       if (isExisting) {
-        await apiFetch(`/api/v1/bridge/watchlist/${newAlgo.id}`, {
+        const data = await apiFetch(`/api/v1/bridge/watchlist/${enrichedAlgo.id}`, {
           method: 'PUT',
-          body: JSON.stringify(newAlgo)
+          body: JSON.stringify(enrichedAlgo)
         });
+        if (data.success && Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
       } else {
-        await apiFetch('/api/v1/bridge/watchlist/add', {
+        const data = await apiFetch('/api/v1/bridge/watchlist/add', {
           method: 'POST',
-          body: JSON.stringify(newAlgo)
+          body: JSON.stringify(enrichedAlgo)
         });
+        if (data.success && Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
       }
     } catch (_) {}
   };
@@ -607,14 +654,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         return {
           ...w,
           algoActive: nextActive,
-          status: nextActive ? 'WAITING_TRIGGER' : 'PAUSED'
+          status: !nextActive ? 'PAUSED' : (w.status === 'PAUSED' ? 'WAITING_TRIGGER' : w.status)
         };
       }
       return w;
     }));
     showToast(`Algo strategy ${!target?.algoActive ? 'STARTED' : 'PAUSED'} for ${target?.symbol}`);
     try {
-      await apiFetch(`/api/v1/bridge/watchlist/${id}/toggle`, { method: 'POST' });
+      const data = await apiFetch(`/api/v1/bridge/watchlist/${id}/toggle`, { method: 'POST' });
+      if (data.success && Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
     } catch (_) {}
   };
 
@@ -624,36 +672,46 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     try {
       const data = await apiFetch(`/api/v1/bridge/watchlist/${id}/square-off`, { method: 'POST' });
       if (data.success) {
-        if (data.watchlist) setWatchlist(data.watchlist);
-        if (data.orders) setOrders(data.orders);
-        showToast(`Position squared off for ${target.symbol}!`);
+        if (Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        showToast(data.message || `Position squared off for ${target.symbol}!`);
         return;
       }
     } catch (_) {}
-    setWatchlist(prev => prev.map(w => w.id === id ? { ...w, status: 'WAITING_TRIGGER' } : w));
+    setWatchlist(prev => prev.map(w => w.id === id ? { ...w, status: w.algoActive ? 'WAITING_TRIGGER' : 'PAUSED', entryPrice: null } : w));
     showToast(`Position squared off for ${target.symbol}!`);
   };
 
-  const handleAddWatchlist = async () => {
-    if (!searchSymbol.trim()) return;
-    const cleanSym = searchSymbol.trim().toUpperCase();
+  const handleAddWatchlist = async (customSymInput) => {
+    const rawInput = typeof customSymInput === 'string' ? customSymInput : searchSymbol;
+    if (!rawInput || !rawInput.trim()) return;
+    const cleanSym = rawInput.trim().toUpperCase();
     const fullSym = cleanSym.includes(':') ? cleanSym : `NSE:${cleanSym}`;
+
+    if (watchlist.some(w => String(w.symbol).toUpperCase() === fullSym)) {
+      showToast(`${fullSym} is already in your Algo Watchlist.`);
+      setSearchSymbol('');
+      return;
+    }
+
+    const liveQuote = resolveSymbolLiveQuote(fullSym);
+    const ltp = liveQuote ? liveQuote.ltp : 1250.00;
     const newItem = {
       id: 'WL-' + Math.floor(100 + Math.random() * 900),
       symbol: fullSym,
-      ltp: 2450.00,
-      change: '+0.62%',
-      isUp: true,
-      high: 2480.00,
-      low: 2420.00,
+      ltp,
+      change: liveQuote ? liveQuote.change : '+0.00%',
+      isUp: liveQuote ? liveQuote.isUp : true,
+      high: liveQuote ? liveQuote.high : Number((ltp * 1.012).toFixed(2)),
+      low: liveQuote ? liveQuote.low : Number((ltp * 0.988).toFixed(2)),
       algoStrategy: 'EMA 9/21 Trend Scalper',
       algoActive: true,
-      mode: 'SANDBOX',
+      mode: demats.length > 0 ? 'LIVE' : 'SANDBOX',
       status: 'WAITING_TRIGGER',
       lots: 1,
       qty: 50,
       targetPts: 60,
-      slPts: 30,
+      slPts: 25,
       trailingSl: true,
       autoSquareOff: '15:15',
       realizedPnl: 0
@@ -662,10 +720,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     setSearchSymbol('');
     showToast(`Added ${newItem.symbol} to Algo Watchlist!`);
     try {
-      await apiFetch('/api/v1/bridge/watchlist/add', {
+      const data = await apiFetch('/api/v1/bridge/watchlist/add', {
         method: 'POST',
         body: JSON.stringify(newItem)
       });
+      if (data.success && Array.isArray(data.watchlist)) {
+        setWatchlist(data.watchlist);
+      }
     } catch (_) {}
   };
 
@@ -692,7 +753,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     e.preventDefault();
     if (!selectedStockForOrder) return;
     const chosenDemat = demats.find(d => d.id === orderTargetDemat);
+    const liveLtp = Number(selectedStockForOrder.ltp) || 1250;
     const payload = {
+      watchlistId: selectedStockForOrder.id,
       broker: chosenDemat ? chosenDemat.broker : (demats[0]?.broker || 'SkandX Algo Simulator'),
       account: chosenDemat ? chosenDemat.clientCode : (demats[0]?.clientCode || 'ALGO-SIM'),
       symbol: selectedStockForOrder.symbol,
@@ -701,17 +764,31 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       orderType,
       targetPts: Number(orderTargetPts) || 80,
       slPts: Number(orderSlPts) || 40,
-      price: `₹${(selectedStockForOrder.ltp || 25000).toFixed(2)}`,
+      price: `₹${liveLtp.toFixed(2)}`,
       source: 'Manual Algo Execution'
     };
+
+    // Optimistic watchlist position status update
+    setWatchlist(prev => prev.map(w => {
+      if (w.id === selectedStockForOrder.id || w.symbol === selectedStockForOrder.symbol) {
+        return {
+          ...w,
+          algoActive: true,
+          entryPrice: liveLtp,
+          status: orderSide === 'BUY' ? 'IN_POSITION_LONG' : 'IN_POSITION_SHORT'
+        };
+      }
+      return w;
+    }));
 
     try {
       const data = await apiFetch('/api/v1/bridge/order', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      if (data.success && data.orders) {
-        setOrders(data.orders);
+      if (data.success) {
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        if (Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
       }
     } catch (_) {}
 
@@ -721,6 +798,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
   // ── Copy Group Handlers ──────────────────────────────────────────────────
   const handleUpdateCopyGroup = async (patch) => {
+    if (patch.status === 'ACTIVE') {
+      const hasMaster = (patch.masterAccount || copyGroup.masterAccount) && (patch.masterAccount || copyGroup.masterAccount) !== 'UNASSIGNED';
+      const hasFollowers = Array.isArray(copyGroup.followers) && copyGroup.followers.length > 0;
+      if (!hasMaster && demats.length === 0) {
+        showToast('Connect a Master Demat account first before starting the Copy Trading Engine.');
+        return;
+      }
+      if (!hasFollowers) {
+        showToast('Add at least 1 Follower Account before starting the Copy Trading Engine.');
+        return;
+      }
+    }
     const nextGroup = { ...copyGroup, ...patch };
     setCopyGroup(nextGroup);
     try {
@@ -735,6 +824,49 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     } catch (_) {}
   };
 
+  const handleSyncLinkedFollowers = async () => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/copy-group/sync-linked', { method: 'POST' });
+      if (data.success) {
+        if (data.copyGroups) setCopyGroup(data.copyGroups);
+        showToast(data.message || 'Synced Linked Clients into Copy Group!');
+      }
+    } catch (_) {
+      showToast('Could not sync Linked Clients.');
+    }
+  };
+
+  const handleSimulateCopyOrder = async () => {
+    const activeFollowers = (copyGroup.followers || []).filter(f => f.status === 'ACTIVE');
+    if (activeFollowers.length === 0) {
+      showToast('Add at least 1 ACTIVE follower account to test trade replication.');
+      return;
+    }
+    const testSym = watchlist[0]?.symbol || 'NSE:RELIANCE';
+    const liveQuote = resolveSymbolLiveQuote(testSym);
+    const ltp = liveQuote ? liveQuote.ltp : (watchlist[0]?.ltp || 1285.50);
+    try {
+      const data = await apiFetch('/api/v1/bridge/order', {
+        method: 'POST',
+        body: JSON.stringify({
+          symbol: testSym,
+          side: 'BUY',
+          qty: 50,
+          price: `₹${Number(ltp).toFixed(2)}`,
+          account: copyGroup.masterAccount !== 'UNASSIGNED' ? copyGroup.masterAccount : (demats[0]?.clientCode || 'MASTER-A/C'),
+          broker: 'Angel One SmartAPI',
+          forceCopy: true,
+          source: 'Master Copy Trade Broadcast'
+        })
+      });
+      if (data.success) {
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        if (Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
+        showToast(`Master Trade Broadcasted! Replicated across ${activeFollowers.length} Follower Demat(s).`);
+      }
+    } catch (_) {}
+  };
+
   const handleAddFollowerSubmit = async (e) => {
     e.preventDefault();
     if (!newFollowerCode.trim()) {
@@ -745,7 +877,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       const data = await apiFetch('/api/v1/bridge/copy-group/followers/add', {
         method: 'POST',
         body: JSON.stringify({
-          broker: newFollowerBroker,
+          broker: 'Angel One SmartAPI',
           accountCode: newFollowerCode.toUpperCase().trim(),
           multiplier: Number(newFollowerMultiplier) || 1.0,
           maxRiskPerTrade: Number(newFollowerMaxRisk) || 3000
@@ -785,15 +917,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   // ── Webhook & Telegram Handlers ──────────────────────────────────────────
+  const resolvedWebhookSecret = config.webhookSecret || ("SKANDX_WH_" + String(config.connectionToken || 'TRD01').slice(-8).toUpperCase());
   const jsonWebhookSample = JSON.stringify({
-    secret: config.webhookSecret || ("SKANDX_WH_" + config.connectionToken.substring(0, 8)),
+    secret: resolvedWebhookSecret,
     action: whAction,
     symbol: whSymbol,
-    qty: Number(whQty),
+    qty: Number(whQty) || 50,
     order_type: whType,
     product: whProduct,
-    target_pts: Number(whTarget),
-    sl_pts: Number(whSl)
+    target_pts: Number(whTarget) || 0,
+    sl_pts: Number(whSl) || 0
   }, null, 2);
 
   const handleTestWebhookFire = async () => {
@@ -804,9 +937,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         body: jsonWebhookSample
       });
       if (data.success) {
-        showToast(`Webhook Executed! Order ${data.orderId} routed (${whAction} ${whQty} ${whSymbol}).`);
-        if (data.order) {
+        const copyNote = data.copiedCount > 0 ? ` (+${data.copiedCount} follower copies)` : '';
+        showToast(`Webhook Executed! Order ${data.orderId} routed (${whAction} ${whQty} ${whSymbol})${copyNote}.`);
+        if (Array.isArray(data.orders)) {
+          setOrders(data.orders);
+        } else if (data.order) {
           setOrders(prev => [data.order, ...prev]);
+        }
+        if (Array.isArray(data.watchlist)) {
+          setWatchlist(data.watchlist);
         }
       }
     } catch (_) {
@@ -821,22 +960,76 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         method: 'POST',
         body: JSON.stringify(telegramConfig)
       });
-      if (data.success && data.telegram) {
-        setTelegramConfig(data.telegram);
+      if (data.success && (data.telegramConfig || data.telegram)) {
+        setTelegramConfig(data.telegramConfig || data.telegram);
         showToast('Telegram Bot notification preferences saved!');
       }
     } catch (_) {}
   };
 
+  const handleDisconnectTelegram = async () => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/telegram/save', {
+        method: 'POST',
+        body: JSON.stringify({ ...telegramConfig, chatId: '', connected: false })
+      });
+      if (data.success && (data.telegramConfig || data.telegram)) {
+        setTelegramConfig(data.telegramConfig || data.telegram);
+      } else {
+        setTelegramConfig(prev => ({ ...prev, chatId: '', connected: false }));
+      }
+      showToast('Telegram Bot disconnected.');
+    } catch (_) {}
+  };
+
   const handleTelegramTestPing = async () => {
     try {
-      const data = await apiFetch('/api/v1/bridge/telegram/test', { method: 'POST' });
+      const data = await apiFetch('/api/v1/bridge/telegram/test', {
+        method: 'POST',
+        body: JSON.stringify({ chatId: telegramConfig.chatId })
+      });
       if (data.success) {
+        if (data.telegramConfig || data.telegram) {
+          setTelegramConfig(data.telegramConfig || data.telegram);
+        }
+        setBotCommandReply(data.message);
         showToast(data.message);
         return;
       }
     } catch (_) {}
     showToast('🔔 [SkandX Telegram Bot] Test alert sent to @SkandXAlgoBot: OMS Gateway Latency 1.8ms OK');
+  };
+
+  const handleExecuteTelegramCommand = async (cmdText) => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/telegram/command', {
+        method: 'POST',
+        body: JSON.stringify({ command: cmdText })
+      });
+      if (data.success) {
+        if (Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        if (Array.isArray(data.demats)) setDemats(data.demats);
+        if (data.copyGroups) setCopyGroup(data.copyGroups);
+        setBotCommandReply(data.reply || `Executed ${cmdText}`);
+        showToast(data.reply || `Executed Telegram command: ${cmdText}`);
+      }
+    } catch (_) {
+      showToast(`Executed Telegram command: ${cmdText}`);
+    }
+  };
+
+  const handleSelectStarterPlan = async () => {
+    try {
+      const data = await apiFetch('/api/v1/bridge/plan/select', {
+        method: 'POST',
+        body: JSON.stringify({ plan: 'STARTER' })
+      });
+      if (data.success && data.stats) {
+        setConfig(prev => ({ ...prev, ...data.stats, activePlan: 'STARTER', currentPlan: 'STARTER' }));
+        showToast('Switched active plan to Starter Basic Algo.');
+      }
+    } catch (_) {}
   };
 
   const handleKillSwitch = async () => {
@@ -846,8 +1039,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       if (data.success) {
         setCopyGroup(prev => ({ ...prev, status: 'PAUSED' }));
         setDemats(prev => prev.map(a => ({ ...a, tradingActive: false })));
-        setWatchlist(prev => prev.map(w => ({ ...w, algoActive: false, status: 'PAUSED' })));
-        if (data.killOrder) setOrders(prev => [data.killOrder, ...prev]);
+        setWatchlist(prev => prev.map(w => ({ ...w, algoActive: false, status: 'PAUSED', entryPrice: null })));
+        if (Array.isArray(data.orders)) setOrders(data.orders);
       }
     } catch (_) {}
     showToast('🚨 EMERGENCY KILL SWITCH ACTIVATED: All positions squared off!');
@@ -2719,11 +2912,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Institutional Algo Watchlist & Strategy Deployments ({watchlist.length})
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Real-time market ticks, automated strategy triggers, multi-broker order routing, and 1-click risk exits.
+                    Real-time market ticks, automated strategy triggers, Angel One SmartAPI routing, and 1-click risk exits.
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', position: 'relative' }}>
                   <button
                     onClick={handleOpenDeployNew}
                     style={{
@@ -2746,10 +2939,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <Plus size={15} /> + Deploy Algo Strategy
                   </button>
 
-                  <div style={{ display: 'flex', gap: '6px', flex: isMobile ? 1 : 'initial' }}>
+                  <div style={{ display: 'flex', gap: '6px', flex: isMobile ? 1 : 'initial', position: 'relative' }}>
                     <input
                       type="text"
-                      placeholder="Add Symbol (e.g. NIFTY, INFY)..."
+                      placeholder="Add NSE Symbol (e.g. RELIANCE, TCS)..."
                       value={searchSymbol}
                       onChange={e => setSearchSymbol(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleAddWatchlist(); }}
@@ -2760,12 +2953,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         padding: '8px 12px',
                         color: '#fff',
                         fontSize: '12.5px',
-                        width: isMobile ? '100%' : '200px',
+                        width: isMobile ? '100%' : '230px',
                         minWidth: 0
                       }}
                     />
                     <button
-                      onClick={handleAddWatchlist}
+                      onClick={() => handleAddWatchlist()}
                       style={{
                         padding: '8px 14px',
                         background: '#2563eb',
@@ -2780,6 +2973,53 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     >
                       Add
                     </button>
+
+                    {/* Live Symbol Autocomplete Suggestions */}
+                    {searchSymbol.trim().length > 0 && Array.isArray(marketStocks) && (() => {
+                      const q = searchSymbol.trim().toUpperCase();
+                      const matches = marketStocks.filter(s =>
+                        String(s.symbol || '').toUpperCase().includes(q) ||
+                        String(s.name || '').toUpperCase().includes(q)
+                      ).slice(0, 6);
+                      if (matches.length === 0) return null;
+                      return (
+                        <div style={{
+                          position: 'absolute',
+                          top: '42px',
+                          left: 0,
+                          right: 0,
+                          background: '#0f172a',
+                          border: '1px solid #334155',
+                          borderRadius: '10px',
+                          boxShadow: '0 12px 30px rgba(0,0,0,0.65)',
+                          zIndex: 50,
+                          overflow: 'hidden'
+                        }}>
+                          {matches.map(m => {
+                            const sym = String(m.symbol || '').includes(':') ? m.symbol : `NSE:${m.symbol}`;
+                            const px = Number(m.price || m.ltp || 0);
+                            return (
+                              <div
+                                key={m.symbol}
+                                onClick={() => handleAddWatchlist(sym)}
+                                style={{
+                                  padding: '9px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  borderBottom: '1px solid #1e293b',
+                                  cursor: 'pointer',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                <span style={{ color: '#fff', fontWeight: '800' }}>{sym}</span>
+                                <span style={{ color: '#22c55e', fontWeight: '700' }}>₹{px.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2830,249 +3070,318 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              {/* Strategy Cards Grid */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {watchlist.map(w => {
-                  const isLive = (w.mode || 'LIVE') === 'LIVE';
-                  const inPosition = (w.status || '').includes('POSITION');
-                  const isLong = (w.status || '').includes('LONG');
-                  const isShort = (w.status || '').includes('SHORT');
-                  const isWaiting = w.status === 'WAITING_TRIGGER';
-                  const isPaused = !w.algoActive || w.status === 'PAUSED';
-
-                  return (
-                    <div
-                      key={w.id}
-                      style={{
-                        background: '#101726',
-                        border: `1px solid ${inPosition ? (isLong ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)') : '#1e293b'}`,
-                        borderRadius: '14px',
-                        padding: isMobile ? '16px' : '20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#fff' }}>
-                                {w.symbol}
-                              </span>
-                              <span style={{
-                                padding: '2px 7px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: '900',
-                                background: isLive ? 'rgba(34,197,94,0.18)' : 'rgba(56,189,248,0.18)',
-                                color: isLive ? '#22c55e' : '#38bdf8',
-                                border: `1px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`
-                              }}>
-                                {isLive ? '● LIVE' : '○ SANDBOX'}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ color: '#38bdf8', fontWeight: '700' }}>{w.algoStrategy || 'Custom Webhook'}</span>
-                              <span>•</span>
-                              <span>Auto Exit: {w.autoSquareOff || '15:15'} IST</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                          <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                            <div style={{ fontSize: '17px', fontWeight: '900', color: w.isUp ? '#22c55e' : '#ef4444' }}>
-                              ₹{Number(w.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </div>
-                            <div style={{ fontSize: '11.5px', color: w.isUp ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
-                              {w.change}
-                            </div>
-                          </div>
-
-                          <div>
-                            {isLong && (
-                              <span style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.5)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '900', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e' }}></span>
-                                IN POSITION (LONG)
-                              </span>
-                            )}
-                            {isShort && (
-                              <span style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.5)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '900', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444' }}></span>
-                                IN POSITION (SHORT)
-                              </span>
-                            )}
-                            {isWaiting && !isPaused && (
-                              <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
-                                ⏳ WAITING TRIGGER
-                              </span>
-                            )}
-                            {isPaused && (
-                              <span style={{ background: 'rgba(100,116,139,0.2)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
-                                ⏸️ PAUSED
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{
-                        background: '#090d16',
-                        borderRadius: '10px',
-                        padding: '12px 16px',
-                        display: 'grid',
-                        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
-                        gap: '12px',
-                        fontSize: '12px'
-                      }}>
-                        <div>
-                          <div style={{ color: '#64748b' }}>Lots / Qty:</div>
-                          <div style={{ color: '#fff', fontWeight: '800', marginTop: '2px' }}>
-                            {w.lots || 1} Lots ({w.qty || 50} Qty)
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: '#64748b' }}>Target (Points):</div>
-                          <div style={{ color: '#22c55e', fontWeight: '800', marginTop: '2px' }}>
-                            +{w.targetPts || 80} pts
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: '#64748b' }}>Stop Loss:</div>
-                          <div style={{ color: '#ef4444', fontWeight: '800', marginTop: '2px' }}>
-                            -{w.slPts || 40} pts
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: '#64748b' }}>Trailing SL:</div>
-                          <div style={{ color: w.trailingSl ? '#38bdf8' : '#64748b', fontWeight: '800', marginTop: '2px' }}>
-                            {w.trailingSl ? 'ON (+20 pts)' : 'OFF'}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: '#64748b' }}>Today Realized P&L:</div>
-                          <div style={{ color: (w.realizedPnl || 0) >= 0 ? '#22c55e' : '#ef4444', fontWeight: '900', marginTop: '2px' }}>
-                            {(w.realizedPnl || 0) >= 0 ? '+' : ''}₹{(Number(w.realizedPnl) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => handleToggleWatchlistAlgo(w.id)}
-                            style={{
-                              padding: '7px 14px',
-                              background: w.algoActive ? 'rgba(34,197,94,0.18)' : 'rgba(245,158,11,0.18)',
-                              border: `1px solid ${w.algoActive ? '#22c55e' : '#f59e0b'}`,
-                              color: w.algoActive ? '#22c55e' : '#f59e0b',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '800',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {w.algoActive ? '🟢 RUNNING' : '⏸️ PAUSED'}
-                          </button>
-
-                          <button
-                            onClick={() => handleSquareOffWatchlistAlgo(w.id)}
-                            style={{
-                              padding: '7px 14px',
-                              background: '#dc2626',
-                              border: 'none',
-                              color: '#fff',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '800',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            1-Click Square Off
-                          </button>
-
-                          <button
-                            onClick={() => handleEditAlgo(w)}
-                            style={{
-                              padding: '7px 12px',
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#cbd5e1',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Sliders size={13} /> Edit Config
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              const sample = JSON.stringify({
-                                secret: config.webhookSecret || 'SKANDX_WH_SECRET',
-                                action: 'BUY',
-                                symbol: w.symbol,
-                                qty: w.qty || 50,
-                                product: 'MIS',
-                                target: w.targetPts || 80,
-                                stoploss: w.slPts || 40
-                              }, null, 2);
-                              navigator.clipboard.writeText(sample);
-                              showToast(`Copied TradingView webhook payload for ${w.symbol}!`);
-                            }}
-                            style={{
-                              padding: '7px 12px',
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#38bdf8',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Code size={13} /> Copy Alert JSON
-                          </button>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => handleOpenPlaceOrder(w, 'BUY')}
-                            style={{ padding: '6px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
-                          >
-                            BUY
-                          </button>
-                          <button
-                            onClick={() => handleOpenPlaceOrder(w, 'SELL')}
-                            style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
-                          >
-                            SELL
-                          </button>
-                          <button
-                            onClick={() => handleDeleteWatchlist(w.id)}
-                            style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px' }}
-                            title="Remove from Watchlist"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
+              {/* Empty State with 1-Click Live NSE Instrument Chips */}
+              {watchlist.length === 0 ? (
+                <div style={{
+                  background: '#101726',
+                  border: '1px dashed #334155',
+                  borderRadius: '14px',
+                  padding: isMobile ? '24px 16px' : '32px 24px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '14px'
+                }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                    <Bookmark size={24} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                      Your Algo Watchlist is Clean & Ready
                     </div>
-                  );
-                })}
-              </div>
+                    <div style={{ fontSize: '12.5px', color: '#94a3b8', marginTop: '4px', maxWidth: '520px' }}>
+                      Add any live NSE stock or index below, or click <b>"+ Deploy Algo Strategy"</b> to configure automated entry, target, stop-loss, and trailing SL parameters.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '4px' }}>
+                    {['NSE:RELIANCE', 'NSE:HDFCBANK', 'NSE:TCS', 'NSE:INFY', 'NSE:ICICIBANK', 'NSE:SBIN'].map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => handleAddWatchlist(sym)}
+                        style={{
+                          padding: '7px 12px',
+                          background: '#090d16',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#38bdf8',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + {sym}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Strategy Cards Grid */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {watchlist.map(w => {
+                    const isLive = (w.mode || 'LIVE') === 'LIVE';
+                    const inPosition = (w.status || '').includes('POSITION');
+                    const isLong = (w.status || '').includes('LONG');
+                    const isShort = (w.status || '').includes('SHORT');
+                    const isWaiting = w.status === 'WAITING_TRIGGER';
+                    const isPaused = !w.algoActive || w.status === 'PAUSED';
+                    const entryPx = Number(w.entryPrice) || Number(w.ltp) || 0;
+                    const liveUnrealized = inPosition && entryPx > 0
+                      ? Number(((isLong ? (Number(w.ltp) - entryPx) : (entryPx - Number(w.ltp))) * (Number(w.qty) || 50)).toFixed(2))
+                      : 0;
+
+                    return (
+                      <div
+                        key={w.id}
+                        style={{
+                          background: '#101726',
+                          border: `1px solid ${inPosition ? (isLong ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)') : '#1e293b'}`,
+                          borderRadius: '14px',
+                          padding: isMobile ? '16px' : '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#fff' }}>
+                                  {w.symbol}
+                                </span>
+                                <span style={{
+                                  padding: '2px 7px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  background: isLive ? 'rgba(34,197,94,0.18)' : 'rgba(56,189,248,0.18)',
+                                  color: isLive ? '#22c55e' : '#38bdf8',
+                                  border: `1px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`
+                                }}>
+                                  {isLive ? '● LIVE' : '○ SANDBOX'}
+                                </span>
+                                {inPosition && (
+                                  <span style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: '800',
+                                    background: liveUnrealized >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                    color: liveUnrealized >= 0 ? '#22c55e' : '#ef4444'
+                                  }}>
+                                    Open P&L: {liveUnrealized >= 0 ? '+' : ''}₹{liveUnrealized.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#38bdf8', fontWeight: '700' }}>{w.algoStrategy || 'Custom Webhook'}</span>
+                                <span>•</span>
+                                <span>Auto Exit: {w.autoSquareOff || '15:15'} IST</span>
+                                {inPosition && entryPx > 0 && (
+                                  <>
+                                    <span>•</span>
+                                    <span style={{ color: '#cbd5e1' }}>Entry: ₹{entryPx.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                            <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                              <div style={{ fontSize: '17px', fontWeight: '900', color: w.isUp ? '#22c55e' : '#ef4444' }}>
+                                ₹{Number(w.ltp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: w.isUp ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
+                                {w.change}
+                              </div>
+                            </div>
+
+                            <div>
+                              {isLong && (
+                                <span style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.5)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '900', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e' }}></span>
+                                  IN POSITION (LONG)
+                                </span>
+                              )}
+                              {isShort && (
+                                <span style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.5)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '900', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444' }}></span>
+                                  IN POSITION (SHORT)
+                                </span>
+                              )}
+                              {isWaiting && !isPaused && (
+                                <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
+                                  ⏳ WAITING TRIGGER
+                                </span>
+                              )}
+                              {isPaused && (
+                                <span style={{ background: 'rgba(100,116,139,0.2)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
+                                  ⏸️ PAUSED
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{
+                          background: '#090d16',
+                          borderRadius: '10px',
+                          padding: '12px 16px',
+                          display: 'grid',
+                          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+                          gap: '12px',
+                          fontSize: '12px'
+                        }}>
+                          <div>
+                            <div style={{ color: '#64748b' }}>Lots / Qty:</div>
+                            <div style={{ color: '#fff', fontWeight: '800', marginTop: '2px' }}>
+                              {w.lots || 1} Lots ({w.qty || 50} Qty)
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b' }}>Target (Points):</div>
+                            <div style={{ color: '#22c55e', fontWeight: '800', marginTop: '2px' }}>
+                              +{w.targetPts || 60} pts
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b' }}>Stop Loss:</div>
+                            <div style={{ color: '#ef4444', fontWeight: '800', marginTop: '2px' }}>
+                              -{w.slPts || 25} pts
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b' }}>Trailing SL:</div>
+                            <div style={{ color: w.trailingSl ? '#38bdf8' : '#64748b', fontWeight: '800', marginTop: '2px' }}>
+                              {w.trailingSl ? 'ON (+20 pts)' : 'OFF'}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b' }}>Today Realized P&L:</div>
+                            <div style={{ color: (w.realizedPnl || 0) >= 0 ? '#22c55e' : '#ef4444', fontWeight: '900', marginTop: '2px' }}>
+                              {(w.realizedPnl || 0) >= 0 ? '+' : ''}₹{(Number(w.realizedPnl) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => handleToggleWatchlistAlgo(w.id)}
+                              style={{
+                                padding: '7px 14px',
+                                background: w.algoActive ? 'rgba(34,197,94,0.18)' : 'rgba(245,158,11,0.18)',
+                                border: `1px solid ${w.algoActive ? '#22c55e' : '#f59e0b'}`,
+                                color: w.algoActive ? '#22c55e' : '#f59e0b',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '800',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {w.algoActive ? '🟢 RUNNING' : '⏸️ PAUSED'}
+                            </button>
+
+                            <button
+                              onClick={() => handleSquareOffWatchlistAlgo(w.id)}
+                              style={{
+                                padding: '7px 14px',
+                                background: '#dc2626',
+                                border: 'none',
+                                color: '#fff',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '800',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              1-Click Square Off
+                            </button>
+
+                            <button
+                              onClick={() => handleEditAlgo(w)}
+                              style={{
+                                padding: '7px 12px',
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#cbd5e1',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <Sliders size={13} /> Edit Config
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const sample = JSON.stringify({
+                                  secret: resolvedWebhookSecret,
+                                  action: 'BUY',
+                                  symbol: w.symbol,
+                                  qty: w.qty || 50,
+                                  product: 'MIS',
+                                  target_pts: w.targetPts || 60,
+                                  sl_pts: w.slPts || 25
+                                }, null, 2);
+                                navigator.clipboard.writeText(sample);
+                                showToast(`Copied TradingView webhook payload for ${w.symbol}!`);
+                              }}
+                              style={{
+                                padding: '7px 12px',
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#38bdf8',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <Code size={13} /> Copy Alert JSON
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              onClick={() => handleOpenPlaceOrder(w, 'BUY')}
+                              style={{ padding: '6px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                            >
+                              BUY
+                            </button>
+                            <button
+                              onClick={() => handleOpenPlaceOrder(w, 'SELL')}
+                              style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                            >
+                              SELL
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWatchlist(w.id)}
+                              style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px' }}
+                              title="Remove from Watchlist"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -3087,10 +3396,52 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Group & Multi-Account Copy Trading
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Replicate orders from your Master Demat account to Follower Demats with custom lot multipliers.
+                    Replicate orders from your Master Angel One Demat account to Follower Demats with custom lot multipliers.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                  {linkedUsers.length > 0 && (
+                    <button
+                      onClick={handleSyncLinkedFollowers}
+                      style={{
+                        flex: isMobile ? 1 : 'initial',
+                        justifyContent: 'center',
+                        padding: '9px 14px',
+                        background: '#1e293b',
+                        color: '#38bdf8',
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <RefreshCw size={14} /> Sync Linked Clients ({linkedUsers.length})
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSimulateCopyOrder}
+                    style={{
+                      flex: isMobile ? 1 : 'initial',
+                      justifyContent: 'center',
+                      padding: '9px 14px',
+                      background: '#16a34a',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ⚡ Test Master Copy Trade
+                  </button>
                   <button
                     onClick={() => setShowAddFollowerModal(true)}
                     style={{
@@ -3135,14 +3486,32 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                     <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7', flexShrink: 0 }}>
                       👑
                     </div>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{copyGroup.groupName}</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          value={copyGroup.groupName || ''}
+                          onChange={e => setCopyGroup(prev => ({ ...prev, groupName: e.target.value }))}
+                          onBlur={e => handleUpdateCopyGroup({ groupName: e.target.value })}
+                          style={{
+                            background: 'transparent',
+                            border: '1px dashed #334155',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '15px',
+                            fontWeight: '800',
+                            color: '#fff',
+                            minWidth: '220px'
+                          }}
+                          title="Click to rename Copy Group"
+                        />
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
                         <span>Master Demat:</span>
                         <select
                           value={copyGroup.masterAccount || 'UNASSIGNED'}
@@ -3154,6 +3523,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <option key={d.id} value={d.clientCode}>{d.broker} ({d.clientCode})</option>
                           ))}
                         </select>
+
+                        <span>• Max Group Loss Limit (₹):</span>
+                        <input
+                          type="number"
+                          value={copyGroup.maxLossLimit ?? 15000}
+                          onChange={e => setCopyGroup(prev => ({ ...prev, maxLossLimit: Number(e.target.value) }))}
+                          onBlur={e => handleUpdateCopyGroup({ maxLossLimit: Number(e.target.value) })}
+                          style={{ width: '95px', background: '#090d16', border: '1px solid #334155', color: '#f59e0b', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -3188,7 +3566,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                   {(!copyGroup.followers || copyGroup.followers.length === 0) ? (
                     <div style={{ background: '#090d16', border: '1px dashed #334155', borderRadius: '8px', padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
-                      No follower accounts added to this Copy Group yet. Click <b>"+ Add Follower Account"</b> above to start mirroring trades.
+                      No follower accounts added to this Copy Group yet. Click <b>"+ Add Follower Account"</b>{linkedUsers.length > 0 ? ' or "Sync Linked Clients"' : ''} above to start mirroring trades.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -3208,8 +3586,25 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           }}
                         >
                           <div>
-                            <div style={{ fontWeight: '800', color: '#fff' }}>{f.broker} - {f.accountCode}</div>
-                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>Max Risk/Trade: ₹{f.maxRiskPerTrade}</div>
+                            <div style={{ fontWeight: '800', color: '#fff' }}>
+                              {f.clientName ? `${f.clientName} • ` : ''}Angel One SmartAPI ({f.accountCode})
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                              <span>Max Risk/Trade: ₹</span>
+                              <input
+                                type="number"
+                                value={f.maxRiskPerTrade || 3000}
+                                onChange={e => {
+                                  const val = Number(e.target.value);
+                                  setCopyGroup(prev => ({
+                                    ...prev,
+                                    followers: (prev.followers || []).map(item => item.id === f.id ? { ...item, maxRiskPerTrade: val } : item)
+                                  }));
+                                }}
+                                onBlur={e => handleUpdateFollower(f.id, { maxRiskPerTrade: Number(e.target.value) })}
+                                style={{ width: '75px', background: '#101726', border: '1px solid #334155', color: '#cbd5e1', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}
+                              />
+                            </div>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -3254,6 +3649,47 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   )}
                 </div>
               </div>
+
+              {/* Recent Replicated Copy Orders Table */}
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                  Recent Master & Follower Copy Trade Log ({orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).length})
+                </div>
+                {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).length === 0 ? (
+                  <div style={{ fontSize: '12.5px', color: '#64748b' }}>
+                    No replicated copy trades recorded yet. Add a follower account and click <b>"⚡ Test Master Copy Trade"</b> above to verify multi-account execution.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <th style={{ padding: '8px' }}>Order ID</th>
+                          <th style={{ padding: '8px' }}>Time</th>
+                          <th style={{ padding: '8px' }}>Account</th>
+                          <th style={{ padding: '8px' }}>Symbol</th>
+                          <th style={{ padding: '8px' }}>Side / Qty</th>
+                          <th style={{ padding: '8px' }}>Price</th>
+                          <th style={{ padding: '8px' }}>Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).slice(0, 10).map(o => (
+                          <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <td style={{ padding: '8px', fontFamily: 'monospace', color: '#a855f7' }}>{o.id}</td>
+                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.time || o.timestamp}</td>
+                            <td style={{ padding: '8px', fontWeight: '800', color: '#fff' }}>{o.account}</td>
+                            <td style={{ padding: '8px', color: '#38bdf8', fontWeight: '700' }}>{o.symbol}</td>
+                            <td style={{ padding: '8px', color: o.side === 'BUY' ? '#22c55e' : '#ef4444', fontWeight: '800' }}>{o.side} ({o.qty})</td>
+                            <td style={{ padding: '8px' }}>{o.price}</td>
+                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -3267,36 +3703,88 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   TradingView, Chartink & Python Webhook Bridge
                 </h2>
                 <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                  Zero-latency JSON alert webhook listener routing strategy signals directly into your connected Demats.
+                  Zero-latency JSON alert webhook listener routing strategy signals directly into your connected Angel One SmartAPI Demats.
                 </p>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8' }}>
-                    Target Webhook URL
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: '14px' }}>
+                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#38bdf8' }}>
+                      Target Webhook URL (TradingView / Chartink)
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://www.skandx.in/api/v1/bridge/webhook');
+                        showToast('Copied Webhook URL!');
+                      }}
+                      style={{ padding: '5px 12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                    >
+                      Copy Webhook URL
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText('https://www.skandx.in/api/v1/bridge/webhook');
-                      showToast('Copied Webhook URL!');
-                    }}
-                    style={{ padding: '6px 12px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    Copy Webhook URL
-                  </button>
+                  <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
+                    https://www.skandx.in/api/v1/bridge/webhook
+                  </code>
                 </div>
-                <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13.5px', wordBreak: 'break-all' }}>
-                  https://www.skandx.in/api/v1/bridge/webhook
-                </code>
+
+                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#a855f7' }}>
+                      Your Personal Webhook Secret Key
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(resolvedWebhookSecret);
+                          showToast('Copied Webhook Secret Key!');
+                        }}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Copy Secret
+                      </button>
+                      <button
+                        onClick={handleRegenerateToken}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#f59e0b', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Rotate
+                      </button>
+                    </div>
+                  </div>
+                  <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#f8fafc', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
+                    {resolvedWebhookSecret}
+                  </code>
+                </div>
               </div>
 
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
-                  Interactive TradingView Alert Payload Builder
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                    Interactive TradingView Alert Payload Builder
+                  </div>
+                  {watchlist.length > 0 && (
+                    <select
+                      onChange={e => {
+                        const found = watchlist.find(w => w.symbol === e.target.value);
+                        if (found) {
+                          setWhSymbol(found.symbol);
+                          setWhQty(found.qty || 50);
+                          setWhTarget(found.targetPts || 60);
+                          setWhSl(found.slPts || 25);
+                        }
+                      }}
+                      defaultValue=""
+                      style={{ background: '#090d16', border: '1px solid #334155', color: '#38bdf8', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' }}
+                    >
+                      <option value="" disabled>Load from Algo Watchlist...</option>
+                      {watchlist.map(w => (
+                        <option key={w.id} value={w.symbol}>{w.symbol} ({w.qty} Qty)</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(145px, 1fr))', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '11.5px', color: '#64748b' }}>Action</label>
                     <select
@@ -3306,6 +3794,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     >
                       <option value="BUY">BUY</option>
                       <option value="SELL">SELL</option>
+                      <option value="EXIT">EXIT / SQUARE_OFF</option>
                     </select>
                   </div>
 
@@ -3314,15 +3803,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <input
                       type="text"
                       value={whSymbol}
-                      onChange={e => setWhSymbol(e.target.value)}
+                      onChange={e => setWhSymbol(e.target.value.toUpperCase())}
                       style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '11.5px', color: '#64748b' }}>Qty (Lot Size)</label>
+                    <label style={{ fontSize: '11.5px', color: '#64748b' }}>Qty (Shares/Lots)</label>
                     <input
                       type="number"
+                      min="1"
                       value={whQty}
                       onChange={e => setWhQty(e.target.value)}
                       style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
@@ -3341,7 +3831,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </select>
                   </div>
 
-                  <div style={{ gridColumn: isMobile ? 'span 2' : 'auto' }}>
+                  <div>
                     <label style={{ fontSize: '11.5px', color: '#64748b' }}>Product</label>
                     <select
                       value={whProduct}
@@ -3352,6 +3842,28 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <option value="CNC">CNC (Delivery)</option>
                       <option value="NRML">NRML (Carry Forward F&O)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11.5px', color: '#22c55e' }}>Target (Points)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={whTarget}
+                      onChange={e => setWhTarget(e.target.value)}
+                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#22c55e', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11.5px', color: '#ef4444' }}>Stop Loss (Points)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={whSl}
+                      onChange={e => setWhSl(e.target.value)}
+                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#ef4444', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
+                    />
                   </div>
                 </div>
 
@@ -3364,7 +3876,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           navigator.clipboard.writeText(jsonWebhookSample);
                           showToast('Copied TradingView Alert JSON!');
                         }}
-                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer' }}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
                         <Copy size={12} /> Copy JSON
                       </button>
@@ -3390,6 +3902,49 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {jsonWebhookSample}
                   </pre>
                 </div>
+              </div>
+
+              {/* Recent Webhook Signals & Execution Log */}
+              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                  Recent Webhook & Algo Order Execution Log ({orders.length})
+                </div>
+                {orders.length === 0 ? (
+                  <div style={{ fontSize: '12.5px', color: '#64748b' }}>
+                    No webhook signals fired yet. Click <b>"⚡ Test Webhook Fire"</b> above to simulate a live TradingView signal.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '520px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <th style={{ padding: '8px' }}>Order ID</th>
+                          <th style={{ padding: '8px' }}>Time</th>
+                          <th style={{ padding: '8px' }}>Symbol</th>
+                          <th style={{ padding: '8px' }}>Side / Qty</th>
+                          <th style={{ padding: '8px' }}>Price</th>
+                          <th style={{ padding: '8px' }}>Account</th>
+                          <th style={{ padding: '8px' }}>Source</th>
+                          <th style={{ padding: '8px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.slice(0, 10).map(o => (
+                          <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <td style={{ padding: '8px', fontFamily: 'monospace', color: '#38bdf8' }}>{o.id}</td>
+                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.time || o.timestamp}</td>
+                            <td style={{ padding: '8px', fontWeight: '800', color: '#fff' }}>{o.symbol}</td>
+                            <td style={{ padding: '8px', fontWeight: '800', color: o.side === 'BUY' ? '#22c55e' : '#ef4444' }}>{o.side} ({o.qty})</td>
+                            <td style={{ padding: '8px' }}>{o.price}</td>
+                            <td style={{ padding: '8px', color: '#cbd5e1' }}>{o.account}</td>
+                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.source}</td>
+                            <td style={{ padding: '8px', color: '#22c55e', fontWeight: '800' }}>{o.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3417,23 +3972,40 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div>
                       <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{telegramConfig.botUsername || '@SkandXAlgoBot'}</div>
                       <div style={{ fontSize: '12px', color: telegramConfig.connected ? '#22c55e' : '#f59e0b', fontWeight: '600' }}>
-                        {telegramConfig.connected ? `● Connected to Chat ID: ${telegramConfig.chatId}` : '○ Enter your Telegram Chat ID below to activate personal alerts'}
+                        {telegramConfig.connected && telegramConfig.chatId
+                          ? `● Connected to Chat ID: ${telegramConfig.chatId}`
+                          : '○ Enter your Telegram Chat ID below to activate personal alerts'}
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleTelegramTestPing}
-                    style={{ width: isMobile ? '100%' : 'auto', padding: '9px 16px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    Send Test Trade Alert
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                    <button
+                      onClick={handleTelegramTestPing}
+                      style={{ flex: isMobile ? 1 : 'initial', padding: '9px 16px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' }}
+                    >
+                      Send Test Trade Alert
+                    </button>
+                    {telegramConfig.connected && (
+                      <button
+                        onClick={handleDisconnectTelegram}
+                        style={{ padding: '9px 14px', background: '#1e293b', color: '#ef4444', border: '1px solid #334155', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Disconnect
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Telegram Configuration Form */}
                 <form onSubmit={handleSaveTelegramConfig} style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fff' }}>
-                    Personal Telegram Alert Routing
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fff' }}>
+                      Personal Telegram Alert Routing
+                    </div>
+                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                      Tip: Message <b>/start</b> to <b>@SkandXAlgoBot</b> or <b>@userinfobot</b> on Telegram to get your numeric Chat ID
+                    </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '10px' }}>
                     <input
@@ -3472,43 +4044,115 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 <div style={{ borderTop: '1px solid #1e293b', paddingTop: '16px' }}>
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
-                    Interactive Telegram Chat Commands:
+                    Interactive Telegram Chat Commands (Click to Execute Live):
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                      <code style={{ color: '#38bdf8', fontWeight: '800' }}>/buy &lt;symbol&gt; &lt;qty&gt;</code>
-                      <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market buy across master demat</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                      <div>
+                        <code style={{ color: '#38bdf8', fontWeight: '800' }}>/buy &lt;symbol&gt; &lt;qty&gt;</code>
+                        <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market buy across master demat</div>
+                      </div>
+                      <button
+                        onClick={() => handleExecuteTelegramCommand(`/buy ${watchlist[0]?.symbol || 'NSE:RELIANCE'} ${watchlist[0]?.qty || 50}`)}
+                        style={{ padding: '6px 10px', background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.4)', color: '#38bdf8', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer', alignSelf: 'flex-start' }}
+                      >
+                        ▶ Run /buy {watchlist[0]?.symbol || 'NSE:RELIANCE'}
+                      </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                      <code style={{ color: '#ef4444', fontWeight: '800' }}>/sell &lt;symbol&gt; &lt;qty&gt;</code>
-                      <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market sell across master demat</div>
+                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                      <div>
+                        <code style={{ color: '#ef4444', fontWeight: '800' }}>/sell &lt;symbol&gt; &lt;qty&gt;</code>
+                        <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market sell across master demat</div>
+                      </div>
+                      <button
+                        onClick={() => handleExecuteTelegramCommand(`/sell ${watchlist[0]?.symbol || 'NSE:RELIANCE'} ${watchlist[0]?.qty || 50}`)}
+                        style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer', alignSelf: 'flex-start' }}
+                      >
+                        ▶ Run /sell {watchlist[0]?.symbol || 'NSE:RELIANCE'}
+                      </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                      <code style={{ color: '#f59e0b', fontWeight: '800' }}>/positions</code>
-                      <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Returns open positions and live P&L</div>
+                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                      <div>
+                        <code style={{ color: '#f59e0b', fontWeight: '800' }}>/positions</code>
+                        <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Returns open positions and live P&L</div>
+                      </div>
+                      <button
+                        onClick={() => handleExecuteTelegramCommand('/positions')}
+                        style={{ padding: '6px 10px', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer', alignSelf: 'flex-start' }}
+                      >
+                        ▶ Check /positions
+                      </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                      <code style={{ color: '#ec4899', fontWeight: '800' }}>/kill</code>
-                      <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Emergency exit all active trades</div>
+                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                      <div>
+                        <code style={{ color: '#ec4899', fontWeight: '800' }}>/kill</code>
+                        <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Emergency exit all active trades</div>
+                      </div>
+                      <button
+                        onClick={() => handleExecuteTelegramCommand('/kill')}
+                        style={{ padding: '6px 10px', background: 'rgba(236,72,153,0.15)', border: '1px solid rgba(236,72,153,0.4)', color: '#ec4899', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer', alignSelf: 'flex-start' }}
+                      >
+                        🚨 Trigger /kill
+                      </button>
                     </div>
                   </div>
+
+                  {botCommandReply && (
+                    <div style={{
+                      marginTop: '12px',
+                      background: '#05070c',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      padding: '12px 14px',
+                      fontSize: '12.5px',
+                      color: '#22c55e',
+                      fontFamily: 'monospace'
+                    }}>
+                      {botCommandReply}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* TAB 9: PLANS & PRICING (WITH RAZORPAY CHECKOUT)               */}
+          {/* TAB 9: PLANS & PRICING (WITH RAZORPAY & WALLET CHECKOUT)      */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'Plans' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
-                  Institutional Algo Trading Plans & Add-ons
-                </h2>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
-                  All subscriptions and add-ons are processed securely through the official Razorpay Payment Gateway.
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                    Institutional Algo Trading Plans & Add-ons
+                  </h2>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
+                    Activate instantly using your <b>SkandX Algo Wallet Credit</b> or via official <b>Razorpay Checkout</b>.
+                  </p>
+                </div>
+
+                <div style={{
+                  background: 'rgba(16,185,129,0.1)',
+                  border: '1px solid rgba(16,185,129,0.35)',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '700' }}>ALGO WALLET CREDIT</div>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#10b981' }}>
+                      ₹{Number(config.availableCredit || 0).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOpenAddFundsRazorpay}
+                    style={{ padding: '7px 12px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}
+                  >
+                    + Add Credit
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
@@ -3531,20 +4175,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   <button
-                    disabled
+                    disabled={config.activePlan === 'STARTER'}
+                    onClick={handleSelectStarterPlan}
                     style={{
                       width: '100%',
                       padding: '11px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid #334155',
-                      color: '#94a3b8',
+                      background: config.activePlan === 'STARTER' ? 'rgba(34,197,94,0.12)' : '#1e293b',
+                      border: `1px solid ${config.activePlan === 'STARTER' ? 'rgba(34,197,94,0.4)' : '#334155'}`,
+                      color: config.activePlan === 'STARTER' ? '#22c55e' : '#cbd5e1',
                       borderRadius: '8px',
                       fontWeight: '800',
                       fontSize: '13px',
-                      cursor: 'default'
+                      cursor: config.activePlan === 'STARTER' ? 'default' : 'pointer'
                     }}
                   >
-                    {config.activePlan === 'STARTER' ? 'Current Active Plan' : 'Included in Your Plan'}
+                    {config.activePlan === 'STARTER' ? '✓ Current Active Plan' : 'Switch to Starter Plan'}
                   </button>
                 </div>
 
@@ -3585,7 +4230,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Up to 5 Connected Demats</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Real Live Market Order Routing</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> 5 Client Link Slots Included</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> 5 Client Link Slots + 1 Static IP</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Telegram Bot OMS & Instant Alerts</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Trailing SL & Auto 15:15 Exit</div>
                   </div>
@@ -3596,7 +4241,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       id: 'PRO',
                       title: 'Pro Algo Trader Plan',
                       amount: 999,
-                      subtitle: '1 Month Pro Angel One SmartAPI Algo Subscription via Razorpay'
+                      subtitle: '1 Month Pro Angel One SmartAPI Algo Subscription'
                     })}
                     style={{
                       width: '100%',
@@ -3611,7 +4256,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       boxShadow: '0 4px 14px rgba(37,99,235,0.4)'
                     }}
                   >
-                    {config.activePlan === 'PRO' ? 'Renew Pro Plan (₹999/mo)' : 'Upgrade with Razorpay (₹999/mo)'}
+                    {config.activePlan === 'PRO'
+                      ? 'Renew Pro Plan (₹999/mo)'
+                      : (Number(config.availableCredit || 0) >= 999 ? 'Activate with Wallet / Razorpay (₹999)' : 'Upgrade with Razorpay (₹999/mo)')}
                   </button>
                 </div>
 
@@ -3640,7 +4287,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       id: 'INSTITUTIONAL',
                       title: 'Institutional Copy Master',
                       amount: 2499,
-                      subtitle: '1 Month Master Demat Multi-Account Copy Trading Suite via Razorpay'
+                      subtitle: '1 Month Master Demat Multi-Account Copy Trading Suite'
                     })}
                     style={{
                       width: '100%',
@@ -3654,7 +4301,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    {config.activePlan === 'INSTITUTIONAL' ? 'Renew Institutional (₹2,499/mo)' : 'Get Institutional via Razorpay (₹2,499/mo)'}
+                    {config.activePlan === 'INSTITUTIONAL'
+                      ? 'Renew Institutional (₹2,499/mo)'
+                      : (Number(config.availableCredit || 0) >= 2499 ? 'Activate with Wallet / Razorpay (₹2,499)' : 'Get Institutional via Razorpay (₹2,499/mo)')}
                   </button>
                 </div>
               </div>
@@ -3679,7 +4328,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handlePurchaseStaticIp}
                       style={{ marginTop: '14px', padding: '9px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      Buy Static IP via Razorpay (₹350)
+                      {Number(config.availableCredit || 0) >= 350 ? 'Buy Static IP via Wallet / Razorpay (₹350)' : 'Buy Static IP via Razorpay (₹350)'}
                     </button>
                   </div>
 
@@ -3697,7 +4346,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handlePurchaseLinkSlot}
                       style={{ marginTop: '14px', padding: '9px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      Buy Client Slot via Razorpay (₹250)
+                      {Number(config.availableCredit || 0) >= 250 ? 'Buy Client Slot via Wallet / Razorpay (₹250)' : 'Buy Client Slot via Razorpay (₹250)'}
                     </button>
                   </div>
 
@@ -5110,29 +5759,29 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   onChange={e => {
                     const val = e.target.value;
                     if (!val) return;
-                    const [b, c] = val.split('||');
-                    setNewFollowerBroker(b);
+                    const [, c] = val.split('||');
+                    setNewFollowerBroker('Angel One SmartAPI');
                     setNewFollowerCode(c);
                   }}
                   style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
                 >
                   <option value="">Choose existing Demat or type below...</option>
                   {demats.map(d => (
-                    <option key={d.id} value={`${d.broker}||${d.clientCode}`}>{d.broker} ({d.clientCode})</option>
+                    <option key={d.id} value={`Angel One SmartAPI||${d.clientCode}`}>Angel One SmartAPI ({d.clientCode})</option>
                   ))}
                   {linkedUsers.map(u => (
-                    <option key={u.id} value={`${u.broker}||${u.clientCode}`}>{u.clientName} - {u.broker} ({u.clientCode})</option>
+                    <option key={u.id} value={`Angel One SmartAPI||${u.clientCode}`}>{u.clientName} - Angel One SmartAPI ({u.clientCode})</option>
                   ))}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Name</label>
+                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Gateway</label>
                   <input
                     type="text"
-                    value={newFollowerBroker}
-                    onChange={e => setNewFollowerBroker(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    value="Angel One SmartAPI"
+                    readOnly
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#38bdf8', fontWeight: '800', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
