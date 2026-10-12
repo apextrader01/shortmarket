@@ -9915,7 +9915,7 @@ app.post('/api/telegram/test', authenticateToken, async (req, res) => {
 // 🌐 Official Social Media & Support Channels Configuration (Instagram, Facebook, WhatsApp, Telegram)
 const DEFAULT_SOCIAL_LINKS = {
   instagram: 'https://www.instagram.com/skandx.in',
-  facebook: 'https://www.facebook.com/skandx.in',
+  facebook: 'https://www.facebook.com/SkandXOfficial',
   whatsapp: 'https://wa.me/919497861379?text=Hello%20SkandX%20Team%2C%20I%20need%20help%20with%20my%20account.',
   whatsappNumber: '+919497861379',
   telegram: 'https://t.me/skandx_official',
@@ -9933,6 +9933,9 @@ async function getPlatformSocialLinks() {
     const row = await db('system_settings').where({ key: 'platform_social_links' }).first();
     if (row && row.value) {
       const parsed = JSON.parse(row.value);
+      if (parsed.facebook === 'https://www.facebook.com/skandx.in') {
+        parsed.facebook = DEFAULT_SOCIAL_LINKS.facebook;
+      }
       cachedSocialLinks = { ...DEFAULT_SOCIAL_LINKS, ...parsed };
       cachedSocialLinksAt = now;
       return cachedSocialLinks;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export const DEFAULT_SOCIAL_LINKS = {
   instagram: 'https://www.instagram.com/skandx.in',
-  facebook: 'https://www.facebook.com/skandx.in',
+  facebook: 'https://www.facebook.com/SkandXOfficial',
   whatsapp: 'https://wa.me/919497861379?text=Hello%20SkandX%20Team%2C%20I%20need%20help%20with%20my%20account.',
   whatsappNumber: '+919497861379',
   telegram: 'https://t.me/skandx_official',
@@ -13,13 +13,21 @@ let memorySocialLinks = null;
 let fetchPromise = null;
 const listeners = new Set();
 
+function normalizeLinks(obj) {
+  const merged = { ...DEFAULT_SOCIAL_LINKS, ...(obj || {}) };
+  if (merged.facebook === 'https://www.facebook.com/skandx.in') {
+    merged.facebook = DEFAULT_SOCIAL_LINKS.facebook;
+  }
+  return merged;
+}
+
 function getInitialLinks() {
   if (memorySocialLinks) return memorySocialLinks;
   try {
     const raw = localStorage.getItem('skx_social_links');
     if (raw) {
       const parsed = JSON.parse(raw);
-      memorySocialLinks = { ...DEFAULT_SOCIAL_LINKS, ...parsed };
+      memorySocialLinks = normalizeLinks(parsed);
       return memorySocialLinks;
     }
   } catch (e) {}
@@ -27,7 +35,7 @@ function getInitialLinks() {
 }
 
 function notifyListeners(nextLinks) {
-  memorySocialLinks = { ...DEFAULT_SOCIAL_LINKS, ...nextLinks };
+  memorySocialLinks = normalizeLinks(nextLinks);
   try {
     localStorage.setItem('skx_social_links', JSON.stringify(memorySocialLinks));
   } catch (e) {}
