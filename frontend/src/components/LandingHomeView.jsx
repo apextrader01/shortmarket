@@ -522,7 +522,7 @@ export default function LandingHomeView({
       hubNum: '06',
       category: 'TRADING',
       title: 'SkandX Algo Demat & Bridge Suite',
-      shortDesc: 'Angel One SmartAPI Demat connection, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account copy trading.',
+      shortDesc: 'Angel One SmartAPI Demat connection, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account API sync.',
       icon: Cpu,
       color: '#0284c7',
       gradient: 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
@@ -531,14 +531,14 @@ export default function LandingHomeView({
       badgeColor: '#38bdf8',
       kpiLeft: { label: 'Supported Broker', value: 'Angel One SmartAPI' },
       kpiRight: { label: 'Bridge Latency', value: '<15ms Webhook' },
-      tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts', 'Copy Trading'],
+      tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts', 'Multi-Account Sync'],
       tagActions: {
         'Share Demat Link': () => onOpenAlgoBridge('SHARE_LINK'),
         'Demat API Keys': () => onOpenAlgoBridge('API_KEYS'),
         'Static IPs': () => onOpenAlgoBridge('STATIC_IP'),
         'JSON Webhook Bridge': () => onOpenAlgoBridge('WEBHOOK'),
         'TradingView Alerts': () => onOpenAlgoBridge('WEBHOOK'),
-        'Copy Trading': () => onOpenAlgoBridge('GROUPCOPY')
+        'Multi-Account Sync': () => onOpenAlgoBridge('GROUPCOPY')
       },
       actionLabel: 'Launch SkandX Algo Console',
       primaryAction: () => (onOpenAlgoBridge ? onOpenAlgoBridge('Dashboard') : onOpenPaperTrading()),
