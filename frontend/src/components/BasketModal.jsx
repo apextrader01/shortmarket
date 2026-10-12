@@ -162,6 +162,28 @@ export default function BasketModal() {
   const [globalMultiplier, setGlobalMultiplier] = useState(1);
 
   const chainsCacheRef = useRef({});
+  const futuresCacheRef = useRef({});
+
+  // Helper to resolve nearest futures symbol for MCX / F&O underlyings from local backend memory
+  const ensureNearestFutureSymbol = async (underlying) => {
+    if (!underlying) return null;
+    if (futuresCacheRef.current[underlying]) {
+      return futuresCacheRef.current[underlying];
+    }
+    try {
+      const res = await fetch(`${API}/api/options/futures/${encodeURIComponent(underlying)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.symbol) {
+          futuresCacheRef.current[underlying] = data.symbol;
+          return data.symbol;
+        }
+      }
+    } catch (e) {
+      // Ignore network errors and fall back to price store scan
+    }
+    return null;
+  };
 
   // Asynchronous helper to guarantee chain is in cache before use
   const ensureOptionChain = async (underlying) => {
@@ -260,9 +282,10 @@ export default function BasketModal() {
     return () => { isCancelled = true; };
   }, [basketModalOpen, selectedUnderlying]);
 
-  // Auto-subscribe to spot/index feed for selected underlying
+  // Auto-subscribe to spot/index/futures feed for selected underlying
   useEffect(() => {
     if (!basketModalOpen) return;
+    let isCancelled = false;
     const isMCX = MCX_LIST.includes(selectedUnderlying) || isCommodityContract(selectedUnderlying);
     const isBSE = selectedUnderlying === 'SENSEX' || selectedUnderlying === 'BANKEX';
     let key = null;
@@ -277,7 +300,15 @@ export default function BasketModal() {
     if (key) {
       useStore.getState().subscribeToSymbol?.(key);
       useStore.getState().fetchBatchPrices?.([key], true);
+    } else if (isMCX) {
+      ensureNearestFutureSymbol(selectedUnderlying).then(futSym => {
+        if (!isCancelled && futSym) {
+          useStore.getState().subscribeToSymbol?.(futSym);
+          useStore.getState().fetchBatchPrices?.([futSym], true);
+        }
+      });
     }
+    return () => { isCancelled = true; };
   }, [basketModalOpen, selectedUnderlying]);
 
   // Auto-subscribe to socket feed and fetch batch prices whenever basket opens or items change
@@ -937,22 +968,67 @@ export default function BasketModal() {
     else if (targetUnderlying === 'BANKEX') indexKey = 'BSE:BANKEX-INDEX';
     else if (!isMCX) indexKey = `${exch}:${targetUnderlying}-EQ`;
 
-    const allPrices = useStore.getState().prices;
-    let liveSpot = indexKey && allPrices[indexKey] ? allPrices[indexKey].ltp : 0;
+    // Helper to look up live spot or nearest futures price from in-memory store (zero extra API cost)
+    const resolvePriceFromStore = (pricesMap) => {
+      if (!pricesMap) return 0;
+      const directCandidates = [
+        indexKey,
+        `${targetUnderlying}-${exch}`,
+        `${exch}:${targetUnderlying}`,
+        targetUnderlying,
+        futuresCacheRef.current[targetUnderlying],
+        futuresCacheRef.current[targetUnderlying] ? `${exch}:${futuresCacheRef.current[targetUnderlying]}` : null
+      ].filter(Boolean);
+
+      for (const k of directCandidates) {
+        if (pricesMap[k]?.ltp > 0) return pricesMap[k].ltp;
+      }
+
+      // Scan already-loaded store prices for active futures contract of this underlying (e.g. CRUDEOIL26OCTFUT / CRUDEOILM26OCTFUT)
+      const exactFutRegex = new RegExp(`^(?:MCX:|NSE:|NFO:|BSE:)?${targetUnderlying}\\d{2}[A-Z]{3}FUT$`, 'i');
+      for (const k of Object.keys(pricesMap)) {
+        if (exactFutRegex.test(k) && pricesMap[k]?.ltp > 0) {
+          return pricesMap[k].ltp;
+        }
+      }
+
+      // Check Mini/Mega commodity sibling futures (e.g. CRUDEOIL <-> CRUDEOILM, GOLD <-> GOLDM, SILVER <-> SILVERM)
+      if (isMCX) {
+        const baseRoot = targetUnderlying.replace(/(MINI|MIC|M)$/i, '');
+        const siblingFutRegex = new RegExp(`^(?:MCX:)?${baseRoot}(?:M|MINI|MIC)?\\d{2}[A-Z]{3}FUT$`, 'i');
+        for (const k of Object.keys(pricesMap)) {
+          if (siblingFutRegex.test(k) && pricesMap[k]?.ltp > 0) {
+            return pricesMap[k].ltp;
+          }
+        }
+      }
+      return 0;
+    };
+
+    let liveSpot = resolvePriceFromStore(useStore.getState().prices);
+
     if (!liveSpot && indexKey) {
       await useStore.getState().fetchBatchPrices?.([indexKey], true);
-      const curPrices = useStore.getState().prices;
-      liveSpot = curPrices[indexKey]?.ltp || 0;
+      liveSpot = resolvePriceFromStore(useStore.getState().prices);
+    }
+
+    if (!liveSpot && isMCX) {
+      const futSym = await ensureNearestFutureSymbol(targetUnderlying);
+      if (futSym) {
+        useStore.getState().subscribeToSymbol?.(futSym);
+        await useStore.getState().fetchBatchPrices?.([futSym], true);
+        liveSpot = resolvePriceFromStore(useStore.getState().prices);
+      }
     }
 
     const fallbackSpots = {
       'NIFTY': 24500, 'BANKNIFTY': 51000, 'FINNIFTY': 23000, 'SENSEX': 80000, 'MIDCPNIFTY': 12500,
-      'BANKEX': 57000, 'CRUDEOIL': 6500, 'NATURALGAS': 220, 'GOLD': 72000, 'SILVER': 85000,
-      'COPPER': 800, 'ZINC': 270, 'ALUMINIUM': 230, 'RELIANCE': 1450, 'TCS': 2300, 'HDFCBANK': 710,
-      'INFY': 1850, 'SBIN': 820, 'ICICIBANK': 1250, 'TATAMOTORS': 980
+      'BANKEX': 57000, 'CRUDEOIL': 8950, 'CRUDEOILM': 8950, 'NATURALGAS': 230, 'NATURALGASM': 230,
+      'GOLD': 76000, 'GOLDM': 76000, 'SILVER': 92000, 'SILVERM': 92000,
+      'COPPER': 830, 'ZINC': 280, 'ALUMINIUM': 240, 'LEAD': 185, 'RELIANCE': 1450, 'TCS': 2300,
+      'HDFCBANK': 710, 'INFY': 1850, 'SBIN': 820, 'ICICIBANK': 1250, 'TATAMOTORS': 980
     };
 
-    const spotPrice = liveSpot > 0 ? liveSpot : (fallbackSpots[targetUnderlying] || 1000);
     const defaultLotsize = getUnderlyingFnoLotsize(targetUnderlying) || getInstantLotsize(targetUnderlying) || 1;
 
     let newItems = [];
@@ -961,6 +1037,8 @@ export default function BasketModal() {
     if (chain && activeExpiry && chain[activeExpiry]) {
       const strikesObj = chain[activeExpiry];
       const strikeNums = Object.keys(strikesObj).map(Number).sort((a,b) => a - b);
+      const medianStrike = strikeNums.length > 0 ? strikeNums[Math.floor(strikeNums.length / 2)] : 1000;
+      const spotPrice = liveSpot > 0 ? liveSpot : (fallbackSpots[targetUnderlying] || medianStrike);
       
       let atmIndex = 0;
       let minDiff = Infinity;
