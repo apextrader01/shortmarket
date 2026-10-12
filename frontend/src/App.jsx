@@ -301,9 +301,9 @@ function App() {
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [hotkeyToast, setHotkeyToast] = useState(null);
-  const [isCompactViewport, setIsCompactViewport] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1200);
+  const [isCompactViewport, setIsCompactViewport] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
   useEffect(() => {
-    const handleViewportResize = () => setIsCompactViewport(window.innerWidth <= 1200);
+    const handleViewportResize = () => setIsCompactViewport(window.innerWidth <= 768);
     window.addEventListener('resize', handleViewportResize);
     return () => window.removeEventListener('resize', handleViewportResize);
   }, []);
@@ -436,7 +436,7 @@ function App() {
       'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
       'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
       'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
-      'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets',
+      'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
       'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
@@ -508,7 +508,8 @@ function App() {
   // Unified in-app Back handler (used by both top-left <- Back buttons and Android hardware Back)
   const handleBackNavigation = useCallback(() => {
     const currentUser = userRef.current;
-    const rootTab = currentUser ? 'Watchlist' : 'Home';
+    const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    const rootTab = currentUser ? (isMobileScreen ? 'Watchlist' : 'Markets') : 'Home';
     const currentTab = activeTabRef.current || rootTab;
     let nextTab = rootTab;
 
@@ -522,14 +523,21 @@ function App() {
     if (nextTab === currentTab) {
       nextTab = rootTab;
     }
+    if (!isMobileScreen && nextTab === 'Watchlist') {
+      nextTab = 'Markets';
+    }
 
     isHandlingBackNavRef.current = true;
     lastRecordedTabRef.current = nextTab;
     activeTabRef.current = nextTab;
     const nextUrl = getUrlForTab(nextTab);
     try {
-      window.history.replaceState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
-      window.history.pushState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+      if (isMobileScreen) {
+        window.history.replaceState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+        window.history.pushState({ appTab: nextTab, hasGuard: true, userActivated: true }, '', nextUrl);
+      } else if (window.location.pathname !== nextUrl) {
+        window.history.pushState({ appTab: nextTab }, '', nextUrl);
+      }
     } catch (_) {}
     setActiveTab(nextTab);
   }, [getUrlForTab]);
@@ -627,18 +635,21 @@ function App() {
     if (activeTab) {
       const prevTab = lastRecordedTabRef.current;
       const currentUser = userRef.current;
-      const isRoot = currentUser
-        ? (activeTab === 'Watchlist' || activeTab === 'Markets')
-        : (activeTab === 'Home');
+      const isMobileScreenForStack = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      const isRoot = isMobileScreenForStack
+        ? (currentUser ? (activeTab === 'Watchlist' || activeTab === 'Markets') : (activeTab === 'Home'))
+        : false;
 
       if (prevTab && prevTab !== activeTab) {
         if (isHandlingBackNavRef.current) {
           isHandlingBackNavRef.current = false;
         } else if (isRoot) {
-          // Tapping the primary Root tab (Watchlist when logged in, Home when guest) resets stack to root
+          // On mobile, tapping the primary Root tab resets stack to root
           tabHistoryStackRef.current = [];
         } else {
-          const normalizedPrev = (currentUser && prevTab === 'Markets') ? 'Watchlist' : prevTab;
+          const normalizedPrev = (isMobileScreenForStack && currentUser && prevTab === 'Markets')
+            ? 'Watchlist'
+            : (!isMobileScreenForStack && prevTab === 'Watchlist' ? 'Markets' : prevTab);
           const filtered = tabHistoryStackRef.current.filter(
             (t) => t !== activeTab && t !== normalizedPrev
           );
@@ -902,7 +913,7 @@ function App() {
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
-        'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Watchlist',
+        'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
         'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
@@ -1700,7 +1711,7 @@ function App() {
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '4px' }}>
                   <div 
-                    onClick={() => setActiveTab(user ? 'Watchlist' : 'Home')}
+                    onClick={() => setActiveTab(user ? (window.innerWidth <= 768 ? 'Watchlist' : 'Markets') : 'Home')}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}
                     title="SkandX Trading Platform"
                   >
@@ -1771,7 +1782,7 @@ function App() {
                     <div
                       key={tabItem.key}
                       onClick={() => setActiveTab(tabItem.key)}
-                      className={`nav-pill ${activeTab === tabItem.key ? "active" : ""}`}
+                      className={`nav-pill ${(activeTab === tabItem.key || (tabItem.key === 'Markets' && activeTab === 'Watchlist')) ? "active" : ""}`}
                       style={{
                         padding:        '16px 4px',
                         cursor:         'pointer',
@@ -1875,15 +1886,13 @@ function App() {
                 onStockSelect={(sym) => {
                   if (window.innerWidth <= 768) {
                     useStore.getState().setMobileStockOverviewSymbol(sym || selectedSymbol);
-                  } else if (window.innerWidth <= 1200) {
-                    setActiveTab('Chart');
                   }
                 }}
               />
             )}
             <div className={`main-content ${(activeTab === 'Watchlist' || activeTab === 'Markets') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
               <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-              {(activeTab === 'Chart' || (activeTab === 'Markets' && !isCompactViewport)) && (
+              {(activeTab === 'Chart' || ((activeTab === 'Markets' || activeTab === 'Watchlist') && !isCompactViewport)) && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: isCompactViewport ? '0' : '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
                     <Suspense fallback={<TabLoader />}>
