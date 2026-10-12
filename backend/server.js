@@ -3895,6 +3895,10 @@ async function activateUserPlanSubscription(userId, planStr) {
 
 async function handleCreateCashfreePlanOrder(req, res) {
   const { plan, itemType, amount: customAmount } = req.body || {};
+  const reqType = String(itemType || plan || '').toUpperCase();
+  if ((reqType === 'WALLET_RECHARGE' || reqType === 'ALGO_WALLET') && Number(customAmount || 0) < 250) {
+    return res.status(400).json({ error: 'Minimum Algo Wallet top-up amount is ₹250.' });
+  }
   const meta = resolvePlanMeta(plan || itemType);
   const finalAmountInr = (customAmount && Number(customAmount) >= 1) ? Math.round(Number(customAmount)) : meta.amountInr;
   const amountPaise = finalAmountInr * 100;
@@ -16411,10 +16415,10 @@ function resolveAlgoPaymentItem(body = {}) {
     return { itemType: 'PLAN_PRO', planKey: 'ALGO_PRO', amountInr: 999, title: 'Pro Multi-Broker Algo Trader Plan (1 Month)' };
   }
   if (itemType === 'WALLET_RECHARGE' || itemType === 'ALGO_WALLET') {
-    const customAmt = Math.max(1, Math.min(500000, Math.round(Number(body.amount) || 500)));
+    const customAmt = Math.max(250, Math.min(500000, Math.round(Number(body.amount) || 500)));
     return { itemType: 'WALLET_RECHARGE', planKey: 'ALGO_WALLET', amountInr: customAmt, title: `SkandX Algo Wallet Credit (+₹${customAmt})` };
   }
-  const fallbackAmt = Math.max(1, Math.round(Number(body.amount) || 350));
+  const fallbackAmt = Math.max(250, Math.round(Number(body.amount) || 350));
   return { itemType, planKey: 'ALGO_ADDON', amountInr: fallbackAmt, title: String(body.title || 'SkandX Algo Service') };
 }
 
@@ -16520,6 +16524,10 @@ function provisionAlgoItemIntoState(state, resolvedItem, txId, methodLabel = 'Ca
 }
 
 async function handleCreateAlgoCashfreeOrder(req, res) {
+  const reqType = String(req.body?.itemType || req.body?.plan || '').toUpperCase();
+  if ((reqType === 'WALLET_RECHARGE' || reqType === 'ALGO_WALLET') && Number(req.body?.amount || 0) < 250) {
+    return res.status(400).json({ error: 'Minimum Algo Wallet top-up amount is ₹250.' });
+  }
   const resolved = resolveAlgoPaymentItem(req.body);
   const amountPaise = resolved.amountInr * 100;
   try {

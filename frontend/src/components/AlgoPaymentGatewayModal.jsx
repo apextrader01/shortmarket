@@ -74,7 +74,7 @@ export default function AlgoPaymentGatewayModal({
       const itemPrice = Number(item?.amount || 0);
       const canUseWallet = item?.type !== 'WALLET_RECHARGE' && itemPrice > 0 && Number(walletBalance || 0) >= itemPrice;
       setPaymentTab(canUseWallet ? 'WALLET' : 'CASHFREE');
-      setCustomAmount(Number(item?.amount || 500));
+      setCustomAmount(Math.max(250, Number(item?.amount || 500)));
       loadCashfreeScript();
     }
   }, [isOpen, item, walletBalance]);
@@ -82,7 +82,7 @@ export default function AlgoPaymentGatewayModal({
   if (!isOpen) return null;
 
   const effectiveAmount = isWalletRecharge
-    ? Math.max(1, Number(customAmount || 0))
+    ? Math.max(0, Math.round(Number(customAmount || 0)))
     : Number(item?.amount || 0);
 
   const notifyParent = (payload) => {
@@ -104,8 +104,12 @@ export default function AlgoPaymentGatewayModal({
 
   const handleCashfreePayment = async () => {
     setErrorMsg('');
+    if (isWalletRecharge && (!effectiveAmount || effectiveAmount < 250)) {
+      setErrorMsg('Minimum Algo Wallet top-up is ₹250. Please enter ₹250 or above.');
+      return;
+    }
     if (!effectiveAmount || effectiveAmount < 1) {
-      setErrorMsg('Please enter a valid amount (minimum ₹1).');
+      setErrorMsg('Please enter a valid amount.');
       return;
     }
 
@@ -517,14 +521,14 @@ export default function AlgoPaymentGatewayModal({
                 padding: '14px'
               }}>
                 <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
-                  Select or Enter Recharge Amount (₹)
+                  Select or Enter One-Time Top-Up Amount (Min ₹250)
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
                   {[250, 500, 1000, 2500, 5000].map(preset => (
                     <button
                       key={preset}
                       type="button"
-                      onClick={() => setCustomAmount(preset)}
+                      onClick={() => { setCustomAmount(preset); setErrorMsg(''); }}
                       style={{
                         padding: '8px 4px',
                         borderRadius: '8px',
@@ -542,16 +546,16 @@ export default function AlgoPaymentGatewayModal({
                 </div>
                 <input
                   type="number"
-                  min="1"
+                  min="250"
                   max="500000"
                   value={customAmount}
-                  onChange={e => setCustomAmount(e.target.value)}
-                  placeholder="Enter custom amount in ₹"
+                  onChange={e => { setCustomAmount(e.target.value); setErrorMsg(''); }}
+                  placeholder="Enter custom amount in ₹ (Min ₹250)"
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     background: '#121826',
-                    border: '1px solid #1e293b',
+                    border: Number(customAmount || 0) < 250 ? '1px solid #ef4444' : '1px solid #1e293b',
                     borderRadius: '8px',
                     color: '#fff',
                     fontSize: '14px',
@@ -559,6 +563,11 @@ export default function AlgoPaymentGatewayModal({
                     boxSizing: 'border-box'
                   }}
                 />
+                <div style={{ fontSize: '10.5px', color: Number(customAmount || 0) < 250 ? '#f87171' : '#64748b', marginTop: '6px' }}>
+                  {Number(customAmount || 0) < 250
+                    ? '⚠️ Minimum Algo Wallet top-up is ₹250.'
+                    : '✓ 100% One-Time Top-Up • No recurring auto-debit'}
+                </div>
               </div>
             )}
 
@@ -678,7 +687,7 @@ export default function AlgoPaymentGatewayModal({
                 </button>
 
                 <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
-                  Verified by Cashfree PG v3 Server Verification • Instant Automated Provisioning
+                  100% One-Time Payment (No Auto-Debit) • Verified by Cashfree PG v3
                 </div>
               </div>
             ) : (

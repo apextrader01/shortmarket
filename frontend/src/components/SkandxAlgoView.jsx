@@ -448,7 +448,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'WALLET_RECHARGE',
       title: 'SkandX Algo Wallet Top-Up',
       amount: 500,
-      subtitle: 'Instant credit via Cashfree Official Gateway (UPI, QR, Cards, NetBanking)'
+      subtitle: 'One-Time Top-Up (Min ₹250) • Instant credit via Cashfree (UPI, QR, Cards, NetBanking)'
     });
   };
 
@@ -457,7 +457,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'STATIC_IP',
       title: 'Dedicated Mumbai BKC Static IP',
       amount: 350,
-      subtitle: '1 Month dedicated IPv4 whitelist for Angel One SmartAPI'
+      subtitle: 'One-Time Payment (30 Days Validity • No Auto-Debit)'
     });
   };
 
@@ -466,7 +466,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       type: 'LINK_USER',
       title: '1 Linked Client Demat Slot',
       amount: 250,
-      subtitle: '1 Month Multi-Account API Sync Slot'
+      subtitle: 'One-Time Payment (30 Days Validity • No Auto-Debit)'
     });
   };
 
@@ -4241,7 +4241,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       id: 'PRO',
                       title: 'Pro Algo Trader Plan',
                       amount: 999,
-                      subtitle: '1 Month Pro Angel One SmartAPI Algo Subscription'
+                      subtitle: 'One-Time Payment (30 Days Pro Algo Access • No Auto-Debit)'
                     })}
                     style={{
                       width: '100%',
@@ -4257,8 +4257,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     }}
                   >
                     {config.activePlan === 'PRO'
-                      ? 'Renew Pro Plan (₹999/mo)'
-                      : (Number(config.availableCredit || 0) >= 999 ? 'Activate with Wallet / Cashfree (₹999)' : 'Upgrade with Cashfree (₹999/mo)')}
+                      ? 'Renew Pro Plan (₹999 One-Time)'
+                      : (Number(config.availableCredit || 0) >= 999 ? 'Activate with Wallet / Cashfree (₹999)' : 'Upgrade with Cashfree (₹999 One-Time)')}
                   </button>
                 </div>
 
@@ -4287,7 +4287,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       id: 'INSTITUTIONAL',
                       title: 'Institutional Multi-Account Suite',
                       amount: 2499,
-                      subtitle: '1 Month Multi-Account API Execution Suite'
+                      subtitle: 'One-Time Payment (30 Days Institutional Suite • No Auto-Debit)'
                     })}
                     style={{
                       width: '100%',
@@ -4302,8 +4302,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     }}
                   >
                     {config.activePlan === 'INSTITUTIONAL'
-                      ? 'Renew Institutional (₹2,499/mo)'
-                      : (Number(config.availableCredit || 0) >= 2499 ? 'Activate with Wallet / Cashfree (₹2,499)' : 'Get Institutional via Cashfree (₹2,499/mo)')}
+                      ? 'Renew Institutional (₹2,499 One-Time)'
+                      : (Number(config.availableCredit || 0) >= 2499 ? 'Activate with Wallet / Cashfree (₹2,499)' : 'Get Institutional via Cashfree (₹2,499 One-Time)')}
                   </button>
                 </div>
               </div>
@@ -4311,17 +4311,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               {/* Add-on Rate Cards */}
               <div style={{ marginTop: '8px' }}>
                 <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#fff', margin: '0 0 12px' }}>
-                  A La Carte Add-ons & Infrastructure
+                  A La Carte Add-ons & Infrastructure (100% One-Time Payments)
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '14px' }}>
                   <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Dedicated Static IP</div>
-                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#10b981' }}>₹350 / mo</span>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#10b981' }}>₹350 One-Time</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        Whitelisted Mumbai BKC IPv4 proxy. Eliminates broker 403 API lockouts and IP concurrency limits.
+                        Whitelisted Mumbai BKC IPv4 proxy (30 days validity). Eliminates broker 403 API lockouts.
                       </div>
                     </div>
                     <button
@@ -4336,10 +4336,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Linked Account Slot</div>
-                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#38bdf8' }}>₹250 / mo</span>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#38bdf8' }}>₹250 One-Time</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        1 Additional linked account slot for multi-account API order synchronization.
+                        1 Additional linked account slot (30 days validity) for multi-account API order synchronization.
                       </div>
                     </div>
                     <button
@@ -4354,17 +4354,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Algo Wallet Recharge</div>
-                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>INSTANT</span>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>MIN ₹250</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                        Top up your SkandX Algo Wallet via Cashfree UPI, Cards, or NetBanking for instant 1-click renewals.
+                        One-time top-up (minimum ₹250) via Cashfree UPI, Cards, or NetBanking for instant 1-click purchases.
                       </div>
                     </div>
                     <button
                       onClick={handleOpenAddFundsRazorpay}
                       style={{ marginTop: '14px', padding: '9px', background: '#7c3aed', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      + Top Up Wallet via Cashfree
+                      + Top Up Wallet via Cashfree (Min ₹250)
                     </button>
                   </div>
                 </div>
