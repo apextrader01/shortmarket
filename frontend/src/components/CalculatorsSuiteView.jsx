@@ -1240,16 +1240,24 @@ function DedicatedCalculatorView({
 }
 
 // ============================================================================
-// 1. REDUCING BALANCE LOAN EMI CALCULATOR (Requested by User)
+// 1. REDUCING BALANCE LOAN EMI CALCULATOR (With Processing Charges, GST & Prepayment)
 // ============================================================================
 function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }) {
   const [loanAmount, setLoanAmount] = useState(2500000);
   const [interestRate, setInterestRate] = useState(8.75); // % p.a.
   const [tenureYears, setTenureYears] = useState(20);
+  // Processing & Bank Charges
+  const [procFeeMode, setProcFeeMode] = useState('PCT'); // 'PCT' | 'FLAT'
+  const [procFeePct, setProcFeePct] = useState(0.5); // % of loan amount
+  const [procFeeFlat, setProcFeeFlat] = useState(12500); // ₹ flat
+  const [includeGstOnFee, setIncludeGstOnFee] = useState(true); // 18% GST on processing & doc charges
+  const [docLegalCharges, setDocLegalCharges] = useState(5000); // Legal / Valuation / MODT Stamp Duty (₹)
+  const [insuranceCost, setInsuranceCost] = useState(0); // Optional Loan Protection Insurance (₹)
+  const [monthlyPrepayment, setMonthlyPrepayment] = useState(0); // Optional extra monthly principal payment (₹)
 
   const math = useMemo(() => {
-    const P = loanAmount;
-    const n = tenureYears * 12;
+    const P = Math.max(1000, loanAmount);
+    const n = Math.max(1, tenureYears * 12);
     const r = interestRate / 12 / 100;
 
     let emi = 0;
@@ -1259,61 +1267,111 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
       emi = P / n;
     }
 
-    const totalRepayment = emi * n;
-    const totalInterest = Math.max(0, totalRepayment - P);
+    // Upfront Processing, Legal/MODT & GST calculation
+    const baseProcessingFee = procFeeMode === 'PCT' ? (P * (procFeePct / 100)) : procFeeFlat;
+    const gstAmount = includeGstOnFee ? (baseProcessingFee + docLegalCharges) * 0.18 : 0;
+    const totalProcessingAndCharges = Math.round(baseProcessingFee + gstAmount + docLegalCharges + insuranceCost);
+    const netDisbursedAmount = Math.max(0, Math.round(P - totalProcessingAndCharges));
 
+    // Standard full-tenure interest (without extra prepayment) for comparison
+    const baselineTotalRepayment = emi * n;
+    const baselineTotalInterest = Math.max(0, baselineTotalRepayment - P);
+
+    // Month-by-month amortization (supports optional extra monthly prepayment)
     let balance = P;
     const schedule = [];
+    let totalInterestActual = 0;
+    let totalPrincipalActual = 0;
+    let activeMonths = 0;
+
     for (let yr = 1; yr <= tenureYears; yr++) {
+      if (balance <= 0.5) break;
       let yrPrincipal = 0;
       let yrInterest = 0;
+      let yrEmiPaid = 0;
       for (let m = 1; m <= 12; m++) {
+        if (balance <= 0.5) break;
+        activeMonths++;
         const mInterest = balance * r;
-        const mPrincipal = emi - mInterest;
-        balance = Math.max(0, balance - mPrincipal);
-        yrPrincipal += mPrincipal;
+        const scheduledPrincipal = Math.max(0, emi - mInterest);
+        const desiredPrincipal = scheduledPrincipal + Math.max(0, monthlyPrepayment);
+        const actualPrincipal = Math.min(balance, desiredPrincipal);
+        const actualPayment = actualPrincipal + mInterest;
+
+        balance = Math.max(0, balance - actualPrincipal);
+        yrPrincipal += actualPrincipal;
         yrInterest += mInterest;
+        yrEmiPaid += actualPayment;
+        totalInterestActual += mInterest;
+        totalPrincipalActual += actualPrincipal;
       }
       schedule.push({
         year: yr,
-        emiPaid: Math.round(emi * 12),
+        emiPaid: Math.round(yrEmiPaid),
         principalPaid: Math.round(yrPrincipal),
         interestPaid: Math.round(yrInterest),
         balance: Math.round(balance)
       });
     }
 
+    const totalLoanRepayment = P + totalInterestActual;
+    const totalAllInOutflow = totalLoanRepayment + totalProcessingAndCharges;
+    const interestSaved = Math.max(0, Math.round(baselineTotalInterest - totalInterestActual));
+    const monthsSaved = Math.max(0, n - activeMonths);
+
+    // Effective All-In APR approximation factoring upfront processing & legal charges
+    const feeDragAnnualPct = tenureYears > 0 ? ((totalProcessingAndCharges / P) * 100) / (tenureYears * 0.6) : 0;
+    const effectiveAllInApr = (interestRate + feeDragAnnualPct).toFixed(2);
+
+    const principalPct = totalAllInOutflow > 0 ? ((P / totalAllInOutflow) * 100) : 0;
+    const interestPct = totalAllInOutflow > 0 ? ((totalInterestActual / totalAllInOutflow) * 100) : 0;
+    const chargesPct = Math.max(0, 100 - principalPct - interestPct);
+
     return {
       emi: Math.round(emi),
-      totalInterest: Math.round(totalInterest),
-      totalRepayment: Math.round(totalRepayment),
+      baseProcessingFee: Math.round(baseProcessingFee),
+      gstAmount: Math.round(gstAmount),
+      totalProcessingAndCharges,
+      netDisbursedAmount,
+      totalInterest: Math.round(totalInterestActual),
+      totalRepayment: Math.round(totalLoanRepayment),
+      totalAllInOutflow: Math.round(totalAllInOutflow),
+      effectiveAllInApr,
+      interestSaved,
+      monthsSaved,
+      activeMonths,
       schedule,
-      interestRatio: totalRepayment > 0 ? ((totalInterest / totalRepayment) * 100).toFixed(1) : '0'
+      principalRatio: principalPct.toFixed(1),
+      interestRatio: interestPct.toFixed(1),
+      chargesRatio: chargesPct.toFixed(1)
     };
-  }, [loanAmount, interestRate, tenureYears]);
+  }, [loanAmount, interestRate, tenureYears, procFeeMode, procFeePct, procFeeFlat, includeGstOnFee, docLegalCharges, insuranceCost, monthlyPrepayment]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
-    const principalPct = Number((100 - Number(math.interestRatio)).toFixed(1));
     onRegisterReport({
-      title: 'Reducing Balance Loan EMI Report',
-      subtitle: 'Monthly reducing principal amortization schedule & total interest analysis',
+      title: 'Reducing Balance Loan EMI & Processing Charges Report',
+      subtitle: 'Monthly reducing principal amortization, processing fees, 18% GST, net disbursement & effective APR',
       inputs: [
-        { label: 'Principal Loan Amount', value: `₹${loanAmount.toLocaleString('en-IN')}` },
+        { label: 'Sanctioned Loan Amount', value: `₹${loanAmount.toLocaleString('en-IN')}` },
         { label: 'Reducing Interest Rate', value: `${interestRate}% p.a.` },
-        { label: 'Loan Tenure', value: `${tenureYears} Years (${tenureYears * 12} Months)` }
+        { label: 'Loan Tenure', value: `${tenureYears} Years (${tenureYears * 12} Months)` },
+        { label: 'Processing Fee', value: procFeeMode === 'PCT' ? `${procFeePct}% (₹${math.baseProcessingFee.toLocaleString('en-IN')})` : `₹${math.baseProcessingFee.toLocaleString('en-IN')} Flat` },
+        { label: 'Legal / MODT + Insurance', value: `₹${(docLegalCharges + insuranceCost).toLocaleString('en-IN')}${includeGstOnFee ? ` (+₹${math.gstAmount.toLocaleString('en-IN')} GST)` : ''}` },
+        { label: 'Net Disbursed in Hand', value: `₹${math.netDisbursedAmount.toLocaleString('en-IN')}` }
       ],
       kpis: [
-        { label: 'Monthly EMI', value: `₹${math.emi.toLocaleString('en-IN')}`, sub: 'Fixed monthly installment', color: '#8b5cf6' },
-        { label: 'Principal Amount', value: `₹${loanAmount.toLocaleString('en-IN')}`, sub: `${principalPct}% of total outflow`, color: '#0284c7' },
-        { label: 'Total Interest Payable', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, sub: `${math.interestRatio}% of total outflow`, color: '#ef4444' },
-        { label: 'Total Repayment', value: `₹${math.totalRepayment.toLocaleString('en-IN')}`, sub: `Over ${tenureYears} years`, color: '#10b981' }
+        { label: 'Monthly EMI', value: `₹${math.emi.toLocaleString('en-IN')}`, sub: monthlyPrepayment > 0 ? `+₹${monthlyPrepayment.toLocaleString('en-IN')}/mo prepayment` : 'Fixed monthly installment', color: '#8b5cf6' },
+        { label: 'Net Disbursed (In-Hand)', value: `₹${math.netDisbursedAmount.toLocaleString('en-IN')}`, sub: `Upfront Fees: ₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}`, color: '#0284c7' },
+        { label: 'Total Interest Payable', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, sub: math.interestSaved > 0 ? `Saved ₹${math.interestSaved.toLocaleString('en-IN')} (${math.monthsSaved} mos)` : `${math.interestRatio}% of total outflow`, color: '#ef4444' },
+        { label: 'Total All-In Outflow', value: `₹${math.totalAllInOutflow.toLocaleString('en-IN')}`, sub: `All-In Effective APR: ${math.effectiveAllInApr}%`, color: '#10b981' }
       ],
       bars: [
-        { label: 'Principal Repaid', value: `₹${loanAmount.toLocaleString('en-IN')}`, pct: principalPct, color: '#0284c7' },
-        { label: 'Total Interest Paid', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, pct: Number(math.interestRatio), color: '#ef4444' }
+        { label: 'Principal Repaid', value: `₹${loanAmount.toLocaleString('en-IN')}`, pct: Number(math.principalRatio), color: '#0284c7' },
+        { label: 'Total Interest Paid', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, pct: Number(math.interestRatio), color: '#ef4444' },
+        { label: 'Processing, GST & Bank Charges', value: `₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}`, pct: Number(math.chargesRatio), color: '#f59e0b' }
       ],
-      tableHeaders: ['Year', 'Annual EMI Paid (₹)', 'Principal Component (₹)', 'Interest Component (₹)', 'Closing Balance (₹)'],
+      tableHeaders: ['Year', 'Annual Outflow (₹)', 'Principal Repaid (₹)', 'Interest Paid (₹)', 'Closing Balance (₹)'],
       tableRows: math.schedule.map(r => [
         `Year ${r.year}`,
         `₹${r.emiPaid.toLocaleString('en-IN')}`,
@@ -1321,14 +1379,18 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
         `₹${r.interestPaid.toLocaleString('en-IN')}`,
         `₹${r.balance.toLocaleString('en-IN')}`
       ]),
-      notes: 'Reducing-balance loans recalculate interest each month strictly on the outstanding principal after deducting prior principal repayments.'
+      notes: `Upfront processing fee (₹${math.baseProcessingFee.toLocaleString('en-IN')}), legal/MODT charges (₹${docLegalCharges.toLocaleString('en-IN')}), insurance (₹${insuranceCost.toLocaleString('en-IN')}), and 18% GST (₹${math.gstAmount.toLocaleString('en-IN')}) total ₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}, resulting in a net disbursement of ₹${math.netDisbursedAmount.toLocaleString('en-IN')} and an all-inclusive effective APR of ${math.effectiveAllInApr}% p.a.`
     });
-  }, [loanAmount, interestRate, tenureYears, math, onRegisterReport]);
+  }, [loanAmount, interestRate, tenureYears, procFeeMode, procFeePct, docLegalCharges, insuranceCost, includeGstOnFee, monthlyPrepayment, math, onRegisterReport]);
 
   const handleExport = () => {
     const headers = ['Year', 'Annual EMI Paid (₹)', 'Principal Repaid (₹)', 'Interest Paid (₹)', 'Remaining Balance (₹)'];
-    const rows = math.schedule.map(row => [row.year, row.emiPaid, row.principalPaid, row.interestPaid, row.balance]);
-    onDownloadCSV(`reducing_loan_emi_${loanAmount}`, headers, rows);
+    const summaryRows = [
+      ['Sanctioned Loan', loanAmount, 'Processing & Bank Charges (incl GST)', math.totalProcessingAndCharges, `Net Disbursed: ${math.netDisbursedAmount}`],
+      ['Quoted Interest Rate', `${interestRate}%`, 'All-In Effective APR', `${math.effectiveAllInApr}%`, `Total All-In Outflow: ${math.totalAllInOutflow}`],
+      ...math.schedule.map(row => [row.year, row.emiPaid, row.principalPaid, row.interestPaid, row.balance])
+    ];
+    onDownloadCSV(`reducing_loan_emi_${loanAmount}`, headers, summaryRows);
   };
 
   return (
@@ -1341,7 +1403,7 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '20px'
       }}>
         {/* Loan Amount Slider */}
         <div>
@@ -1360,9 +1422,9 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
           <input 
             type="range" min="100000" max="20000000" step="50000"
             value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '10px' }}
           />
-          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             {[1000000, 2500000, 5000000, 10000000].map(amt => (
               <button key={amt} onClick={() => setLoanAmount(amt)} style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: '11px', cursor: 'pointer' }}>
                 ₹{(amt / 100000).toFixed(0)}L
@@ -1388,7 +1450,7 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
           <input 
             type="range" min="5" max="20" step="0.1"
             value={interestRate} onChange={e => setInterestRate(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '10px' }}
           />
         </div>
 
@@ -1409,12 +1471,128 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
           <input 
             type="range" min="1" max="30" step="1"
             value={tenureYears} onChange={e => setTenureYears(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#8b5cf6', marginTop: '10px' }}
           />
         </div>
 
+        {/* ── Processing Fee, 18% GST & Bank Charges Box ── */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.28)',
+          border: '1px solid rgba(245, 158, 11, 0.28)',
+          borderRadius: '12px',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🏦 Processing Fee & Bank Charges
+            </span>
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '2px', borderRadius: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setProcFeeMode('PCT')}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: procFeeMode === 'PCT' ? '#f59e0b' : 'transparent', color: procFeeMode === 'PCT' ? '#000' : '#94a3b8', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                % of Loan
+              </button>
+              <button
+                type="button"
+                onClick={() => setProcFeeMode('FLAT')}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: procFeeMode === 'FLAT' ? '#f59e0b' : 'transparent', color: procFeeMode === 'FLAT' ? '#000' : '#94a3b8', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Flat ₹
+              </button>
+            </div>
+          </div>
+
+          {procFeeMode === 'PCT' ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#cbd5e1' }}>
+                <span>Processing Fee (%)</span>
+                <strong style={{ color: '#fbbf24' }}>{procFeePct}% (₹{math.baseProcessingFee.toLocaleString('en-IN')})</strong>
+              </div>
+              <input
+                type="range" min="0" max="3" step="0.1"
+                value={procFeePct} onChange={e => setProcFeePct(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#f59e0b', marginTop: '6px' }}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#cbd5e1' }}>Flat Processing Fee (₹)</span>
+              <input
+                type="number" step="500"
+                value={procFeeFlat} onChange={e => setProcFeeFlat(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100px', padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fbbf24', fontSize: '13px', fontWeight: '700', textAlign: 'right' }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Legal / Doc / MODT (₹)</label>
+              <input
+                type="number" step="500"
+                value={docLegalCharges} onChange={e => setDocLegalCharges(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '6px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12.5px', fontWeight: '700', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Loan Insurance (₹)</label>
+              <input
+                type="number" step="1000"
+                value={insuranceCost} onChange={e => setInsuranceCost(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '6px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12.5px', fontWeight: '700', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#cbd5e1', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeGstOnFee}
+                onChange={e => setIncludeGstOnFee(e.target.checked)}
+                style={{ accentColor: '#f59e0b' }}
+              />
+              <span>Add 18% GST on Fees (₹{math.gstAmount.toLocaleString('en-IN')})</span>
+            </label>
+            <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#f59e0b' }}>
+              Total Fee: ₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}
+            </span>
+          </div>
+        </div>
+
+        {/* Optional Extra Monthly Prepayment */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontSize: '12.5px', color: '#34d399', fontWeight: '700' }}>⚡ Extra Monthly Prepayment (Optional)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <span style={{ color: '#34d399', fontWeight: '700', fontSize: '12px' }}>+₹</span>
+              <input
+                type="number" step="1000"
+                value={monthlyPrepayment}
+                onChange={e => setMonthlyPrepayment(Math.max(0, Number(e.target.value)))}
+                style={{ width: '75px', background: 'transparent', border: 'none', color: '#34d399', fontSize: '13.5px', fontWeight: '800', outline: 'none' }}
+              />
+            </div>
+          </div>
+          <input
+            type="range" min="0" max="50000" step="1000"
+            value={monthlyPrepayment} onChange={e => setMonthlyPrepayment(Number(e.target.value))}
+            style={{ width: '100%', accentColor: '#10b981', marginTop: '8px' }}
+          />
+          {math.interestSaved > 0 && (
+            <div style={{ marginTop: '6px', fontSize: '11.5px', color: '#34d399', fontWeight: '600' }}>
+              ✓ Saves <strong>₹{math.interestSaved.toLocaleString('en-IN')}</strong> in interest & closes loan <strong>{math.monthsSaved} months</strong> early!
+            </div>
+          )}
+        </div>
+
         <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.25)', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#c4b5fd', lineHeight: '1.4' }}>
-          💡 <strong>Reducing Balance Formula:</strong> Monthly interest is assessed only on your remaining balance. As you repay principal, the interest share shrinks each month!
+          💡 <strong>Reducing Balance + Processing Charges:</strong> Banks deduct Processing Fee + 18% GST + Legal/MODT upfront, so your <strong>Net Disbursed in Hand is ₹{math.netDisbursedAmount.toLocaleString('en-IN')}</strong> (All-In Effective APR: <strong>{math.effectiveAllInApr}%</strong>).
         </div>
       </div>
 
@@ -1430,60 +1608,111 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
       }}>
         {viewMode === 'CHART' ? (
           <div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Monthly EMI Repayment
-            </div>
-            <div style={{ fontSize: '36px', fontWeight: '900', color: '#8b5cf6', margin: '4px 0 16px' }}>
-              ₹{math.emi.toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ month</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Monthly EMI Repayment
+                </div>
+                <div style={{ fontSize: '36px', fontWeight: '900', color: '#8b5cf6', margin: '4px 0 12px' }}>
+                  ₹{math.emi.toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ month</span>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '8px 12px', textAlign: 'right' }}>
+                <div style={{ fontSize: '10.5px', color: '#fbbf24', fontWeight: '700', textTransform: 'uppercase' }}>All-In Effective APR</div>
+                <div style={{ fontSize: '18px', fontWeight: '900', color: '#f59e0b' }}>{math.effectiveAllInApr}% p.a.</div>
+              </div>
             </div>
 
-            {/* Results Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            {/* Results Grid (6 comprehensive cards) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
               <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Principal Loan</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Sanctioned Loan</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{loanAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: '600' }}>Processing & Charges</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#fbbf24', marginTop: '2px' }}>
+                  ₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Fee ₹{math.baseProcessingFee.toLocaleString('en-IN')} + GST ₹{math.gstAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.3)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#7dd3fc', fontWeight: '600' }}>Net Disbursed in Hand</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>
+                  ₹{math.netDisbursedAmount.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Credited after upfront fees
                 </div>
               </div>
               <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Total Interest</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.totalInterest.toLocaleString('en-IN')}
                 </div>
               </div>
-              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Total Payment</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+              <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#c4b5fd', fontWeight: '600' }}>Loan Repayment (P+I)</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.totalRepayment.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Total All-In Outflow</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>
+                  ₹{math.totalAllInOutflow.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Principal + Interest + Fees
                 </div>
               </div>
             </div>
 
-            {/* SVG Visual Donut Chart */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '16px 0' }}>
-              <svg width="180" height="180" viewBox="0 0 42 42">
+            {/* SVG Visual Donut Chart (Principal vs Interest vs Processing Charges) */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '12px 0' }}>
+              <svg width="175" height="175" viewBox="0 0 42 42">
                 <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0284c7" strokeWidth="6" />
                 <circle 
                   cx="21" cy="21" r="15.91549430918954" fill="transparent" 
                   stroke="#ef4444" strokeWidth="6" 
-                  strokeDasharray={`${math.interestRatio} ${100 - math.interestRatio}`}
+                  strokeDasharray={`${math.interestRatio} ${100 - Number(math.interestRatio)}`}
                   strokeDashoffset="25"
                 />
+                {Number(math.chargesRatio) > 0 && (
+                  <circle 
+                    cx="21" cy="21" r="15.91549430918954" fill="transparent" 
+                    stroke="#f59e0b" strokeWidth="6" 
+                    strokeDasharray={`${math.chargesRatio} ${100 - Number(math.chargesRatio)}`}
+                    strokeDashoffset={`${25 - Number(math.interestRatio)}`}
+                  />
+                )}
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#0284c7' }} />
-                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Principal: {(100 - math.interestRatio).toFixed(1)}%</span>
+                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Principal: {math.principalRatio}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#ef4444' }} />
                   <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Interest: {math.interestRatio}%</span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }} />
+                  <span style={{ fontSize: '12.5px', color: '#fbbf24' }}>Processing & Charges: {math.chargesRatio}%</span>
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', maxHeight: '420px' }}>
+          <div style={{ overflowX: 'auto', maxHeight: '460px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '12px', color: '#cbd5e1', background: 'rgba(245, 158, 11, 0.08)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+              <span>Upfront Charges (incl. GST): <strong style={{ color: '#fbbf24' }}>₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}</strong></span>
+              <span>Net Disbursed: <strong style={{ color: '#38bdf8' }}>₹{math.netDisbursedAmount.toLocaleString('en-IN')}</strong></span>
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -1530,7 +1759,7 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
             }}
           >
             <Download size={14} />
-            <span>Export Amortization Schedule (CSV)</span>
+            <span>Export Amortization & Charges Schedule (CSV)</span>
           </button>
         </div>
       </div>
@@ -1539,22 +1768,36 @@ function ReducingLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterRepor
 }
 
 // ============================================================================
-// 2. FIXED / FLAT RATE LOAN CALCULATOR (Requested by User)
+// 2. FIXED / FLAT RATE LOAN CALCULATOR (With Processing Charges, File Fee & GST)
 // ============================================================================
 function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }) {
   const [loanAmount, setLoanAmount] = useState(500000);
   const [flatRate, setFlatRate] = useState(10.0); // % p.a.
   const [tenureYears, setTenureYears] = useState(3);
+  const [procFeeMode, setProcFeeMode] = useState('PCT'); // 'PCT' | 'FLAT'
+  const [procFeePct, setProcFeePct] = useState(1.5); // % of loan
+  const [procFeeFlat, setProcFeeFlat] = useState(7500); // ₹ flat
+  const [fileDocCharges, setFileDocCharges] = useState(2500); // File / Stamp Duty / Documentation (₹)
+  const [includeGstOnFee, setIncludeGstOnFee] = useState(true); // 18% GST on fees
 
   const math = useMemo(() => {
-    const P = loanAmount;
-    const T = tenureYears;
+    const P = Math.max(1000, loanAmount);
+    const T = Math.max(1, tenureYears);
     const n = T * 12;
 
     const totalInterest = P * (flatRate / 100) * T;
     const totalRepayment = P + totalInterest;
     const emi = totalRepayment / n;
-    const effectiveApr = n > 0 ? (flatRate * ((2 * n) / (n + 1))).toFixed(2) : flatRate;
+    const effectiveAprNum = n > 0 ? (flatRate * ((2 * n) / (n + 1))) : flatRate;
+
+    const baseProcessingFee = procFeeMode === 'PCT' ? P * (procFeePct / 100) : procFeeFlat;
+    const gstAmount = includeGstOnFee ? (baseProcessingFee + fileDocCharges) * 0.18 : 0;
+    const totalProcessingAndCharges = Math.round(baseProcessingFee + fileDocCharges + gstAmount);
+    const netDisbursedAmount = Math.max(0, Math.round(P - totalProcessingAndCharges));
+    const totalAllInOutflow = Math.round(totalRepayment + totalProcessingAndCharges);
+
+    const feeAprBoost = T > 0 ? ((totalProcessingAndCharges / P) * 100) / (T * 0.55) : 0;
+    const allInEffectiveApr = (effectiveAprNum + feeAprBoost).toFixed(2);
 
     const schedule = [];
     const monthlyPrincipal = P / n;
@@ -1569,37 +1812,51 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
       });
     }
 
+    const principalPct = totalAllInOutflow > 0 ? (P / totalAllInOutflow) * 100 : 0;
+    const interestPct = totalAllInOutflow > 0 ? (totalInterest / totalAllInOutflow) * 100 : 0;
+    const chargesPct = Math.max(0, 100 - principalPct - interestPct);
+
     return {
       emi: Math.round(emi),
+      baseProcessingFee: Math.round(baseProcessingFee),
+      gstAmount: Math.round(gstAmount),
+      totalProcessingAndCharges,
+      netDisbursedAmount,
       totalInterest: Math.round(totalInterest),
       totalRepayment: Math.round(totalRepayment),
-      effectiveApr,
+      totalAllInOutflow,
+      effectiveApr: effectiveAprNum.toFixed(2),
+      allInEffectiveApr,
       schedule,
-      interestRatio: totalRepayment > 0 ? ((totalInterest / totalRepayment) * 100).toFixed(1) : '0'
+      principalRatio: principalPct.toFixed(1),
+      interestRatio: interestPct.toFixed(1),
+      chargesRatio: chargesPct.toFixed(1)
     };
-  }, [loanAmount, flatRate, tenureYears]);
+  }, [loanAmount, flatRate, tenureYears, procFeeMode, procFeePct, procFeeFlat, fileDocCharges, includeGstOnFee]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
-    const principalPct = Number((100 - Number(math.interestRatio)).toFixed(1));
     onRegisterReport({
-      title: 'Fixed / Flat Rate Loan EMI Report',
-      subtitle: 'Flat interest vs True Effective Reducing APR comparison & yearly repayment schedule',
+      title: 'Fixed / Flat Rate Loan EMI & Processing Charges Report',
+      subtitle: 'Flat interest vs True Effective Reducing APR comparison, processing fees & yearly repayment schedule',
       inputs: [
-        { label: 'Principal Loan Amount', value: `₹${loanAmount.toLocaleString('en-IN')}` },
+        { label: 'Sanctioned Loan Amount', value: `₹${loanAmount.toLocaleString('en-IN')}` },
         { label: 'Quoted Flat Rate', value: `${flatRate}% p.a.` },
         { label: 'Loan Tenure', value: `${tenureYears} Years (${tenureYears * 12} Months)` },
-        { label: 'True Effective APR', value: `${math.effectiveApr}% p.a.` }
+        { label: 'Processing & File Charges', value: `₹${math.totalProcessingAndCharges.toLocaleString('en-IN')} (incl. GST)` },
+        { label: 'Net Disbursed in Hand', value: `₹${math.netDisbursedAmount.toLocaleString('en-IN')}` },
+        { label: 'All-In Effective APR', value: `${math.allInEffectiveApr}% p.a.` }
       ],
       kpis: [
         { label: 'Monthly EMI', value: `₹${math.emi.toLocaleString('en-IN')}`, sub: 'Fixed monthly installment', color: '#ec4899' },
-        { label: 'Principal Amount', value: `₹${loanAmount.toLocaleString('en-IN')}`, sub: `${principalPct}% of total cost`, color: '#0284c7' },
-        { label: 'Flat Interest Total', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, sub: `${math.interestRatio}% of total cost`, color: '#ef4444' },
-        { label: 'Total Repayment', value: `₹${math.totalRepayment.toLocaleString('en-IN')}`, sub: `True APR: ${math.effectiveApr}%`, color: '#10b981' }
+        { label: 'Net Disbursed (In-Hand)', value: `₹${math.netDisbursedAmount.toLocaleString('en-IN')}`, sub: `Upfront Fees: ₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}`, color: '#0284c7' },
+        { label: 'Flat Interest Total', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, sub: `${math.interestRatio}% of total outflow`, color: '#ef4444' },
+        { label: 'Total All-In Outflow', value: `₹${math.totalAllInOutflow.toLocaleString('en-IN')}`, sub: `All-In APR: ${math.allInEffectiveApr}%`, color: '#10b981' }
       ],
       bars: [
-        { label: 'Principal Amount', value: `₹${loanAmount.toLocaleString('en-IN')}`, pct: principalPct, color: '#0284c7' },
-        { label: 'Flat Interest', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, pct: Number(math.interestRatio), color: '#ec4899' }
+        { label: 'Principal Amount', value: `₹${loanAmount.toLocaleString('en-IN')}`, pct: Number(math.principalRatio), color: '#0284c7' },
+        { label: 'Flat Interest', value: `₹${math.totalInterest.toLocaleString('en-IN')}`, pct: Number(math.interestRatio), color: '#ec4899' },
+        { label: 'Processing & File Charges', value: `₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}`, pct: Number(math.chargesRatio), color: '#f59e0b' }
       ],
       tableHeaders: ['Year', 'Annual EMI Outflow (₹)', 'Principal Repaid (₹)', 'Flat Interest Paid (₹)', 'Remaining Payable (₹)'],
       tableRows: math.schedule.map(r => [
@@ -1609,13 +1866,17 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
         `₹${r.interestPaid.toLocaleString('en-IN')}`,
         `₹${r.remainingCost.toLocaleString('en-IN')}`
       ]),
-      notes: `A quoted flat interest rate of ${flatRate}% p.a. charges interest on the full original principal throughout the tenure, resulting in an effective reducing-balance APR of ~${math.effectiveApr}% p.a.`
+      notes: `A quoted flat interest rate of ${flatRate}% p.a. equals ~${math.effectiveApr}% reducing APR, and after factoring upfront processing & file charges of ₹${math.totalProcessingAndCharges.toLocaleString('en-IN')}, your true All-In APR is ~${math.allInEffectiveApr}% p.a.`
     });
   }, [loanAmount, flatRate, tenureYears, math, onRegisterReport]);
 
   const handleExport = () => {
     const headers = ['Year', 'Annual EMI (₹)', 'Principal Repaid (₹)', 'Flat Interest Paid (₹)', 'Remaining Total Repayment (₹)'];
-    const rows = math.schedule.map(row => [row.year, row.annualPaid, row.principalPaid, row.interestPaid, row.remainingCost]);
+    const rows = [
+      ['Sanctioned Loan', loanAmount, 'Processing & File Charges (incl GST)', math.totalProcessingAndCharges, `Net Disbursed: ${math.netDisbursedAmount}`],
+      ['Quoted Flat Rate', `${flatRate}%`, 'All-In Effective APR', `${math.allInEffectiveApr}%`, `Total Outflow: ${math.totalAllInOutflow}`],
+      ...math.schedule.map(row => [row.year, row.annualPaid, row.principalPaid, row.interestPaid, row.remainingCost])
+    ];
     onDownloadCSV(`flat_rate_loan_${loanAmount}`, headers, rows);
   };
 
@@ -1629,7 +1890,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '20px'
       }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1647,7 +1908,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
           <input 
             type="range" min="50000" max="5000000" step="10000"
             value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#ec4899', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#ec4899', marginTop: '10px' }}
           />
         </div>
 
@@ -1667,7 +1928,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
           <input 
             type="range" min="3" max="25" step="0.25"
             value={flatRate} onChange={e => setFlatRate(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#ec4899', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#ec4899', marginTop: '10px' }}
           />
         </div>
 
@@ -1687,8 +1948,88 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
           <input 
             type="range" min="1" max="10" step="1"
             value={tenureYears} onChange={e => setTenureYears(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#ec4899', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#ec4899', marginTop: '10px' }}
           />
+        </div>
+
+        {/* ── Processing Fee, File Charges & 18% GST Box ── */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.28)',
+          border: '1px solid rgba(245, 158, 11, 0.28)',
+          borderRadius: '12px',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🏦 Processing & File Charges
+            </span>
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '2px', borderRadius: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setProcFeeMode('PCT')}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: procFeeMode === 'PCT' ? '#f59e0b' : 'transparent', color: procFeeMode === 'PCT' ? '#000' : '#94a3b8', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                % of Loan
+              </button>
+              <button
+                type="button"
+                onClick={() => setProcFeeMode('FLAT')}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: procFeeMode === 'FLAT' ? '#f59e0b' : 'transparent', color: procFeeMode === 'FLAT' ? '#000' : '#94a3b8', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Flat ₹
+              </button>
+            </div>
+          </div>
+
+          {procFeeMode === 'PCT' ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#cbd5e1' }}>
+                <span>Processing Fee (%)</span>
+                <strong style={{ color: '#fbbf24' }}>{procFeePct}% (₹{math.baseProcessingFee.toLocaleString('en-IN')})</strong>
+              </div>
+              <input
+                type="range" min="0" max="5" step="0.25"
+                value={procFeePct} onChange={e => setProcFeePct(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#f59e0b', marginTop: '6px' }}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#cbd5e1' }}>Flat Processing Fee (₹)</span>
+              <input
+                type="number" step="500"
+                value={procFeeFlat} onChange={e => setProcFeeFlat(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100px', padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fbbf24', fontSize: '13px', fontWeight: '700', textAlign: 'right' }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>File / Stamp Duty Charges (₹)</label>
+            <input
+              type="number" step="500"
+              value={fileDocCharges} onChange={e => setFileDocCharges(Math.max(0, Number(e.target.value)))}
+              style={{ width: '100px', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12.5px', fontWeight: '700', textAlign: 'right' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#cbd5e1', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeGstOnFee}
+                onChange={e => setIncludeGstOnFee(e.target.checked)}
+                style={{ accentColor: '#f59e0b' }}
+              />
+              <span>Add 18% GST on Fees (₹{math.gstAmount.toLocaleString('en-IN')})</span>
+            </label>
+            <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#f59e0b' }}>
+              Total Fee: ₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}
+            </span>
+          </div>
         </div>
 
         {/* Warning Callout about Flat vs Effective APR */}
@@ -1698,7 +2039,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
             <span>Hidden APR Trap Detector</span>
           </div>
           <div style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', lineHeight: '1.45' }}>
-            A <strong>{flatRate}% flat rate</strong> feels cheap, but because interest is charged on the original principal for the entire loan, your <strong>True Effective APR is ~{math.effectiveApr}%</strong>!
+            A <strong>{flatRate}% flat rate</strong> equals <strong>~{math.effectiveApr}% reducing APR</strong>, and once you include <strong>₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}</strong> in processing & file fees, your <strong>All-In Effective APR jumps to ~{math.allInEffectiveApr}%</strong>!
           </div>
         </div>
       </div>
@@ -1715,53 +2056,94 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
       }}>
         {viewMode === 'CHART' ? (
           <div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Monthly EMI
-            </div>
-            <div style={{ fontSize: '36px', fontWeight: '900', color: '#ec4899', margin: '4px 0 16px' }}>
-              ₹{math.emi.toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ month</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Monthly EMI
+                </div>
+                <div style={{ fontSize: '36px', fontWeight: '900', color: '#ec4899', margin: '4px 0 14px' }}>
+                  ₹{math.emi.toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ month</span>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(236, 72, 153, 0.12)', border: '1px solid rgba(236, 72, 153, 0.3)', borderRadius: '10px', padding: '8px 12px', textAlign: 'right' }}>
+                <div style={{ fontSize: '10.5px', color: '#f472b6', fontWeight: '700', textTransform: 'uppercase' }}>All-In True APR</div>
+                <div style={{ fontSize: '18px', fontWeight: '900', color: '#f472b6' }}>{math.allInEffectiveApr}% p.a.</div>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
               <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Principal Amount</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Sanctioned Loan</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{loanAmount.toLocaleString('en-IN')}
                 </div>
               </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: '600' }}>Processing & File Fee</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#fbbf24', marginTop: '2px' }}>
+                  ₹{math.totalProcessingAndCharges.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Incl. ₹{math.gstAmount.toLocaleString('en-IN')} GST
+                </div>
+              </div>
+              <div style={{ background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.3)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#7dd3fc', fontWeight: '600' }}>Net Disbursed in Hand</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>
+                  ₹{math.netDisbursedAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
               <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Flat Interest</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Flat Interest Total</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.totalInterest.toLocaleString('en-IN')}
                 </div>
               </div>
               <div style={{ background: 'rgba(236, 72, 153, 0.08)', border: '1px solid rgba(236, 72, 153, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#f472b6', fontWeight: '600' }}>True APR Rate</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f472b6', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#f472b6', fontWeight: '600' }}>Base Reducing APR</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f472b6', marginTop: '2px' }}>
                   {math.effectiveApr}% p.a.
+                </div>
+              </div>
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Total All-In Outflow</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>
+                  ₹{math.totalAllInOutflow.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
 
             {/* Donut Chart */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '16px 0' }}>
-              <svg width="180" height="180" viewBox="0 0 42 42">
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '12px 0' }}>
+              <svg width="175" height="175" viewBox="0 0 42 42">
                 <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0284c7" strokeWidth="6" />
                 <circle 
                   cx="21" cy="21" r="15.91549430918954" fill="transparent" 
                   stroke="#ec4899" strokeWidth="6" 
-                  strokeDasharray={`${math.interestRatio} ${100 - math.interestRatio}`}
+                  strokeDasharray={`${math.interestRatio} ${100 - Number(math.interestRatio)}`}
                   strokeDashoffset="25"
                 />
+                {Number(math.chargesRatio) > 0 && (
+                  <circle 
+                    cx="21" cy="21" r="15.91549430918954" fill="transparent" 
+                    stroke="#f59e0b" strokeWidth="6" 
+                    strokeDasharray={`${math.chargesRatio} ${100 - Number(math.chargesRatio)}`}
+                    strokeDashoffset={`${25 - Number(math.interestRatio)}`}
+                  />
+                )}
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#0284c7' }} />
-                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Principal: {(100 - math.interestRatio).toFixed(1)}%</span>
+                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Principal: {math.principalRatio}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#ec4899' }} />
-                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Interest: {math.interestRatio}%</span>
+                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>Flat Interest: {math.interestRatio}%</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }} />
+                  <span style={{ fontSize: '12.5px', color: '#fbbf24' }}>Processing & Charges: {math.chargesRatio}%</span>
                 </div>
               </div>
             </div>
@@ -1815,7 +2197,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
           }}
         >
           <Download size={14} />
-          <span>Export Flat Loan Summary (CSV)</span>
+          <span>Export Flat Loan & Charges Summary (CSV)</span>
         </button>
       </div>
     </div>
@@ -1823,7 +2205,7 @@ function FixedLoanCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport }
 }
 
 // ============================================================================
-// 3. AVERAGE SHARE PRICE CALCULATOR (From Fyers)
+// 3. AVERAGE SHARE PRICE CALCULATOR (With Delivery Brokerage, STT & DP Charges)
 // ============================================================================
 function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [tranches, setTranches] = useState([
@@ -1832,6 +2214,9 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
     { id: 3, price: 2180, qty: 100 }
   ]);
   const [targetGainPct, setTargetGainPct] = useState(15);
+  const [includeDeliveryTaxes, setIncludeDeliveryTaxes] = useState(true); // Statutory 0.1% STT + Stamp + Exchange + GST
+  const [brokeragePerOrder, setBrokeragePerOrder] = useState(0); // ₹0 (Discount) or ₹20/order
+  const [dpChargeOnSell, setDpChargeOnSell] = useState(15.93); // Depository Participant CDSL/NSDL charge incl. 18% GST
 
   const math = useMemo(() => {
     let totalQty = 0;
@@ -1850,39 +2235,57 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
     });
 
     const avgPrice = totalQty > 0 ? totalInvestment / totalQty : 0;
+    const grossSellValue = totalInvestment * (1 + targetGainPct / 100);
     const targetSellPrice = avgPrice * (1 + targetGainPct / 100);
-    const targetProfitAmount = totalInvestment * (targetGainPct / 100);
+    const grossProfitAmount = grossSellValue - totalInvestment;
+
+    // Calculate Buy + Sell Delivery Charges & Processing Fees
+    const totalOrders = tranches.length + 1; // N buy lots + 1 exit order
+    const totalBrokerage = brokeragePerOrder * totalOrders;
+    const sttBuyAndSell = includeDeliveryTaxes ? (totalInvestment + grossSellValue) * 0.001 : 0; // 0.1% STT on delivery buy & sell
+    const stampDutyBuy = includeDeliveryTaxes ? totalInvestment * 0.00015 : 0; // 0.015% on delivery buy
+    const exchAndSebi = includeDeliveryTaxes ? (totalInvestment + grossSellValue) * 0.0000335 : 0;
+    const gstOnFees = includeDeliveryTaxes ? (totalBrokerage + exchAndSebi) * 0.18 : 0;
+    const dpCharge = includeDeliveryTaxes ? dpChargeOnSell : 0;
+
+    const totalCharges = totalBrokerage + sttBuyAndSell + stampDutyBuy + exchAndSebi + gstOnFees + dpCharge;
+    const netBreakevenPrice = totalQty > 0 ? (totalInvestment + totalCharges) / totalQty : avgPrice;
+    const netProfitAfterCharges = grossProfitAmount - totalCharges;
 
     return {
       totalQty,
       totalInvestment,
       avgPrice: avgPrice.toFixed(2),
+      netBreakevenPrice: netBreakevenPrice.toFixed(2),
       targetSellPrice: targetSellPrice.toFixed(2),
-      targetProfitAmount: Math.round(targetProfitAmount),
+      grossProfitAmount: Math.round(grossProfitAmount),
+      totalCharges: Math.round(totalCharges),
+      targetProfitAmount: Math.round(netProfitAfterCharges),
       list: list.map(item => ({
         ...item,
         weightPct: totalInvestment > 0 ? ((item.cost / totalInvestment) * 100).toFixed(1) : '0.0'
       }))
     };
-  }, [tranches, targetGainPct]);
+  }, [tranches, targetGainPct, includeDeliveryTaxes, brokeragePerOrder, dpChargeOnSell]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     const palette = ['#0284c7', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
     onRegisterReport({
-      title: 'Stock Average Share Price & Tranche Analysis',
-      subtitle: 'Multi-lot equity accumulation cost-basis & target exit calculation',
+      title: 'Stock Average Share Price, Breakeven & Charges Report',
+      subtitle: 'Multi-lot equity accumulation cost-basis, delivery STT/DP charges & target exit calculation',
       inputs: [
         { label: 'Total Buy Tranches', value: `${tranches.length} Lots` },
         { label: 'Total Quantity Accumulated', value: `${math.totalQty.toLocaleString('en-IN')} Shares` },
         { label: 'Total Capital Deployed', value: `₹${math.totalInvestment.toLocaleString('en-IN')}` },
+        { label: 'Delivery Taxes, STT & DP Fee', value: `₹${math.totalCharges.toLocaleString('en-IN')}` },
         { label: 'Target Profit Goal', value: `+${targetGainPct}%` }
       ],
       kpis: [
-        { label: 'Weighted Avg Price', value: `₹${Number(math.avgPrice).toLocaleString('en-IN')}`, sub: 'Breakeven price per share', color: '#f59e0b' },
-        { label: 'Total Capital Invested', value: `₹${math.totalInvestment.toLocaleString('en-IN')}`, sub: `${math.totalQty} total shares`, color: '#0284c7' },
+        { label: 'Weighted Avg Price', value: `₹${Number(math.avgPrice).toLocaleString('en-IN')}`, sub: `Net Breakeven: ₹${Number(math.netBreakevenPrice).toLocaleString('en-IN')}`, color: '#f59e0b' },
+        { label: 'Total Capital Invested', value: `₹${math.totalInvestment.toLocaleString('en-IN')}`, sub: `Charges: ₹${math.totalCharges.toLocaleString('en-IN')}`, color: '#0284c7' },
         { label: `Target Exit (+${targetGainPct}%)`, value: `₹${Number(math.targetSellPrice).toLocaleString('en-IN')}`, sub: 'Required sell price/share', color: '#10b981' },
-        { label: 'Projected Net Profit', value: `+₹${math.targetProfitAmount.toLocaleString('en-IN')}`, sub: `At +${targetGainPct}% target`, color: '#10b981' }
+        { label: 'Net Profit (After Charges)', value: `+₹${math.targetProfitAmount.toLocaleString('en-IN')}`, sub: `Gross: +₹${math.grossProfitAmount.toLocaleString('en-IN')}`, color: '#10b981' }
       ],
       bars: math.list.map((t, idx) => ({
         label: `Lot #${idx + 1} (₹${t.price} × ${t.qty})`,
@@ -1899,7 +2302,7 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
         `${t.weightPct}%`,
         `₹${Number(t.runningAvg).toLocaleString('en-IN')}`
       ]),
-      notes: 'Weighted average share price accounts for exact share quantities across each tranche. Statutory delivery brokerage and STT apply at exit.'
+      notes: `Weighted average share price is ₹${math.avgPrice}, and after factoring ₹${math.totalCharges.toLocaleString('en-IN')} in delivery STT (0.1%), stamp duty, brokerage & DP charges, your true net breakeven is ₹${math.netBreakevenPrice}/share.`
     });
   }, [tranches, targetGainPct, math, onRegisterReport]);
 
@@ -1926,7 +2329,10 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
 
   const handleExport = () => {
     const headers = ['Tranche #', 'Purchase Price (₹)', 'Shares Bought', 'Total Tranche Cost (₹)', 'Capital Weight (%)', 'Cumulative Avg (₹)'];
-    const rows = math.list.map((t, idx) => [idx + 1, t.price, t.qty, t.cost, t.weightPct, t.runningAvg]);
+    const rows = [
+      ...math.list.map((t, idx) => [idx + 1, t.price, t.qty, t.cost, t.weightPct, t.runningAvg]),
+      ['SUMMARY', `Weighted Avg: ${math.avgPrice}`, `Total Qty: ${math.totalQty}`, `Invested: ${math.totalInvestment}`, `Charges: ${math.totalCharges}`, `Net Breakeven: ${math.netBreakevenPrice}`]
+    ];
     onDownloadCSV('average_share_price_calculation', headers, rows);
   };
 
@@ -1942,7 +2348,7 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '18px'
+        gap: '16px'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -2027,7 +2433,7 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
         </div>
 
         {/* Target Gain Slider */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Target Profit Goal (%)</label>
             <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#10b981' }}>+{targetGainPct}%</span>
@@ -2037,6 +2443,44 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
             value={targetGainPct} onChange={e => setTargetGainPct(Number(e.target.value))}
             style={{ width: '100%', accentColor: '#10b981', marginTop: '8px' }}
           />
+        </div>
+
+        {/* Delivery Brokerage, STT & DP Charges Box */}
+        <div style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#fbbf24', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeDeliveryTaxes}
+                onChange={e => setIncludeDeliveryTaxes(e.target.checked)}
+                style={{ accentColor: '#f59e0b' }}
+              />
+              <span>Include STT (0.1%), Stamp & DP Charges</span>
+            </label>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#f87171' }}>
+              ₹{math.totalCharges.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div>
+              <label style={{ fontSize: '10.5px', color: '#94a3b8' }}>Brokerage / Order (₹)</label>
+              <input
+                type="number" step="5"
+                value={brokeragePerOrder}
+                onChange={e => setBrokeragePerOrder(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '700', marginTop: '2px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '10.5px', color: '#94a3b8' }}>DP Exit Charge (₹)</label>
+              <input
+                type="number" step="1"
+                value={dpChargeOnSell}
+                onChange={e => setDpChargeOnSell(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '700', marginTop: '2px', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2052,24 +2496,38 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
       }}>
         {viewMode === 'CHART' ? (
           <div>
-            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Weighted Average Purchase Price
-            </span>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: '#f59e0b', margin: '4px 0 16px' }}>
-              ₹{Number(math.avgPrice).toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ share</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Weighted Average Purchase Price
+                </span>
+                <div style={{ fontSize: '36px', fontWeight: '900', color: '#f59e0b', margin: '4px 0 14px' }}>
+                  ₹{Number(math.avgPrice).toLocaleString('en-IN')} <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>/ share</span>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '8px 12px', textAlign: 'right' }}>
+                <div style={{ fontSize: '10.5px', color: '#fbbf24', fontWeight: '700', textTransform: 'uppercase' }}>Net Breakeven (Incl. Charges)</div>
+                <div style={{ fontSize: '18px', fontWeight: '900', color: '#f59e0b' }}>₹{Number(math.netBreakevenPrice).toLocaleString('en-IN')}</div>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px', marginBottom: '18px' }}>
               <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Total Shares Owned</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   {math.totalQty.toLocaleString('en-IN')} units
                 </div>
               </div>
               <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Total Capital Invested</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Capital Invested</div>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.totalInvestment.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>STT, DP & Taxes</div>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f87171', marginTop: '2px' }}>
+                  ₹{math.totalCharges.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -2114,7 +2572,7 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Target Net Profit</div>
+                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Net Profit (After STT & DP)</div>
                   <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                     +₹{math.targetProfitAmount.toLocaleString('en-IN')}
                   </div>
@@ -2181,13 +2639,17 @@ function AverageSharePriceEngine({ viewMode, onDownloadCSV, onRegisterReport, on
 }
 
 // ============================================================================
-// 4. MTF (MARGIN TRADING FACILITY) CALCULATOR (From Fyers)
+// 4. MTF (MARGIN TRADING FACILITY) CALCULATOR (With Pledge/Unpledge & Statutory Charges)
 // ============================================================================
 function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [tradeValue, setTradeValue] = useState(200000);
   const [marginPct, setMarginPct] = useState(25); // e.g. 25% margin = 4x leverage
   const [holdingDays, setHoldingDays] = useState(30);
   const [mtfInterestRate, setMtfInterestRate] = useState(12.5); // % p.a.
+  // MTF Processing, Pledge/Unpledge & Statutory Delivery Charges
+  const [pledgeUnpledgeFee, setPledgeUnpledgeFee] = useState(40); // ₹20 Pledge + ₹20 Unpledge
+  const [mtfBrokerageFee, setMtfBrokerageFee] = useState(40); // Buy + Sell MTF Order Brokerage
+  const [includeMtfStatutoryTaxes, setIncludeMtfStatutoryTaxes] = useState(true); // 0.1% STT + Stamp + Exchange + 18% GST + DP
 
   const math = useMemo(() => {
     const clientMargin = tradeValue * (marginPct / 100);
@@ -2195,21 +2657,30 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
     const dailyInterestRate = (mtfInterestRate / 100) / 365;
     const dailyInterest = borrowedAmount * dailyInterestRate;
     const totalInterest = dailyInterest * holdingDays;
-    const breakevenStockMovePct = tradeValue > 0 ? (totalInterest / tradeValue) * 100 : 0;
+
+    // Processing Charges: Pledge/Unpledge + Brokerage + 18% GST + Statutory Delivery STT/Stamp/DP
+    const gstOnPledgeAndBrok = (pledgeUnpledgeFee + mtfBrokerageFee) * 0.18;
+    const sttAndStamp = includeMtfStatutoryTaxes ? (tradeValue * 2 * 0.001) + (tradeValue * 0.00015) + (tradeValue * 2 * 0.0000335) + 15.93 : 0;
+    const totalProcessingAndTaxes = Math.round(pledgeUnpledgeFee + mtfBrokerageFee + gstOnPledgeAndBrok + sttAndStamp);
+    const totalAllInMtfCost = Math.round(totalInterest + totalProcessingAndTaxes);
+
+    const breakevenStockMovePct = tradeValue > 0 ? (totalAllInMtfCost / tradeValue) * 100 : 0;
 
     // Multi-horizon holding schedule for TABLE mode and PDF report
     const dayHorizons = Array.from(new Set([7, 15, 30, 60, 90, 180, 365, holdingDays])).sort((a, b) => a - b);
     const schedule = dayHorizons.map(days => {
       const interestForDays = dailyInterest * days;
-      const breakevenPct = tradeValue > 0 ? (interestForDays / tradeValue) * 100 : 0;
+      const totalCostForDays = interestForDays + totalProcessingAndTaxes;
+      const breakevenPct = tradeValue > 0 ? (totalCostForDays / tradeValue) * 100 : 0;
       const grossProfitAt10Pct = tradeValue * 0.10;
-      const netProfitAt10Pct = grossProfitAt10Pct - interestForDays;
+      const netProfitAt10Pct = grossProfitAt10Pct - totalCostForDays;
       const roeOnMarginPct = clientMargin > 0 ? (netProfitAt10Pct / clientMargin) * 100 : 0;
       return {
         days,
         isCurrent: days === holdingDays,
         borrowed: Math.round(borrowedAmount),
         interest: Math.round(interestForDays),
+        totalCost: Math.round(totalCostForDays),
         breakevenPct: breakevenPct.toFixed(2),
         netProfitAt10Pct: Math.round(netProfitAt10Pct),
         roeOnMarginPct: roeOnMarginPct.toFixed(1)
@@ -2221,53 +2692,57 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
       borrowedAmount: Math.round(borrowedAmount),
       dailyInterest: dailyInterest.toFixed(2),
       totalInterest: Math.round(totalInterest),
+      totalProcessingAndTaxes,
+      totalAllInMtfCost,
       breakevenStockMovePct: breakevenStockMovePct.toFixed(2),
       leverageMultiplier: marginPct > 0 ? (100 / marginPct).toFixed(1) : '1.0',
       schedule
     };
-  }, [tradeValue, marginPct, holdingDays, mtfInterestRate]);
+  }, [tradeValue, marginPct, holdingDays, mtfInterestRate, pledgeUnpledgeFee, mtfBrokerageFee, includeMtfStatutoryTaxes]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     onRegisterReport({
-      title: 'MTF (Margin Trading Facility) Leverage & Cost Report',
-      subtitle: 'Pay-Later stock funding breakdown, daily interest accrual & holding duration schedule',
+      title: 'MTF (Margin Trading Facility) Leverage, Interest & Charges Report',
+      subtitle: 'Pay-Later stock funding breakdown, daily interest, pledge/unpledge fees & statutory charges',
       inputs: [
         { label: 'Total Stock Trade Value', value: `₹${tradeValue.toLocaleString('en-IN')}` },
         { label: 'Client Margin Required', value: `${marginPct}% (${math.leverageMultiplier}x Leverage)` },
         { label: 'Holding Duration', value: `${holdingDays} Days` },
-        { label: 'Broker MTF Interest Rate', value: `${mtfInterestRate}% p.a.` }
+        { label: 'Broker MTF Interest Rate', value: `${mtfInterestRate}% p.a.` },
+        { label: 'Pledge, Brokerage & STT Charges', value: `₹${math.totalProcessingAndTaxes.toLocaleString('en-IN')}` }
       ],
       kpis: [
-        { label: `MTF Cost (${holdingDays} Days)`, value: `₹${math.totalInterest.toLocaleString('en-IN')}`, sub: `₹${math.dailyInterest} / day interest`, color: '#06b6d4' },
+        { label: `All-In MTF Cost (${holdingDays}d)`, value: `₹${math.totalAllInMtfCost.toLocaleString('en-IN')}`, sub: `Interest ₹${math.totalInterest.toLocaleString('en-IN')} + Fees ₹${math.totalProcessingAndTaxes.toLocaleString('en-IN')}`, color: '#06b6d4' },
         { label: 'Your Cash Margin', value: `₹${math.clientMargin.toLocaleString('en-IN')}`, sub: `${marginPct}% upfront capital`, color: '#10b981' },
         { label: 'Broker Funded Capital', value: `₹${math.borrowedAmount.toLocaleString('en-IN')}`, sub: `${100 - marginPct}% MTF loan`, color: '#0284c7' },
-        { label: 'Breakeven Stock Move', value: `+${math.breakevenStockMovePct}%`, sub: 'Minimum move to cover interest', color: '#f59e0b' }
+        { label: 'All-In Breakeven Move', value: `+${math.breakevenStockMovePct}%`, sub: 'Covers interest + pledge + STT', color: '#f59e0b' }
       ],
       bars: [
         { label: 'Your Cash Margin', value: `₹${math.clientMargin.toLocaleString('en-IN')}`, pct: marginPct, color: '#10b981' },
         { label: 'Broker MTF Funded', value: `₹${math.borrowedAmount.toLocaleString('en-IN')}`, pct: 100 - marginPct, color: '#0284c7' }
       ],
-      tableHeaders: ['Holding Period', 'Broker Funded (₹)', 'Cumulative MTF Interest (₹)', 'Breakeven Move (%)', 'Net Profit @ +10% Move (₹)', 'Leveraged ROE on Margin'],
+      tableHeaders: ['Holding Period', 'MTF Interest (₹)', 'All-In Cost incl. Fees (₹)', 'Breakeven Move (%)', 'Net Profit @ +10% Move (₹)', 'Leveraged ROE on Margin'],
       tableRows: math.schedule.map(r => [
         `${r.days} Days${r.isCurrent ? ' (Selected)' : ''}`,
-        `₹${r.borrowed.toLocaleString('en-IN')}`,
         `₹${r.interest.toLocaleString('en-IN')}`,
+        `₹${r.totalCost.toLocaleString('en-IN')}`,
         `+${r.breakevenPct}%`,
         `₹${r.netProfitAt10Pct.toLocaleString('en-IN')}`,
         `${r.roeOnMarginPct}%`
       ]),
-      notes: 'MTF interest is accrued daily on the broker-funded portion (Trade Value minus Client Margin) over the holding period.'
+      notes: 'MTF all-in cost includes daily interest on broker-funded capital plus CDSL pledge/unpledge processing charges, brokerage, 18% GST, and delivery STT.'
     });
   }, [tradeValue, marginPct, holdingDays, mtfInterestRate, math, onRegisterReport]);
 
   const handleExport = () => {
-    const headers = ['Holding Days', 'Client Margin (₹)', 'Broker Funded (₹)', 'MTF Interest Cost (₹)', 'Breakeven Move (%)', 'Net Profit at +10% Move (₹)', 'ROE on Margin (%)'];
+    const headers = ['Holding Days', 'Client Margin (₹)', 'Broker Funded (₹)', 'MTF Interest (₹)', 'All-In Cost incl Charges (₹)', 'Breakeven Move (%)', 'Net Profit at +10% Move (₹)', 'ROE on Margin (%)'];
     const rows = math.schedule.map(r => [
       r.days,
       math.clientMargin,
       r.borrowed,
       r.interest,
+      r.totalCost,
       `${r.breakevenPct}%`,
       r.netProfitAt10Pct,
       `${r.roeOnMarginPct}%`
@@ -2285,7 +2760,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '18px'
       }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2303,7 +2778,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="20000" max="2000000" step="10000"
             value={tradeValue} onChange={e => setTradeValue(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '10px' }}
           />
         </div>
 
@@ -2315,7 +2790,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="20" max="50" step="5"
             value={marginPct} onChange={e => setMarginPct(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '10px' }}
           />
         </div>
 
@@ -2327,7 +2802,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="1" max="365" step="1"
             value={holdingDays} onChange={e => setHoldingDays(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '10px' }}
           />
         </div>
 
@@ -2339,8 +2814,49 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="9" max="18" step="0.5"
             value={mtfInterestRate} onChange={e => setMtfInterestRate(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#06b6d4', marginTop: '10px' }}
           />
+        </div>
+
+        {/* MTF Processing, Pledge/Unpledge & Statutory Charges */}
+        <div style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(6, 182, 212, 0.28)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#22d3ee', textTransform: 'uppercase' }}>
+            ⚡ MTF Processing, Pledge & Statutory Charges
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div>
+              <label style={{ fontSize: '10.5px', color: '#94a3b8' }}>Pledge + Unpledge Fee (₹)</label>
+              <input
+                type="number" step="10"
+                value={pledgeUnpledgeFee}
+                onChange={e => setPledgeUnpledgeFee(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '700', marginTop: '2px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '10.5px', color: '#94a3b8' }}>MTF Brokerage (Buy+Sell ₹)</label>
+              <input
+                type="number" step="10"
+                value={mtfBrokerageFee}
+                onChange={e => setMtfBrokerageFee(Math.max(0, Number(e.target.value)))}
+                style={{ width: '100%', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '700', marginTop: '2px', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#cbd5e1', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeMtfStatutoryTaxes}
+                onChange={e => setIncludeMtfStatutoryTaxes(e.target.checked)}
+                style={{ accentColor: '#06b6d4' }}
+              />
+              <span>Include 18% GST, STT (0.1%) & DP Charges</span>
+            </label>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#fbbf24' }}>
+              ₹{math.totalProcessingAndTaxes.toLocaleString('en-IN')}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -2357,23 +2873,35 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         {viewMode === 'CHART' ? (
           <div>
             <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Total MTF Financing Cost
+              Total All-In MTF Cost (Interest + Pledge & Taxes)
             </span>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: '#06b6d4', margin: '4px 0 16px' }}>
-              ₹{math.totalInterest.toLocaleString('en-IN')} <span style={{ fontSize: '13.5px', color: '#94a3b8', fontWeight: '500' }}>for {holdingDays} days</span>
+            <div style={{ fontSize: '38px', fontWeight: '900', color: '#06b6d4', margin: '4px 0 14px' }}>
+              ₹{math.totalAllInMtfCost.toLocaleString('en-IN')} <span style={{ fontSize: '13.5px', color: '#94a3b8', fontWeight: '500' }}>for {holdingDays} days</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px', marginBottom: '18px' }}>
               <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Your Cash Margin</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.clientMargin.toLocaleString('en-IN')}
                 </div>
               </div>
               <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Broker Borrowed Funds</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Broker Borrowed</div>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
                   ₹{math.borrowedAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#22d3ee', fontWeight: '600' }}>MTF Interest ({holdingDays}d)</div>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                  ₹{math.totalInterest.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: '600' }}>Pledge, GST & STT</div>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: '#fbbf24', marginTop: '2px' }}>
+                  ₹{math.totalProcessingAndTaxes.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -2410,7 +2938,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
                 <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#f59e0b' }}>₹{math.dailyInterest} / day</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#cbd5e1' }}>Breakeven Stock Gain:</span>
+                <span style={{ fontSize: '12px', color: '#cbd5e1' }}>All-In Breakeven Stock Gain:</span>
                 <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#10b981' }}>+{math.breakevenStockMovePct}%</span>
               </div>
             </div>
@@ -2418,13 +2946,14 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         ) : (
           <div style={{ overflowX: 'auto', maxHeight: '420px' }}>
             <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#22d3ee', marginBottom: '10px' }}>
-              MTF Holding Duration Interest & Breakeven Schedule
+              MTF Holding Duration Interest, Charges & Breakeven Schedule
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                   <th style={{ padding: '8px', textAlign: 'left' }}>Holding Days</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>MTF Interest</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>All-In Cost</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>Breakeven %</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>Net @ +10% Move</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>ROE on Margin</th>
@@ -2444,6 +2973,9 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
                     </td>
                     <td style={{ padding: '8px', textAlign: 'right', color: '#f59e0b', fontWeight: '700' }}>
                       ₹{row.interest.toLocaleString('en-IN')}
+                    </td>
+                    <td style={{ padding: '8px', textAlign: 'right', color: '#fbbf24', fontWeight: '700' }}>
+                      ₹{row.totalCost.toLocaleString('en-IN')}
                     </td>
                     <td style={{ padding: '8px', textAlign: 'right', color: '#cbd5e1' }}>
                       +{row.breakevenPct}%
@@ -2480,7 +3012,7 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           }}
         >
           <Download size={14} />
-          <span>Export MTF Financing Breakdown (CSV)</span>
+          <span>Export MTF Financing & Charges Breakdown (CSV)</span>
         </button>
       </div>
     </div>
@@ -2488,21 +3020,27 @@ function MtfCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
 }
 
 // ============================================================================
-// 5. SIP COMPONENT ENGINE (Fyers Style)
+// 5. SIP COMPONENT ENGINE (With Expense Ratio, Stamp Duty & Post-Tax LTCG)
 // ============================================================================
 function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [monthlyInvestment, setMonthlyInvestment] = useState(25000);
   const [expectedReturn, setExpectedReturn] = useState(12);
   const [tenureYears, setTenureYears] = useState(10);
   const [stepUpPct, setStepUpPct] = useState(10); // annual step-up %
+  const [expenseRatioPct, setExpenseRatioPct] = useState(0.5); // AMC Expense Ratio (TER %)
+  const [deductLtcgTax, setDeductLtcgTax] = useState(true); // 12.5% LTCG above ₹1.25L exemption
 
   const math = useMemo(() => {
-    const rateMonthly = expectedReturn / 12 / 100;
+    const netAnnualRate = Math.max(0.1, expectedReturn - expenseRatioPct);
+    const rateMonthlyNet = netAnnualRate / 12 / 100;
+    const rateMonthlyGross = expectedReturn / 12 / 100;
     const totalMonths = tenureYears * 12;
 
     let totalInvested = 0;
+    let totalStampDuty = 0;
     let currentMonthly = monthlyInvestment;
-    let futureVal = 0;
+    let futureValNet = 0;
+    let futureValGross = 0;
     const schedule = [];
 
     for (let yr = 1; yr <= tenureYears; yr++) {
@@ -2510,51 +3048,64 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
       for (let m = 1; m <= 12; m++) {
         yrInvested += currentMonthly;
         totalInvested += currentMonthly;
+        // SEBI 0.005% Stamp Duty deducted on Mutual Fund purchase
+        const stamp = currentMonthly * 0.00005;
+        totalStampDuty += stamp;
+        const netDeposit = currentMonthly - stamp;
         const remainingMonths = totalMonths - ((yr - 1) * 12 + m) + 1;
-        futureVal += currentMonthly * Math.pow(1 + rateMonthly, remainingMonths);
+        futureValNet += netDeposit * Math.pow(1 + rateMonthlyNet, remainingMonths);
+        futureValGross += currentMonthly * Math.pow(1 + rateMonthlyGross, remainingMonths);
       }
       schedule.push({
         year: yr,
         annualDeposit: Math.round(yrInvested),
         totalInvested: Math.round(totalInvested),
-        estGains: Math.round(Math.max(0, futureVal - totalInvested)),
-        futureVal: Math.round(futureVal)
+        estGains: Math.round(Math.max(0, futureValNet - totalInvested)),
+        futureVal: Math.round(futureValNet)
       });
       if (stepUpPct > 0) {
         currentMonthly = currentMonthly * (1 + stepUpPct / 100);
       }
     }
 
-    const estimatedReturn = Math.max(0, futureVal - totalInvested);
-    const wealthRatio = futureVal > 0 ? ((totalInvested / futureVal) * 100).toFixed(1) : '50';
+    const estimatedReturn = Math.max(0, futureValNet - totalInvested);
+    const expenseAndStampDrag = Math.max(0, Math.round(futureValGross - futureValNet));
+    const taxableGains = Math.max(0, estimatedReturn - 125000); // ₹1.25L LTCG exemption
+    const ltcgTaxAmount = deductLtcgTax ? Math.round(taxableGains * 0.125) : 0; // 12.5% LTCG
+    const postTaxCorpus = Math.round(futureValNet - ltcgTaxAmount);
+    const wealthRatio = futureValNet > 0 ? ((totalInvested / futureValNet) * 100).toFixed(1) : '50';
 
     return {
       totalInvested: Math.round(totalInvested),
+      totalStampDuty: Math.round(totalStampDuty),
+      expenseAndStampDrag,
       estimatedReturn: Math.round(estimatedReturn),
-      totalValue: Math.round(futureVal),
+      totalValue: Math.round(futureValNet),
+      ltcgTaxAmount,
+      postTaxCorpus,
       wealthRatio,
       schedule
     };
-  }, [monthlyInvestment, expectedReturn, tenureYears, stepUpPct]);
+  }, [monthlyInvestment, expectedReturn, tenureYears, stepUpPct, expenseRatioPct, deductLtcgTax]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     const investedPct = Number(math.wealthRatio);
     const returnPct = Number((100 - investedPct).toFixed(1));
     onRegisterReport({
-      title: 'SIP (Systematic Investment Plan) Wealth Compounding Report',
-      subtitle: 'Step-Up monthly SIP projection & year-by-year compounding schedule',
+      title: 'SIP (Systematic Investment Plan) Wealth & Post-Tax Report',
+      subtitle: 'Step-Up monthly SIP projection, AMC expense ratio, stamp duty & LTCG tax schedule',
       inputs: [
         { label: 'Starting Monthly SIP', value: `₹${monthlyInvestment.toLocaleString('en-IN')}` },
-        { label: 'Expected Annual Return', value: `${expectedReturn}% p.a.` },
+        { label: 'Expected Gross Return', value: `${expectedReturn}% p.a. (TER: ${expenseRatioPct}%)` },
         { label: 'Investment Horizon', value: `${tenureYears} Years` },
         { label: 'Annual Step-Up Rate', value: `+${stepUpPct}% / yr` }
       ],
       kpis: [
-        { label: 'Projected Maturity Value', value: `₹${math.totalValue.toLocaleString('en-IN')}`, sub: `After ${tenureYears} years`, color: '#0284c7' },
-        { label: 'Total Capital Invested', value: `₹${math.totalInvested.toLocaleString('en-IN')}`, sub: `${investedPct}% of corpus`, color: '#38bdf8' },
-        { label: 'Estimated Wealth Gain', value: `+₹${math.estimatedReturn.toLocaleString('en-IN')}`, sub: `${returnPct}% of corpus`, color: '#10b981' },
-        { label: 'Wealth Multiplier', value: `${(math.totalValue / Math.max(1, math.totalInvested)).toFixed(2)}x`, sub: 'Total value / invested', color: '#8b5cf6' }
+        { label: 'Projected Maturity Value', value: `₹${math.totalValue.toLocaleString('en-IN')}`, sub: `Post-Tax In-Hand: ₹${math.postTaxCorpus.toLocaleString('en-IN')}`, color: '#0284c7' },
+        { label: 'Total Capital Invested', value: `₹${math.totalInvested.toLocaleString('en-IN')}`, sub: `Stamp Duty: ₹${math.totalStampDuty.toLocaleString('en-IN')}`, color: '#38bdf8' },
+        { label: 'Estimated Wealth Gain', value: `+₹${math.estimatedReturn.toLocaleString('en-IN')}`, sub: `LTCG Tax: ₹${math.ltcgTaxAmount.toLocaleString('en-IN')}`, color: '#10b981' },
+        { label: 'AMC TER & Fee Impact', value: `-₹${math.expenseAndStampDrag.toLocaleString('en-IN')}`, sub: `${expenseRatioPct}% p.a. expense ratio`, color: '#f59e0b' }
       ],
       bars: [
         { label: 'Invested Capital', value: `₹${math.totalInvested.toLocaleString('en-IN')}`, pct: investedPct, color: '#0284c7' },
@@ -2568,9 +3119,9 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         `+₹${r.estGains.toLocaleString('en-IN')}`,
         `₹${r.futureVal.toLocaleString('en-IN')}`
       ]),
-      notes: 'SIP projections assume monthly compounding at the specified expected annual return rate with annual step-up increments.'
+      notes: `SIP projections factor in ${expenseRatioPct}% p.a. AMC Expense Ratio (TER), 0.005% SEBI stamp duty on purchase, and 12.5% LTCG tax above ₹1.25L exemption.`
     });
-  }, [monthlyInvestment, expectedReturn, tenureYears, stepUpPct, math, onRegisterReport]);
+  }, [monthlyInvestment, expectedReturn, tenureYears, stepUpPct, expenseRatioPct, math, onRegisterReport]);
 
   const handleExport = () => {
     const headers = ['Year', 'Annual Deposit (₹)', 'Total Cumulative Invested (₹)', 'Estimated Gains (₹)', 'Maturity Corpus (₹)'];
@@ -2588,7 +3139,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '18px'
       }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2606,7 +3157,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="1000" max="200000" step="1000"
             value={monthlyInvestment} onChange={e => setMonthlyInvestment(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#0284c7', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#0284c7', marginTop: '10px' }}
           />
         </div>
 
@@ -2626,7 +3177,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="5" max="30" step="0.5"
             value={expectedReturn} onChange={e => setExpectedReturn(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#0284c7', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#0284c7', marginTop: '10px' }}
           />
         </div>
 
@@ -2646,7 +3197,7 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="1" max="40" step="1"
             value={tenureYears} onChange={e => setTenureYears(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#0284c7', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#0284c7', marginTop: '10px' }}
           />
         </div>
 
@@ -2658,8 +3209,33 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
           <input 
             type="range" min="0" max="25" step="1"
             value={stepUpPct} onChange={e => setStepUpPct(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#0284c7', marginTop: '12px' }}
+            style={{ width: '100%', accentColor: '#0284c7', marginTop: '10px' }}
           />
+        </div>
+
+        {/* AMC Expense Ratio, Stamp Duty & LTCG Tax Box */}
+        <div style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(2, 132, 199, 0.3)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>AMC Expense Ratio (TER %)</span>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: '#fbbf24' }}>{expenseRatioPct}% p.a.</span>
+          </div>
+          <input
+            type="range" min="0" max="2.5" step="0.05"
+            value={expenseRatioPct} onChange={e => setExpenseRatioPct(Number(e.target.value))}
+            style={{ width: '100%', accentColor: '#f59e0b' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#cbd5e1' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={deductLtcgTax}
+                onChange={e => setDeductLtcgTax(e.target.checked)}
+                style={{ accentColor: '#0284c7' }}
+              />
+              <span>Calculate 12.5% LTCG Tax (&gt;₹1.25L gain)</span>
+            </label>
+            <span style={{ color: '#f87171', fontWeight: '700' }}>-₹{math.ltcgTaxAmount.toLocaleString('en-IN')}</span>
+          </div>
         </div>
       </div>
 
@@ -2681,17 +3257,27 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
 
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Invested Value</span>
+                <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Invested Value (Stamp Duty: ₹{math.totalStampDuty.toLocaleString('en-IN')})</span>
                 <span style={{ fontSize: '15px', fontWeight: '800', color: '#0284c7' }}>₹{math.totalInvested.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Estimated Return</span>
-                <span style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>₹{math.estimatedReturn.toLocaleString('en-IN')}</span>
+                <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Estimated Return (Net of {expenseRatioPct}% TER)</span>
+                <span style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>+₹{math.estimatedReturn.toLocaleString('en-IN')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', color: '#fbbf24' }}>AMC Fee & Stamp Duty Impact</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#fbbf24' }}>-₹{math.expenseAndStampDrag.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
-                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#f8fafc' }}>Total Value</span>
+                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#f8fafc' }}>Maturity Value</span>
                 <span style={{ fontSize: '20px', fontWeight: '900', color: '#38bdf8' }}>₹{math.totalValue.toLocaleString('en-IN')}</span>
               </div>
+              {deductLtcgTax && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(16, 185, 129, 0.08)', padding: '8px 10px', borderRadius: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '12px', color: '#86efac', fontWeight: '700' }}>Post-Tax In-Hand (After 12.5% LTCG)</span>
+                  <span style={{ fontSize: '15px', fontWeight: '900', color: '#10b981' }}>₹{math.postTaxCorpus.toLocaleString('en-IN')}</span>
+                </div>
+              )}
             </div>
 
             {/* Donut Chart */}
@@ -2773,20 +3359,31 @@ function SipCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
 }
 
 // ============================================================================
-// 6. LUMPSUM CALCULATOR ENGINE
+// 6. LUMPSUM CALCULATOR ENGINE (With Expense Ratio, Stamp Duty & LTCG Tax)
 // ============================================================================
 function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [investment, setInvestment] = useState(100000);
   const [cagr, setCagr] = useState(14);
   const [years, setYears] = useState(10);
+  const [expenseRatioPct, setExpenseRatioPct] = useState(0.5); // AMC TER %
+  const [deductLtcgTax, setDeductLtcgTax] = useState(true); // 12.5% LTCG > ₹1.25L
 
   const math = useMemo(() => {
-    const futureVal = investment * Math.pow(1 + cagr / 100, years);
-    const gains = futureVal - investment;
+    const stampDuty = investment * 0.00005; // 0.005% SEBI stamp duty on MF purchase
+    const netInvested = investment - stampDuty;
+    const netCagr = Math.max(0.1, cagr - expenseRatioPct);
+    const futureValGross = investment * Math.pow(1 + cagr / 100, years);
+    const futureVal = netInvested * Math.pow(1 + netCagr / 100, years);
+    const gains = Math.max(0, futureVal - investment);
+    const expenseAndStampDrag = Math.max(0, Math.round(futureValGross - futureVal));
+    const taxableGains = Math.max(0, gains - 125000);
+    const ltcgTaxAmount = deductLtcgTax ? Math.round(taxableGains * 0.125) : 0;
+    const postTaxCorpus = Math.round(futureVal - ltcgTaxAmount);
+
     const schedule = [];
     for (let yr = 1; yr <= years; yr++) {
-      const val = Math.round(investment * Math.pow(1 + cagr / 100, yr));
-      const prevVal = yr === 1 ? investment : Math.round(investment * Math.pow(1 + cagr / 100, yr - 1));
+      const val = Math.round(netInvested * Math.pow(1 + netCagr / 100, yr));
+      const prevVal = yr === 1 ? investment : Math.round(netInvested * Math.pow(1 + netCagr / 100, yr - 1));
       schedule.push({
         year: yr,
         yearlyGain: val - prevVal,
@@ -2796,30 +3393,34 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
     }
     return {
       invested: investment,
+      stampDuty: Math.round(stampDuty),
+      expenseAndStampDrag,
       gains: Math.round(gains),
       futureVal: Math.round(futureVal),
+      ltcgTaxAmount,
+      postTaxCorpus,
       schedule,
       ratio: futureVal > 0 ? ((investment / futureVal) * 100).toFixed(1) : '50'
     };
-  }, [investment, cagr, years]);
+  }, [investment, cagr, years, expenseRatioPct, deductLtcgTax]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     const invPct = Number(math.ratio);
     const gainPct = Number((100 - invPct).toFixed(1));
     onRegisterReport({
-      title: 'Lumpsum Capital Compounding Report',
-      subtitle: 'Single-tranche exponential CAGR growth projection & annual wealth schedule',
+      title: 'Lumpsum Capital Compounding & Post-Tax Report',
+      subtitle: 'Single-tranche exponential CAGR growth projection, AMC expense ratio & LTCG tax schedule',
       inputs: [
         { label: 'Initial Lumpsum Capital', value: `₹${investment.toLocaleString('en-IN')}` },
-        { label: 'Expected CAGR Rate', value: `${cagr}% p.a.` },
+        { label: 'Expected CAGR Rate', value: `${cagr}% p.a. (TER: ${expenseRatioPct}%)` },
         { label: 'Compounding Horizon', value: `${years} Years` }
       ],
       kpis: [
-        { label: 'Maturity Corpus', value: `₹${math.futureVal.toLocaleString('en-IN')}`, sub: `After ${years} years`, color: '#10b981' },
+        { label: 'Maturity Corpus', value: `₹${math.futureVal.toLocaleString('en-IN')}`, sub: `Post-Tax In-Hand: ₹${math.postTaxCorpus.toLocaleString('en-IN')}`, color: '#10b981' },
         { label: 'Initial Principal', value: `₹${investment.toLocaleString('en-IN')}`, sub: `${invPct}% of final value`, color: '#0284c7' },
-        { label: 'Compounded Gains', value: `+₹${math.gains.toLocaleString('en-IN')}`, sub: `${gainPct}% of final value`, color: '#10b981' },
-        { label: 'Capital Multiple', value: `${(math.futureVal / Math.max(1, investment)).toFixed(2)}x`, sub: 'Total growth multiple', color: '#8b5cf6' }
+        { label: 'Compounded Gains', value: `+₹${math.gains.toLocaleString('en-IN')}`, sub: `LTCG Tax: ₹${math.ltcgTaxAmount.toLocaleString('en-IN')}`, color: '#10b981' },
+        { label: 'AMC Fee & Stamp Drag', value: `-₹${math.expenseAndStampDrag.toLocaleString('en-IN')}`, sub: `${expenseRatioPct}% p.a. TER impact`, color: '#f59e0b' }
       ],
       bars: [
         { label: 'Initial Principal', value: `₹${investment.toLocaleString('en-IN')}`, pct: invPct, color: '#0284c7' },
@@ -2833,9 +3434,9 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
         `+₹${r.totalGain.toLocaleString('en-IN')}`,
         `₹${r.value.toLocaleString('en-IN')}`
       ]),
-      notes: 'Lumpsum compounding follows the standard exponential growth formula FV = P × (1 + r)^n.'
+      notes: `Lumpsum compounding accounts for ${expenseRatioPct}% p.a. AMC Expense Ratio, 0.005% SEBI purchase stamp duty, and 12.5% LTCG tax above ₹1.25L exemption.`
     });
-  }, [investment, cagr, years, math, onRegisterReport]);
+  }, [investment, cagr, years, expenseRatioPct, math, onRegisterReport]);
 
   const handleExport = () => {
     const headers = ['Year', 'Initial Principal (₹)', 'Annual Gain (₹)', 'Total Gain (₹)', 'Compounded Value (₹)'];
@@ -2845,7 +3446,7 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
-      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Initial Lumpsum Capital</label>
@@ -2854,21 +3455,46 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
               <input type="number" value={investment} onChange={e => setInvestment(Math.max(1000, Number(e.target.value)))} style={{ width: '100px', background: 'transparent', border: 'none', color: '#fff', fontSize: '15px', fontWeight: '800', outline: 'none' }} />
             </div>
           </div>
-          <input type="range" min="10000" max="5000000" step="10000" value={investment} onChange={e => setInvestment(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '12px' }} />
+          <input type="range" min="10000" max="5000000" step="10000" value={investment} onChange={e => setInvestment(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '10px' }} />
         </div>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Expected CAGR (%)</label>
             <span style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>{cagr}%</span>
           </div>
-          <input type="range" min="4" max="30" step="0.5" value={cagr} onChange={e => setCagr(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '12px' }} />
+          <input type="range" min="4" max="30" step="0.5" value={cagr} onChange={e => setCagr(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '10px' }} />
         </div>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Tenure</label>
             <span style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>{years} Years</span>
           </div>
-          <input type="range" min="1" max="35" step="1" value={years} onChange={e => setYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '12px' }} />
+          <input type="range" min="1" max="35" step="1" value={years} onChange={e => setYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', marginTop: '10px' }} />
+        </div>
+
+        {/* AMC Expense Ratio & LTCG Tax Box */}
+        <div style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>AMC Expense Ratio (TER %)</span>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: '#fbbf24' }}>{expenseRatioPct}% p.a.</span>
+          </div>
+          <input
+            type="range" min="0" max="2.5" step="0.05"
+            value={expenseRatioPct} onChange={e => setExpenseRatioPct(Number(e.target.value))}
+            style={{ width: '100%', accentColor: '#f59e0b' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#cbd5e1' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={deductLtcgTax}
+                onChange={e => setDeductLtcgTax(e.target.checked)}
+                style={{ accentColor: '#10b981' }}
+              />
+              <span>Calculate 12.5% LTCG Tax (&gt;₹1.25L gain)</span>
+            </label>
+            <span style={{ color: '#f87171', fontWeight: '700' }}>-₹{math.ltcgTaxAmount.toLocaleString('en-IN')}</span>
+          </div>
         </div>
       </div>
 
@@ -2876,15 +3502,23 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
         {viewMode === 'CHART' ? (
           <div>
             <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>After {years} years of compounding</div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: '#10b981', margin: '6px 0 16px' }}>₹{math.futureVal.toLocaleString('en-IN')}</div>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-              <div style={{ flex: 1, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
+            <div style={{ fontSize: '38px', fontWeight: '900', color: '#10b981', margin: '6px 0 12px' }}>₹{math.futureVal.toLocaleString('en-IN')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Invested Principal</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>₹{investment.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>₹{investment.toLocaleString('en-IN')}</div>
               </div>
-              <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Compounded Gains</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>+₹{math.gains.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>+₹{math.gains.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: '600' }}>AMC TER & Stamp Drag</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#fbbf24', marginTop: '2px' }}>-₹{math.expenseAndStampDrag.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.3)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#7dd3fc', fontWeight: '600' }}>Post-Tax In-Hand</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>₹{math.postTaxCorpus.toLocaleString('en-IN')}</div>
               </div>
             </div>
 
@@ -2948,7 +3582,7 @@ function LumpsumCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, on
 }
 
 // ============================================================================
-// 7. MUTUAL FUNDS DIRECT VS REGULAR ENGINE
+// 7. MUTUAL FUNDS DIRECT VS REGULAR ENGINE (With Exit Load, Stamp Duty & LTCG)
 // ============================================================================
 function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [monthlySip, setMonthlySip] = useState(15000);
@@ -2956,11 +3590,14 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
   const [expectedCagr, setExpectedCagr] = useState(14);
   const [regularTer, setRegularTer] = useState(1.65);
   const [directTer, setDirectTer] = useState(0.65);
+  const [exitLoadPct, setExitLoadPct] = useState(0); // Optional Exit Load (0% - 2%)
+  const [deductLtcgTax, setDeductLtcgTax] = useState(true); // 12.5% LTCG > ₹1.25L
 
   const feeSavings = useMemo(() => {
     const months = tenureYears * 12;
     const directMonthlyRate = (expectedCagr - directTer) / 12 / 100;
     const regularMonthlyRate = (expectedCagr - regularTer) / 12 / 100;
+    const netSipAfterStamp = monthlySip * (1 - 0.00005); // 0.005% SEBI stamp duty
 
     let directCorpus = 0;
     let regularCorpus = 0;
@@ -2971,8 +3608,8 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
       let dYr = 0;
       let rYr = 0;
       for (let m = 1; m <= mCount; m++) {
-        dYr += monthlySip * Math.pow(1 + directMonthlyRate, mCount - m + 1);
-        rYr += monthlySip * Math.pow(1 + regularMonthlyRate, mCount - m + 1);
+        dYr += netSipAfterStamp * Math.pow(1 + directMonthlyRate, mCount - m + 1);
+        rYr += netSipAfterStamp * Math.pow(1 + regularMonthlyRate, mCount - m + 1);
       }
       schedule.push({
         year: yr,
@@ -2982,29 +3619,39 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
         savedVal: Math.round(Math.max(0, dYr - rYr))
       });
       if (yr === tenureYears) {
-        directCorpus = dYr;
-        regularCorpus = rYr;
+        directCorpus = dYr * (1 - exitLoadPct / 100);
+        regularCorpus = rYr * (1 - exitLoadPct / 100);
       }
     }
 
+    const totalInvested = monthlySip * months;
+    const stampDutyTotal = Math.round(totalInvested * 0.00005);
     const savedAmount = Math.max(0, directCorpus - regularCorpus);
     const lossPct = directCorpus > 0 ? ((savedAmount / directCorpus) * 100).toFixed(1) : '0.0';
+
+    const directGains = Math.max(0, directCorpus - totalInvested);
+    const directLtcgTax = deductLtcgTax ? Math.round(Math.max(0, directGains - 125000) * 0.125) : 0;
+    const directPostTax = Math.round(directCorpus - directLtcgTax);
+
     return {
-      totalInvested: monthlySip * months,
+      totalInvested,
+      stampDutyTotal,
       directCorpus: Math.round(directCorpus),
       regularCorpus: Math.round(regularCorpus),
       savedAmount: Math.round(savedAmount),
+      directLtcgTax,
+      directPostTax,
       lossPct,
       schedule
     };
-  }, [monthlySip, tenureYears, expectedCagr, regularTer, directTer]);
+  }, [monthlySip, tenureYears, expectedCagr, regularTer, directTer, exitLoadPct, deductLtcgTax]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     const regPct = Number((100 - Number(feeSavings.lossPct)).toFixed(1));
     onRegisterReport({
-      title: 'Mutual Fund Direct vs Regular TER Commission Report',
-      subtitle: 'Impact of distributor trail commissions & Total Expense Ratio (TER) on long-term SIP wealth',
+      title: 'Mutual Fund Direct vs Regular TER Commission & Post-Tax Report',
+      subtitle: 'Impact of distributor trail commissions, Total Expense Ratio (TER), Stamp Duty & LTCG on SIP wealth',
       inputs: [
         { label: 'Monthly SIP Amount', value: `₹${monthlySip.toLocaleString('en-IN')}` },
         { label: 'Investment Horizon', value: `${tenureYears} Years` },
@@ -3013,7 +3660,7 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
       ],
       kpis: [
         { label: 'Extra Wealth in Direct', value: `+₹${feeSavings.savedAmount.toLocaleString('en-IN')}`, sub: 'Saved from agent commissions', color: '#10b981' },
-        { label: 'Direct Plan Corpus', value: `₹${feeSavings.directCorpus.toLocaleString('en-IN')}`, sub: `Net CAGR: ${(expectedCagr - directTer).toFixed(2)}%`, color: '#0284c7' },
+        { label: 'Direct Plan Corpus', value: `₹${feeSavings.directCorpus.toLocaleString('en-IN')}`, sub: `Post-Tax: ₹${feeSavings.directPostTax.toLocaleString('en-IN')}`, color: '#0284c7' },
         { label: 'Regular Plan Corpus', value: `₹${feeSavings.regularCorpus.toLocaleString('en-IN')}`, sub: `Net CAGR: ${(expectedCagr - regularTer).toFixed(2)}%`, color: '#ef4444' },
         { label: 'Commission Drag', value: `${feeSavings.lossPct}%`, sub: 'Corpus lost to regular TER', color: '#f59e0b' }
       ],
@@ -3041,37 +3688,48 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
-      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Monthly SIP</label>
             <span style={{ fontSize: '14px', fontWeight: '800', color: '#3b82f6' }}>₹{monthlySip.toLocaleString('en-IN')}</span>
           </div>
-          <input type="range" min="1000" max="100000" step="1000" value={monthlySip} onChange={e => setMonthlySip(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '10px' }} />
+          <input type="range" min="1000" max="100000" step="1000" value={monthlySip} onChange={e => setMonthlySip(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '8px' }} />
         </div>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Tenure</label>
             <span style={{ fontSize: '14px', fontWeight: '800', color: '#10b981' }}>{tenureYears} Years</span>
           </div>
-          <input type="range" min="3" max="30" step="1" value={tenureYears} onChange={e => setTenureYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '10px' }} />
+          <input type="range" min="3" max="30" step="1" value={tenureYears} onChange={e => setTenureYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '8px' }} />
         </div>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Gross Fund Return (CAGR)</label>
             <span style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8' }}>{expectedCagr}% p.a.</span>
           </div>
-          <input type="range" min="8" max="24" step="0.5" value={expectedCagr} onChange={e => setExpectedCagr(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '10px' }} />
+          <input type="range" min="8" max="24" step="0.5" value={expectedCagr} onChange={e => setExpectedCagr(Number(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6', marginTop: '8px' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
           <div>
-            <label style={{ fontSize: '11px', color: '#f87171' }}>Regular TER (Agent %)</label>
-            <input type="number" step="0.05" value={regularTer} onChange={e => setRegularTer(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fca5a5', marginTop: '4px' }} />
+            <label style={{ fontSize: '11px', color: '#f87171' }}>Regular TER (%)</label>
+            <input type="number" step="0.05" value={regularTer} onChange={e => setRegularTer(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fca5a5', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: '11px', color: '#34d399' }}>Direct TER (Zero Fee %)</label>
-            <input type="number" step="0.05" value={directTer} onChange={e => setDirectTer(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', color: '#86efac', marginTop: '4px' }} />
+            <label style={{ fontSize: '11px', color: '#34d399' }}>Direct TER (%)</label>
+            <input type="number" step="0.05" value={directTer} onChange={e => setDirectTer(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', color: '#86efac', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
+          <div>
+            <label style={{ fontSize: '11px', color: '#fbbf24' }}>Exit Load (%)</label>
+            <input type="number" step="0.25" value={exitLoadPct} onChange={e => setExitLoadPct(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '6px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', color: '#fbbf24', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#cbd5e1', background: 'rgba(0,0,0,0.25)', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={deductLtcgTax} onChange={e => setDeductLtcgTax(e.target.checked)} style={{ accentColor: '#3b82f6' }} />
+            <span>12.5% LTCG Tax & 0.005% Stamp Duty</span>
+          </label>
+          <span style={{ color: '#38bdf8', fontWeight: '700' }}>Post-Tax Direct: ₹{feeSavings.directPostTax.toLocaleString('en-IN')}</span>
         </div>
       </div>
 
@@ -3080,14 +3738,18 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
           <div>
             <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase' }}>Extra Wealth Gained via Direct Plan</div>
             <div style={{ fontSize: '38px', fontWeight: '900', color: '#10b981', margin: '4px 0 16px' }}>+₹{feeSavings.savedAmount.toLocaleString('en-IN')}</div>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ flex: 1, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', padding: '12px', borderRadius: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Direct Corpus ({directTer}% TER)</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>₹{feeSavings.directCorpus.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>₹{feeSavings.directCorpus.toLocaleString('en-IN')}</div>
               </div>
-              <div style={{ flex: 1, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '12px', borderRadius: '10px' }}>
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '12px', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Regular Corpus ({regularTer}% TER)</div>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#cbd5e1', marginTop: '2px' }}>₹{feeSavings.regularCorpus.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#cbd5e1', marginTop: '2px' }}>₹{feeSavings.regularCorpus.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', padding: '12px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Direct Post-Tax In-Hand</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>₹{feeSavings.directPostTax.toLocaleString('en-IN')}</div>
               </div>
             </div>
 
@@ -3146,50 +3808,64 @@ function MutualFundsCalculatorEngine({ viewMode, onDownloadCSV, onRegisterReport
 }
 
 // ============================================================================
-// 8. BROKERAGE & SEBI TAX ENGINE (Oct 2024 Rates)
+// 8. BROKERAGE & SEBI TAX ENGINE (With Custom Brokerage, DP & IPFT Charges)
 // ============================================================================
 function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [segment, setSegment] = useState('EQUITY_INTRADAY'); // 'EQUITY_DELIVERY' | 'EQUITY_INTRADAY' | 'FUTURES' | 'OPTIONS'
   const [buyPrice, setBuyPrice] = useState(500);
   const [sellPrice, setSellPrice] = useState(510);
   const [qty, setQty] = useState(100);
+  const [customOrderBrokerage, setCustomOrderBrokerage] = useState(20); // ₹20/order default
+  const [includeDpCharge, setIncludeDpCharge] = useState(true); // ₹15.93 CDSL DP charge on Delivery Sell
 
   const taxes = useMemo(() => {
-    const turnover = (buyPrice + sellPrice) * qty;
+    const buyVal = buyPrice * qty;
+    const sellVal = sellPrice * qty;
+    const turnover = buyVal + sellVal;
     const grossPnl = (sellPrice - buyPrice) * qty;
 
     let brokerage = 0;
     let stt = 0;
-    const etc = turnover * 0.0000325; // 0.00325%
+    let stampDuty = 0;
+    let etc = turnover * 0.0000325; // NSE Exchange Txn Charge
+    let dpCharge = 0;
 
     if (segment === 'EQUITY_DELIVERY') {
-      brokerage = 0;
-      stt = (turnover / 2) * 0.001;
+      brokerage = 0; // Zero Delivery Brokerage
+      stt = turnover * 0.001; // 0.1% on both Buy & Sell
+      stampDuty = buyVal * 0.00015; // 0.015% on Delivery Buy
+      dpCharge = includeDpCharge && sellVal > 0 ? 15.93 : 0; // CDSL DP Charge ₹13.5 + 18% GST
     } else if (segment === 'EQUITY_INTRADAY') {
-      brokerage = Math.min(40, turnover * 0.0003);
-      stt = (sellPrice * qty) * 0.00025;
+      brokerage = Math.min(customOrderBrokerage, buyVal * 0.0003) + Math.min(customOrderBrokerage, sellVal * 0.0003);
+      stt = sellVal * 0.00025; // 0.025% on Sell
+      stampDuty = buyVal * 0.00003; // 0.003% on Buy
     } else if (segment === 'FUTURES') {
-      brokerage = 40;
-      stt = (sellPrice * qty) * 0.0002;
+      brokerage = customOrderBrokerage * 2;
+      stt = sellVal * 0.0002; // 0.02% revised Oct 2024
+      stampDuty = buyVal * 0.00002;
+      etc = turnover * 0.0000173;
     } else {
-      brokerage = 40;
-      stt = (sellPrice * qty) * 0.001;
+      brokerage = customOrderBrokerage * 2;
+      stt = sellVal * 0.001; // 0.1% on Option Premium Sell (revised Oct 2024)
+      stampDuty = buyVal * 0.00003;
+      etc = turnover * 0.0003503;
     }
 
-    const gst = (brokerage + etc) * 0.18;
-    const stampDuty = (buyPrice * qty) * 0.00003;
-    const sebiFee = turnover * 0.000001;
-    const totalCharges = brokerage + stt + etc + gst + stampDuty + sebiFee;
+    const sebiFee = turnover * 0.000001; // ₹10 / Crore
+    const ipftCharge = turnover * 0.000001; // NSE IPFT Charge ₹10 / Crore
+    const gst = (brokerage + etc + sebiFee + ipftCharge) * 0.18;
+    const totalCharges = brokerage + stt + etc + gst + stampDuty + sebiFee + ipftCharge + dpCharge;
     const netPnl = grossPnl - totalCharges;
     const breakevenMovePerShare = qty > 0 ? totalCharges / qty : 0;
 
     const breakdown = [
-      { name: 'Brokerage Fee', amount: brokerage.toFixed(2), rule: segment === 'EQUITY_DELIVERY' ? '₹0 Zero Delivery' : 'Max ₹20/order', color: '#38bdf8' },
+      { name: 'Brokerage Fee', amount: brokerage.toFixed(2), rule: segment === 'EQUITY_DELIVERY' ? '₹0 Zero Delivery' : `Max ₹${customOrderBrokerage}/order`, color: '#38bdf8' },
       { name: 'Securities Transaction Tax (STT)', amount: stt.toFixed(2), rule: 'Statutory Govt Levy', color: '#ef4444' },
-      { name: 'Exchange Transaction Charges', amount: etc.toFixed(2), rule: '0.00325% NSE/BSE', color: '#f59e0b' },
-      { name: 'GST (18% on Brokerage + ETC)', amount: gst.toFixed(2), rule: '18% Statutory Tax', color: '#a855f7' },
-      { name: 'Stamp Duty', amount: stampDuty.toFixed(2), rule: '0.003% on Buy Side', color: '#ec4899' },
-      { name: 'SEBI Turnover Charges', amount: sebiFee.toFixed(2), rule: '₹10 / Crore', color: '#10b981' }
+      { name: 'Exchange Transaction Charges', amount: etc.toFixed(2), rule: 'NSE/BSE Turnover Levy', color: '#f59e0b' },
+      { name: 'GST (18% on Brok + Exchange + SEBI)', amount: gst.toFixed(2), rule: '18% Statutory Tax', color: '#a855f7' },
+      { name: 'Stamp Duty', amount: stampDuty.toFixed(2), rule: segment === 'EQUITY_DELIVERY' ? '0.015% on Buy' : '0.003% on Buy', color: '#ec4899' },
+      { name: 'SEBI + IPFT Turnover Charges', amount: (sebiFee + ipftCharge).toFixed(2), rule: '₹20 / Crore Total', color: '#10b981' },
+      ...(dpCharge > 0 ? [{ name: 'DP (Depository) Sell Charge', amount: dpCharge.toFixed(2), rule: '₹13.50 + 18% GST CDSL', color: '#06b6d4' }] : [])
     ];
 
     return {
@@ -3200,19 +3876,20 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
       etc: etc.toFixed(2),
       gst: gst.toFixed(2),
       stampDuty: stampDuty.toFixed(2),
-      sebiFee: sebiFee.toFixed(2),
+      sebiFee: (sebiFee + ipftCharge).toFixed(2),
+      dpCharge: dpCharge.toFixed(2),
       totalCharges: totalCharges.toFixed(2),
       netPnl: Math.round(netPnl),
       breakevenMovePerShare: breakevenMovePerShare.toFixed(2),
       breakdown
     };
-  }, [segment, buyPrice, sellPrice, qty]);
+  }, [segment, buyPrice, sellPrice, qty, customOrderBrokerage, includeDpCharge]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     const totalNum = Math.max(0.01, Number(taxes.totalCharges));
     onRegisterReport({
-      title: 'Brokerage, STT & SEBI Statutory Tax Contract Note',
+      title: 'Brokerage, STT, DP & SEBI Statutory Tax Contract Note',
       subtitle: `Updated SEBI & Exchange transaction cost breakdown (${segment.replace('_', ' ')})`,
       inputs: [
         { label: 'Market Segment', value: segment.replace('_', ' ') },
@@ -3239,7 +3916,7 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
         `₹${b.amount}`,
         `${((Number(b.amount) / totalNum) * 100).toFixed(1)}%`
       ]),
-      notes: 'Computed using revised SEBI & Union Budget STT rates (0.02% on Futures, 0.10% on Options premium) plus 18% GST on brokerage and exchange fees.'
+      notes: 'Computed using revised SEBI & Union Budget STT rates (0.02% on Futures, 0.10% on Options premium) plus 18% GST, IPFT, and CDSL DP charges.'
     });
   }, [segment, buyPrice, sellPrice, qty, taxes, onRegisterReport]);
 
@@ -3257,7 +3934,7 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '18px' }}>
-      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '8px' }}>
           {[
             { id: 'EQUITY_INTRADAY', label: 'Intraday' },
@@ -3270,18 +3947,32 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
             </button>
           ))}
         </div>
-        <div>
-          <label style={{ fontSize: '12px', color: '#94a3b8' }}>Buy Price (₹)</label>
-          <input type="number" value={buyPrice} onChange={e => setBuyPrice(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div>
+            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Buy Price (₹)</label>
+            <input type="number" value={buyPrice} onChange={e => setBuyPrice(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Sell Price (₹)</label>
+            <input type="number" value={sellPrice} onChange={e => setSellPrice(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
         </div>
-        <div>
-          <label style={{ fontSize: '12px', color: '#94a3b8' }}>Sell Price (₹)</label>
-          <input type="number" value={sellPrice} onChange={e => setSellPrice(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div>
+            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Quantity</label>
+            <input type="number" value={qty} onChange={e => setQty(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Max Brok / Order (₹)</label>
+            <input type="number" value={customOrderBrokerage} onChange={e => setCustomOrderBrokerage(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#facc15', fontWeight: '700', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
         </div>
-        <div>
-          <label style={{ fontSize: '12px', color: '#94a3b8' }}>Quantity</label>
-          <input type="number" value={qty} onChange={e => setQty(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
-        </div>
+        {segment === 'EQUITY_DELIVERY' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#cbd5e1', cursor: 'pointer', background: 'rgba(0,0,0,0.25)', padding: '8px 10px', borderRadius: '8px' }}>
+            <input type="checkbox" checked={includeDpCharge} onChange={e => setIncludeDpCharge(e.target.checked)} style={{ accentColor: '#eab308' }} />
+            <span>Include CDSL Depository (DP) Sell Charge (₹15.93 incl. GST)</span>
+          </label>
+        )}
       </div>
 
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -3373,7 +4064,7 @@ function BrokerageTaxEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
 }
 
 // ============================================================================
-// 9. POSITION SIZING & RISK/REWARD ENGINE
+// 9. POSITION SIZING & RISK/REWARD ENGINE (With Brokerage & Slippage Buffer)
 // ============================================================================
 function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [capital, setCapital] = useState(500000);
@@ -3381,14 +4072,17 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
   const [entryPrice, setEntryPrice] = useState(1450);
   const [stopLoss, setStopLoss] = useState(1420);
   const [targetPrice, setTargetPrice] = useState(1540);
+  const [slippageAndChargesPerShare, setSlippageAndChargesPerShare] = useState(1.5); // ₹ buffer per share for brokerage + STT + slippage
 
   const math = useMemo(() => {
     const riskAmount = capital * (riskPct / 100);
-    const riskPerShare = Math.max(0.01, Math.abs(entryPrice - stopLoss));
-    const positionQty = Math.floor(riskAmount / riskPerShare);
+    const rawRiskPerShare = Math.max(0.01, Math.abs(entryPrice - stopLoss));
+    const effectiveRiskPerShare = rawRiskPerShare + Math.max(0, slippageAndChargesPerShare);
+    const positionQty = Math.floor(riskAmount / effectiveRiskPerShare);
     const positionValue = positionQty * entryPrice;
-    const rewardPerShare = Math.max(0, Math.abs(targetPrice - entryPrice));
-    const rewardToRisk = riskPerShare > 0 ? (rewardPerShare / riskPerShare).toFixed(2) : '0';
+    const totalEstimatedCharges = Math.round(positionQty * slippageAndChargesPerShare);
+    const rewardPerShare = Math.max(0, Math.abs(targetPrice - entryPrice) - slippageAndChargesPerShare);
+    const rewardToRisk = effectiveRiskPerShare > 0 ? (rewardPerShare / effectiveRiskPerShare).toFixed(2) : '0';
     const totalPotentialProfit = positionQty * rewardPerShare;
     const capitalAllocationPct = capital > 0 ? Math.min(100, (positionValue / capital) * 100).toFixed(1) : '0';
 
@@ -3396,9 +4090,9 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
     const rMultiples = [-1, 0, 1, 1.5, 2, 3, 5];
     const ladder = rMultiples.map(rMult => {
       const pricePoint = entryPrice >= stopLoss
-        ? entryPrice + rMult * riskPerShare
-        : entryPrice - rMult * riskPerShare;
-      const pnl = Math.round(positionQty * rMult * riskPerShare);
+        ? entryPrice + rMult * rawRiskPerShare
+        : entryPrice - rMult * rawRiskPerShare;
+      const pnl = Math.round(positionQty * (rMult * rawRiskPerShare - slippageAndChargesPerShare));
       const acctImpactPct = capital > 0 ? ((pnl / capital) * 100).toFixed(2) : '0.00';
       return {
         label: rMult === -1 ? '-1R (Stop Loss)' : rMult === 0 ? '0R (Breakeven)' : `+${rMult}R Target`,
@@ -3410,51 +4104,52 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
 
     return {
       riskAmount: Math.round(riskAmount),
-      riskPerShare: riskPerShare.toFixed(2),
+      riskPerShare: effectiveRiskPerShare.toFixed(2),
       rewardPerShare: rewardPerShare.toFixed(2),
       positionQty,
       positionValue: Math.round(positionValue),
+      totalEstimatedCharges,
       rewardToRisk,
       totalPotentialProfit: Math.round(totalPotentialProfit),
       capitalAllocationPct,
       ladder
     };
-  }, [capital, riskPct, entryPrice, stopLoss, targetPrice]);
+  }, [capital, riskPct, entryPrice, stopLoss, targetPrice, slippageAndChargesPerShare]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
     onRegisterReport({
       title: 'Position Sizing & Risk-Reward Discipline Report',
-      subtitle: 'Institutional R-Multiple trade sizing, stop-loss risk cap & target payoff matrix',
+      subtitle: 'Institutional R-Multiple trade sizing, stop-loss risk cap, slippage buffer & target payoff matrix',
       inputs: [
         { label: 'Total Trading Capital', value: `₹${capital.toLocaleString('en-IN')}` },
         { label: 'Max Risk Per Trade', value: `${riskPct}% (₹${math.riskAmount.toLocaleString('en-IN')})` },
         { label: 'Entry / Stop-Loss', value: `₹${entryPrice} / ₹${stopLoss}` },
-        { label: 'Target Exit Price', value: `₹${targetPrice}` }
+        { label: 'Target / Slippage Buffer', value: `₹${targetPrice} (₹${slippageAndChargesPerShare}/sh buffer)` }
       ],
       kpis: [
         { label: 'Recommended Quantity', value: `${math.positionQty.toLocaleString('en-IN')} Shares`, sub: `Position Value: ₹${math.positionValue.toLocaleString('en-IN')}`, color: '#0284c7' },
-        { label: 'Max Capital at Risk (1R)', value: `-₹${math.riskAmount.toLocaleString('en-IN')}`, sub: `₹${math.riskPerShare} risk/share`, color: '#ef4444' },
-        { label: 'Target Profit', value: `+₹${math.totalPotentialProfit.toLocaleString('en-IN')}`, sub: `₹${math.rewardPerShare} reward/share`, color: '#10b981' },
-        { label: 'Risk : Reward Ratio', value: `1 : ${math.rewardToRisk}`, sub: `${math.capitalAllocationPct}% capital deployed`, color: '#8b5cf6' }
+        { label: 'Max Capital at Risk (1R)', value: `-₹${math.riskAmount.toLocaleString('en-IN')}`, sub: `Incl. ₹${math.totalEstimatedCharges} charges buffer`, color: '#ef4444' },
+        { label: 'Net Target Profit', value: `+₹${math.totalPotentialProfit.toLocaleString('en-IN')}`, sub: `₹${math.rewardPerShare} net reward/share`, color: '#10b981' },
+        { label: 'Net Risk : Reward', value: `1 : ${math.rewardToRisk}`, sub: `${math.capitalAllocationPct}% capital deployed`, color: '#8b5cf6' }
       ],
       bars: [
         { label: 'Deployed Position Capital', value: `₹${math.positionValue.toLocaleString('en-IN')}`, pct: Number(math.capitalAllocationPct), color: '#0284c7' },
         { label: 'Unallocated Cash Reserve', value: `₹${Math.max(0, capital - math.positionValue).toLocaleString('en-IN')}`, pct: Math.max(0, 100 - Number(math.capitalAllocationPct)), color: '#10b981' }
       ],
-      tableHeaders: ['R-Multiple Level', 'Stock Price Trigger (₹)', 'Realized Trade P&L (₹)', 'Account Equity Impact (%)'],
+      tableHeaders: ['R-Multiple Level', 'Stock Price Trigger (₹)', 'Net Realized P&L (₹)', 'Account Equity Impact (%)'],
       tableRows: math.ladder.map(row => [
         row.label,
         `₹${Number(row.pricePoint).toLocaleString('en-IN')}`,
         `${row.pnl >= 0 ? '+' : ''}₹${row.pnl.toLocaleString('en-IN')}`,
         `${Number(row.acctImpactPct) >= 0 ? '+' : ''}${row.acctImpactPct}%`
       ]),
-      notes: 'Position quantity is strictly capped so that if the stop-loss is triggered, the total loss never exceeds your specified Risk Per Trade percentage.'
+      notes: 'Position quantity is strictly capped so that even after brokerage, taxes, and slippage, a stop-loss hit never exceeds your 1R risk cap.'
     });
-  }, [capital, riskPct, entryPrice, stopLoss, targetPrice, math, onRegisterReport]);
+  }, [capital, riskPct, entryPrice, stopLoss, targetPrice, slippageAndChargesPerShare, math, onRegisterReport]);
 
   const handleExport = () => {
-    const headers = ['R-Multiple', 'Trigger Price (₹)', 'Projected P&L (₹)', 'Account Impact (%)'];
+    const headers = ['R-Multiple', 'Trigger Price (₹)', 'Projected Net P&L (₹)', 'Account Impact (%)'];
     const rows = math.ladder.map(r => [r.label, r.pricePoint, r.pnl, `${r.acctImpactPct}%`]);
     onDownloadCSV(`position_sizing_${entryPrice}`, headers, rows);
   };
@@ -3464,7 +4159,7 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Total Account Capital (₹)</label>
-          <input type="number" value={capital} onChange={e => setCapital(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+          <input type="number" value={capital} onChange={e => setCapital(Number(e.target.value))} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
         </div>
         <div>
           <label style={{ fontSize: '12px', color: '#94a3b8' }}>Risk Per Trade (%): <strong style={{ color: '#f87171' }}>{riskPct}%</strong></label>
@@ -3473,16 +4168,28 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
           <div>
             <label style={{ fontSize: '11px', color: '#38bdf8' }}>Entry Price</label>
-            <input type="number" value={entryPrice} onChange={e => setEntryPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+            <input type="number" value={entryPrice} onChange={e => setEntryPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: '11px', color: '#f87171' }}>Stop Loss</label>
-            <input type="number" value={stopLoss} onChange={e => setStopLoss(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+            <input type="number" value={stopLoss} onChange={e => setStopLoss(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: '11px', color: '#34d399' }}>Target Price</label>
-            <input type="number" value={targetPrice} onChange={e => setTargetPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+            <input type="number" value={targetPrice} onChange={e => setTargetPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
+        </div>
+        <div style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '10px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '11.5px', color: '#fbbf24', fontWeight: '700' }}>Brokerage, Taxes & Slippage Buffer (₹/sh)</div>
+            <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>Est. Charges: ₹{math.totalEstimatedCharges.toLocaleString('en-IN')}</div>
+          </div>
+          <input
+            type="number" step="0.25"
+            value={slippageAndChargesPerShare}
+            onChange={e => setSlippageAndChargesPerShare(Math.max(0, Number(e.target.value)))}
+            style={{ width: '75px', padding: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fbbf24', fontWeight: '800', textAlign: 'right' }}
+          />
         </div>
       </div>
 
@@ -3495,11 +4202,11 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#f87171' }}>Capital at Risk (1R)</div>
+                <div style={{ fontSize: '11px', color: '#f87171' }}>Capital at Risk (1R incl. Charges)</div>
                 <div style={{ fontSize: '17px', fontWeight: '800', color: '#f8fafc' }}>-₹{math.riskAmount.toLocaleString('en-IN')}</div>
               </div>
               <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16,185,129,0.2)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#34d399' }}>Target Reward ({math.rewardToRisk}R)</div>
+                <div style={{ fontSize: '11px', color: '#34d399' }}>Net Target Reward ({math.rewardToRisk}R)</div>
                 <div style={{ fontSize: '17px', fontWeight: '800', color: '#10b981' }}>+₹{math.totalPotentialProfit.toLocaleString('en-IN')}</div>
               </div>
             </div>
@@ -3507,9 +4214,9 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
             {/* Visual Risk vs Reward Bar */}
             <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#cbd5e1', marginBottom: '6px' }}>
-                <span>Risk: ₹{math.riskPerShare}/sh</span>
-                <span style={{ fontWeight: '800', color: '#34d399' }}>R:R Ratio = 1 : {math.rewardToRisk}</span>
-                <span>Reward: ₹{math.rewardPerShare}/sh</span>
+                <span>All-In Risk: ₹{math.riskPerShare}/sh</span>
+                <span style={{ fontWeight: '800', color: '#34d399' }}>Net R:R = 1 : {math.rewardToRisk}</span>
+                <span>Net Reward: ₹{math.rewardPerShare}/sh</span>
               </div>
               <div style={{ height: '12px', width: '100%', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
                 <div style={{ width: `${(1 / (1 + Math.max(0.1, Number(math.rewardToRisk)))) * 100}%`, background: '#ef4444', height: '100%' }} />
@@ -3527,7 +4234,7 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
                 <tr style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                   <th style={{ padding: '8px', textAlign: 'left' }}>R-Multiple</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>Stock Price</th>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>Trade P&L</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Net P&L</th>
                   <th style={{ padding: '8px', textAlign: 'right' }}>Equity Impact</th>
                 </tr>
               </thead>
@@ -3554,7 +4261,7 @@ function PositionSizerEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpen
 }
 
 // ============================================================================
-// 10. OPTIONS GREEKS BLACK-SCHOLES ENGINE
+// 10. OPTIONS GREEKS BLACK-SCHOLES ENGINE (With Lot Size & F&O Charges)
 // ============================================================================
 function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenPaperTrading }) {
   const [spotPrice, setSpotPrice] = useState(24500);
@@ -3562,6 +4269,7 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
   const [daysToExpiry, setDaysToExpiry] = useState(7);
   const [ivPct, setIvPct] = useState(14.5);
   const [optionType, setOptionType] = useState('CE'); // 'CE' | 'PE'
+  const [lotSize, setLotSize] = useState(75); // e.g. 75 NIFTY, 30 BANKNIFTY
 
   const greeks = useMemo(() => {
     const normalCdf = (x) => {
@@ -3594,6 +4302,9 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
     };
 
     const current = calcBS(spotPrice, strikePrice, daysToExpiry, ivPct, optionType);
+    const lotValue = current.price * lotSize;
+    // F&O Option Round-Trip Brokerage (₹40) + STT (0.1% on sell) + Exchange Txn + 18% GST
+    const fnOCharges = 40 + (lotValue * 0.001) + (lotValue * 2 * 0.0003503) + (40 + lotValue * 2 * 0.0003503) * 0.18;
 
     // Build Strike Matrix around current strike for TABLE view & PDF report
     const step = spotPrice > 10000 ? 100 : spotPrice > 1000 ? 50 : 10;
@@ -3617,6 +4328,9 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
 
     return {
       price: current.price.toFixed(2),
+      lotValue: Math.round(lotValue),
+      fnOCharges: Math.round(fnOCharges),
+      lotTheta: Math.round(current.theta * lotSize),
       delta: current.delta.toFixed(3),
       gamma: current.gamma.toFixed(5),
       theta: current.theta.toFixed(2),
@@ -3626,7 +4340,7 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
       intrinsicPct,
       chainRows
     };
-  }, [spotPrice, strikePrice, daysToExpiry, ivPct, optionType]);
+  }, [spotPrice, strikePrice, daysToExpiry, ivPct, optionType, lotSize]);
 
   useEffect(() => {
     if (!onRegisterReport) return;
@@ -3634,17 +4348,17 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
     const extrPct = Number((100 - intrPct).toFixed(1));
     onRegisterReport({
       title: `Black-Scholes Options Pricing & Greeks Report (${optionType})`,
-      subtitle: 'Theoretical option premium decomposition, Greeks sensitivity & strike matrix',
+      subtitle: 'Theoretical option premium decomposition, lot exposure, F&O charges & strike matrix',
       inputs: [
-        { label: 'Option Type', value: optionType === 'CE' ? 'Call Option (CE)' : 'Put Option (PE)' },
+        { label: 'Option Type / Lot Size', value: `${optionType === 'CE' ? 'Call (CE)' : 'Put (PE)'} • ${lotSize} Units` },
         { label: 'Underlying Spot Price', value: `₹${spotPrice.toLocaleString('en-IN')}` },
         { label: 'Strike Price', value: `₹${strikePrice.toLocaleString('en-IN')}` },
         { label: 'Days to Expiry / IV', value: `${daysToExpiry} Days • ${ivPct}% IV` }
       ],
       kpis: [
-        { label: `Theoretical ${optionType} Price`, value: `₹${greeks.price}`, sub: `Intrinsic: ₹${greeks.intrinsic} | Time: ₹${greeks.extrinsic}`, color: '#a855f7' },
-        { label: 'Δ Delta / Γ Gamma', value: `${greeks.delta} / ${greeks.gamma}`, sub: 'Directional & convexity sensitivity', color: '#0284c7' },
-        { label: 'Θ Theta Decay', value: `₹${greeks.theta} / day`, sub: 'Daily time-value erosion', color: '#ef4444' },
+        { label: `Theoretical ${optionType} Price`, value: `₹${greeks.price}`, sub: `1 Lot Capital: ₹${greeks.lotValue.toLocaleString('en-IN')}`, color: '#a855f7' },
+        { label: 'Δ Delta / Γ Gamma', value: `${greeks.delta} / ${greeks.gamma}`, sub: `Est. F&O Charges: ₹${greeks.fnOCharges}`, color: '#0284c7' },
+        { label: 'Θ Theta Decay', value: `₹${greeks.theta} / day`, sub: `Per Lot: ₹${greeks.lotTheta}/day`, color: '#ef4444' },
         { label: 'V Vega Sensitivity', value: `₹${greeks.vega} / 1% IV`, sub: 'Volatility impact per 1% IV', color: '#10b981' }
       ],
       bars: [
@@ -3660,9 +4374,9 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
         `₹${r.theta}`,
         `₹${r.vega}`
       ]),
-      notes: 'Computed via continuous-time Black-Scholes-Merton formula assuming a 7.0% risk-free rate (MIBOR/91-Day T-Bill proxy).'
+      notes: 'Computed via continuous-time Black-Scholes-Merton formula assuming a 7.0% risk-free rate (MIBOR/91-Day T-Bill proxy) plus F&O brokerage & STT.'
     });
-  }, [spotPrice, strikePrice, daysToExpiry, ivPct, optionType, greeks, onRegisterReport]);
+  }, [spotPrice, strikePrice, daysToExpiry, ivPct, optionType, lotSize, greeks, onRegisterReport]);
 
   const handleExport = () => {
     const headers = ['Strike Price (₹)', 'Call Premium (₹)', 'Put Premium (₹)', `${optionType} Delta`, `${optionType} Theta/Day`, 'Vega'];
@@ -3677,14 +4391,18 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
           <button onClick={() => setOptionType('CE')} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: optionType === 'CE' ? '#10b981' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Call (CE)</button>
           <button onClick={() => setOptionType('PE')} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: optionType === 'PE' ? '#ef4444' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Put (PE)</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
           <div>
             <label style={{ fontSize: '11px', color: '#94a3b8' }}>Spot Price (₹)</label>
-            <input type="number" value={spotPrice} onChange={e => setSpotPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+            <input type="number" value={spotPrice} onChange={e => setSpotPrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: '11px', color: '#94a3b8' }}>Strike Price (₹)</label>
-            <input type="number" value={strikePrice} onChange={e => setStrikePrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px' }} />
+            <input type="number" value={strikePrice} onChange={e => setStrikePrice(Number(e.target.value))} style={{ width: '100%', padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', marginTop: '4px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '11px', color: '#c084fc' }}>Lot Size (Qty)</label>
+            <input type="number" value={lotSize} onChange={e => setLotSize(Math.max(1, Number(e.target.value)))} style={{ width: '100%', padding: '6px', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', color: '#e9d5ff', fontWeight: '700', marginTop: '4px', boxSizing: 'border-box' }} />
           </div>
         </div>
         <div>
@@ -3700,8 +4418,17 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
       <div style={{ background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         {viewMode === 'CHART' ? (
           <div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase' }}>Theoretical Option Premium ({optionType})</div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: '#a855f7', margin: '4px 0 16px' }}>₹{greeks.price}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase' }}>Theoretical Option Premium ({optionType})</div>
+                <div style={{ fontSize: '38px', fontWeight: '900', color: '#a855f7', margin: '4px 0 12px' }}>₹{greeks.price}</div>
+              </div>
+              <div style={{ background: 'rgba(168, 85, 247, 0.12)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '10px', padding: '8px 12px', textAlign: 'right' }}>
+                <div style={{ fontSize: '10.5px', color: '#e9d5ff', fontWeight: '700', textTransform: 'uppercase' }}>1 Lot Value ({lotSize} Qty)</div>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#c084fc' }}>₹{greeks.lotValue.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>Est. F&O Charges: ₹{greeks.fnOCharges}</div>
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>Δ Delta</div>
@@ -3713,7 +4440,7 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
               </div>
               <div style={{ background: 'rgba(239,68,68,0.08)', padding: '10px', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#f87171' }}>Θ Theta Decay</div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: '#fca5a5' }}>₹{greeks.theta}/day</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#fca5a5' }}>₹{greeks.theta}/d (₹{greeks.lotTheta}/lot)</div>
               </div>
               <div style={{ background: 'rgba(168,85,247,0.08)', padding: '10px', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#c084fc' }}>V Vega</div>
@@ -3778,3 +4505,4 @@ function OptionGreeksEngine({ viewMode, onDownloadCSV, onRegisterReport, onOpenP
     </div>
   );
 }
+
