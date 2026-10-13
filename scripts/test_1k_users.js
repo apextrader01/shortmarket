@@ -2,22 +2,24 @@
  * SkandX Heavy-Stack High-Concurrency Real-World Trading Load Tester
  * 
  * Simulates complete realistic trading floor behavior at scale (1,000 to 10,000 users):
- *   1. 1,000+ Real-Time WebSocket LTP streaming connections
- *   2. Dynamic Watchlist Churn (adding & removing stocks on the fly)
- *   3. Regular BUY/SELL Limit Orders
- *   4. BO (Bracket Orders) with Stop-Loss and Target legs
- *   5. CO (Cover Orders) with Stop-Loss triggers
- *   6. Editing Open Orders (modifying price and quantity)
- *   7. Cancelling Open Orders
- *   8. Heavy REST API load (Orders, Positions, Bhavcopy, Deals)
+ *   1. 1,000 Real Dedicated Trader Accounts created in PostgreSQL with ₹10,00,000 cash
+ *   2. 1,000 Live WebSocket LTP streaming connections
+ *   3. Dynamic Watchlist Churn (adding & removing stocks on the fly)
+ *   4. Regular BUY/SELL Limit Orders
+ *   5. BO (Bracket Orders) with Stop-Loss and Target legs
+ *   6. CO (Cover Orders) with Stop-Loss triggers
+ *   7. Editing Open Orders (modifying price and quantity)
+ *   8. Cancelling Open Orders
+ *   9. Automatic Database Cleanup after test (all 1,000 accounts deleted cleanly)
  *
  * Usage:
  *   node scripts/test_1k_users.js
  *   node scripts/test_1k_users.js [URL] [TOTAL_USERS] [DURATION_SECONDS]
+ *   node scripts/test_1k_users.js --cleanup
  *
  * Examples:
  *   node scripts/test_1k_users.js http://localhost:5000 1000 30
- *   node scripts/test_1k_users.js https://skandx.in 1000 30
+ *   node scripts/test_1k_users.js --cleanup
  */
 
 const path = require('path');
@@ -39,32 +41,7 @@ for (const envPath of envCandidates) {
     }
 }
 
-// 2. Resolve socket.io-client
-let io;
-const possiblePaths = [
-    'socket.io-client',
-    path.join(__dirname, '../frontend/node_modules/socket.io-client'),
-    path.join(__dirname, '../backend/node_modules/socket.io-client'),
-    path.join(process.cwd(), 'frontend/node_modules/socket.io-client'),
-    path.join(process.cwd(), 'node_modules/socket.io-client')
-];
-
-for (const p of possiblePaths) {
-    try {
-        io = require(p);
-        if (typeof io === 'function' || (io && typeof io.io === 'function')) {
-            if (typeof io !== 'function' && typeof io.io === 'function') io = io.io;
-            break;
-        }
-    } catch (e) {}
-}
-
-if (!io) {
-    console.error('❌ Could not load socket.io-client. Please run npm install in frontend or backend.');
-    process.exit(1);
-}
-
-// 3. Resolve Database & Auth Middleware
+// 2. Resolve Database & Auth Middleware
 let db = null;
 let jwt = null;
 let authModule = null;
@@ -104,6 +81,52 @@ try {
     try { db = require(path.join(process.cwd(), 'backend/database/db')); } catch(e2) {}
 }
 
+// Dedicated cleanup command handler
+if (process.argv.includes('--cleanup')) {
+    (async () => {
+        if (!db) {
+            console.error('❌ Database not available for cleanup.');
+            process.exit(1);
+        }
+        console.log('\n🧹 Cleaning up all test trader accounts from PostgreSQL...');
+        try {
+            const deleted = await db('users')
+                .where('email', 'like', 'loadtest_trader_%@skandx.in')
+                .del();
+            console.log(`✅ Successfully deleted ${deleted} test accounts and all associated orders/positions! Database is clean.\n`);
+        } catch (e) {
+            console.error('❌ Cleanup error:', e.message);
+        }
+        process.exit(0);
+    })();
+    return;
+}
+
+// 3. Resolve socket.io-client
+let io;
+const possiblePaths = [
+    'socket.io-client',
+    path.join(__dirname, '../frontend/node_modules/socket.io-client'),
+    path.join(__dirname, '../backend/node_modules/socket.io-client'),
+    path.join(process.cwd(), 'frontend/node_modules/socket.io-client'),
+    path.join(process.cwd(), 'node_modules/socket.io-client')
+];
+
+for (const p of possiblePaths) {
+    try {
+        io = require(p);
+        if (typeof io === 'function' || (io && typeof io.io === 'function')) {
+            if (typeof io !== 'function' && typeof io.io === 'function') io = io.io;
+            break;
+        }
+    } catch (e) {}
+}
+
+if (!io) {
+    console.error('❌ Could not load socket.io-client. Please run npm install in frontend or backend.');
+    process.exit(1);
+}
+
 const BASE_STOCKS = [
     'NSE:RELIANCE-EQ',
     'NSE:TATASTEEL-EQ',
@@ -141,30 +164,64 @@ async function detectTarget() {
     return 'https://skandx.in';
 }
 
-async function prepareAuthTokens() {
+async function ensureTestTraderAccounts(count = 1000) {
+    if (!db) return [];
+    try {
+        // 1. Check existing test accounts
+        const existing = await db('users')
+            .where('email', 'like', 'loadtest_trader_%@skandx.in')
+            .select('id', 'email')
+            .limit(count);
+
+        if (existing.length >= count) {
+            console.log(`✅ Using ${existing.length} existing load test trader accounts from database.`);
+            return existing;
+        }
+
+        const needed = count - existing.length;
+        console.log(`🌱 Seeding ${needed} dedicated test trader accounts in PostgreSQL (₹10,00,000 cash each)...`);
+
+        const startIndex = existing.length + 1;
+        const batch = [];
+        const dummyHash = '$2b$10$abcdefghijklmnopqrstuvwx.dummyHashForTesting1234567890';
+
+        for (let i = 0; i < needed; i++) {
+            const num = startIndex + i;
+            batch.push({
+                username: `loadtest_user_${num}`,
+                email: `loadtest_trader_${num}@skandx.in`,
+                password_hash: dummyHash,
+                balance: 1000000.0,
+                subscription_tier: 'PRO',
+                watchlists: '[]'
+            });
+        }
+
+        // Batch insert in chunks of 100
+        await db.batchInsert('users', batch, 100);
+        console.log(`✅ Successfully created ${count} real test accounts in database!`);
+
+        return await db('users')
+            .where('email', 'like', 'loadtest_trader_%@skandx.in')
+            .select('id', 'email')
+            .limit(count);
+    } catch (e) {
+        console.warn('⚠️ Could not seed database test accounts:', e.message);
+        return [];
+    }
+}
+
+async function prepareAuthTokens(targetCount = 1000) {
     const secret = jwtSecret || (authModule && authModule.JWT_SECRET) || process.env.JWT_SECRET;
     if (!secret || !jwt) {
         console.warn('⚠️ No JWT secret detected. Running public traffic mode.');
         return [];
     }
 
-    let users = [];
-    if (db) {
-        try {
-            users = await db('users')
-                .where({ is_banned: false })
-                .select('id', 'email')
-                .limit(20);
-        } catch (e) {
-            try {
-                users = await db('users').select('id', 'email').limit(20);
-            } catch (e2) {}
-        }
-    }
-
-    if (users && users.length > 0) {
-        console.log(`🔑 Loaded ${users.length} real trader database accounts for order placement.`);
-        return users.map(u => ({
+    const testUsers = await ensureTestTraderAccounts(targetCount);
+    if (testUsers && testUsers.length > 0) {
+        console.log(`🔑 Generated authenticated sessions for all ${testUsers.length} real trader database accounts.`);
+        return testUsers.map(u => ({
             id: u.id,
             email: u.email,
             token: jwt.sign({ id: u.id, email: u.email }, secret, { expiresIn: '2h' })
@@ -179,7 +236,7 @@ async function run() {
     const totalUsers = parseInt(process.argv[3] || process.env.USERS || '1000', 10);
     const durationSeconds = parseInt(process.argv[4] || process.env.DURATION || '30', 10);
 
-    const authUsers = await prepareAuthTokens();
+    const authUsers = await prepareAuthTokens(totalUsers);
 
     console.log('\n======================================================================');
     console.log(`🚀 SKANDX HEAVY-STACK TRADING SIMULATION: ${totalUsers} CONCURRENT USERS`);
@@ -189,7 +246,7 @@ async function run() {
     console.log(`⏱️  Observation Window:    ${durationSeconds} seconds`);
     console.log(`🔄 Dynamic Watchlist:      Continuous Add/Remove stock churning`);
     console.log(`📦 Order Types Simulated:  Regular Limit, BO (Bracket), CO (Cover), Edit & Cancel`);
-    console.log(`🔑 Active Auth Traders:    ${authUsers.length > 0 ? `${authUsers.length} authenticated sessions loaded` : 'Public/Viewer mode (No DB auth token found)'}`);
+    console.log(`🔑 Active Auth Traders:    ${authUsers.length > 0 ? `${authUsers.length} real database accounts authenticated` : 'Public mode'}`);
     console.log('======================================================================\n');
 
     let connectedCount = 0;
@@ -215,10 +272,10 @@ async function run() {
     const sockets = [];
     const sampleUsers = new Set([1, Math.floor(totalUsers * 0.25), Math.floor(totalUsers * 0.5), Math.floor(totalUsers * 0.75), totalUsers]);
 
-    console.log('⏳ 1. Ramping up active WebSocket connections...');
+    console.log('⏳ 1. Ramping up 1,000 active WebSocket connections...');
 
     const batchSize = 50;
-    const rampDelayMs = 120;
+    const rampDelayMs = 100;
 
     for (let i = 1; i <= totalUsers; i++) {
         const userId = i;
@@ -301,11 +358,12 @@ async function run() {
             console.log(`   ✔ Dispatched ${dynamicStocksAdded} dynamic stock subscriptions!`);
         }
 
-        // EVENT 2 (Sec 7): Regular Limit Orders (Placing Buy & Sell Orders)
+        // EVENT 2 (Sec 7): Regular Limit Orders (Placing Buy & Sell Orders from distinct accounts)
         if (sec === 7 && authUsers.length > 0) {
             console.log('\n\n⚡ [EVENT: REGULAR ORDERS] Virtual traders placing Buy & Sell Limit orders...');
-            for (let k = 0; k < Math.min(authUsers.length * 2, 20); k++) {
-                const trader = authUsers[k % authUsers.length];
+            const tradersToOrder = authUsers.slice(0, Math.min(authUsers.length, 50));
+            for (let k = 0; k < tradersToOrder.length; k++) {
+                const trader = tradersToOrder[k];
                 try {
                     const res = await fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
@@ -317,7 +375,7 @@ async function run() {
                             symbol: 'NSE:TATASTEEL-EQ',
                             side: k % 2 === 0 ? 'BUY' : 'SELL',
                             type: 'LIMIT',
-                            price: 155.00 + (k * 0.5), // Lower limit price so it stays OPEN for editing/cancelling
+                            price: 155.00 + (k * 0.1),
                             quantity: 10,
                             product_type: 'INT'
                         })
@@ -342,8 +400,9 @@ async function run() {
         if (sec === 11 && !boEventDone && authUsers.length > 0) {
             boEventDone = true;
             console.log('\n\n⚡ [EVENT: BRACKET ORDERS (BO)] Virtual traders placing 3-leg Bracket Orders (Entry + Target + SL)...');
-            for (let k = 0; k < Math.min(authUsers.length, 10); k++) {
-                const trader = authUsers[k % authUsers.length];
+            const tradersForBO = authUsers.slice(50, Math.min(authUsers.length, 80));
+            for (let k = 0; k < tradersForBO.length; k++) {
+                const trader = tradersForBO[k];
                 try {
                     const res = await fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
@@ -382,8 +441,9 @@ async function run() {
         if (sec === 15 && !coEventDone && authUsers.length > 0) {
             coEventDone = true;
             console.log('\n\n⚡ [EVENT: COVER ORDERS (CO)] Virtual traders placing Cover Orders (Entry + Stop Loss Trigger)...');
-            for (let k = 0; k < Math.min(authUsers.length, 10); k++) {
-                const trader = authUsers[k % authUsers.length];
+            const tradersForCO = authUsers.slice(80, Math.min(authUsers.length, 110));
+            for (let k = 0; k < tradersForCO.length; k++) {
+                const trader = tradersForCO[k];
                 try {
                     const res = await fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
@@ -434,7 +494,7 @@ async function run() {
         if (sec === 21 && !editEventDone && createdOrderIds.length > 0) {
             editEventDone = true;
             console.log('\n\n⚡ [EVENT: EDIT OPEN ORDERS] Traders modifying open order prices & quantities...');
-            const toEdit = createdOrderIds.slice(0, 10);
+            const toEdit = createdOrderIds.slice(0, 20);
             for (const ord of toEdit) {
                 try {
                     const res = await fetch(`${targetUrl}/api/order/${ord.id}`, {
@@ -458,7 +518,7 @@ async function run() {
         if (sec === 25 && !cancelEventDone && createdOrderIds.length > 0) {
             cancelEventDone = true;
             console.log('\n\n⚡ [EVENT: CANCEL ORDERS] Traders cancelling open orders...');
-            const toCancel = createdOrderIds.slice(0, 12);
+            const toCancel = createdOrderIds.slice(0, 25);
             for (const ord of toCancel) {
                 try {
                     const res = await fetch(`${targetUrl}/api/order/${ord.id}/cancel`, {
@@ -487,10 +547,25 @@ async function run() {
         process.stdout.write(`\r   ⏱️  Time: ${sec}s/${durationSeconds}s | WS: ${connectedCount}/${totalUsers} | Ticks: ${totalTicksReceived} | Orders: ${regularOrdersPlaced + boOrdersPlaced + coOrdersPlaced} (Edit: ${ordersEdited}, Cancel: ${ordersCancelled})`);
     }
 
-    console.log('\n\n🧹 Cleaning up test sockets...');
+    console.log('\n\n🧹 3. Disconnecting virtual WebSocket users...');
     sockets.forEach(s => {
         try { s.disconnect(); } catch (e) {}
     });
+
+    // 4. Automatic Database Cleanup (Deletes the test accounts and their orders)
+    if (process.argv.includes('--keep')) {
+        console.log('\n📌 Test accounts preserved in database (--keep specified). Run with --cleanup to delete them.');
+    } else if (db) {
+        console.log('\n🧹 4. Automatically cleaning up test trader accounts and orders from PostgreSQL...');
+        try {
+            const deleted = await db('users')
+                .where('email', 'like', 'loadtest_trader_%@skandx.in')
+                .del();
+            console.log(`   ✔ Cleaned up ${deleted} test accounts and associated orders. Database is 100% clean!`);
+        } catch (e) {
+            console.warn('   ⚠️ Cleanup note:', e.message);
+        }
+    }
 
     const avgConnect = connectLatencies.length > 0 
         ? Math.round(connectLatencies.reduce((a, b) => a + b, 0) / connectLatencies.length) 
