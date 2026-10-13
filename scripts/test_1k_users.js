@@ -80,6 +80,32 @@ try {
     try { db = require(path.join(process.cwd(), 'backend/database/db')); } catch(e2) {}
 }
 
+async function flushRedisTelemetry() {
+    try {
+        const redisModulePath = path.join(__dirname, '../backend/services/redisClient');
+        if (fs.existsSync(redisModulePath + '.js')) {
+            const { generalClient } = require(redisModulePath);
+            if (generalClient) {
+                let ready = generalClient.isReady;
+                for (let r = 0; r < 4 && !ready; r++) {
+                    await new Promise(res => setTimeout(res, 250));
+                    ready = generalClient.isReady;
+                }
+                if (ready) {
+                    const keysToDelete = [];
+                    for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:*', COUNT: 200 })) {
+                        const keys = Array.isArray(chunk) ? chunk : [chunk];
+                        keysToDelete.push(...keys);
+                    }
+                    if (keysToDelete.length > 0) {
+                        await generalClient.del(keysToDelete);
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+}
+
 // Dedicated cleanup command handler
 if (process.argv.includes('--cleanup')) {
     (async () => {
@@ -99,6 +125,8 @@ if (process.argv.includes('--cleanup')) {
                 .where('email', 'like', 'loadtest_trader_%@skandx.in')
                 .del();
             console.log(`✅ Successfully deleted ${deleted} test accounts and all associated subscription/order records! Database is clean.\n`);
+
+            await flushRedisTelemetry();
         } catch (e) {
             console.error('❌ Cleanup error:', e.message);
         }
@@ -327,6 +355,8 @@ async function run() {
                     const nextVal = Math.max(1, parseInt(maxUser?.max_id || 1, 10));
                     await db.raw(`SELECT setval(pg_get_serial_sequence('users', 'id'), ?)`, [nextVal]);
                 } catch (seqErr) {}
+
+                await flushRedisTelemetry();
             } catch (e) {}
         }
         process.exit(0);
@@ -636,6 +666,8 @@ async function run() {
                 const nextVal = Math.max(1, parseInt(maxUser?.max_id || 1, 10));
                 await db.raw(`SELECT setval(pg_get_serial_sequence('users', 'id'), ?)`, [nextVal]);
             } catch (seqErr) {}
+
+            await flushRedisTelemetry();
         } catch (e) {
             console.warn('   ⚠️ Cleanup note:', e.message);
         }
