@@ -1,6 +1,6 @@
 // frontend/src/components/PrimaryMarketsView.jsx
-// 🏛️ Hub 03: Primary Markets, Full NSE & BSE Bhavcopy Screener (5,772+ Stocks),
-// Rolling 30-Day Bulk/Block/Insider Deals (1,060+ Deals up to Today) & Live 14-Column IPO Subscription & GMP Hub
+// 🏛️ Hub 03: Primary Markets, Full NSE & BSE Bhavcopy Screener (5,797+ Stocks, 20 Filters + Per-Column Filters),
+// Rolling 30-Day Bulk/Block/Insider Deals (1,140+ Deals, Per-Column Filters) & Live 14-Column IPO Subscription & GMP Hub
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -13,31 +13,48 @@ import {
 import { API } from '../store';
 import logoImg from '../assets/logo.png';
 
+// Helper: Compute completed trading session date in IST on client (before 5:35 PM IST -> previous trading day)
+function getClientCompletedTradingDate() {
+  const now = new Date();
+  const istMs = now.getTime() + (5.5 * 60 * 60 * 1000);
+  const d = new Date(istMs);
+  if (d.getUTCHours() < 17 || (d.getUTCHours() === 17 && d.getUTCMinutes() < 35)) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return {
+    iso: `${yyyy}-${mm}-${dd}`,
+    display: `${dd}-${months[d.getUTCMonth()]}-${yyyy}`
+  };
+}
+
+const DEFAULT_TRADING_DATE = getClientCompletedTradingDate();
+
 const SEED_BHAVCOPY_DATA = [
-  { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'BOTH', bseCode: '500180', ltp: 1682.40, change: 0.90, volume: 15420000, delivQty: 12490200, delivPct: 81.0, surgeMult: 3.1, is52wHigh: false, is52wLow: false, sector: 'Banking & Financials' },
-  { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'BOTH', bseCode: '532174', ltp: 1248.80, change: 1.80, volume: 11200000, delivQty: 8736000, delivPct: 78.0, surgeMult: 2.6, is52wHigh: true, is52wLow: false, sector: 'Banking & Financials' },
-  { symbol: 'SBIN', name: 'State Bank of India', exchange: 'BOTH', bseCode: '500112', ltp: 812.50, change: 0.85, volume: 18450000, delivQty: 12915000, delivPct: 70.0, surgeMult: 1.7, is52wHigh: false, is52wLow: false, sector: 'Banking & Financials' },
-  { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'BOTH', bseCode: '500325', ltp: 2985.40, change: 1.45, volume: 8250000, delivQty: 6435000, delivPct: 78.0, surgeMult: 2.4, is52wHigh: true, is52wLow: false, sector: 'Energy & Power' },
-  { symbol: 'TCS', name: 'Tata Consultancy Services', exchange: 'BOTH', bseCode: '532540', ltp: 4210.20, change: -0.35, volume: 2950000, delivQty: 2242000, delivPct: 76.0, surgeMult: 1.8, is52wHigh: false, is52wLow: false, sector: 'Information Tech' },
-  { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'BOTH', bseCode: '500209', ltp: 1912.10, change: 0.40, volume: 6420000, delivQty: 4622400, delivPct: 72.0, surgeMult: 1.5, is52wHigh: false, is52wLow: false, sector: 'Information Tech' },
-  { symbol: 'BSE', name: 'BSE Limited', exchange: 'BSE', bseCode: '542650', ltp: 4180.00, change: 4.80, volume: 3850000, delivQty: 3080000, delivPct: 80.0, surgeMult: 4.8, is52wHigh: true, is52wLow: false, sector: 'Capital Markets & Exchanges' },
-  { symbol: 'CDSL', name: 'Central Depository Services', exchange: 'BOTH', bseCode: '543210', ltp: 1540.00, change: 3.20, volume: 5400000, delivQty: 4212000, delivPct: 78.0, surgeMult: 3.5, is52wHigh: true, is52wLow: false, sector: 'Capital Markets & Exchanges' },
-  { symbol: 'MCX', name: 'Multi Commodity Exchange', exchange: 'BOTH', bseCode: '534091', ltp: 5850.00, change: 2.90, volume: 1850000, delivQty: 1424500, delivPct: 77.0, surgeMult: 3.2, is52wHigh: true, is52wLow: false, sector: 'Capital Markets & Exchanges' },
-  { symbol: 'HAL', name: 'Hindustan Aeronautics Ltd', exchange: 'BOTH', bseCode: '541154', ltp: 4480.00, change: 3.20, volume: 4800000, delivQty: 3696000, delivPct: 77.0, surgeMult: 3.6, is52wHigh: true, is52wLow: false, sector: 'Defense & PSUs' },
-  { symbol: 'BEL', name: 'Bharat Electronics Ltd', exchange: 'BOTH', bseCode: '500049', ltp: 295.40, change: 2.80, volume: 28400000, delivQty: 22152000, delivPct: 78.0, surgeMult: 3.8, is52wHigh: true, is52wLow: false, sector: 'Defense & PSUs' },
-  { symbol: 'TRENT', name: 'Trent Ltd', exchange: 'BOTH', bseCode: '500251', ltp: 7680.00, change: 3.80, volume: 2150000, delivQty: 1763000, delivPct: 82.0, surgeMult: 4.5, is52wHigh: true, is52wLow: false, sector: 'FMCG & Consumer' }
+  { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'BOTH', bseCode: '500180', isFnO: true, ltp: 1682.40, vwap: 1676.20, high: 1692.00, low: 1665.00, change: 0.90, volume: 15420000, delivQty: 12490200, delivPct: 81.0, turnoverCr: 259.42, surgeMult: 3.1, is52wHigh: false, is52wLow: false, aboveVwap: true, sector: 'Banking & Financials' },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'BOTH', bseCode: '532174', isFnO: true, ltp: 1248.80, vwap: 1241.10, high: 1255.00, low: 1230.00, change: 1.80, volume: 11200000, delivQty: 8736000, delivPct: 78.0, turnoverCr: 139.86, surgeMult: 2.6, is52wHigh: true, is52wLow: false, aboveVwap: true, sector: 'Banking & Financials' },
+  { symbol: 'SBIN', name: 'State Bank of India', exchange: 'BOTH', bseCode: '500112', isFnO: true, ltp: 812.50, vwap: 809.40, high: 818.00, low: 804.00, change: 0.85, volume: 18450000, delivQty: 12915000, delivPct: 70.0, turnoverCr: 149.90, surgeMult: 1.7, is52wHigh: false, is52wLow: false, aboveVwap: true, sector: 'Banking & Financials' },
+  { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'BOTH', bseCode: '500325', isFnO: true, ltp: 2985.40, vwap: 2971.00, high: 2998.00, low: 2952.00, change: 1.45, volume: 8250000, delivQty: 6435000, delivPct: 78.0, turnoverCr: 246.29, surgeMult: 2.4, is52wHigh: true, is52wLow: false, aboveVwap: true, sector: 'Energy & Power' },
+  { symbol: 'TCS', name: 'Tata Consultancy Services', exchange: 'BOTH', bseCode: '532540', isFnO: true, ltp: 4210.20, vwap: 4218.50, high: 4235.00, low: 4195.00, change: -0.35, volume: 2950000, delivQty: 2242000, delivPct: 76.0, turnoverCr: 124.20, surgeMult: 1.8, is52wHigh: false, is52wLow: false, aboveVwap: false, sector: 'Information Tech' },
+  { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'BOTH', bseCode: '500209', isFnO: true, ltp: 1912.10, vwap: 1906.80, high: 1922.00, low: 1898.00, change: 0.40, volume: 6420000, delivQty: 4622400, delivPct: 72.0, turnoverCr: 122.75, surgeMult: 1.5, is52wHigh: false, is52wLow: false, aboveVwap: true, sector: 'Information Tech' },
+  { symbol: 'BSE', name: 'BSE Limited', exchange: 'BSE', bseCode: '542650', isFnO: true, ltp: 4180.00, vwap: 4115.00, high: 4210.00, low: 4040.00, change: 4.80, volume: 3850000, delivQty: 3080000, delivPct: 80.0, turnoverCr: 160.93, surgeMult: 4.8, is52wHigh: true, is52wLow: false, aboveVwap: true, sector: 'Capital Markets & Exchanges' }
 ];
 
 const SEED_DEALS_DATA = [
-  { id: 1, date: new Date().toISOString().slice(0, 10), symbol: 'ZOMATO', company: 'Zomato Ltd', exchange: 'NSE', client: 'Morgan Stanley Asia Singapore', type: 'BUY', qty: 12500000, price: 272.50, valueCr: 340.62, dealType: 'BULK_DEAL' },
-  { id: 2, date: new Date().toISOString().slice(0, 10), symbol: 'INFY', company: 'Infosys Ltd', exchange: 'NSE', client: 'LIC of India', type: 'BUY', qty: 2100000, price: 1905.00, valueCr: 400.05, dealType: 'BULK_DEAL' },
-  { id: 3, date: new Date().toISOString().slice(0, 10), symbol: 'BSE', company: 'BSE Limited', exchange: 'BSE', client: 'Goldman Sachs India Equity', type: 'BUY', qty: 950000, price: 4150.00, valueCr: 394.25, dealType: 'BULK_DEAL' },
-  { id: 4, date: new Date().toISOString().slice(0, 10), symbol: 'HDFCBANK', company: 'HDFC Bank Ltd', exchange: 'NSE', client: 'Government of Singapore (GIC)', type: 'BUY', qty: 4500000, price: 1678.00, valueCr: 755.10, dealType: 'BLOCK_DEAL' },
-  { id: 5, date: new Date().toISOString().slice(0, 10), symbol: 'RELIANCE', company: 'Reliance Industries', exchange: 'NSE', client: 'Promoter Group: Reliance Industries', type: 'BUY', qty: 2500000, price: 2980.00, valueCr: 745.00, dealType: 'INSIDER_PROMOTER' }
+  { id: 1, date: DEFAULT_TRADING_DATE.iso, symbol: 'ZOMATO', company: 'Zomato Ltd', exchange: 'NSE', client: 'Morgan Stanley Asia Singapore', clientCategory: 'FII', type: 'BUY', qty: 12500000, price: 272.50, valueCr: 340.62, dealType: 'BULK_DEAL', isMultiDeal: true },
+  { id: 2, date: DEFAULT_TRADING_DATE.iso, symbol: 'INFY', company: 'Infosys Ltd', exchange: 'NSE', client: 'LIC of India', clientCategory: 'DII', type: 'BUY', qty: 2100000, price: 1905.00, valueCr: 400.05, dealType: 'BULK_DEAL', isMultiDeal: true },
+  { id: 3, date: DEFAULT_TRADING_DATE.iso, symbol: 'BSE', company: 'BSE Limited', exchange: 'BSE', client: 'Goldman Sachs India Equity', clientCategory: 'FII', type: 'BUY', qty: 950000, price: 4150.00, valueCr: 394.25, dealType: 'BULK_DEAL', isMultiDeal: false },
+  { id: 4, date: DEFAULT_TRADING_DATE.iso, symbol: 'HDFCBANK', company: 'HDFC Bank Ltd', exchange: 'NSE', client: 'Government of Singapore (GIC)', clientCategory: 'FII', type: 'BUY', qty: 4500000, price: 1678.00, valueCr: 755.10, dealType: 'BLOCK_DEAL', isMultiDeal: true },
+  { id: 5, date: DEFAULT_TRADING_DATE.iso, symbol: 'BANKBARODA', company: 'Bank of Baroda', exchange: 'NSE', client: 'SBI Mutual Fund - Contra & Bluechip', clientCategory: 'DII', type: 'BUY', qty: 6500000, price: 242.80, valueCr: 157.82, dealType: 'BLOCK_DEAL', isMultiDeal: true }
 ];
 
 const SEED_IPO_DATA = [
-  // --- Exact Screenshot 4 Issues + Active Mainboard & SME Catalog ---
   {
     id: 101,
     name: 'Longfian Scitech (India) Ltd.',
@@ -103,270 +120,6 @@ const SEED_IPO_DATA = [
     asOn: '12-Oct-2026 17:55',
     registrar: 'Bigshare Services',
     registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 104,
-    name: 'Bai-Kakaji Polymers Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'OPEN',
-    priceBand: '₹177 - ₹186',
-    minPrice: 177,
-    maxPrice: 186,
-    lotSize: 800,
-    issueSizeCr: 105.17,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 18,
-    gmpPct: 9.68,
-    subscription: { qib: 7.56, snii: 9.33, bnii: 9.04, nii: 9.13, retail: 4.10, employee: null, shareholder: null, others: null, total: 5.71 },
-    applications: 9521,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 105,
-    name: 'Nanta Tech Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'OPEN',
-    priceBand: '₹209 - ₹220',
-    minPrice: 209,
-    maxPrice: 220,
-    lotSize: 600,
-    issueSizeCr: 31.81,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 25,
-    gmpPct: 11.36,
-    subscription: { qib: 12.98, snii: 5.95, bnii: 8.65, nii: 7.75, retail: 3.13, employee: null, shareholder: null, others: null, total: 6.43 },
-    applications: 14820,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 106,
-    name: 'Admach Systems Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'OPEN',
-    priceBand: '₹227 - ₹239',
-    minPrice: 227,
-    maxPrice: 239,
-    lotSize: 600,
-    issueSizeCr: 42.60,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 16,
-    gmpPct: 6.69,
-    subscription: { qib: 1.07, snii: 7.21, bnii: 4.30, nii: 5.36, retail: 4.00, employee: null, shareholder: null, others: null, total: 4.07 },
-    applications: 11240,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Skyline Financial',
-    registrarUrl: 'https://www.skylinerta.com/ipo.php'
-  },
-  {
-    id: 107,
-    name: 'Dhara Rail Projects Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'OPEN',
-    priceBand: '₹120 - ₹126',
-    minPrice: 120,
-    maxPrice: 126,
-    lotSize: 1000,
-    issueSizeCr: 50.20,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 62,
-    gmpPct: 49.21,
-    subscription: { qib: 70.63, snii: 184.42, bnii: 206.95, nii: 199.41, retail: 92.93, employee: null, shareholder: null, others: null, total: 111.90 },
-    applications: 109457,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 108,
-    name: 'Sundrex Oil Company Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'CLOSED',
-    priceBand: '₹81 - ₹86',
-    minPrice: 81,
-    maxPrice: 86,
-    lotSize: 1600,
-    issueSizeCr: 32.09,
-    openDate: '2026-10-06',
-    closeDate: '2026-10-10',
-    listingDate: '2026-10-14',
-    gmp: 4,
-    gmpPct: 4.65,
-    subscription: { qib: 1.54, snii: 2.09, bnii: 5.56, nii: 4.39, retail: 0.59, employee: null, shareholder: null, others: null, total: 1.51 },
-    applications: 1325,
-    asOn: '10-Oct-2026 17:55',
-    registrar: 'Cameo Corporate',
-    registrarUrl: 'https://ipo.cameoindia.com/'
-  },
-  {
-    id: 109,
-    name: 'Shyam Dhani Industries Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'CLOSED',
-    priceBand: '₹65 - ₹70',
-    minPrice: 65,
-    maxPrice: 70,
-    lotSize: 2000,
-    issueSizeCr: 38.49,
-    openDate: '2026-10-06',
-    closeDate: '2026-10-10',
-    listingDate: '2026-10-14',
-    gmp: 95,
-    gmpPct: 135.71,
-    subscription: { qib: 256.24, snii: 1479.85, bnii: 1668.93, nii: 1612.65, retail: 1137.92, employee: null, shareholder: null, others: null, total: 988.29 },
-    applications: 622665,
-    asOn: '10-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 110,
-    name: 'Dachepalli Publishers Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'CLOSED',
-    priceBand: '₹100 - ₹102',
-    minPrice: 100,
-    maxPrice: 102,
-    lotSize: 1200,
-    issueSizeCr: 40.39,
-    openDate: '2026-10-06',
-    closeDate: '2026-10-10',
-    listingDate: '2026-10-14',
-    gmp: 8,
-    gmpPct: 7.84,
-    subscription: { qib: 1.49, snii: 2.34, bnii: 2.91, nii: 2.72, retail: 1.90, employee: null, shareholder: null, others: null, total: 1.97 },
-    applications: 1737,
-    asOn: '10-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 111,
-    name: 'EPW India Ltd.',
-    badge: 'LT',
-    category: 'SME',
-    status: 'CLOSED',
-    priceBand: '₹95 - ₹97',
-    minPrice: 95,
-    maxPrice: 97,
-    lotSize: 1200,
-    issueSizeCr: 31.81,
-    openDate: '2026-10-06',
-    closeDate: '2026-10-10',
-    listingDate: '2026-10-14',
-    gmp: 6,
-    gmpPct: 6.19,
-    subscription: { qib: 1.11, snii: 1.15, bnii: 2.27, nii: 1.90, retail: 1.24, employee: null, shareholder: null, others: null, total: 1.34 },
-    applications: 983,
-    asOn: '10-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 112,
-    name: 'Gujarat Kidney And Super Speciality Ltd.',
-    badge: 'LT',
-    category: 'MAINBOARD',
-    status: 'CLOSED',
-    priceBand: '₹108 - ₹114',
-    minPrice: 108,
-    maxPrice: 114,
-    lotSize: 128,
-    issueSizeCr: 250.80,
-    openDate: '2026-10-06',
-    closeDate: '2026-10-10',
-    listingDate: '2026-10-14',
-    gmp: 18,
-    gmpPct: 15.79,
-    subscription: { qib: 1.06, snii: 9.21, bnii: 4.49, nii: 5.73, retail: 19.04, employee: null, shareholder: null, others: null, total: 5.21 },
-    applications: 189465,
-    asOn: '10-Oct-2026 17:55',
-    registrar: 'MUFG Intime (Link Intime)',
-    registrarUrl: 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'
-  },
-  {
-    id: 1,
-    name: 'Hyundai Motor India Ltd.',
-    badge: 'MAINBOARD',
-    category: 'MAINBOARD',
-    status: 'OPEN',
-    priceBand: '₹1,865 - ₹1,960',
-    minPrice: 1865,
-    maxPrice: 1960,
-    lotSize: 7,
-    issueSizeCr: 27870.16,
-    openDate: '2026-10-12',
-    closeDate: '2026-10-15',
-    listingDate: '2026-10-20',
-    gmp: 125,
-    gmpPct: 6.38,
-    subscription: { qib: 6.97, snii: 0.62, bnii: 0.59, nii: 0.60, retail: 0.50, employee: 1.74, shareholder: null, others: null, total: 2.37 },
-    applications: 1428910,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'KFintech',
-    registrarUrl: 'https://ipostatus.kfintech.com/'
-  },
-  {
-    id: 2,
-    name: 'Waaree Energies Ltd.',
-    badge: 'LT',
-    category: 'MAINBOARD',
-    status: 'OPEN',
-    priceBand: '₹1,427 - ₹1,503',
-    minPrice: 1427,
-    maxPrice: 1503,
-    lotSize: 9,
-    issueSizeCr: 4321.44,
-    openDate: '2026-10-12',
-    closeDate: '2026-10-15',
-    listingDate: '2026-10-19',
-    gmp: 1480,
-    gmpPct: 98.47,
-    subscription: { qib: 208.63, snii: 51.79, bnii: 68.20, nii: 62.49, retail: 10.79, employee: 5.17, shareholder: null, others: null, total: 76.34 },
-    applications: 9734520,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'MUFG Intime (Link Intime)',
-    registrarUrl: 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'
-  },
-  {
-    id: 3,
-    name: 'Deepak Builders & Engineers India Ltd.',
-    badge: 'LT',
-    category: 'MAINBOARD',
-    status: 'OPEN',
-    priceBand: '₹192 - ₹203',
-    minPrice: 192,
-    maxPrice: 203,
-    lotSize: 73,
-    issueSizeCr: 260.04,
-    openDate: '2026-10-12',
-    closeDate: '2026-10-15',
-    listingDate: '2026-10-19',
-    gmp: 61,
-    gmpPct: 30.05,
-    subscription: { qib: 13.91, snii: 78.45, bnii: 84.90, nii: 82.47, retail: 39.79, employee: null, shareholder: null, others: null, total: 41.54 },
-    applications: 1648290,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'KFintech',
-    registrarUrl: 'https://ipostatus.kfintech.com/'
   }
 ];
 
@@ -379,7 +132,7 @@ const resolvePrimaryMarketTab = (tab) => {
 };
 
 function formatDateBadge(isoStr) {
-  if (!isoStr) return 'Today';
+  if (!isoStr) return 'Latest';
   const parts = String(isoStr).split('-');
   if (parts.length !== 3) return isoStr;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -399,31 +152,35 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [activeTab, setActiveTab] = useState(() => resolvePrimaryMarketTab(initialTab));
   const [bhavcopyData, setBhavcopyData] = useState(SEED_BHAVCOPY_DATA);
   const [bhavStats, setBhavStats] = useState({
-    totalStocks: 5772,
-    nseCount: 3427,
+    totalStocks: 5797,
+    nseCount: 3452,
     bseCount: 5018,
-    breakouts52w: 139,
-    reversals52w: 92,
-    highDelivery75: 1494,
-    volumeSurges2x: 4277,
-    asOfDate: '13-Oct-2026'
+    fnoCount: 196,
+    breakouts52w: 214,
+    reversals52w: 302,
+    highDelivery75: 1353,
+    volumeSurges2x: 4873,
+    asOfDate: DEFAULT_TRADING_DATE.display
   });
-  const [bhavTotalFiltered, setBhavTotalFiltered] = useState(5772);
+  const [bhavTotalFiltered, setBhavTotalFiltered] = useState(5797);
   const [bhavPage, setBhavPage] = useState(1);
   const [bhavHasMore, setBhavHasMore] = useState(true);
 
   const [dealsData, setDealsData] = useState(SEED_DEALS_DATA);
   const [dealsStats, setDealsStats] = useState({
-    totalDeals: 1063,
-    bulkCount: 708,
-    blockCount: 221,
-    insiderCount: 134,
-    totalFlowCr: 211151,
-    buyFlowCr: 124571,
-    sellFlowCr: 86579,
-    latestDate: new Date().toISOString().slice(0, 10)
+    totalDeals: 1141,
+    bulkCount: 793,
+    blockCount: 218,
+    insiderCount: 130,
+    fiiCount: 416,
+    diiCount: 380,
+    hftCount: 215,
+    totalFlowCr: 161763,
+    buyFlowCr: 92689,
+    sellFlowCr: 69074,
+    latestDate: DEFAULT_TRADING_DATE.iso
   });
-  const [dealsTotalFiltered, setDealsTotalFiltered] = useState(1063);
+  const [dealsTotalFiltered, setDealsTotalFiltered] = useState(1141);
   const [dealsPage, setDealsPage] = useState(1);
   const [dealsHasMore, setDealsHasMore] = useState(true);
 
@@ -432,11 +189,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [loadingMoreBhav, setLoadingMoreBhav] = useState(false);
   const [loadingMoreDeals, setLoadingMoreDeals] = useState(false);
 
-  // --- Bhavcopy Filters ---
+  // --- Tab 1: Bhavcopy Filters (20 Checkboxes + Per-Column Filters + Sort) ---
   const [exchangeFilter, setExchangeFilter] = useState('ALL');
-  const [minDelivery, setMinDelivery] = useState(40);
+  const [minDelivery, setMinDelivery] = useState(25);
   const [bhavSearch, setBhavSearch] = useState('');
   const [sectorFilter, setSectorFilter] = useState('ALL');
+
+  // Original 9 Checkboxes
   const [onlySurge, setOnlySurge] = useState(false);
   const [onlyMegaSurge, setOnlyMegaSurge] = useState(false);
   const [onlyBreakout, setOnlyBreakout] = useState(false);
@@ -447,16 +206,56 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [onlyTopGainers, setOnlyTopGainers] = useState(false);
   const [onlyTopLosers, setOnlyTopLosers] = useState(false);
 
-  // --- Deals Filters ---
+  // 11 New Institutional Checkboxes
+  const [onlyFno, setOnlyFno] = useState(false);
+  const [onlyUltraDelivery, setOnlyUltraDelivery] = useState(false);
+  const [onlyCloseNearHigh, setOnlyCloseNearHigh] = useState(false);
+  const [onlyCloseNearLow, setOnlyCloseNearLow] = useState(false);
+  const [onlyAboveVwap, setOnlyAboveVwap] = useState(false);
+  const [onlyWideRange, setOnlyWideRange] = useState(false);
+  const [onlyTightCoil, setOnlyTightCoil] = useState(false);
+  const [onlyHighTurnover, setOnlyHighTurnover] = useState(false);
+  const [onlyMidSmallAccum, setOnlyMidSmallAccum] = useState(false);
+  const [onlyCircuitGainers, setOnlyCircuitGainers] = useState(false);
+  const [onlyCircuitLosers, setOnlyCircuitLosers] = useState(false);
+
+  // Tab 1 Per-Column Filters & Sorting
+  const [bhavSortBy, setBhavSortBy] = useState('');
+  const [bhavSortDir, setBhavSortDir] = useState('DESC');
+  const [bhavColFilter, setBhavColFilter] = useState({
+    colStock: '',
+    colExchange: 'ALL',
+    colLtp: '',
+    colChange: '',
+    colVolume: '',
+    colDelivVol: '',
+    colDelivPct: '',
+    colTurnover: '',
+    colSignal: 'ALL'
+  });
+
+  // --- Tab 2: Deals Filters (Client Categories + Per-Column Filters + Sort) ---
   const [dealTypeFilter, setDealTypeFilter] = useState('ALL');
+  const [dealsClientCategory, setDealsClientCategory] = useState('ALL');
   const [dealsExchangeFilter, setDealsExchangeFilter] = useState('ALL');
   const [dealsDateRange, setDealsDateRange] = useState('ALL');
   const [dealsMinSize, setDealsMinSize] = useState(0);
   const [dealsSearch, setDealsSearch] = useState('');
   const [dealsSortBy, setDealsSortBy] = useState('DATE_DESC');
+  const [dealsSortDir, setDealsSortDir] = useState('DESC');
+  const [dealsColFilter, setDealsColFilter] = useState({
+    colDate: '',
+    colStock: '',
+    colExch: 'ALL',
+    colClient: '',
+    colType: 'ALL',
+    colQty: '',
+    colPrice: '',
+    colValue: ''
+  });
 
-  // --- IPO Filters, View Mode & Per-Column Search (Screenshot 4) ---
-  const [ipoViewMode, setIpoViewMode] = useState('SUBSCRIPTION_TABLE'); // 'SUBSCRIPTION_TABLE' | 'CARDS'
+  // --- Tab 3: IPO Filters, View Mode & Per-Column Search (Screenshot 4) ---
+  const [ipoViewMode, setIpoViewMode] = useState('SUBSCRIPTION_TABLE');
   const [ipoCategory, setIpoCategory] = useState('ALL');
   const [ipoStatusFilter, setIpoStatusFilter] = useState('ALL');
   const [ipoSearch, setIpoSearch] = useState('');
@@ -487,11 +286,12 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const fetchBhavcopyPage = useCallback(async (pageNum = 1, append = false) => {
     if (append) setLoadingMoreBhav(true);
     try {
+      const hasExplicitSearch = Boolean(bhavSearch.trim() || bhavColFilter.colStock.trim());
       const params = new URLSearchParams({
         page: String(pageNum),
         limit: '50',
         exchange: exchangeFilter,
-        minDelivery: String(bhavSearch.trim() ? 0 : minDelivery),
+        minDelivery: String(hasExplicitSearch ? 0 : minDelivery),
         sector: sectorFilter,
         search: bhavSearch.trim(),
         breakoutOnly: String(onlyBreakout),
@@ -502,7 +302,29 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
         smartAccumulationOnly: String(onlySmartAccumulation),
         distributionOnly: String(onlyDistribution),
         topGainersOnly: String(onlyTopGainers),
-        topLosersOnly: String(onlyTopLosers)
+        topLosersOnly: String(onlyTopLosers),
+        fnoOnly: String(onlyFno),
+        ultraDeliveryOnly: String(onlyUltraDelivery),
+        closeNearHighOnly: String(onlyCloseNearHigh),
+        closeNearLowOnly: String(onlyCloseNearLow),
+        aboveVwapOnly: String(onlyAboveVwap),
+        wideRangeOnly: String(onlyWideRange),
+        tightCoilOnly: String(onlyTightCoil),
+        highTurnoverOnly: String(onlyHighTurnover),
+        midSmallAccumOnly: String(onlyMidSmallAccum),
+        circuitGainersOnly: String(onlyCircuitGainers),
+        circuitLosersOnly: String(onlyCircuitLosers),
+        colStock: bhavColFilter.colStock.trim(),
+        colExchange: bhavColFilter.colExchange,
+        colLtp: bhavColFilter.colLtp.trim(),
+        colChange: bhavColFilter.colChange.trim(),
+        colVolume: bhavColFilter.colVolume.trim(),
+        colDelivVol: bhavColFilter.colDelivVol.trim(),
+        colDelivPct: bhavColFilter.colDelivPct.trim(),
+        colTurnover: bhavColFilter.colTurnover.trim(),
+        colSignal: bhavColFilter.colSignal,
+        sortBy: bhavSortBy,
+        sortDir: bhavSortDir
       });
       const res = await fetch(`${API}/api/bhavcopy/delivery?${params.toString()}`).then(r => r.ok ? r.json() : null).catch(() => null);
       if (res?.data && Array.isArray(res.data)) {
@@ -521,7 +343,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     exchangeFilter, minDelivery, bhavSearch, sectorFilter,
     onlyBreakout, only52wLow, onlySurge, onlyMegaSurge,
     onlyHighDelivery, onlySmartAccumulation, onlyDistribution,
-    onlyTopGainers, onlyTopLosers
+    onlyTopGainers, onlyTopLosers, onlyFno, onlyUltraDelivery,
+    onlyCloseNearHigh, onlyCloseNearLow, onlyAboveVwap,
+    onlyWideRange, onlyTightCoil, onlyHighTurnover,
+    onlyMidSmallAccum, onlyCircuitGainers, onlyCircuitLosers,
+    bhavColFilter, bhavSortBy, bhavSortDir
   ]);
 
   // Build query string for Server-Side Paginated Deals (~4 KB response)
@@ -532,11 +358,21 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
         page: String(pageNum),
         limit: '50',
         type: dealTypeFilter,
+        clientCategory: dealsClientCategory,
         exchange: dealsExchangeFilter,
         dateRange: dealsDateRange,
         minSize: String(dealsMinSize),
         search: dealsSearch.trim(),
-        sortBy: dealsSortBy
+        sortBy: dealsSortBy,
+        sortDir: dealsSortDir,
+        colDate: dealsColFilter.colDate.trim(),
+        colStock: dealsColFilter.colStock.trim(),
+        colExch: dealsColFilter.colExch,
+        colClient: dealsColFilter.colClient.trim(),
+        colType: dealsColFilter.colType,
+        colQty: dealsColFilter.colQty.trim(),
+        colPrice: dealsColFilter.colPrice.trim(),
+        colValue: dealsColFilter.colValue.trim()
       });
       const res = await fetch(`${API}/api/market-deals?${params.toString()}`).then(r => r.ok ? r.json() : null).catch(() => null);
       if (res?.deals && Array.isArray(res.deals)) {
@@ -551,7 +387,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     } finally {
       if (append) setLoadingMoreDeals(false);
     }
-  }, [dealTypeFilter, dealsExchangeFilter, dealsDateRange, dealsMinSize, dealsSearch, dealsSortBy]);
+  }, [
+    dealTypeFilter, dealsClientCategory, dealsExchangeFilter,
+    dealsDateRange, dealsMinSize, dealsSearch,
+    dealsSortBy, dealsSortDir, dealsColFilter
+  ]);
 
   const fetchIposList = useCallback(async () => {
     try {
@@ -577,7 +417,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     }
   };
 
-  // Re-fetch Page 1 whenever Bhavcopy filters change
   useEffect(() => {
     const t = setTimeout(() => {
       fetchBhavcopyPage(1, false);
@@ -585,7 +424,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     return () => clearTimeout(t);
   }, [fetchBhavcopyPage]);
 
-  // Re-fetch Page 1 whenever Deals filters change
   useEffect(() => {
     const t = setTimeout(() => {
       fetchDealsPage(1, false);
@@ -596,6 +434,26 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   useEffect(() => {
     fetchIposList();
   }, [fetchIposList]);
+
+  // Sort handler for Tab 1 (Bhavcopy Table)
+  const handleSortBhavCol = (col) => {
+    if (bhavSortBy === col) {
+      setBhavSortDir(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setBhavSortBy(col);
+      setBhavSortDir('DESC');
+    }
+  };
+
+  // Sort handler for Tab 2 (Deals Table)
+  const handleSortDealsCol = (col) => {
+    if (dealsSortBy === col) {
+      setDealsSortDir(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setDealsSortBy(col);
+      setDealsSortDir('DESC');
+    }
+  };
 
   // Filtered & Sorted IPOs (including Screenshot 4 per-column search filters & sort headers)
   const filteredIpos = useMemo(() => {
@@ -615,7 +473,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       );
     }
 
-    // Per-column search filters (matching Screenshot 4's column search boxes)
     if (colSearch.company.trim()) {
       const q = colSearch.company.toLowerCase().trim();
       list = list.filter(i => i.name.toLowerCase().includes(q) || (i.badge && i.badge.toLowerCase().includes(q)));
@@ -647,7 +504,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       list = list.filter(i => (i.asOn || '').toLowerCase().includes(q));
     }
 
-    // Column Sorting
     list.sort((a, b) => {
       const dir = ipoSortDir === 'ASC' ? 1 : -1;
       if (ipoSortCol === 'name') return a.name.localeCompare(b.name) * dir;
@@ -681,7 +537,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   };
 
   const resetAllBhavFilters = () => {
-    setMinDelivery(40);
+    setMinDelivery(25);
     setBhavSearch('');
     setSectorFilter('ALL');
     setExchangeFilter('ALL');
@@ -694,12 +550,43 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     setOnlyDistribution(false);
     setOnlyTopGainers(false);
     setOnlyTopLosers(false);
+    setOnlyFno(false);
+    setOnlyUltraDelivery(false);
+    setOnlyCloseNearHigh(false);
+    setOnlyCloseNearLow(false);
+    setOnlyAboveVwap(false);
+    setOnlyWideRange(false);
+    setOnlyTightCoil(false);
+    setOnlyHighTurnover(false);
+    setOnlyMidSmallAccum(false);
+    setOnlyCircuitGainers(false);
+    setOnlyCircuitLosers(false);
+    setBhavSortBy('');
+    setBhavColFilter({
+      colStock: '',
+      colExchange: 'ALL',
+      colLtp: '',
+      colChange: '',
+      colVolume: '',
+      colDelivVol: '',
+      colDelivPct: '',
+      colTurnover: '',
+      colSignal: 'ALL'
+    });
   };
 
   const activeFilterCount = [
     onlySurge, onlyMegaSurge, onlyBreakout, only52wLow, onlyHighDelivery,
     onlySmartAccumulation, onlyDistribution, onlyTopGainers, onlyTopLosers,
-    sectorFilter !== 'ALL', exchangeFilter !== 'ALL', bhavSearch.trim().length > 0
+    onlyFno, onlyUltraDelivery, onlyCloseNearHigh, onlyCloseNearLow,
+    onlyAboveVwap, onlyWideRange, onlyTightCoil, onlyHighTurnover,
+    onlyMidSmallAccum, onlyCircuitGainers, onlyCircuitLosers,
+    sectorFilter !== 'ALL', exchangeFilter !== 'ALL', bhavSearch.trim().length > 0,
+    bhavColFilter.colStock.trim().length > 0, bhavColFilter.colExchange !== 'ALL',
+    bhavColFilter.colLtp.trim().length > 0, bhavColFilter.colChange.trim().length > 0,
+    bhavColFilter.colVolume.trim().length > 0, bhavColFilter.colDelivVol.trim().length > 0,
+    bhavColFilter.colDelivPct.trim().length > 0, bhavColFilter.colTurnover.trim().length > 0,
+    bhavColFilter.colSignal !== 'ALL'
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -717,16 +604,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   }, []);
 
   const handleExportPrimaryCsv = () => {
-    const headers = ['Symbol', 'Company Name', 'Exchange', 'BSE Code', 'Sector', 'LTP', 'Day Change (%)', 'Volume', 'Delivery Qty', 'Delivery (%)', 'Volume Surge (x)'];
+    const headers = ['Symbol', 'Company Name', 'Exchange', 'BSE Code', 'Sector', 'LTP', 'VWAP', 'Day Change (%)', 'Volume', 'Delivery Qty', 'Delivery (%)', 'Turnover (Cr)', 'Volume Surge (x)'];
     const rows = bhavcopyData.map(r => [
-      r.symbol, `"${(r.name || '').replace(/"/g, '""')}"`, r.exchange, r.bseCode || '', `"${r.sector || ''}"`, r.ltp, r.change, r.volume, r.delivQty, r.delivPct, r.surgeMult
+      r.symbol, `"${(r.name || '').replace(/"/g, '""')}"`, r.exchange, r.bseCode || '', `"${r.sector || ''}"`, r.ltp, r.vwap || r.ltp, r.change, r.volume, r.delivQty, r.delivPct, r.turnoverCr || '', r.surgeMult
     ]);
     const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SkandX_Bhavcopy_Screener_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `SkandX_Bhavcopy_Screener_${bhavStats.asOfDate || DEFAULT_TRADING_DATE.iso}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -763,14 +650,14 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <img src={logoImg} alt="SkandX Logo" style={{ width: isMobile ? '26px' : '30px', height: isMobile ? '26px' : '30px', borderRadius: '8px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)', border: '1px solid rgba(125, 211, 252, 0.35)', objectFit: 'cover', flexShrink: 0 }} />
               <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '20px', fontWeight: '800', letterSpacing: '-0.3px', lineHeight: 1.25 }}>Primary Markets &amp; Institutional Intelligence</h1>
-              <span style={{ fontSize: '9.5px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>Official Exchange Feed ({bhavStats.asOfDate})</span>
+              <span style={{ fontSize: '9.5px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>Official EOD Feed ({bhavStats.asOfDate})</span>
               <span style={{ fontSize: '9.5px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>
                 {bhavStats.totalStocks.toLocaleString('en-IN')} Stocks • {dealsStats.totalDeals.toLocaleString('en-IN')} Deals • {ipoData.length} IPOs
               </span>
             </div>
             {!isMobile && (
               <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: 'var(--text-secondary, #94a3b8)' }}>
-                Full NSE &amp; BSE Bhavcopy delivery screener ({bhavStats.totalStocks.toLocaleString('en-IN')} equities), daily SEBI bulk/block/insider deals up to {latestDealBadge}, and live 14-column IPO subscription &amp; GMP hub.
+                Full NSE &amp; BSE Bhavcopy delivery screener ({bhavStats.totalStocks.toLocaleString('en-IN')} equities, 20 institutional filters), daily SEBI bulk/block/insider deals (as of {latestDealBadge} EOD), and live 14-column IPO subscription &amp; GMP hub.
               </p>
             )}
           </div>
@@ -860,7 +747,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 1: FULL NSE & BSE BHAVCOPY SCREENER (5,772+ STOCKS, SERVER-SIDE PAGINATED) */}
+      {/* TAB 1: FULL NSE & BSE BHAVCOPY SCREENER (20 CHECKBOXES + PER-COLUMN FILTERS)  */}
       {/* ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'BHAVCOPY' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -868,7 +755,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Quick Stats KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Stocks Screened</div>
+              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Stocks Screened ({bhavStats.asOfDate})</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
                 {bhavTotalFiltered.toLocaleString('en-IN')} of {bhavStats.totalStocks.toLocaleString('en-IN')}
               </div>
@@ -906,7 +793,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <SlidersHorizontal size={16} color="#60a5fa" />
                 <h3 style={{ margin: 0, fontSize: isMobile ? '13px' : '14px', fontWeight: '800', color: '#f8fafc' }}>
-                  Institutional Delivery &amp; Price Action Filters ({activeFilterCount} Active)
+                  20 Institutional Delivery, VWAP &amp; Price Action Filters ({activeFilterCount} Active)
                 </h3>
               </div>
               {activeFilterCount > 0 && (
@@ -946,14 +833,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
             {/* Inputs: Search, Sector & Delivery Slider */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-              {/* Search */}
               <div>
                 <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Search Any NSE Symbol / BSE Code</label>
                 <div style={{ position: 'relative' }}>
                   <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
                   <input
                     type="text"
-                    placeholder="Search across all 5,772 stocks (e.g. RELIANCE, 500325, TATA)..."
+                    placeholder="Search across all 5,797 stocks (e.g. RELIANCE, 500325, TATA)..."
                     value={bhavSearch}
                     onChange={e => setBhavSearch(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12.5px' }}
@@ -961,7 +847,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 </div>
               </div>
 
-              {/* Sector Dropdown */}
               <div>
                 <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Sector Filter</label>
                 <select
@@ -981,14 +866,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   <option value="Infra & Telecom">Infra &amp; Telecom</option>
                   <option value="Capital Markets & Exchanges">Capital Markets &amp; Exchanges</option>
                   <option value="Electronics & Tech">Electronics &amp; Tech</option>
-                  <option value="Chemicals & Fertilizers">Chemicals &amp; Fertilizers</option>
-                  <option value="Textiles & Apparel">Textiles &amp; Apparel</option>
-                  <option value="Hospitality & Media">Hospitality &amp; Media</option>
-                  <option value="Diversified & Midcap">Diversified &amp; Midcap</option>
+                  <option value="Chemicals, Industrial & Midcaps">Chemicals, Industrial &amp; Midcaps</option>
                 </select>
               </div>
 
-              {/* Delivery Slider */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Min Delivery %</label>
@@ -996,7 +877,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 </div>
                 <input
                   type="range"
-                  min="25"
+                  min="15"
                   max="85"
                   step="5"
                   value={minDelivery}
@@ -1006,112 +887,235 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
             </div>
 
-            {/* 9 Checkbox Screener Pills */}
+            {/* 20 Institutional Checkbox Screener Pills */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyBreakout ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.04)', border: onlyBreakout ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyBreakout ? '#fef08a' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyBreakout} onChange={e => setOnlyBreakout(e.target.checked)} style={{ accentColor: '#eab308' }} />
-                <span>🔥 52W High Breakouts</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: only52wLow ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.04)', border: only52wLow ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: only52wLow ? '#38bdf8' : '#cbd5e1' }}>
-                <input type="checkbox" checked={only52wLow} onChange={e => setOnly52wLow(e.target.checked)} style={{ accentColor: '#38bdf8' }} />
-                <span>❄️ 52W Low Reversals</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlySurge ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)', border: onlySurge ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlySurge ? '#c084fc' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlySurge} onChange={e => setOnlySurge(e.target.checked)} style={{ accentColor: '#a855f7' }} />
-                <span>⚡ Volume Surge (2x+)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyMegaSurge ? 'rgba(244,63,94,0.2)' : 'rgba(255,255,255,0.04)', border: onlyMegaSurge ? '1px solid #f43f5e' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyMegaSurge ? '#fb7185' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyMegaSurge} onChange={e => setOnlyMegaSurge(e.target.checked)} style={{ accentColor: '#f43f5e' }} />
-                <span>🚀 Mega Surge (3.5x+)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyHighDelivery ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.04)', border: onlyHighDelivery ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyHighDelivery ? '#86efac' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyHighDelivery} onChange={e => setOnlyHighDelivery(e.target.checked)} style={{ accentColor: '#22c55e' }} />
-                <span>💎 High Delivery (≥75%)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlySmartAccumulation ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.04)', border: onlySmartAccumulation ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlySmartAccumulation ? '#6ee7b7' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlySmartAccumulation} onChange={e => setOnlySmartAccumulation(e.target.checked)} style={{ accentColor: '#10b981' }} />
-                <span>📈 Smart Accumulation</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyDistribution ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)', border: onlyDistribution ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyDistribution ? '#fca5a5' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyDistribution} onChange={e => setOnlyDistribution(e.target.checked)} style={{ accentColor: '#ef4444' }} />
-                <span>🚨 Distribution</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyTopGainers ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', border: onlyTopGainers ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyTopGainers ? '#4ade80' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyTopGainers} onChange={e => setOnlyTopGainers(e.target.checked)} style={{ accentColor: '#22c55e' }} />
-                <span>🟢 Top Gainers (&gt;2%)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: onlyTopLosers ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: onlyTopLosers ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', color: onlyTopLosers ? '#f87171' : '#cbd5e1' }}>
-                <input type="checkbox" checked={onlyTopLosers} onChange={e => setOnlyTopLosers(e.target.checked)} style={{ accentColor: '#ef4444' }} />
-                <span>🔴 Top Losers (&lt;-1.5%)</span>
-              </label>
+              {[
+                { state: onlyBreakout, setter: setOnlyBreakout, label: '🔥 52W High Breakouts', color: '#eab308', bg: 'rgba(234,179,8,0.2)', text: '#fef08a' },
+                { state: only52wLow, setter: setOnly52wLow, label: '❄️ 52W Low Reversals', color: '#38bdf8', bg: 'rgba(56,189,248,0.2)', text: '#38bdf8' },
+                { state: onlySurge, setter: setOnlySurge, label: '⚡ Volume Surge (2x+)', color: '#a855f7', bg: 'rgba(168,85,247,0.2)', text: '#c084fc' },
+                { state: onlyMegaSurge, setter: setOnlyMegaSurge, label: '🚀 Mega Surge (3.5x+)', color: '#f43f5e', bg: 'rgba(244,63,94,0.2)', text: '#fb7185' },
+                { state: onlyHighDelivery, setter: setOnlyHighDelivery, label: '💎 High Delivery (≥75%)', color: '#22c55e', bg: 'rgba(34,197,94,0.2)', text: '#86efac' },
+                { state: onlyUltraDelivery, setter: setOnlyUltraDelivery, label: '🎯 Ultra Delivery (≥85%)', color: '#10b981', bg: 'rgba(16,185,129,0.22)', text: '#6ee7b7' },
+                { state: onlySmartAccumulation, setter: setOnlySmartAccumulation, label: '📈 Smart Accumulation', color: '#10b981', bg: 'rgba(16,185,129,0.2)', text: '#6ee7b7' },
+                { state: onlyDistribution, setter: setOnlyDistribution, label: '🚨 Distribution', color: '#ef4444', bg: 'rgba(239,68,68,0.2)', text: '#fca5a5' },
+                { state: onlyTopGainers, setter: setOnlyTopGainers, label: '🟢 Top Gainers (>2%)', color: '#22c55e', bg: 'rgba(34,197,94,0.15)', text: '#4ade80' },
+                { state: onlyTopLosers, setter: setOnlyTopLosers, label: '🔴 Top Losers (<-1.5%)', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#f87171' },
+                { state: onlyFno, setter: setOnlyFno, label: `🏛️ F&O Liquid Only (${bhavStats.fnoCount || 196})`, color: '#3b82f6', bg: 'rgba(59,130,246,0.22)', text: '#93c5fd' },
+                { state: onlyAboveVwap, setter: setOnlyAboveVwap, label: '📊 Price > VWAP', color: '#06b6d4', bg: 'rgba(6,182,212,0.2)', text: '#67e8f9' },
+                { state: onlyCloseNearHigh, setter: setOnlyCloseNearHigh, label: '📈 Close Near Day High', color: '#22c55e', bg: 'rgba(34,197,94,0.18)', text: '#86efac' },
+                { state: onlyCloseNearLow, setter: setOnlyCloseNearLow, label: '📉 Close Near Day Low', color: '#f97316', bg: 'rgba(249,115,22,0.2)', text: '#fdba74' },
+                { state: onlyWideRange, setter: setOnlyWideRange, label: '💥 Wide Range (>4%)', color: '#ec4899', bg: 'rgba(236,72,153,0.2)', text: '#f9a8d4' },
+                { state: onlyTightCoil, setter: setOnlyTightCoil, label: '🔒 NR7 / Tight Coil (<1.2%)', color: '#8b5cf6', bg: 'rgba(139,92,246,0.2)', text: '#c4b5fd' },
+                { state: onlyHighTurnover, setter: setOnlyHighTurnover, label: '💰 High Turnover (≥₹50 Cr)', color: '#eab308', bg: 'rgba(234,179,8,0.18)', text: '#fde047' },
+                { state: onlyMidSmallAccum, setter: setOnlyMidSmallAccum, label: '🪙 Mid/Small Gems (₹50–₹500)', color: '#14b8a6', bg: 'rgba(20,184,166,0.2)', text: '#5eead4' },
+                { state: onlyCircuitGainers, setter: setOnlyCircuitGainers, label: '🚀 Momentum Runners (≥+4.5%)', color: '#16a34a', bg: 'rgba(22,163,74,0.22)', text: '#4ade80' },
+                { state: onlyCircuitLosers, setter: setOnlyCircuitLosers, label: '🩸 Heavy Sell-Off (≤-4%)', color: '#dc2626', bg: 'rgba(220,38,38,0.22)', text: '#fca5a5' }
+              ].map((pill, idx) => (
+                <label
+                  key={idx}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: pill.state ? pill.bg : 'rgba(255,255,255,0.04)',
+                    border: pill.state ? `1px solid ${pill.color}` : '1px solid rgba(255,255,255,0.08)',
+                    padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px',
+                    color: pill.state ? pill.text : '#cbd5e1', fontWeight: pill.state ? '700' : '500'
+                  }}
+                >
+                  <input type="checkbox" checked={pill.state} onChange={e => pill.setter(e.target.checked)} style={{ accentColor: pill.color }} />
+                  <span>{pill.label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Delivery Table */}
+          {/* Delivery Table with Per-Column Sort & Per-Column Filter Inputs */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
+            <table style={{ width: '100%', minWidth: '940px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
               <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.04)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px' }}>
-                  <th style={{ padding: '12px 16px' }}>Stock / Company &amp; Sector</th>
-                  <th style={{ padding: '12px 16px' }}>Exchange</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>LTP (₹)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Day Change</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Traded Vol</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Delivery Vol</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Delivery %</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Signals</th>
+                {/* Row 1: Clickable Sort Headers */}
+                <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
+                  <th onClick={() => handleSortBhavCol('symbol')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Stock / Company &amp; Sector ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('exchange')} style={{ padding: '11px 10px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Exchange ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('ltp')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    LTP / VWAP (₹) ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('change')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Day Change ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('volume')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Traded Vol ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('delivQty')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Delivery Vol ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('delivPct')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Delivery % ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('turnoverCr')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    Turnover (Cr) ⇅
+                  </th>
+                  <th onClick={() => handleSortBhavCol('surgeMult')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer' }}>
+                    Signals ⇅
+                  </th>
+                </tr>
+
+                {/* Row 2: Per-Column Filter Inputs (LTP, Day Change, Traded Vol, Delivery Vol, Delivery %, Turnover, Signals) */}
+                <tr style={{ background: 'rgba(15,23,42,0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <th style={{ padding: '6px 10px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Filter stock / sector..."
+                      value={bhavColFilter.colStock}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colStock: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <select
+                      value={bhavColFilter.colExchange}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colExchange: e.target.value }))}
+                      style={{ width: '100%', padding: '5px 6px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    >
+                      <option value="ALL">All Exch</option>
+                      <option value="NSE">NSE</option>
+                      <option value="BSE">BSE</option>
+                      <option value="BOTH">NSE • BSE</option>
+                    </select>
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. >200 or 50-500"
+                      value={bhavColFilter.colLtp}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colLtp: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. >2 or <-1.5"
+                      value={bhavColFilter.colChange}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colChange: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Min L (e.g. >10)"
+                      value={bhavColFilter.colVolume}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colVolume: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Min L (e.g. >5)"
+                      value={bhavColFilter.colDelivVol}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colDelivVol: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Min % (e.g. 75)"
+                      value={bhavColFilter.colDelivPct}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colDelivPct: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Min Cr (e.g. 25)"
+                      value={bhavColFilter.colTurnover}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colTurnover: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px' }}>
+                    <select
+                      value={bhavColFilter.colSignal}
+                      onChange={e => setBhavColFilter(p => ({ ...p, colSignal: e.target.value }))}
+                      style={{ width: '100%', padding: '5px 6px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    >
+                      <option value="ALL">All Signals</option>
+                      <option value="52W_HIGH">🔥 52W High</option>
+                      <option value="52W_LOW">❄️ 52W Low</option>
+                      <option value="SURGE_2X">⚡ Surge 2x+</option>
+                      <option value="MEGA_3_5X">🚀 Mega 3.5x+</option>
+                      <option value="FNO">🏛️ F&amp;O Stock</option>
+                      <option value="VWAP_BULL">📊 &gt; VWAP</option>
+                    </select>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {bhavcopyData.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      No stocks matched your active filter combination. Click "Reset All Filters" or relax the delivery slider.
+                    <td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                      No stocks matched your active filter combination. Click "Reset All Filters" or clear the column filter boxes.
                     </td>
                   </tr>
                 ) : (
                   bhavcopyData.map((stock, idx) => (
                     <tr key={`${stock.symbol}_${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: '700', color: '#fff' }}>{stock.symbol}</span>
+                          {stock.isFnO && (
+                            <span style={{ fontSize: '9px', background: 'rgba(59,130,246,0.2)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>F&amp;O</span>
+                          )}
                           {stock.bseCode && (
-                            <span style={{ fontSize: '10.5px', color: '#64748b' }}>#{stock.bseCode}</span>
+                            <span style={{ fontSize: '10px', color: '#64748b' }}>#{stock.bseCode}</span>
                           )}
                         </div>
                         <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                           {stock.name && stock.name !== stock.symbol ? `${stock.name} • ` : ''}<span style={{ color: '#64748b' }}>{stock.sector}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '11px 10px', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '10px', background: 'rgba(56,189,248,0.1)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                           {stock.exchange === 'BOTH' ? 'NSE • BSE' : stock.exchange}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', whiteSpace: 'nowrap' }}>₹{stock.ltp?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: stock.change >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
-                        {stock.change >= 0 ? `+${stock.change}%` : `${stock.change}%`}
+                      <td style={{ padding: '11px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: '700', color: '#fff' }}>₹{stock.ltp?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                        {stock.vwap > 0 && (
+                          <div style={{ fontSize: '10px', color: stock.aboveVwap ? '#4ade80' : '#94a3b8' }}>
+                            VWAP: ₹{Number(stock.vwap).toFixed(1)}
+                          </div>
+                        )}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.volume / 100000).toFixed(2)} L</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.delivQty / 100000).toFixed(2)} L</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '700', color: stock.change >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
+                        <div>{stock.change >= 0 ? `+${stock.change}%` : `${stock.change}%`}</div>
+                        {stock.dayRangePct > 0 && (
+                          <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>H-L: {stock.dayRangePct}%</div>
+                        )}
+                      </td>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.volume / 100000).toFixed(2)} L</td>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.delivQty / 100000).toFixed(2)} L</td>
+                      <td style={{ padding: '11px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: stock.delivPct >= 75 ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)', color: stock.delivPct >= 75 ? '#22c55e' : '#60a5fa', border: `1px solid ${stock.delivPct >= 75 ? 'rgba(34,197,94,0.3)' : 'rgba(59,130,246,0.3)'}`, padding: '3px 10px', borderRadius: '12px', fontWeight: '800' }}>
                           {stock.delivPct}%
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap' }}>
+                        ₹{Number(stock.turnoverCr || ((stock.volume * stock.ltp) / 10000000)).toFixed(2)} Cr
+                      </td>
+                      <td style={{ padding: '11px 12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'wrap' }}>
                           {stock.is52wHigh && <span title="52-Week High Breakout" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>🔥 52W High</span>}
                           {stock.is52wLow && <span title="52-Week Low Bounce" style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>❄️ 52W Low</span>}
                           {stock.surgeMult >= 2.0 && <span title="Volume Surge 2x+" style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>⚡ {stock.surgeMult}x Vol</span>}
+                          {stock.aboveVwap && <span title="Price Above VWAP" style={{ background: 'rgba(6,182,212,0.12)', color: '#67e8f9', border: '1px solid rgba(6,182,212,0.3)', padding: '2px 5px', borderRadius: '6px', fontSize: '9.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>&gt;VWAP</span>}
                         </div>
                       </td>
                     </tr>
@@ -1141,7 +1145,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       )}
 
       {/* ───────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 2: BULK, BLOCK & INSIDER DEALS MONITOR (1,060+ DEALS UP TO TODAY)          */}
+      {/* TAB 2: BULK, BLOCK & INSIDER DEALS MONITOR (WITH PER-COLUMN FILTERS & SORT)   */}
       {/* ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'DEALS' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1149,7 +1153,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Deals KPI Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Deals (30D Rolling)</div>
+              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Deals (As of {latestDealBadge} EOD)</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
                 {dealsTotalFiltered.toLocaleString('en-IN')} / {dealsStats.totalDeals.toLocaleString('en-IN')} Deals
               </div>
@@ -1177,7 +1181,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Advanced Filter Control Bar */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-            {/* Top row: Deal Category Pills */}
+            {/* Row 1: Deal Type Pills & Search */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
@@ -1185,8 +1189,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   { id: 'BULK_DEAL', label: `Bulk Deals (${dealsStats.bulkCount.toLocaleString('en-IN')})` },
                   { id: 'BLOCK_DEAL', label: `Block Deals (${dealsStats.blockCount.toLocaleString('en-IN')})` },
                   { id: 'INSIDER_PROMOTER', label: `Insider & Promoters (${dealsStats.insiderCount.toLocaleString('en-IN')})` },
-                  { id: 'BUY', label: 'Buys Only' },
-                  { id: 'SELL', label: 'Sells Only' }
+                  { id: 'BUY', label: '🟢 Buys Only' },
+                  { id: 'SELL', label: '🔴 Sells Only' }
                 ].map(f => (
                   <button
                     key={f.id}
@@ -1204,12 +1208,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              {/* Search Input for Deals */}
               <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '260px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '380px' }}>
                 <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
                 <input
                   type="text"
-                  placeholder="Search 1,060+ deals (e.g. Morgan Stanley, LIC, ZOMATO)..."
+                  placeholder="Search 1,140+ deals (e.g. Morgan Stanley, LIC, ZOMATO)..."
                   value={dealsSearch}
                   onChange={e => setDealsSearch(e.target.value)}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
@@ -1217,10 +1220,36 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
             </div>
 
-            {/* Bottom Row: Exchange, Date Range, Size & Sort Filters */}
+            {/* Row 2: Institution Category Pills (FII, DII/MF, HFT, Promoter, Multi-Deal Cluster) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Institution Desk:</span>
+              {[
+                { id: 'ALL', label: 'All Desks' },
+                { id: 'FII', label: `🌍 FII / Foreign Funds (${dealsStats.fiiCount || 416})` },
+                { id: 'DII', label: `🇮🇳 DII / Mutual Funds & LIC (${dealsStats.diiCount || 380})` },
+                { id: 'HFT', label: `⚡ HFT & Quant Prop (${dealsStats.hftCount || 215})` },
+                { id: 'PROMOTER', label: `👔 Promoters (${dealsStats.insiderCount || 130})` },
+                { id: 'MULTI_DEAL', label: '🔥 Multi-Deal Cluster Stocks' }
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setDealsClientCategory(cat.id)}
+                  style={{
+                    padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                    background: dealsClientCategory === cat.id ? 'rgba(59,130,246,0.22)' : 'rgba(255,255,255,0.04)',
+                    color: dealsClientCategory === cat.id ? '#60a5fa' : '#94a3b8',
+                    border: dealsClientCategory === cat.id ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                  }}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 3: Exchange, Date Range, Size & Sort Filters */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
 
-              {/* Exchange Filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Exchange:</span>
                 {['ALL', 'NSE', 'BSE'].map(ex => (
@@ -1240,12 +1269,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              {/* Date Filter (Dynamically anchored to latest trading date!) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Date:</span>
                 {[
                   { id: 'ALL', label: 'All Dates' },
-                  { id: 'TODAY', label: `Latest (${latestDealBadge})` },
+                  { id: 'TODAY', label: `Latest EOD (${latestDealBadge})` },
                   { id: 'WEEK', label: 'Past 7 Days' },
                   { id: 'MONTH', label: 'Past 30 Days' }
                 ].map(dt => (
@@ -1265,7 +1293,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              {/* Size Filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Deal Size:</span>
                 {[
@@ -1290,7 +1317,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              {/* Sort Order */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Sort:</span>
                 {[
@@ -1315,53 +1341,149 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
           </div>
 
-          {/* Deals Table */}
+          {/* Deals Table with Per-Column Sort & Per-Column Filter Inputs */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
+            <table style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
               <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.04)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px' }}>
-                  <th style={{ padding: '12px 16px' }}>Date</th>
-                  <th style={{ padding: '12px 16px' }}>Stock</th>
-                  <th style={{ padding: '12px 16px' }}>Exch</th>
-                  <th style={{ padding: '12px 16px' }}>Client / Institution / Promoter</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Type</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Shares Traded</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Price (₹)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Value (₹ Cr)</th>
+                {/* Row 1: Sortable Headers */}
+                <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
+                  <th onClick={() => handleSortDealsCol('DATE')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Date ⇅</th>
+                  <th onClick={() => handleSortDealsCol('SYMBOL')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Stock ⇅</th>
+                  <th style={{ padding: '11px 10px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Exch</th>
+                  <th onClick={() => handleSortDealsCol('CLIENT')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Client / Institution / Promoter ⇅</th>
+                  <th style={{ padding: '11px 10px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Type</th>
+                  <th onClick={() => handleSortDealsCol('QTY')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Shares Traded ⇅</th>
+                  <th onClick={() => handleSortDealsCol('PRICE')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Price (₹) ⇅</th>
+                  <th onClick={() => handleSortDealsCol('VALUECR')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer' }}>Value (₹ Cr) ⇅</th>
+                </tr>
+
+                {/* Row 2: Per-Column Filter Inputs (Date, Stock, Exch, Client, Type, Shares Traded, Price, Value Cr) */}
+                <tr style={{ background: 'rgba(15,23,42,0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="YYYY-MM-DD..."
+                      value={dealsColFilter.colDate}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colDate: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Filter stock..."
+                      value={dealsColFilter.colStock}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colStock: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <select
+                      value={dealsColFilter.colExch}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colExch: e.target.value }))}
+                      style={{ width: '100%', padding: '5px 5px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    >
+                      <option value="ALL">All</option>
+                      <option value="NSE">NSE</option>
+                      <option value="BSE">BSE</option>
+                    </select>
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Filter client / FII / MF / Promoter..."
+                      value={dealsColFilter.colClient}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colClient: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <select
+                      value={dealsColFilter.colType}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colType: e.target.value }))}
+                      style={{ width: '100%', padding: '5px 5px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                    >
+                      <option value="ALL">All</option>
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                      <option value="BULK_DEAL">BULK</option>
+                      <option value="BLOCK_DEAL">BLOCK</option>
+                      <option value="INSIDER_PROMOTER">INSIDER</option>
+                    </select>
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="Min shares (e.g. >100000)"
+                      value={dealsColFilter.colQty}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colQty: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. >200 or 50-500"
+                      value={dealsColFilter.colPrice}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colPrice: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
+                  <th style={{ padding: '6px 8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Min Cr (e.g. >25)"
+                      value={dealsColFilter.colValue}
+                      onChange={e => setDealsColFilter(p => ({ ...p, colValue: e.target.value }))}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {dealsData.length === 0 ? (
                   <tr>
                     <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      No institutional deals match this search or filter. Try clearing the search query or date range.
+                      No institutional deals match this search or column filter. Try clearing the column filter boxes.
                     </td>
                   </tr>
                 ) : (
                   dealsData.map((deal, idx) => (
                     <tr key={deal.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '12px 16px', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: '600' }}>{deal.date}</td>
-                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: '700', color: '#fff' }}>{deal.symbol}</div>
+                      <td style={{ padding: '12px 14px', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: '600' }}>{deal.date}</td>
+                      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: '700', color: '#fff' }}>{deal.symbol}</span>
+                          {deal.isMultiDeal && (
+                            <span title="Multiple Institutional Deals in this Stock" style={{ fontSize: '9px', background: 'rgba(234,179,8,0.18)', color: '#facc15', border: '1px solid rgba(234,179,8,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>🔥 CLUSTER</span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '10.5px', color: '#64748b' }}>{deal.company}</div>
                       </td>
-                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.06)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                           {deal.exchange || 'NSE'}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                      <td style={{ padding: '12px 14px', color: '#cbd5e1' }}>
                         <div style={{ fontWeight: '600' }}>{deal.client}</div>
-                        <div style={{ fontSize: '10.5px', color: '#64748b' }}>{deal.dealType?.replace('_', ' ')}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>{deal.dealType?.replace('_', ' ')}</span>
+                          {deal.clientCategory && (
+                            <span style={{ fontSize: '9.5px', background: 'rgba(168,85,247,0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                              {deal.clientCategory}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{ background: deal.type === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: deal.type === 'BUY' ? '#22c55e' : '#ef4444', border: `1px solid ${deal.type === 'BUY' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px' }}>
                           {deal.type}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>{deal.qty?.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>₹{deal.price?.toFixed(2)}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>{deal.qty?.toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>₹{deal.price?.toFixed(2)}</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
                     </tr>
                   ))
                 )}
@@ -1425,7 +1547,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Category Toggle, View Mode Switcher & Search */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              {/* Category Pills */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'ALL', label: `All IPOs (${ipoData.length})` },
@@ -1448,7 +1569,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              {/* View Mode Switcher: Live Subscription Table vs Cards View */}
               <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.35)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <button
                   type="button"
@@ -1475,7 +1595,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
             </div>
 
-            {/* Second Row: Status Filter & Global Search */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
@@ -1513,14 +1632,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
           </div>
 
-          {/* ─────────────────────────────────────────────────────────────────────────── */}
-          {/* VIEW MODE 1: 14-COLUMN LIVE SUBSCRIPTION STATUS TABLE (MATCHING SCREENSHOT 4) */}
-          {/* ─────────────────────────────────────────────────────────────────────────── */}
+          {/* VIEW MODE 1: 14-COLUMN LIVE SUBSCRIPTION STATUS TABLE */}
           {ipoViewMode === 'SUBSCRIPTION_TABLE' && (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', minWidth: '1480px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
                 <thead>
-                  {/* Row 1: Sortable Column Headers */}
                   <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '11px', fontWeight: '800' }}>
                     <th onClick={() => handleSortIpoCol('name')} style={{ padding: '10px 12px', cursor: 'pointer', minWidth: '230px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1590,7 +1706,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     </th>
                   </tr>
 
-                  {/* Row 2: Per-Column Search Inputs (Matching Screenshot 4!) */}
+                  {/* Row 2: Per-Column Search Inputs */}
                   <tr style={{ background: 'rgba(15,23,42,0.85)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     {[
                       { key: 'company', placeholder: 'Search company...' },
@@ -1621,11 +1737,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         />
                       </th>
                     ))}
-                    {/* GMP column spacer */}
                     <th style={{ padding: '5px 6px', borderRight: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
                       Price / Lot
                     </th>
-                    {/* As On search */}
                     <th style={{ padding: '5px 6px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
                       <input
                         type="text"
@@ -1673,7 +1787,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                             background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'rgba(59,130,246,0.03)'
                           }}
                         >
-                          {/* 1. Company Name + LT/SME/MAINBOARD Badge */}
                           <td style={{ padding: '10px 12px', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: '700', color: '#60a5fa' }}>{ipo.name}</span>
@@ -1699,68 +1812,55 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                             </div>
                           </td>
 
-                          {/* 2. Closing Date */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             <div style={{ fontWeight: '600' }}>{ipo.closeDate}</div>
                             <div style={{ fontSize: '10px', color: '#64748b' }}>Open: {ipo.openDate}</div>
                           </td>
 
-                          {/* 3. Issue Amount (Rs.Cr.) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {Number(ipo.issueSizeCr || 0).toFixed(2)}
                           </td>
 
-                          {/* 4. QIB (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.qib)}
                           </td>
 
-                          {/* 5. SNII (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.snii)}
                           </td>
 
-                          {/* 6. BNII (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.bnii)}
                           </td>
 
-                          {/* 7. NII (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.nii)}
                           </td>
 
-                          {/* 8. Retail (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.retail)}
                           </td>
 
-                          {/* 9. Employee (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.employee)}
                           </td>
 
-                          {/* 10. Shareholder (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.shareholder)}
                           </td>
 
-                          {/* 11. Others (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {formatSubVal(sub.others)}
                           </td>
 
-                          {/* 12. Total (X) */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)', color: totalSub >= 50 ? '#facc15' : (totalSub >= 10 ? '#4ade80' : '#60a5fa') }}>
                             {formatSubVal(sub.total)}
                           </td>
 
-                          {/* 13. Applications */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {ipo.applications ? ipo.applications.toLocaleString('en-IN') : '-'}
                           </td>
 
-                          {/* 14. Live GMP & Est. Listing Gain */}
                           <td style={{ padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             <div style={{ fontWeight: '800', color: '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
                             <div style={{ fontSize: '10px', color: '#94a3b8' }}>
@@ -1768,12 +1868,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                             </div>
                           </td>
 
-                          {/* 15. Subscription As On */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94a3b8', fontSize: '11px', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
                             {ipo.asOn || '12-Oct-2026 17:55'}
                           </td>
 
-                          {/* 16. 1-Click Allotment Check */}
                           <td style={{ padding: '10px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <button
                               type="button"
@@ -1792,9 +1890,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
           )}
 
-          {/* ─────────────────────────────────────────────────────────────────────────── */}
-          {/* VIEW MODE 2: GMP, EST. LOT PROFIT & ALLOTMENT CARDS VIEW                     */}
-          {/* ─────────────────────────────────────────────────────────────────────────── */}
+          {/* VIEW MODE 2: GMP, EST. LOT PROFIT & ALLOTMENT CARDS VIEW */}
           {ipoViewMode === 'CARDS' && (
             filteredIpos.length === 0 ? (
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '40px', textAlign: 'center', color: '#64748b' }}>
@@ -1812,7 +1908,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       key={ipo.id}
                       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}
                     >
-                      {/* Header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -1830,7 +1925,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         </span>
                       </div>
 
-                      {/* GMP & Expected Listing Gain Badge */}
                       <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <div style={{ fontSize: '11px', color: '#94a3b8' }}>Live GMP &amp; Est. Lot Profit</div>
@@ -1841,7 +1935,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         <Award size={22} color="#22c55e" />
                       </div>
 
-                      {/* Key Metrics */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
                         <div>
                           <div style={{ color: '#64748b' }}>Price Band &amp; Lot</div>
@@ -1863,7 +1956,6 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         </div>
                       </div>
 
-                      {/* Detailed Category Subscription Breakdown (QIB / sNII / bNII / Retail) */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', textAlign: 'center', fontSize: '11px' }}>
                         <div>
                           <div style={{ color: '#64748b', fontSize: '10px' }}>QIB</div>
@@ -1883,13 +1975,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         </div>
                       </div>
 
-                      {/* Dates & Retail Allotment Probability */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
                         <span>📅 {ipo.openDate} → {ipo.closeDate}</span>
                         <span style={{ color: '#facc15', fontWeight: '700' }}>🎯 Retail Odds: {retailOdds}%</span>
                       </div>
 
-                      {/* 1-Click Allotment Status Button */}
                       <button
                         type="button"
                         onClick={() => setSelectedIpoForCheck(ipo)}
@@ -1906,9 +1996,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
         </div>
       )}
 
-      {/* ───────────────────────────────────────────────────────────────────────────── */}
-      {/* 1-CLICK ALLOTMENT STATUS MODAL (OFFICIAL KFINTECH, LINK INTIME & BIGSHARE)    */}
-      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* 1-CLICK ALLOTMENT STATUS MODAL */}
       {selectedIpoForCheck && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
