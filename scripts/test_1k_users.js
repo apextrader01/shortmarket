@@ -4,7 +4,7 @@
  * Simulates complete realistic trading floor behavior at scale (1,000 to 10,000 users):
  *   1. 1,000+ Real-Time WebSocket LTP streaming connections
  *   2. Dynamic Watchlist Churn (adding & removing stocks on the fly)
- *   3. Regular BUY/SELL Limit & Market Orders
+ *   3. Regular BUY/SELL Limit Orders
  *   4. BO (Bracket Orders) with Stop-Loss and Target legs
  *   5. CO (Cover Orders) with Stop-Loss triggers
  *   6. Editing Open Orders (modifying price and quantity)
@@ -24,7 +24,22 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-// Resolve socket.io-client
+// 1. Load backend environment variables (.env) before anything else
+const envCandidates = [
+    path.join(__dirname, '../backend/.env'),
+    path.join(process.cwd(), 'backend/.env'),
+    path.join(__dirname, '../../backend/.env')
+];
+for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+        try {
+            require('dotenv').config({ path: envPath });
+            break;
+        } catch (e) {}
+    }
+}
+
+// 2. Resolve socket.io-client
 let io;
 const possiblePaths = [
     'socket.io-client',
@@ -49,9 +64,10 @@ if (!io) {
     process.exit(1);
 }
 
-// Resolve Database & JWT Secret if running locally/on-server
+// 3. Resolve Database & Auth Middleware
 let db = null;
 let jwt = null;
+let authModule = null;
 let jwtSecret = process.env.JWT_SECRET || null;
 
 try {
@@ -61,9 +77,13 @@ try {
 }
 
 try {
-    db = require(path.join(__dirname, '../backend/database/db'));
+    authModule = require('../backend/middleware/auth');
 } catch (e) {
-    try { db = require(path.join(process.cwd(), 'backend/database/db')); } catch(e2) {}
+    try { authModule = require(path.join(process.cwd(), 'backend/middleware/auth')); } catch(e2) {}
+}
+
+if (!jwtSecret && authModule && authModule.JWT_SECRET) {
+    jwtSecret = authModule.JWT_SECRET;
 }
 
 if (!jwtSecret) {
@@ -76,6 +96,12 @@ if (!jwtSecret) {
             try { jwtSecret = fs.readFileSync(sf, 'utf8').trim(); break; } catch(e) {}
         }
     }
+}
+
+try {
+    db = require(path.join(__dirname, '../backend/database/db'));
+} catch (e) {
+    try { db = require(path.join(process.cwd(), 'backend/database/db')); } catch(e2) {}
 }
 
 const BASE_STOCKS = [
@@ -116,18 +142,36 @@ async function detectTarget() {
 }
 
 async function prepareAuthTokens() {
-    if (!db || !jwt || !jwtSecret) return [];
-    try {
-        const users = await db('users').select('id', 'email', 'virtual_balance').limit(20);
-        if (!users || users.length === 0) return [];
+    const secret = jwtSecret || (authModule && authModule.JWT_SECRET) || process.env.JWT_SECRET;
+    if (!secret || !jwt) {
+        console.warn('⚠️ No JWT secret detected. Running public traffic mode.');
+        return [];
+    }
+
+    let users = [];
+    if (db) {
+        try {
+            users = await db('users')
+                .where({ is_banned: false })
+                .select('id', 'email')
+                .limit(20);
+        } catch (e) {
+            try {
+                users = await db('users').select('id', 'email').limit(20);
+            } catch (e2) {}
+        }
+    }
+
+    if (users && users.length > 0) {
+        console.log(`🔑 Loaded ${users.length} real trader database accounts for order placement.`);
         return users.map(u => ({
             id: u.id,
             email: u.email,
-            token: jwt.sign({ id: u.id, email: u.email }, jwtSecret, { expiresIn: '2h' })
+            token: jwt.sign({ id: u.id, email: u.email }, secret, { expiresIn: '2h' })
         }));
-    } catch (e) {
-        return [];
     }
+
+    return [];
 }
 
 async function run() {
