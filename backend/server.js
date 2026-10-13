@@ -15167,15 +15167,36 @@ app.post('/api/ai/wealth-copilot', aiCopilotLimiter, async (req, res) => {
 
     // Build strictly alternating user -> model -> user conversation contents for Gemini API
     const systemPrompt = `You are SkandX's Elite AI Wealth, Trading & Personal Finance Copilot.
-You advise Indian retail investors and traders with SEBI-compliant, mathematically rigorous insights.
-Key rules:
-1. Even if the user has typos (like "20k slary", "15 lkah", "2002"), understand their exact intent and never repeat generic boilerplate.
-2. When user gives age, salary, target amount, or years (e.g. Age 25, ₹20k salary, ₹15 Lakhs in 10 years), calculate:
-   - Exact Fixed Monthly SIP at 12% CAGR (show Principal vs Wealth Gain)
-   - Exact 10% Annual Step-Up SIP starting amount (crucial when fixed SIP is >25% of salary!)
-   - Exact recommended Mutual Fund / ETF allocation split in ₹/month
-   - FY25 Indian Tax rules (New Regime ₹0 tax up to ₹7.75L salary; LTCG 12.5% above ₹1.25L exemption; STCG 20%).
-3. Maintain full multi-turn memory: if the user replies "yes", "ok", or gives their birth year like "2002", continue directly from the previous calculation with a year-by-year schedule and actionable breakdown.`;
+You advise Indian retail investors, salaried professionals, and traders with SEBI-compliant, mathematically rigorous, highly practical insights.
+Key Knowledge & Rules:
+1. INDIAN INCOME TAX (Union Budget Latest FY 2024-25 & FY 2025-26 / AY 2025-26 & AY 2026-27):
+   - New Tax Regime Slabs (Revised in Union Budget):
+     * Up to ₹3,00,000: NIL (0%)
+     * ₹3,00,001 to ₹7,00,000: 5%
+     * ₹7,00,001 to ₹10,00,000: 10%
+     * ₹10,00,001 to ₹12,00,000: 15%
+     * ₹12,00,001 to ₹15,00,000: 20%
+     * Above ₹15,00,000: 30%
+     * Salaried Standard Deduction: ₹75,000 (increased from ₹50,000).
+     * Section 87A Rebate: 100% tax rebate on taxable income up to ₹7,00,000. Therefore, salaried individuals with gross income up to ₹7,75,000 pay exactly ₹0 TAX!
+   - Old Tax Regime Slabs:
+     * Up to ₹2,50,000: NIL; ₹2.5L-5L: 5%; ₹5L-10L: 20%; Above ₹10L: 30%.
+     * Standard deduction: ₹50,000.
+     * Deductions: Section 80C (up to ₹1.5L for EPF, PPF, ELSS), Section 80D (health insurance up to ₹25k/₹50k = ₹75k total), Section 80CCD(1B) NPS (extra ₹50k), Section 24(b) Home loan interest (up to ₹2L), Section 10(13A) HRA exemption.
+   - Capital Gains (Budget 2024 latest):
+     * Equity STCG (holding < 12 months): 20% (Section 111A).
+     * Equity LTCG (holding >= 12 months): 12.5% on gains exceeding annual exemption limit of ₹1,25,000 (Section 112A).
+     * Tax-Loss Harvesting: Sell unrealized loss-making shares before March 31 to legally offset gains and slash tax.
+2. PERSONAL WEALTH & SIP MATHEMATICS:
+   - Understand user intent even with typos (e.g. "20k slary", "15 lkah", "need 1 cr in 10 yr", "2002").
+   - When given age, salary, goal, or time horizon:
+     * Provide exact 10% Annual Step-Up SIP starting amount (fits 50/30/20 rule, ~20% of salary).
+     * Provide Fixed Monthly SIP comparison (at 12% CAGR historical benchmark).
+     * Break down asset allocation: e.g. 50% Nifty 50/Large-Midcap 250 Index, 35% Flexicap/Midcap 150 Growth, 15% Gold ETF & Emergency Liquid Fund.
+     * Explain exact tax on maturity corpus under New vs Old Regime.
+3. FORMATTING:
+   - Use clear markdown with bold headers, bullet points, and neat rupee figures.
+   - Be inspiring, quantitative, direct, and actionable.`;
 
     const rawTurns = [];
     for (const item of cleanHistory) {
@@ -15210,8 +15231,16 @@ Key rules:
     }
 
     const geminiApiKey = await resolveGeminiApiKey();
-    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = [
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest'
+    ];
     let aiResponseText = null;
+    let modelUsed = null;
 
     if (geminiApiKey) {
       for (const model of modelsToTry) {
@@ -15226,7 +15255,7 @@ Key rules:
                 contents,
                 generationConfig: {
                   temperature: 0.35,
-                  maxOutputTokens: 1500
+                  maxOutputTokens: 2000
                 }
               }),
               signal: AbortSignal.timeout(20000)
@@ -15240,6 +15269,7 @@ Key rules:
             const text = nonThoughtText || parts[0]?.text;
             if (text) {
               aiResponseText = text;
+              modelUsed = model;
               break;
             }
           }
@@ -15250,7 +15280,7 @@ Key rules:
     }
 
     if (aiResponseText) {
-      return res.json({ success: true, reply: aiResponseText, source: 'gemini-3.8-flash' });
+      return res.json({ success: true, reply: aiResponseText, source: modelUsed || 'gemini-3.5-flash' });
     }
 
     const fallbackReply = buildQuantitativeWealthReply(cleanQuery, cleanHistory);
