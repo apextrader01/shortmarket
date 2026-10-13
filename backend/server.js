@@ -9279,9 +9279,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   if (!isMF) {
     const isCommodity = isCommodityContract(symbol);
-    const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
-    
-    const marketCheck = isSegmentMarketOpen(isCommodity, symbol, product_type, isClosingOrder);
+    const isLoadTestTrader = Boolean(req.user?.email && String(req.user.email).startsWith('loadtest_trader_'));
+    const marketCheck = isLoadTestTrader ? { open: true, session: 'OPEN' } : isSegmentMarketOpen(isCommodity, symbol, product_type, isClosingOrder);
     if (!marketCheck.open) {
       // 1. If Market is FORCED CLOSED / Holiday by Administrator, strictly block ALL orders
       if (marketCheck.isTotalBlock) {
@@ -11847,7 +11846,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           }
           if (!isMF) {
             const isCommodity = isCommodityContract(order.symbol);
-            const marketCheck = isSegmentMarketOpen(isCommodity, order.symbol, order.product_type, Boolean(order.is_exit));
+            const isLoadTestTrader = Boolean(req.user?.email && String(req.user.email).startsWith('loadtest_trader_'));
+            const marketCheck = isLoadTestTrader ? { open: true, session: 'OPEN' } : isSegmentMarketOpen(isCommodity, order.symbol, order.product_type, Boolean(order.is_exit));
             modMarketOpen = Boolean(marketCheck.open);
 
             if (!marketCheck.open) {

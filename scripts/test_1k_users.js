@@ -355,24 +355,13 @@ async function run() {
         socket.on('disconnect', () => disconnectedCount++);
         socket.on('connect_error', () => disconnectedCount++);
 
-        // Fire authenticated user bootstrap so 100% of accounts appear in Admin Telemetry
-        if (authUsers[i - 1]) {
-            const trader = authUsers[i - 1];
-            fetch(`${targetUrl}/api/user/bootstrap`, {
-                headers: { 'Authorization': `Bearer ${trader.token}` }
-            }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
-            fetch(`${targetUrl}/api/orders?limit=10`, {
-                headers: { 'Authorization': `Bearer ${trader.token}` }
-            }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
-        }
-
         if (i % batchSize === 0) {
-            process.stdout.write(`\r   Connecting & authenticating: ${i}/${totalUsers} users queued... (Active WS: ${connectedCount})`);
+            process.stdout.write(`\r   Connecting: ${i}/${totalUsers} users queued... (Active WS: ${connectedCount})`);
             await new Promise(r => setTimeout(r, rampDelayMs));
         }
     }
 
-    console.log(`\n\n✅ All ${totalUsers} user connections established and authenticated!`);
+    console.log(`\n\n✅ All ${totalUsers} user connections established!`);
     console.log(`🔥 2. Starting continuous 10-minute heavy trading cycle (Watch 'pm2 monit' on your server!)\n`);
 
     // Continuous 1-Second Heavy Trading Loop
@@ -412,64 +401,79 @@ async function run() {
                 const orderRoll = (sec + o) % 3;
 
                 if (orderRoll === 0) {
-                    // Regular Limit Order (price below LTP to remain PENDING for edit/cancel)
+                    // Regular Limit Sell Order (priced above market so it remains PENDING for edit/cancel)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:TATASTEEL-EQ',
-                            side: 'BUY',
+                            side: 'SELL',
                             type: 'LIMIT',
-                            price: 130.00 + (Math.random() * 5),
+                            price: 450.00 + (Math.random() * 5),
                             quantity: 10,
                             product_type: 'INT'
                         })
-                    }).then(r => r.json()).then(data => {
-                        regularOrdersPlaced++;
-                        apiCallsCompleted++;
-                        const id = data?.orderId || data?.id || data?.order?.id;
-                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'REGULAR' });
+                    }).then(async r => {
+                        const data = await r.json().catch(() => ({}));
+                        if (r.ok && data?.orderId) {
+                            regularOrdersPlaced++;
+                            apiCallsCompleted++;
+                            openOrdersPool.push({ id: data.orderId, token: trader.token, type: 'REGULAR' });
+                        } else {
+                            orderErrors++;
+                            apiCallsFailed++;
+                        }
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 } else if (orderRoll === 1) {
-                    // Bracket Order (BO) with Target & SL
+                    // Bracket Order (BO) Sell with Target & SL (stays PENDING)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:RELIANCE-EQ',
-                            side: 'BUY',
+                            side: 'SELL',
                             type: 'LIMIT',
-                            price: 950.00 + (Math.random() * 10),
+                            price: 3500.00 + (Math.random() * 10),
                             quantity: 5,
                             product_type: 'BO',
-                            sl_price: 900.00,
-                            tgt_price: 1100.00
+                            sl_price: 3600.00,
+                            tgt_price: 3300.00
                         })
-                    }).then(r => r.json()).then(data => {
-                        boOrdersPlaced++;
-                        apiCallsCompleted++;
-                        const id = data?.orderId || data?.id || data?.order?.id;
-                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'BO' });
+                    }).then(async r => {
+                        const data = await r.json().catch(() => ({}));
+                        if (r.ok && data?.orderId) {
+                            boOrdersPlaced++;
+                            apiCallsCompleted++;
+                            openOrdersPool.push({ id: data.orderId, token: trader.token, type: 'BO' });
+                        } else {
+                            orderErrors++;
+                            apiCallsFailed++;
+                        }
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 } else {
-                    // Cover Order (CO) with SL trigger
+                    // Cover Order (CO) Sell with SL trigger (stays PENDING)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:HDFCBANK-EQ',
-                            side: 'BUY',
+                            side: 'SELL',
                             type: 'LIMIT',
-                            price: 550.00 + (Math.random() * 5),
+                            price: 2500.00 + (Math.random() * 5),
                             quantity: 5,
                             product_type: 'CO',
-                            trigger_price: 530.00
+                            trigger_price: 2600.00
                         })
-                    }).then(r => r.json()).then(data => {
-                        coOrdersPlaced++;
-                        apiCallsCompleted++;
-                        const id = data?.orderId || data?.id || data?.order?.id;
-                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'CO' });
+                    }).then(async r => {
+                        const data = await r.json().catch(() => ({}));
+                        if (r.ok && data?.orderId) {
+                            coOrdersPlaced++;
+                            apiCallsCompleted++;
+                            openOrdersPool.push({ id: data.orderId, token: trader.token, type: 'CO' });
+                        } else {
+                            orderErrors++;
+                            apiCallsFailed++;
+                        }
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 }
             }
@@ -483,7 +487,7 @@ async function run() {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToEdit.token}` },
                     body: JSON.stringify({
-                        price: 132.50 + (Math.random() * 2),
+                        price: 460.00 + (Math.random() * 2),
                         quantity: 15
                     })
                 }).then(r => { if (r.ok) { ordersEdited++; apiCallsCompleted++; } else { apiCallsFailed++; } }).catch(() => apiCallsFailed++);
@@ -501,10 +505,13 @@ async function run() {
             }
         }
 
-        // ── E. EVERY SECOND: 5 Random Traders Refresh Order Book & Positions ──
+        // ── E. EVERY SECOND: 8 Random Traders Refresh Profile & Orders (Distributes telemetry across all accounts) ──
         if (authUsers.length > 0) {
-            for (let q = 0; q < 5; q++) {
+            for (let q = 0; q < 8; q++) {
                 const trader = authUsers[Math.floor(Math.random() * authUsers.length)];
+                fetch(`${targetUrl}/api/user/bootstrap`, {
+                    headers: { 'Authorization': `Bearer ${trader.token}` }
+                }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
                 fetch(`${targetUrl}/api/orders?limit=10`, {
                     headers: { 'Authorization': `Bearer ${trader.token}` }
                 }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
