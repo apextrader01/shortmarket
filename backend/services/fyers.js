@@ -514,6 +514,7 @@ async function initFyers(io, pc, isMaster = true) {
     // Start interval to broadcast LTPs to clients — BATCHED (1 message for ALL symbols)
     // This is far more efficient than 1 message per symbol (N messages) for multi-user scenarios.
     if (isMasterNode) {
+        const tickBroadcastIntervalMs = parseInt(process.env.TICK_BROADCAST_INTERVAL_MS || '1500', 10);
         setInterval(() => {
             if (dirtySymbols.size === 0 || !global_io) return;
 
@@ -583,7 +584,7 @@ async function initFyers(io, pc, isMaster = true) {
                     }
                 } catch(e) {}
             }
-        }, 1000); // 1000ms (1 update/sec) for batched tick streaming across clients and cluster workers
+        }, tickBroadcastIntervalMs); // 1500ms (configurable via TICK_BROADCAST_INTERVAL_MS) for batched tick streaming across clients and cluster workers
     }
 }
 
