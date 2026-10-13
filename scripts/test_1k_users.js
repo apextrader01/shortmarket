@@ -355,13 +355,24 @@ async function run() {
         socket.on('disconnect', () => disconnectedCount++);
         socket.on('connect_error', () => disconnectedCount++);
 
+        // Fire authenticated user bootstrap so 100% of accounts appear in Admin Telemetry
+        if (authUsers[i - 1]) {
+            const trader = authUsers[i - 1];
+            fetch(`${targetUrl}/api/user/bootstrap`, {
+                headers: { 'Authorization': `Bearer ${trader.token}` }
+            }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
+            fetch(`${targetUrl}/api/orders?limit=10`, {
+                headers: { 'Authorization': `Bearer ${trader.token}` }
+            }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
+        }
+
         if (i % batchSize === 0) {
-            process.stdout.write(`\r   Connecting: ${i}/${totalUsers} users queued... (Active WS: ${connectedCount})`);
+            process.stdout.write(`\r   Connecting & authenticating: ${i}/${totalUsers} users queued... (Active WS: ${connectedCount})`);
             await new Promise(r => setTimeout(r, rampDelayMs));
         }
     }
 
-    console.log(`\n\n✅ All ${totalUsers} user connections established!`);
+    console.log(`\n\n✅ All ${totalUsers} user connections established and authenticated!`);
     console.log(`🔥 2. Starting continuous 10-minute heavy trading cycle (Watch 'pm2 monit' on your server!)\n`);
 
     // Continuous 1-Second Heavy Trading Loop
@@ -394,92 +405,111 @@ async function run() {
             }
         }
 
-        // ── B. EVERY SECOND: Place New Orders (Regular, BO, CO) ──
+        // ── B. EVERY SECOND: 4 Concurrent Orders Placed Across Random Traders ──
         if (authUsers.length > 0) {
-            const trader = authUsers[Math.floor(Math.random() * authUsers.length)];
-            const orderRoll = sec % 3;
+            for (let o = 0; o < 4; o++) {
+                const trader = authUsers[Math.floor(Math.random() * authUsers.length)];
+                const orderRoll = (sec + o) % 3;
 
-            if (orderRoll === 0) {
-                // Regular Limit Order
-                fetch(`${targetUrl}/api/order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
-                    body: JSON.stringify({
-                        symbol: 'NSE:TATASTEEL-EQ',
-                        side: Math.random() > 0.5 ? 'BUY' : 'SELL',
-                        type: 'LIMIT',
-                        price: 154.00 + (Math.random() * 4),
-                        quantity: 10,
-                        product_type: 'INT'
-                    })
-                }).then(r => r.json()).then(data => {
-                    regularOrdersPlaced++;
-                    if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'REGULAR' });
-                }).catch(() => orderErrors++);
-            } else if (orderRoll === 1) {
-                // Bracket Order (BO) with Target & SL
-                fetch(`${targetUrl}/api/order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
-                    body: JSON.stringify({
-                        symbol: 'NSE:RELIANCE-EQ',
-                        side: 'BUY',
-                        type: 'LIMIT',
-                        price: 1080.00 + (Math.random() * 10),
-                        quantity: 5,
-                        product_type: 'BO',
-                        sl_price: 1040.00,
-                        tgt_price: 1210.00
-                    })
-                }).then(r => r.json()).then(data => {
-                    boOrdersPlaced++;
-                    if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'BO' });
-                }).catch(() => orderErrors++);
-            } else {
-                // Cover Order (CO) with SL trigger
-                fetch(`${targetUrl}/api/order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
-                    body: JSON.stringify({
-                        symbol: 'NSE:HDFCBANK-EQ',
-                        side: 'BUY',
-                        type: 'LIMIT',
-                        price: 640.00 + (Math.random() * 5),
-                        quantity: 5,
-                        product_type: 'CO',
-                        trigger_price: 625.00
-                    })
-                }).then(r => r.json()).then(data => {
-                    coOrdersPlaced++;
-                    if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'CO' });
-                }).catch(() => orderErrors++);
+                if (orderRoll === 0) {
+                    // Regular Limit Order
+                    fetch(`${targetUrl}/api/order`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
+                        body: JSON.stringify({
+                            symbol: 'NSE:TATASTEEL-EQ',
+                            side: Math.random() > 0.5 ? 'BUY' : 'SELL',
+                            type: 'LIMIT',
+                            price: 154.00 + (Math.random() * 4),
+                            quantity: 10,
+                            product_type: 'INT'
+                        })
+                    }).then(r => r.json()).then(data => {
+                        regularOrdersPlaced++;
+                        apiCallsCompleted++;
+                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'REGULAR' });
+                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                } else if (orderRoll === 1) {
+                    // Bracket Order (BO) with Target & SL
+                    fetch(`${targetUrl}/api/order`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
+                        body: JSON.stringify({
+                            symbol: 'NSE:RELIANCE-EQ',
+                            side: 'BUY',
+                            type: 'LIMIT',
+                            price: 1080.00 + (Math.random() * 10),
+                            quantity: 5,
+                            product_type: 'BO',
+                            sl_price: 1040.00,
+                            tgt_price: 1210.00
+                        })
+                    }).then(r => r.json()).then(data => {
+                        boOrdersPlaced++;
+                        apiCallsCompleted++;
+                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'BO' });
+                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                } else {
+                    // Cover Order (CO) with SL trigger
+                    fetch(`${targetUrl}/api/order`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
+                        body: JSON.stringify({
+                            symbol: 'NSE:HDFCBANK-EQ',
+                            side: 'BUY',
+                            type: 'LIMIT',
+                            price: 640.00 + (Math.random() * 5),
+                            quantity: 5,
+                            product_type: 'CO',
+                            trigger_price: 625.00
+                        })
+                    }).then(r => r.json()).then(data => {
+                        coOrdersPlaced++;
+                        apiCallsCompleted++;
+                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'CO' });
+                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                }
             }
         }
 
         // ── C. EVERY SECOND: Edit Open Orders (Modify Price & Quantity) ──
-        if (openOrdersPool.length > 2) {
-            const ordToEdit = openOrdersPool[Math.floor(Math.random() * openOrdersPool.length)];
-            fetch(`${targetUrl}/api/order/${ordToEdit.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToEdit.token}` },
-                body: JSON.stringify({
-                    price: 155.20 + (Math.random() * 2),
-                    quantity: 15
-                })
-            }).then(r => { if (r.ok) ordersEdited++; }).catch(() => {});
+        for (let e = 0; e < 2; e++) {
+            if (openOrdersPool.length > 2) {
+                const ordToEdit = openOrdersPool[Math.floor(Math.random() * openOrdersPool.length)];
+                fetch(`${targetUrl}/api/order/${ordToEdit.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToEdit.token}` },
+                    body: JSON.stringify({
+                        price: 155.20 + (Math.random() * 2),
+                        quantity: 15
+                    })
+                }).then(r => { if (r.ok) { ordersEdited++; apiCallsCompleted++; } else { apiCallsFailed++; } }).catch(() => apiCallsFailed++);
+            }
         }
 
         // ── D. EVERY SECOND: Cancel Open Orders (including BO / CO) ──
-        if (openOrdersPool.length > 5) {
-            const ordToCancel = openOrdersPool.shift(); // remove oldest
-            fetch(`${targetUrl}/api/order/${ordToCancel.id}/cancel`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToCancel.token}` }
-            }).then(r => { if (r.ok) ordersCancelled++; }).catch(() => {});
+        for (let c = 0; c < 2; c++) {
+            if (openOrdersPool.length > 5) {
+                const ordToCancel = openOrdersPool.shift(); // remove oldest
+                fetch(`${targetUrl}/api/order/${ordToCancel.id}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToCancel.token}` }
+                }).then(r => { if (r.ok) { ordersCancelled++; apiCallsCompleted++; } else { apiCallsFailed++; } }).catch(() => apiCallsFailed++);
+            }
         }
 
-        // ── E. EVERY 3 SECONDS: Concurrent Screener REST Traffic ──
-        if (sec % 3 === 0) {
+        // ── E. EVERY SECOND: 5 Random Traders Refresh Order Book & Positions ──
+        if (authUsers.length > 0) {
+            for (let q = 0; q < 5; q++) {
+                const trader = authUsers[Math.floor(Math.random() * authUsers.length)];
+                fetch(`${targetUrl}/api/orders?limit=10`, {
+                    headers: { 'Authorization': `Bearer ${trader.token}` }
+                }).then(r => { if (r.ok) apiCallsCompleted++; else apiCallsFailed++; }).catch(() => apiCallsFailed++);
+            }
+        }
+
+        // ── F. EVERY 2 SECONDS: Concurrent Screener REST Traffic ──
+        if (sec % 2 === 0) {
             fetch(`${targetUrl}/api/bhavcopy/delivery?limit=10&page=1`)
                 .then(r => r.ok ? apiCallsCompleted++ : apiCallsFailed++)
                 .catch(() => apiCallsFailed++);
@@ -490,11 +520,11 @@ async function run() {
 
         // Periodic event milestone print every 30 seconds
         if (sec % 30 === 0) {
-            console.log(`\n⚡ [${formatMMSS(sec)}] 1000 Users Active | Ticks: ${totalTicksReceived} | Orders Placed: ${regularOrdersPlaced + boOrdersPlaced + coOrdersPlaced} (BO: ${boOrdersPlaced}, CO: ${coOrdersPlaced}) | Edited: ${ordersEdited} | Cancelled: ${ordersCancelled} | Watchlist Churn: +${dynamicStocksAdded}/-${dynamicStocksRemoved}`);
+            console.log(`\n⚡ [${formatMMSS(sec)}] 1000 Users Active | Ticks: ${totalTicksReceived} | Orders: ${regularOrdersPlaced + boOrdersPlaced + coOrdersPlaced} (BO: ${boOrdersPlaced}, CO: ${coOrdersPlaced}) | Edited: ${ordersEdited} | Cancelled: ${ordersCancelled} | Total API Calls: ${apiCallsCompleted}`);
         }
 
         const totalOrders = regularOrdersPlaced + boOrdersPlaced + coOrdersPlaced;
-        process.stdout.write(`\r   ⏱️  [${formatMMSS(sec)} / ${formatMMSS(durationSeconds)}] WS: ${connectedCount}/${totalUsers} | Ticks: ${totalTicksReceived} | Orders: ${totalOrders} (Edit: ${ordersEdited}, Cancel: ${ordersCancelled}) | Watchlist: +${dynamicStocksAdded}/-${dynamicStocksRemoved}`);
+        process.stdout.write(`\r   ⏱️  [${formatMMSS(sec)} / ${formatMMSS(durationSeconds)}] WS: ${connectedCount}/${totalUsers} | Ticks: ${totalTicksReceived} | Orders: ${totalOrders} (Edit: ${ordersEdited}, Cancel: ${ordersCancelled}) | API Calls: ${apiCallsCompleted}`);
     }
 
     console.log('\n\n🧹 3. Disconnecting virtual WebSocket users...');
@@ -542,7 +572,7 @@ async function run() {
     console.log(`Total Orders Executed:         ${regularOrdersPlaced + boOrdersPlaced + coOrdersPlaced}`);
     console.log(`Orders Modified (Edit Open):   ${ordersEdited}`);
     console.log(`Orders Cancelled Cleanly:      ${ordersCancelled}`);
-    console.log(`REST Screener API Requests:    ${apiCallsCompleted} successful (${apiCallsFailed} failed)`);
+    console.log(`Total HTTP REST API Calls:    ${apiCallsCompleted} successful (${apiCallsFailed} failed)`);
     console.log(`Avg Connection Latency:        ${avgConnect} ms`);
     console.log(`Avg First-Tick Latency:        ${avgFirstTick} ms`);
     console.log(`Failed / Dropped Sockets:      ${totalUsers - connectedCount}`);
