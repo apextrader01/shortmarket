@@ -187,6 +187,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
   const [loading, setLoading] = useState(false);
   const [loadingMoreBhav, setLoadingMoreBhav] = useState(false);
+  const [loadingDeals, setLoadingDeals] = useState(false);
   const [loadingMoreDeals, setLoadingMoreDeals] = useState(false);
 
   // --- Tab 1: Bhavcopy Filters (20 Checkboxes + Per-Column Filters + Sort) ---
@@ -353,6 +354,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   // Build query string for Server-Side Paginated Deals (~4 KB response)
   const fetchDealsPage = useCallback(async (pageNum = 1, append = false) => {
     if (append) setLoadingMoreDeals(true);
+    else setLoadingDeals(true);
     try {
       const params = new URLSearchParams({
         page: String(pageNum),
@@ -386,6 +388,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       // Keep existing state on error
     } finally {
       if (append) setLoadingMoreDeals(false);
+      else setLoadingDeals(false);
     }
   }, [
     dealTypeFilter, dealsClientCategory, dealsExchangeFilter,
@@ -1224,10 +1227,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'ALL', label: `All Deals (${dealsStats.totalDeals.toLocaleString('en-IN')})` },
-                  { id: 'BULK_DEAL', label: `Bulk Deals (${dealsStats.bulkCount.toLocaleString('en-IN')})` },
-                  { id: 'BLOCK_DEAL', label: `Block Deals (${dealsStats.blockCount.toLocaleString('en-IN')})` },
-                  { id: 'INSIDER_PROMOTER', label: `Insider & Promoters (${dealsStats.insiderCount.toLocaleString('en-IN')})` },
+                  { id: 'ALL', label: `All Deals (${(dealsStats.totalDeals || 0).toLocaleString('en-IN')})` },
+                  { id: 'BULK_DEAL', label: `Bulk Deals (${(dealsStats.bulkCount || 0).toLocaleString('en-IN')})` },
+                  { id: 'BLOCK_DEAL', label: `Block Deals (${(dealsStats.blockCount || 0).toLocaleString('en-IN')})` },
+                  { id: 'INSIDER_PROMOTER', label: `Insider & Promoters (${(dealsStats.insiderCount || 0).toLocaleString('en-IN')})` },
                   { id: 'BUY', label: '🟢 Buys Only' },
                   { id: 'SELL', label: '🔴 Sells Only' }
                 ].map(f => (
@@ -1252,7 +1255,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
                   <input
                     type="text"
-                    placeholder="Search 1,140+ deals (e.g. Morgan Stanley, LIC, ZOMATO)..."
+                    placeholder={`Search ${(dealsStats.globalTotal || dealsStats.totalDeals || 3000).toLocaleString('en-IN')}+ deals (e.g. Morgan Stanley, LIC, ZOMATO, RELIANCE)...`}
                     value={dealsSearch}
                     onChange={e => setDealsSearch(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
@@ -1275,10 +1278,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Institution Desk:</span>
               {[
                 { id: 'ALL', label: 'All Desks' },
-                { id: 'FII', label: `🌍 FII / Foreign Funds (${dealsStats.fiiCount || 416})` },
-                { id: 'DII', label: `🇮🇳 DII / Mutual Funds & LIC (${dealsStats.diiCount || 380})` },
-                { id: 'HFT', label: `⚡ HFT & Quant Prop (${dealsStats.hftCount || 215})` },
-                { id: 'PROMOTER', label: `👔 Promoters (${dealsStats.insiderCount || 130})` },
+                { id: 'FII', label: `🌍 FII / Foreign Funds (${(dealsStats.fiiCount || 0).toLocaleString('en-IN')})` },
+                { id: 'DII', label: `🇮🇳 DII / Mutual Funds & LIC (${(dealsStats.diiCount || 0).toLocaleString('en-IN')})` },
+                { id: 'HFT', label: `⚡ HFT & Quant Prop (${(dealsStats.hftCount || 0).toLocaleString('en-IN')})` },
+                { id: 'PROMOTER', label: `👔 Promoters (${(dealsStats.insiderCount || 0).toLocaleString('en-IN')})` },
                 { id: 'MULTI_DEAL', label: '🔥 Multi-Deal Cluster Stocks' }
               ].map(cat => (
                 <button
@@ -1491,7 +1494,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 </tr>
               </thead>
               <tbody>
-                {dealsData.length === 0 ? (
+                {loadingDeals ? (
+                  <tr>
+                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div style={{ width: '16px', height: '16px', border: '2px solid #a855f7', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                        <span>Loading matching institutional deals...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : dealsData.length === 0 ? (
                   <tr>
                     <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                       No institutional deals match this search or column filter. Try clearing the column filter boxes.
