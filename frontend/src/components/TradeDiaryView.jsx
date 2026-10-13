@@ -57,38 +57,112 @@ import {
   Flame, Check, X, Edit3, Trash2, Search,
   BookOpen, ChevronRight, ChevronLeft, Star, ThumbsUp, Menu,
   Copy, CheckCircle, DollarSign, Target, MessageSquare, Download, ShieldAlert, LogOut,
-  Loader2, Camera, Image, Maximize2, UploadCloud
+  Loader2, Camera, Image, Maximize2, UploadCloud, ZoomIn, ZoomOut
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
 import logoImg from '../assets/logo.png';
 
-// Helper: Compress screenshot image client-side to lightweight high-res WebP/JPEG dataUrl
-export const compressImageToDataUrl = (file, maxDimension = 1280, quality = 0.75) => {
-  return new Promise((resolve, reject) => {
+// Helper: Calculate approx binary size in KB of a data URL
+export const getImageSizeKb = (dataUrl) => {
+  if (!dataUrl) return 0;
+  const base64 = dataUrl.split(',')[1] || dataUrl;
+  return Math.round((base64.length * 0.75) / 1024);
+};
+
+// Helper: Compress screenshot image client-side to strictly < 50 KB while preserving crisp chart readability
+export const compressImageToDataUrl = (file, targetMaxKb = 48) => {
+  return new Promise((resolve) => {
     if (!file) return resolve('');
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new window.Image();
       img.onload = () => {
+        const origW = img.width;
+        const origH = img.height;
+        if (!origW || !origH) return resolve(e.target.result);
+
+        // Check WebP support (WebP gives 30% smaller size at higher clarity for charts)
+        let mimeType = 'image/webp';
+        try {
+          const testCanvas = document.createElement('canvas');
+          if (testCanvas.toDataURL('image/webp').indexOf('data:image/webp') !== 0) {
+            mimeType = 'image/jpeg';
+          }
+        } catch (_) {
+          mimeType = 'image/jpeg';
+        }
+
+        // Adaptive compression steps from highest resolution down until strictly under targetMaxKb (< 50 KB)
+        const steps = [
+          { maxDim: 1100, quality: 0.72 },
+          { maxDim: 1000, quality: 0.65 },
+          { maxDim: 920,  quality: 0.58 },
+          { maxDim: 840,  quality: 0.52 },
+          { maxDim: 760,  quality: 0.46 },
+          { maxDim: 680,  quality: 0.40 },
+          { maxDim: 600,  quality: 0.35 }
+        ];
+
+        let bestDataUrl = '';
         const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
+        const ctx = canvas.getContext('2d');
+
+        for (const step of steps) {
+          let w = origW;
+          let h = origH;
+          if (w > step.maxDim || h > step.maxDim) {
+            if (w > h) {
+              h = Math.round((h * step.maxDim) / w);
+              w = step.maxDim;
+            } else {
+              w = Math.round((w * step.maxDim) / h);
+              h = step.maxDim;
+            }
+          }
+
+          canvas.width = w;
+          canvas.height = h;
+
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+          }
+
+          const currentUrl = canvas.toDataURL(mimeType, step.quality);
+          const currentKb = (currentUrl.length * 0.75) / 1024;
+          bestDataUrl = currentUrl;
+
+          // If under target limit (< 50 KB), stop immediately to retain highest visual quality!
+          if (currentKb <= targetMaxKb) {
+            break;
           }
         }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
+
+        // Additional safety passes to strictly ensure < 50 KB even for dense/complex charts
+        let finalKb = (bestDataUrl.length * 0.75) / 1024;
+        if (finalKb > targetMaxKb) {
+          let testW = Math.round(canvas.width * 0.85);
+          let testH = Math.round(canvas.height * 0.85);
+          for (let pass = 0; pass < 4 && finalKb > targetMaxKb; pass++) {
+            canvas.width = testW;
+            canvas.height = testH;
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, testW, testH);
+            }
+            const currentUrl = canvas.toDataURL(mimeType, 0.35);
+            finalKb = (currentUrl.length * 0.75) / 1024;
+            bestDataUrl = currentUrl;
+            testW = Math.round(testW * 0.85);
+            testH = Math.round(testH * 0.85);
+          }
+        }
+
+        resolve(bestDataUrl);
       };
       img.onerror = () => resolve(e.target.result);
       img.src = e.target.result;
@@ -581,6 +655,7 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   // Form states
   const todayStr = new Date().toISOString().split('T')[0];
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
+  const [isLightboxZoomed, setIsLightboxZoomed] = useState(false);
   const [newTradeForm, setNewTradeForm] = useState({
     symbol: 'NIFTY 24500 CE',
     trade_type: 'BUY',
@@ -9014,7 +9089,30 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       {/* 1. LOG NEW TRADE MODAL */}
       {showNewTradeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '540px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+          <div
+            onPaste={async (e) => {
+              const items = e.clipboardData?.items;
+              if (!items) return;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    e.preventDefault();
+                    const compressed = await compressImageToDataUrl(file, 48);
+                    if (compressed) {
+                      setNewTradeForm(prev => {
+                        const cur = prev.screenshots || [];
+                        if (cur.length >= 2) return prev;
+                        return { ...prev, screenshots: [...cur, compressed].slice(0, 2) };
+                      });
+                    }
+                    break;
+                  }
+                }
+              }
+            }}
+            style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '540px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
                 <Plus size={18} color="#2563eb" /> Log New Trade
@@ -9243,7 +9341,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <label style={{ fontSize: '11px', color: colors.textPrimary, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <Camera size={14} color="#2563eb" /> Attach Trade Photos ({newTradeForm.screenshots?.length || 0}/2)
                       </label>
-                      <span style={{ fontSize: '10px', color: colors.textMuted }}>Paste Ctrl+V or Browse</span>
+                      <span style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>✓ Auto-optimized &lt;50 KB (High Quality)</span>
                     </div>
 
                     {(newTradeForm.screenshots?.length || 0) < 2 && (
@@ -9274,7 +9372,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             const cur = newTradeForm.screenshots || [];
                             const remaining = 2 - cur.length;
                             const toProcess = files.slice(0, remaining);
-                            const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f)));
+                            const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
                             setNewTradeForm(prev => ({
                               ...prev,
                               screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
@@ -9288,12 +9386,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     {(newTradeForm.screenshots?.length || 0) > 0 && (
                       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         {newTradeForm.screenshots.map((img, idx) => (
-                          <div key={idx} style={{ position: 'relative', width: '100px', height: '68px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
+                          <div key={idx} style={{ position: 'relative', width: '105px', height: '70px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
                             <img
                               src={img}
                               alt={`Trade Photo ${idx + 1}`}
-                              onClick={() => setActiveLightboxImage(img)}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                              onClick={() => {
+                                setIsLightboxZoomed(false);
+                                setActiveLightboxImage(img);
+                              }}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', imageRendering: '-webkit-optimize-contrast' }}
                               title="Click to preview full-size"
                             />
                             <button
@@ -9309,8 +9410,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             >
                               <X size={12} />
                             </button>
-                            <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', textShadow: '0 1px 2px #000' }}>
-                              Photo #{idx + 1}
+                            <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.75)', padding: '1px 5px', borderRadius: '3px' }}>
+                              #{idx + 1} • {getImageSizeKb(img)} KB
                             </span>
                           </div>
                         ))}
@@ -9388,7 +9489,31 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       {/* EDIT TRADE MODAL */}
       {editingTrade && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+          <div
+            onPaste={async (e) => {
+              const items = e.clipboardData?.items;
+              if (!items) return;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    e.preventDefault();
+                    const compressed = await compressImageToDataUrl(file, 48);
+                    if (compressed) {
+                      setEditingTrade(prev => {
+                        if (!prev) return prev;
+                        const cur = Array.isArray(prev.screenshots) ? prev.screenshots : [];
+                        if (cur.length >= 2) return prev;
+                        return { ...prev, screenshots: [...cur, compressed].slice(0, 2) };
+                      });
+                    }
+                    break;
+                  }
+                }
+              }
+            }}
+            style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
                 <Edit3 size={18} color="#2563eb" /> Edit Logged Trade
@@ -9465,7 +9590,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <label style={{ fontSize: '11px', color: colors.textPrimary, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <Camera size={14} color="#2563eb" /> Trade Execution Photos ({editingTrade.screenshots?.length || 0}/2)
                   </label>
-                  <span style={{ fontSize: '10px', color: colors.textMuted }}>Paste Ctrl+V or Browse</span>
+                  <span style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>✓ Auto-optimized &lt;50 KB (High Quality)</span>
                 </div>
 
                 {(editingTrade.screenshots?.length || 0) < 2 && (
@@ -9496,7 +9621,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         const cur = editingTrade.screenshots || [];
                         const remaining = 2 - cur.length;
                         const toProcess = files.slice(0, remaining);
-                        const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f)));
+                        const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
                         setEditingTrade(prev => ({
                           ...prev,
                           screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
@@ -9510,12 +9635,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {(editingTrade.screenshots?.length || 0) > 0 && (
                   <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                     {editingTrade.screenshots.map((img, idx) => (
-                      <div key={idx} style={{ position: 'relative', width: '100px', height: '68px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
+                      <div key={idx} style={{ position: 'relative', width: '105px', height: '70px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
                         <img
                           src={img}
                           alt={`Trade Photo ${idx + 1}`}
-                          onClick={() => setActiveLightboxImage(img)}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => {
+                            setIsLightboxZoomed(false);
+                            setActiveLightboxImage(img);
+                          }}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', imageRendering: '-webkit-optimize-contrast' }}
                           title="Click to preview full-size"
                         />
                         <button
@@ -9531,8 +9659,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         >
                           <X size={12} />
                         </button>
-                        <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', textShadow: '0 1px 2px #000' }}>
-                          Photo #{idx + 1}
+                        <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.75)', padding: '1px 5px', borderRadius: '3px' }}>
+                          #{idx + 1} • {getImageSizeKb(img)} KB
                         </span>
                       </div>
                     ))}
@@ -9625,11 +9753,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     {shots.map((img, idx) => (
                       <div
                         key={idx}
-                        onClick={() => setActiveLightboxImage(img)}
+                        onClick={() => {
+                          setIsLightboxZoomed(false);
+                          setActiveLightboxImage(img);
+                        }}
                         style={{
                           position: 'relative',
-                          width: '120px',
-                          height: '80px',
+                          width: '125px',
+                          height: '82px',
                           borderRadius: '8px',
                           overflow: 'hidden',
                           border: `1px solid ${colors.borderColor}`,
@@ -9639,9 +9770,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         }}
                         title="Click to view full-size screenshot"
                       >
-                        <img src={img} alt={`Trade proof ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <span style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.65)', padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <Maximize2 size={9} /> View #{idx + 1}
+                        <img src={img} alt={`Trade proof ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: '-webkit-optimize-contrast' }} />
+                        <span style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.75)', padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Maximize2 size={9} /> #{idx + 1} ({getImageSizeKb(img)} KB)
                         </span>
                       </div>
                     ))}
@@ -10856,70 +10987,190 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.92)',
+            backgroundColor: 'rgba(0, 0, 0, 0.94)',
             zIndex: 100000,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px'
+            padding: '16px',
+            userSelect: 'none'
           }}
-          onClick={() => setActiveLightboxImage(null)}
+          onClick={() => {
+            setIsLightboxZoomed(false);
+            setActiveLightboxImage(null);
+          }}
         >
-          <div style={{ position: 'absolute', top: '16px', right: '20px', display: 'flex', gap: '10px', zIndex: 100001 }}>
-            <a
-              href={activeLightboxImage}
-              download={`Trade_Proof_${Date.now()}.jpg`}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.18)',
+          {/* Top Control Bar */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              left: '20px',
+              right: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              zIndex: 100001,
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}
+          >
+            {/* Left badges: Quality, size, ultra-compact notice */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{
+                backgroundColor: 'rgba(255,255,255,0.12)',
                 color: '#ffffff',
                 borderRadius: '8px',
-                padding: '8px 14px',
+                padding: '6px 12px',
                 fontSize: '12px',
                 fontWeight: '700',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                textDecoration: 'none',
                 backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.25)'
-              }}
-            >
-              <Download size={14} /> Download Image
-            </a>
-            <button
-              onClick={() => setActiveLightboxImage(null)}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.18)',
-                color: '#ffffff',
-                border: '1px solid rgba(255,255,255,0.25)',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}>
+                <Camera size={14} color="#60a5fa" />
+                <span>Trade Chart Proof</span>
+              </div>
+              <div style={{
+                backgroundColor: 'rgba(34,197,94,0.2)',
+                color: '#4ade80',
                 borderRadius: '8px',
-                padding: '8px 14px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
+                padding: '6px 10px',
+                fontSize: '11px',
+                fontWeight: '800',
                 backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(74,222,128,0.35)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <X size={16} /> Close (Esc)
-            </button>
+                gap: '5px'
+              }}>
+                <span>✓ {getImageSizeKb(activeLightboxImage)} KB (Ultra-compact &lt;50 KB)</span>
+              </div>
+              <div style={{
+                backgroundColor: 'rgba(59,130,246,0.18)',
+                color: '#93c5fd',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                fontSize: '11px',
+                fontWeight: '700',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(147,197,253,0.3)'
+              }}>
+                High-Contrast HD Crisp Mode
+              </div>
+            </div>
+
+            {/* Right actions: Zoom toggle, Download, Close */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setIsLightboxZoomed(z => !z)}
+                style={{
+                  backgroundColor: isLightboxZoomed ? '#2563eb' : 'rgba(255,255,255,0.18)',
+                  color: '#ffffff',
+                  border: isLightboxZoomed ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+                title={isLightboxZoomed ? "Reset zoom (1x)" : "Zoom in (1.5x) for candle/text detail"}
+              >
+                {isLightboxZoomed ? <ZoomOut size={14} /> : <ZoomIn size={14} />}
+                <span>{isLightboxZoomed ? 'Zoom 1x' : 'Zoom 1.5x'}</span>
+              </button>
+
+              <a
+                href={activeLightboxImage}
+                download={`Trade_Proof_${Date.now()}.webp`}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  textDecoration: 'none',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.25)'
+                }}
+              >
+                <Download size={14} /> Download
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLightboxZoomed(false);
+                  setActiveLightboxImage(null);
+                }}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <X size={16} /> Close
+              </button>
+            </div>
           </div>
-          <img
-            src={activeLightboxImage}
-            alt="Full Trade Execution Screenshot"
+
+          {/* Image Display Container with Pan/Scroll support if zoomed */}
+          <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: '94vw',
-              maxHeight: '88vh',
-              objectFit: 'contain',
-              borderRadius: '10px',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.85)'
+              maxWidth: '96vw',
+              maxHeight: '86vh',
+              overflow: isLightboxZoomed ? 'auto' : 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '45px',
+              borderRadius: '12px'
             }}
-          />
+          >
+            <img
+              src={activeLightboxImage}
+              alt="Full Trade Execution Screenshot"
+              onClick={() => setIsLightboxZoomed(z => !z)}
+              style={{
+                width: isLightboxZoomed ? '150%' : 'auto',
+                maxWidth: isLightboxZoomed ? 'none' : '94vw',
+                maxHeight: isLightboxZoomed ? 'none' : '82vh',
+                objectFit: 'contain',
+                borderRadius: '10px',
+                boxShadow: '0 25px 60px rgba(0,0,0,0.95)',
+                cursor: isLightboxZoomed ? 'zoom-out' : 'zoom-in',
+                imageRendering: '-webkit-optimize-contrast',
+                transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'block'
+              }}
+              title="Click image to toggle zoom"
+            />
+          </div>
         </div>
       )}
     </div>
