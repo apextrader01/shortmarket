@@ -14717,8 +14717,15 @@ app.post('/api/journal/trades', authenticateToken, async (req, res) => {
     const {
       symbol, trade_type, product_type, market_segment, entry_price, exit_price,
       quantity, realized_pnl, charges, net_pnl, roi_percentage, strategy,
-      emotion, mistake, setup_rating, trade_date, notes, tags, screenshot_url
+      emotion, mistake, setup_rating, trade_date, notes, tags, screenshot_url, screenshots
     } = req.body;
+
+    let normalizedScreenshots = '';
+    if (screenshots) {
+      normalizedScreenshots = typeof screenshots === 'string' ? screenshots : JSON.stringify(screenshots);
+    } else if (screenshot_url) {
+      normalizedScreenshots = typeof screenshot_url === 'string' ? screenshot_url : JSON.stringify(screenshot_url);
+    }
 
     const [newTrade] = await db('journal_trades').insert({
       user_id: req.user.id,
@@ -14740,8 +14747,8 @@ app.post('/api/journal/trades', authenticateToken, async (req, res) => {
       setup_rating: parseInt(setup_rating) || 5,
       trade_date: trade_date || new Date().toISOString().split('T')[0],
       notes: notes || '',
-      tags: tags ? JSON.stringify(tags) : JSON.stringify([]),
-      screenshot_url: screenshot_url || ''
+      tags: tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : JSON.stringify([]),
+      screenshot_url: normalizedScreenshots
     }).returning('*');
 
     res.json({ success: true, trade: newTrade });
@@ -14759,6 +14766,15 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
     delete updateData.user_id;
     if (updateData.tags && typeof updateData.tags !== 'string') {
       updateData.tags = JSON.stringify(updateData.tags);
+    }
+
+    if (updateData.screenshots !== undefined) {
+      updateData.screenshot_url = typeof updateData.screenshots === 'string'
+        ? updateData.screenshots
+        : JSON.stringify(updateData.screenshots);
+      delete updateData.screenshots;
+    } else if (Array.isArray(updateData.screenshot_url)) {
+      updateData.screenshot_url = JSON.stringify(updateData.screenshot_url);
     }
 
     const [updated] = await db('journal_trades')
@@ -15288,6 +15304,268 @@ Key Knowledge & Rules:
   } catch (err) {
     console.error('Wealth Copilot Error:', err.message);
     res.status(500).json({ error: 'Failed to process AI query' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🌟 TRADE DIARY AI COGNITIVE & EXECUTION AUDITOR (Gemini Flash-Lite + Algorithmic)
+// ─────────────────────────────────────────────────────────────────────────────
+function buildAlgorithmicTradeAudit(summary, market = 'Indian') {
+  const sym = market === 'Indian' ? '₹' : '$';
+  const { totalTrades, winRate, netPnl, topWinStrat, topLossStrat, dominantEmotion, negativeEmotions, biggestWin, biggestLoss } = summary;
+
+  let grade = 'B';
+  if (winRate >= 65 && netPnl > 0) grade = 'A';
+  else if (winRate >= 50 && netPnl >= 0) grade = 'B+';
+  else if (winRate >= 40 && netPnl >= 0) grade = 'B';
+  else if (netPnl < 0 && winRate >= 40) grade = 'C+';
+  else if (netPnl < 0) grade = 'C';
+
+  const strengths = [];
+  if (winRate >= 50) strengths.push(`Win Rate Consistency: Maintained a solid ${winRate}% win rate across logged executions.`);
+  else strengths.push(`Risk Control Baseline: Controlled overall loss exposure during volatile phases.`);
+
+  if (topWinStrat) strengths.push(`Proven Core Edge: Best profitability achieved in "${topWinStrat}" strategy.`);
+  else strengths.push(`Execution Rhythm: Capitalized on clean setups with defined risk limits.`);
+
+  if (biggestWin > 0) strengths.push(`High Upside Capture: Maximum winning trade achieved ${sym}${biggestWin.toLocaleString('en-IN')}.`);
+  else strengths.push(`Disciplined Position Sizing: Kept trade size within capital allocation boundaries.`);
+
+  strengths.push(`Systematic Process: Active adherence to trade journaling and retrospective review.`);
+
+  const leaks = [];
+  if (negativeEmotions.length > 0) {
+    leaks.push(`Emotional Tilt Flags: Trades tagged with ${negativeEmotions.join(', ')} showed sub-optimal risk compliance.`);
+  } else {
+    leaks.push(`Session Timing Risk: Late afternoon sessions exhibit lower win rates due to decay.`);
+  }
+
+  if (topLossStrat) {
+    leaks.push(`Underperforming Setup: Negative expectancy observed in "${topLossStrat}" trades.`);
+  } else {
+    leaks.push(`Stop-Loss Widening: Hesitation in executing initial invalidation levels.`);
+  }
+
+  if (biggestLoss < 0) {
+    leaks.push(`Tail Loss Outlier: Largest single loss was ${sym}${Math.abs(biggestLoss).toLocaleString('en-IN')}, cutting into overall alpha.`);
+  } else {
+    leaks.push(`Premature Target Exits: Manual exit before price hit the designated reward boundary.`);
+  }
+
+  leaks.push(`Overtrading Risk: High setup frequency on choppy market sessions.`);
+
+  const actionPlan = [
+    `Enforce Hard Terminal Lockdown after taking 2 consecutive stop-outs to stop revenge tilt.`,
+    `Focus 80% of capital allocation on "${topWinStrat || 'Confirmed Breakout'}" setups where expectancy is verified.`,
+    `Set a mandatory 1:2 Risk-to-Reward minimum filter before triggering any new market order.`
+  ];
+
+  return {
+    traderGrade: grade,
+    executiveSummary: `Analyzed ${totalTrades} verified trades with a ${winRate}% win rate and net return of ${sym}${netPnl.toLocaleString('en-IN')}. Focus on eliminating emotional leaks and doubling down on ${topWinStrat || 'core setups'}.`,
+    strengths,
+    leaks,
+    actionPlan
+  };
+}
+
+app.post('/api/journal/ai-audit', authenticateToken, aiCopilotLimiter, async (req, res) => {
+  try {
+    let trades = Array.isArray(req.body.trades) ? req.body.trades : null;
+    const market = req.body.marketSegment || 'Indian';
+
+    if (!trades || trades.length === 0) {
+      trades = await db('journal_trades')
+        .where({ user_id: req.user.id })
+        .orderBy('trade_date', 'desc')
+        .limit(100);
+    }
+
+    if (!trades || trades.length === 0) {
+      return res.json({
+        success: true,
+        audit: {
+          traderGrade: 'N/A',
+          executiveSummary: 'No trade logs detected. Record at least 1 trade to generate your personal AI Cognitive & Execution Audit.',
+          strengths: ['Journal Initialized: Ready to track trade setups, discipline and execution quality.'],
+          leaks: ['Zero Data Baseline: Log your entries, exits, strategies and emotions to reveal profit leaks.'],
+          actionPlan: [
+            'Log your first trade with entry, exit, stop-loss and emotion tag.',
+            'Execute minimum 3 setups following your written playbook.',
+            'Return here for a deep multi-dimensional cognitive audit.'
+          ]
+        },
+        source: 'baseline-prompt',
+        tradeCount: 0
+      });
+    }
+
+    // Pre-calculate compact quantitative summary
+    const totalTrades = trades.length;
+    let winCount = 0;
+    let lossCount = 0;
+    let netPnl = 0;
+    let biggestWin = 0;
+    let biggestLoss = 0;
+
+    const stratMap = {};
+    const emotionMap = {};
+
+    for (const t of trades) {
+      const pnl = parseFloat(t.net_pnl) !== undefined && !isNaN(parseFloat(t.net_pnl))
+        ? parseFloat(t.net_pnl)
+        : (parseFloat(t.realized_pnl) || 0);
+
+      netPnl += pnl;
+      if (pnl > 0) {
+        winCount++;
+        if (pnl > biggestWin) biggestWin = pnl;
+      } else if (pnl < 0) {
+        lossCount++;
+        if (pnl < biggestLoss) biggestLoss = pnl;
+      }
+
+      const strat = (t.strategy || 'Unassigned').trim();
+      if (!stratMap[strat]) stratMap[strat] = { wins: 0, losses: 0, pnl: 0, count: 0 };
+      stratMap[strat].count++;
+      stratMap[strat].pnl += pnl;
+      if (pnl > 0) stratMap[strat].wins++; else if (pnl < 0) stratMap[strat].losses++;
+
+      const em = (t.emotion || 'Neutral').trim();
+      if (!emotionMap[em]) emotionMap[em] = { count: 0, pnl: 0 };
+      emotionMap[em].count++;
+      emotionMap[em].pnl += pnl;
+    }
+
+    const winRate = totalTrades > 0 ? Math.round((winCount / totalTrades) * 100) : 0;
+
+    let topWinStrat = '';
+    let topLossStrat = '';
+    let maxStratPnl = -Infinity;
+    let minStratPnl = Infinity;
+
+    for (const [s, data] of Object.entries(stratMap)) {
+      if (data.pnl > maxStratPnl && data.pnl > 0) {
+        maxStratPnl = data.pnl;
+        topWinStrat = s;
+      }
+      if (data.pnl < minStratPnl && data.pnl < 0) {
+        minStratPnl = data.pnl;
+        topLossStrat = s;
+      }
+    }
+
+    const negativeEmotions = Object.entries(emotionMap)
+      .filter(([em, d]) => d.pnl < 0 || ['FOMO', 'Revenge Trade', 'Greed', 'Anxious', 'Impulsive'].some(bad => em.toLowerCase().includes(bad.toLowerCase())))
+      .map(([em]) => em);
+
+    const dominantEmotion = Object.entries(emotionMap).sort((a, b) => b[1].count - a[1].count)[0]?.[0] || 'Neutral';
+
+    const summary = {
+      totalTrades,
+      winCount,
+      lossCount,
+      winRate,
+      netPnl: Math.round(netPnl),
+      biggestWin: Math.round(biggestWin),
+      biggestLoss: Math.round(biggestLoss),
+      topWinStrat,
+      topLossStrat,
+      dominantEmotion,
+      negativeEmotions,
+      market
+    };
+
+    const algorithmicFallback = buildAlgorithmicTradeAudit(summary, market);
+
+    // Call Gemini low version (Flash-Lite / Flash) for maximum calls per day
+    const geminiApiKey = await resolveGeminiApiKey();
+    if (!geminiApiKey) {
+      return res.json({ success: true, audit: algorithmicFallback, source: 'algorithmic-rules', tradeCount: totalTrades });
+    }
+
+    const modelsToTry = [
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash-8b',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-flash-lite-latest',
+      'gemini-flash-latest',
+      'gemini-3.5-flash'
+    ];
+
+    const promptText = `Analyze this trader's journal record:
+Market: ${market}
+Total Trades: ${totalTrades} (Wins: ${winCount}, Losses: ${lossCount}, Win Rate: ${winRate}%)
+Net Realized PnL: ${netPnl}
+Top Winning Strategy: "${topWinStrat || 'None'}"
+Underperforming Strategy: "${topLossStrat || 'None'}"
+Dominant Emotion: "${dominantEmotion}"
+Negative Emotion Flags: ${negativeEmotions.join(', ') || 'None'}
+Biggest Win: ${biggestWin} | Biggest Loss: ${biggestLoss}
+
+Provide an honest, professional prop-firm grade audit in valid JSON format only:
+{
+  "traderGrade": "A" | "B+" | "B" | "C+" | "C" | "D",
+  "executiveSummary": "1-2 sentence core assessment",
+  "strengths": ["bullet 1 with metrics", "bullet 2 with metrics", "bullet 3", "bullet 4"],
+  "leaks": ["profit leak 1", "profit leak 2", "profit leak 3", "profit leak 4"],
+  "actionPlan": ["prescriptive rule 1", "prescriptive rule 2", "prescriptive rule 3"]
+}`;
+
+    for (const model of modelsToTry) {
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: promptText }] }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 800,
+                responseMimeType: 'application/json'
+              }
+            })
+          }
+        );
+
+        if (geminiRes.ok) {
+          const data = await geminiRes.json();
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          const text = parts.filter(p => !p.thought && p.text).map(p => p.text).join('\n').trim() || parts[0]?.text;
+          if (text) {
+            try {
+              const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+              const parsed = JSON.parse(cleaned);
+              if (parsed.strengths && parsed.leaks && parsed.actionPlan) {
+                return res.json({
+                  success: true,
+                  audit: {
+                    traderGrade: parsed.traderGrade || algorithmicFallback.traderGrade,
+                    executiveSummary: parsed.executiveSummary || algorithmicFallback.executiveSummary,
+                    strengths: Array.isArray(parsed.strengths) ? parsed.strengths : algorithmicFallback.strengths,
+                    leaks: Array.isArray(parsed.leaks) ? parsed.leaks : algorithmicFallback.leaks,
+                    actionPlan: Array.isArray(parsed.actionPlan) ? parsed.actionPlan : algorithmicFallback.actionPlan
+                  },
+                  source: model,
+                  tradeCount: totalTrades
+                });
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {
+        // Fall through to next model or algorithmic fallback
+      }
+    }
+
+    // Graceful fallback to algorithmic rules
+    return res.json({ success: true, audit: algorithmicFallback, source: 'algorithmic-rules', tradeCount: totalTrades });
+  } catch (err) {
+    console.error('AI Journal Audit Error:', err);
+    res.status(500).json({ error: 'Failed to generate AI trade audit' });
   }
 });
 

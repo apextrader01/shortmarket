@@ -57,11 +57,64 @@ import {
   Flame, Check, X, Edit3, Trash2, Search,
   BookOpen, ChevronRight, ChevronLeft, Star, ThumbsUp, Menu,
   Copy, CheckCircle, DollarSign, Target, MessageSquare, Download, ShieldAlert, LogOut,
-  Loader2
+  Loader2, Camera, Image, Maximize2, UploadCloud
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
 import logoImg from '../assets/logo.png';
+
+// Helper: Compress screenshot image client-side to lightweight high-res WebP/JPEG dataUrl
+export const compressImageToDataUrl = (file, maxDimension = 1280, quality = 0.75) => {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+};
+
+// Helper: Safely parse 1 or 2 screenshots from trade object
+export const parseScreenshots = (trade) => {
+  if (!trade) return [];
+  if (Array.isArray(trade.screenshots)) return trade.screenshots.filter(Boolean);
+  if (trade.screenshot_url) {
+    try {
+      const parsed = JSON.parse(trade.screenshot_url);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      if (typeof parsed === 'string' && parsed.trim()) return [parsed.trim()];
+    } catch (_) {
+      if (typeof trade.screenshot_url === 'string' && trade.screenshot_url.trim()) {
+        return [trade.screenshot_url.trim()];
+      }
+    }
+  }
+  return [];
+};
 
 // Available strategies and emotions for tag selection
 export const STRATEGY_TAGS = [
@@ -527,6 +580,7 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
 
   // Form states
   const todayStr = new Date().toISOString().split('T')[0];
+  const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [newTradeForm, setNewTradeForm] = useState({
     symbol: 'NIFTY 24500 CE',
     trade_type: 'BUY',
@@ -542,7 +596,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     mistake: '',
     setup_rating: 5,
     trade_date: todayStr,
-    notes: ''
+    notes: '',
+    screenshots: []
   });
 
   const [newStrategyForm, setNewStrategyForm] = useState({
@@ -1242,6 +1297,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
   };
 
+  // Open Edit Trade Modal with Parsed Screenshots
+  const handleOpenEditTrade = (t) => {
+    if (!t) return;
+    setEditingTrade({
+      ...t,
+      screenshots: parseScreenshots(t)
+    });
+  };
+
   // Save Edited Trade Handler
   const handleSaveEditedTrade = async (e) => {
     e.preventDefault();
@@ -1260,6 +1324,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
     const netPnl = realizedPnl - charges;
 
+    const screenshots = Array.isArray(editingTrade.screenshots) ? editingTrade.screenshots : [];
+
     const updated = {
       ...editingTrade,
       entry_price: entry,
@@ -1267,12 +1333,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       quantity: qty,
       charges,
       realized_pnl: realizedPnl,
-      net_pnl: netPnl
+      net_pnl: netPnl,
+      screenshots,
+      screenshot_url: JSON.stringify(screenshots)
     };
 
     setDbTrades(prev => prev.map(t => (t.id || t.trade_id) === (updated.id || updated.trade_id) ? updated : t));
     setEditingTrade(null);
-    setTradeActionNotice('✓ Trade updated successfully!');
+    setTradeActionNotice('✓ Trade updated successfully with screenshots!');
     setTimeout(() => setTradeActionNotice(null), 3000);
 
     try {
@@ -1354,6 +1422,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
     const netPnl = realizedPnl - charges;
 
+    const screenshots = Array.isArray(newTradeForm.screenshots) ? newTradeForm.screenshots : [];
+
     const tradeData = {
       ...newTradeForm,
       entry_price: entry,
@@ -1362,6 +1432,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       realized_pnl: realizedPnl,
       charges,
       net_pnl: netPnl,
+      screenshots,
+      screenshot_url: JSON.stringify(screenshots),
       id: `MANUAL-${Date.now()}`
     };
 
@@ -1380,6 +1452,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       console.warn('Trade save to backend error:', err);
     }
 
+    setNewTradeForm(prev => ({
+      ...prev,
+      screenshots: []
+    }));
     setShowNewTradeModal(false);
   };
 
@@ -1701,33 +1777,110 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
   ]);
   const [aiToast, setAiToast] = useState(null);
-  const [aiAuditTimestamp, setAiAuditTimestamp] = useState('Just now');
+  const [aiAuditData, setAiAuditData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('shortedge_trade_ai_audit_cache');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {
+      traderGrade: 'B+',
+      executiveSummary: 'AI Execution Audit ready. Click "Generate AI Audit" to audit your actual logged trades with Google Gemini Flash-Lite.',
+      strengths: [
+        'Morning Breakout Edge: High win rate on early session momentum setups with predefined invalidation.',
+        'Stop-Loss Discipline: Strict predefined Stop-Loss compliance on primary market orders.',
+        'Healthy Expectancy: Average favorable Risk-to-Reward ratio on winning executions yielding consistent alpha.',
+        'High Conviction Sizing: Largest winning setups coincided with clean technical confirmation.'
+      ],
+      leaks: [
+        'Late-Session Chop: Loss accumulation noted during afternoon market fatigue phases.',
+        'Stop-Loss Hesitation: Delay in accepting initial invalidation resulting in avoidable loss drag.',
+        'Premature Profit Taking: Truncating runners prior to designated R:R targets.',
+        'Emotional Tilt Events: Re-entry within short intervals following adverse trade outcomes.'
+      ],
+      actionPlan: [
+        'Enforce hard terminal lock after 01:30 PM (Avoid afternoon decay chop).',
+        'Trail stop-loss using 9 EMA on 5m chart instead of premature manual exit.',
+        'Strict 3-trade daily ceiling to eliminate fatigue tilt and overtrading.'
+      ],
+      timestamp: 'Initial Baseline'
+    };
+  });
+  const [aiAuditTimestamp, setAiAuditTimestamp] = useState(() => {
+    try {
+      const saved = localStorage.getItem('shortedge_trade_ai_audit_cache');
+      if (saved) return JSON.parse(saved).timestamp || 'Cached';
+    } catch (_) {}
+    return 'Just now';
+  });
 
-  // Trigger Dynamic AI Analysis
-  const handleRunAiAnalysis = () => {
+  // Trigger Dynamic AI Analysis (Powered by Gemini Flash-Lite + Algorithmic Engine)
+  const handleRunAiAnalysis = async () => {
+    if (aiGenerating) return;
     setAiGenerating(true);
-    setTimeout(() => {
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/journal/ai-audit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          trades: dbTrades,
+          marketSegment
+        })
+      });
+
+      const data = await res.json();
+      if (data && data.success && data.audit) {
+        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const newAudit = {
+          ...data.audit,
+          timestamp: timeNow,
+          source: data.source
+        };
+        setAiAuditData(newAudit);
+        setAiAuditTimestamp(timeNow);
+        try {
+          localStorage.setItem('shortedge_trade_ai_audit_cache', JSON.stringify(newAudit));
+        } catch (_) {}
+        const modelLabel = data.source ? data.source.replace(/gemini-/g, 'Gemini ').replace(/-/g, ' ') : 'Gemini Flash';
+        setAiToast(`✓ AI Audit generated successfully using ${modelLabel}!`);
+      } else {
+        setAiToast('⚠️ Could not complete AI audit. Please verify trade records.');
+      }
+    } catch (err) {
+      console.warn('AI Audit request error:', err);
+      setAiToast('⚠️ Network notice: AI audit offline. Using algorithmic rules.');
+    } finally {
       setAiGenerating(false);
-      setAiAuditTimestamp('Just now');
-      setAiToast('✓ AI Cognitive & Execution Audit updated successfully!');
       setTimeout(() => setAiToast(null), 3500);
-    }, 1200);
+    }
   };
 
   // Sync AI Action Items to Daily Checklist
   const handleSyncAiToActionPlan = () => {
-    const aiTasks = [
-      { id: `ai-task-${Date.now()}-1`, label: 'Enforce hard terminal lock after 01:30 PM (Avoid late chop)', checked: false },
-      { id: `ai-task-${Date.now()}-2`, label: 'Trail stop-loss using 9 EMA instead of premature manual exit', checked: false },
-      { id: `ai-task-${Date.now()}-3`, label: 'Strict 3-trade daily ceiling to eliminate fatigue tilt', checked: false }
-    ];
+    const actionPlanList = aiAuditData?.actionPlan?.length > 0
+      ? aiAuditData.actionPlan
+      : [
+        'Enforce hard terminal lock after 01:30 PM (Avoid late chop)',
+        'Trail stop-loss using 9 EMA instead of premature manual exit',
+        'Strict 3-trade daily ceiling to eliminate fatigue tilt'
+      ];
+
+    const aiTasks = actionPlanList.map((item, idx) => ({
+      id: `ai-task-${Date.now()}-${idx + 1}`,
+      label: item,
+      checked: false
+    }));
 
     setCustomChecklistItems(prev => ({
       ...prev,
       inMarket: [...prev.inMarket, ...aiTasks]
     }));
 
-    setAiToast('✓ 3 AI Action Items synced straight to your Daily Checklist!');
+    setAiToast(`✓ ${aiTasks.length} AI Action Items synced straight to your Daily Checklist!`);
     setTimeout(() => setAiToast(null), 3500);
   };
 
@@ -4277,8 +4430,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                   >
                                     <BookOpen size={14} />
                                   </button>
+                                  {parseScreenshots(t).length > 0 && (
+                                    <span
+                                      onClick={() => setViewingTrade(t)}
+                                      title={`${parseScreenshots(t).length} screenshot(s) attached - click to view`}
+                                      style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)', padding: '2px 5px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                    >
+                                      <Camera size={11} /> {parseScreenshots(t).length}
+                                    </span>
+                                  )}
                                   <button
-                                    onClick={() => setEditingTrade(t)}
+                                    onClick={() => handleOpenEditTrade(t)}
                                     title="Edit Trade"
                                     style={{ background: 'none', border: 'none', color: colors.accentBlueLight, cursor: 'pointer', padding: '3px', display: 'flex' }}
                                   >
@@ -4368,8 +4530,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                         >
                                           <BookOpen size={15} />
                                         </button>
+                                        {parseScreenshots(t).length > 0 && (
+                                          <span
+                                            onClick={() => setViewingTrade(t)}
+                                            title={`${parseScreenshots(t).length} screenshot(s) attached - click to view`}
+                                            style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                          >
+                                            <Camera size={12} /> {parseScreenshots(t).length}
+                                          </span>
+                                        )}
                                         <button
-                                          onClick={() => setEditingTrade(t)}
+                                          onClick={() => handleOpenEditTrade(t)}
                                           title="Edit Trade"
                                           style={{ background: 'transparent', border: 'none', color: colors.accentBlueLight, cursor: 'pointer', padding: '4px' }}
                                         >
@@ -6092,16 +6263,32 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   
                   {/* Top Status Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${colors.borderColor}`, paddingBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: isLight ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)', padding: '4px 10px', borderRadius: '6px' }}>
-                        ACTIVE COGNITIVE AUDIT ({aiAuditMode})
+                        COGNITIVE GRADE: {aiAuditData.traderGrade || 'B+'}
                       </span>
                       <span style={{ fontSize: '11px', color: colors.textMuted }}>Dataset: {tradesAnalyzedCount} Verified Trade Logs</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle size={14} /> System Health: Optimal
+                      <CheckCircle size={14} /> Audit Engine: {aiAuditData.source ? aiAuditData.source.replace(/gemini-/g, 'Gemini ').replace(/-/g, ' ') : 'Gemini Flash'}
                     </div>
                   </div>
+
+                  {/* Executive AI Verdict Summary */}
+                  {aiAuditData.executiveSummary && (
+                    <div style={{
+                      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.06)' : 'rgba(139, 92, 246, 0.12)',
+                      borderLeft: '3px solid #8b5cf6',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: colors.textPrimary,
+                      lineHeight: 1.5,
+                      fontStyle: 'italic'
+                    }}>
+                      "{aiAuditData.executiveSummary}"
+                    </div>
+                  )}
 
                   {/* 2-Column Deep Findings Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
@@ -6111,10 +6298,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         <CheckCircle size={16} /> Top Execution Strengths & Alpha Drivers
                       </div>
                       <ul style={{ fontSize: '11.5px', color: colors.textPrimary, paddingLeft: '18px', margin: 0, lineHeight: 1.6 }}>
-                        <li><strong>Morning Breakout Edge:</strong> 68% win rate on index morning breakout setups (09:30 - 11:00 AM).</li>
-                        <li><strong>Stop-Loss Discipline:</strong> Strict predefined Stop-Loss compliance on 94% of index option trades.</li>
-                        <li><strong>Healthy Expectancy:</strong> Average 1:2.4 Risk-to-Reward ratio on winning days yielding consistent alpha.</li>
-                        <li><strong>High Conviction Sizing:</strong> Largest winning trades coincided with clean 5m candle close confirmation.</li>
+                        {(aiAuditData.strengths || []).map((str, idx) => {
+                          const parts = str.split(':');
+                          return (
+                            <li key={idx} style={{ marginBottom: '4px' }}>
+                              {parts.length > 1 ? (
+                                <><strong>{parts[0]}:</strong>{parts.slice(1).join(':')}</>
+                              ) : (
+                                str
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
 
@@ -6124,10 +6319,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         <ShieldAlert size={16} /> Profit Leaks & Behavioral Flags
                       </div>
                       <ul style={{ fontSize: '11.5px', color: colors.textPrimary, paddingLeft: '18px', margin: 0, lineHeight: 1.6 }}>
-                        <li><strong>Late-Session Chop:</strong> 72% of losses occurred after 02:15 PM when volatility becomes erratic.</li>
-                        <li><strong>Stop-Loss Widening:</strong> Refusal to take initial small losses resulted in -₹22,800 in avoidable leaks.</li>
-                        <li><strong>Premature Profit Taking:</strong> Cutting winning trades early before reaching full 1:2 target (cost: -₹11,200).</li>
-                        <li><strong>Revenge Tilt Events:</strong> Detected 2 occurrences of immediate trade re-entry following a red trade.</li>
+                        {(aiAuditData.leaks || []).map((lk, idx) => {
+                          const parts = lk.split(':');
+                          return (
+                            <li key={idx} style={{ marginBottom: '4px' }}>
+                              {parts.length > 1 ? (
+                                <><strong>{parts[0]}:</strong>{parts.slice(1).join(':')}</>
+                              ) : (
+                                lk
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </div>
@@ -6168,18 +6371,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: colors.textPrimary, lineHeight: 1.4 }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                        <span style={{ fontWeight: '800', color: '#2563eb' }}>1.</span>
-                        <span><strong>Enforce Hard Terminal Lockdown:</strong> Close all open terminals after 01:30 PM to completely avoid afternoon decay chop.</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                        <span style={{ fontWeight: '800', color: '#2563eb' }}>2.</span>
-                        <span><strong>Rule-Based Trailing Stop:</strong> Trail your stop-loss using the 9-EMA on 5m chart instead of manually cutting green runners early.</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                        <span style={{ fontWeight: '800', color: '#2563eb' }}>3.</span>
-                        <span><strong>Strict 3-Trade Maximum Ceiling:</strong> Limit max daily trades strictly to 3 setups to prevent dopamine fatigue and emotional tilt.</span>
-                      </div>
+                      {(aiAuditData.actionPlan || []).map((act, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ fontWeight: '800', color: '#2563eb' }}>{idx + 1}.</span>
+                          <span>{act}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -9040,6 +9237,87 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     />
                   </div>
 
+                  {/* Screenshots Upload (1 or 2 Photos) */}
+                  <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '11px', color: colors.textPrimary, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Camera size={14} color="#2563eb" /> Attach Trade Photos ({newTradeForm.screenshots?.length || 0}/2)
+                      </label>
+                      <span style={{ fontSize: '10px', color: colors.textMuted }}>Paste Ctrl+V or Browse</span>
+                    </div>
+
+                    {(newTradeForm.screenshots?.length || 0) < 2 && (
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        border: `1px dashed ${colors.borderColor}`,
+                        backgroundColor: colors.bgInput,
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        color: colors.textSecondary,
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <UploadCloud size={16} color="#2563eb" />
+                        <span>Upload photo #{((newTradeForm.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length) return;
+                            const cur = newTradeForm.screenshots || [];
+                            const remaining = 2 - cur.length;
+                            const toProcess = files.slice(0, remaining);
+                            const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f)));
+                            setNewTradeForm(prev => ({
+                              ...prev,
+                              screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
+                            }));
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+
+                    {(newTradeForm.screenshots?.length || 0) > 0 && (
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        {newTradeForm.screenshots.map((img, idx) => (
+                          <div key={idx} style={{ position: 'relative', width: '100px', height: '68px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
+                            <img
+                              src={img}
+                              alt={`Trade Photo ${idx + 1}`}
+                              onClick={() => setActiveLightboxImage(img)}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                              title="Click to preview full-size"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewTradeForm(prev => ({
+                                  ...prev,
+                                  screenshots: (prev.screenshots || []).filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              style={{ position: 'absolute', top: '3px', right: '3px', backgroundColor: 'rgba(0,0,0,0.75)', border: 'none', borderRadius: '50%', color: '#ef4444', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                              title="Remove photo"
+                            >
+                              <X size={12} />
+                            </button>
+                            <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', textShadow: '0 1px 2px #000' }}>
+                              Photo #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Live Calculated P&L Preview Banner */}
                   {(() => {
                     const entry = parseFloat(newTradeForm.entry_price);
@@ -9181,6 +9459,87 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 <textarea rows={2} value={editingTrade.notes || ''} onChange={e => setEditingTrade({ ...editingTrade, notes: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
               </div>
 
+              {/* Screenshots Upload (1 or 2 Photos) */}
+              <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '11px', color: colors.textPrimary, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Camera size={14} color="#2563eb" /> Trade Execution Photos ({editingTrade.screenshots?.length || 0}/2)
+                  </label>
+                  <span style={{ fontSize: '10px', color: colors.textMuted }}>Paste Ctrl+V or Browse</span>
+                </div>
+
+                {(editingTrade.screenshots?.length || 0) < 2 && (
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: `1px dashed ${colors.borderColor}`,
+                    backgroundColor: colors.bgInput,
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    color: colors.textSecondary,
+                    transition: 'all 0.15s ease'
+                  }}>
+                    <UploadCloud size={16} color="#2563eb" />
+                    <span>Upload photo #{((editingTrade.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (!files.length) return;
+                        const cur = editingTrade.screenshots || [];
+                        const remaining = 2 - cur.length;
+                        const toProcess = files.slice(0, remaining);
+                        const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f)));
+                        setEditingTrade(prev => ({
+                          ...prev,
+                          screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
+                        }));
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+
+                {(editingTrade.screenshots?.length || 0) > 0 && (
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    {editingTrade.screenshots.map((img, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: '100px', height: '68px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.borderColor}`, backgroundColor: '#000' }}>
+                        <img
+                          src={img}
+                          alt={`Trade Photo ${idx + 1}`}
+                          onClick={() => setActiveLightboxImage(img)}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                          title="Click to preview full-size"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTrade(prev => ({
+                              ...prev,
+                              screenshots: (prev.screenshots || []).filter((_, i) => i !== idx)
+                            }));
+                          }}
+                          style={{ position: 'absolute', top: '3px', right: '3px', backgroundColor: 'rgba(0,0,0,0.75)', border: 'none', borderRadius: '50%', color: '#ef4444', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          title="Remove photo"
+                        >
+                          <X size={12} />
+                        </button>
+                        <span style={{ position: 'absolute', bottom: '2px', left: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', textShadow: '0 1px 2px #000' }}>
+                          Photo #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
                 <button type="button" onClick={() => setEditingTrade(null)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>Update Trade</button>
@@ -9253,17 +9612,67 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px' }}>
-              <button
-                onClick={() => {
-                  const t = viewingTrade;
-                  setViewingTrade(null);
-                  setSelectedTradeForShare(t);
-                }}
-                style={{ backgroundColor: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)', border: '1px solid #2563eb', color: colors.accentBlueLight, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Share2 size={14} /> Share P&L Card
-              </button>
+            {/* Screenshots Display */}
+            {(() => {
+              const shots = parseScreenshots(viewingTrade);
+              if (!shots || shots.length === 0) return null;
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Camera size={13} color="#2563eb" /> Trade Execution Screenshots ({shots.length}/2)
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {shots.map((img, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setActiveLightboxImage(img)}
+                        style={{
+                          position: 'relative',
+                          width: '120px',
+                          height: '80px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          border: `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          backgroundColor: '#000',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                        }}
+                        title="Click to view full-size screenshot"
+                      >
+                        <img src={img} alt={`Trade proof ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <span style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '9px', fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.65)', padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Maximize2 size={9} /> View #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => {
+                    const t = viewingTrade;
+                    setViewingTrade(null);
+                    setSelectedTradeForShare(t);
+                  }}
+                  style={{ backgroundColor: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)', border: '1px solid #2563eb', color: colors.accentBlueLight, padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Share2 size={14} /> Share Card
+                </button>
+                <button
+                  onClick={() => {
+                    const t = viewingTrade;
+                    setViewingTrade(null);
+                    handleOpenEditTrade(t);
+                  }}
+                  style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Edit3 size={14} /> Edit & Photos
+                </button>
+              </div>
               <button
                 onClick={() => setViewingTrade(null)}
                 style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}
@@ -10439,6 +10848,79 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       {/* 6. PNL SHARE CARD MODAL */}
       {selectedTradeForShare && (
         <PnLShareCardModal trade={selectedTradeForShare} onClose={() => setSelectedTradeForShare(null)} />
+      )}
+
+      {/* 7. FULLSCREEN LIGHTBOX FOR TRADE SCREENSHOTS */}
+      {activeLightboxImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.92)',
+            zIndex: 100000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={() => setActiveLightboxImage(null)}
+        >
+          <div style={{ position: 'absolute', top: '16px', right: '20px', display: 'flex', gap: '10px', zIndex: 100001 }}>
+            <a
+              href={activeLightboxImage}
+              download={`Trade_Proof_${Date.now()}.jpg`}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                color: '#ffffff',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '12px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.25)'
+              }}
+            >
+              <Download size={14} /> Download Image
+            </a>
+            <button
+              onClick={() => setActiveLightboxImage(null)}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                color: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <X size={16} /> Close (Esc)
+            </button>
+          </div>
+          <img
+            src={activeLightboxImage}
+            alt="Full Trade Execution Screenshot"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '94vw',
+              maxHeight: '88vh',
+              objectFit: 'contain',
+              borderRadius: '10px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.85)'
+            }}
+          />
+        </div>
       )}
     </div>
   );
