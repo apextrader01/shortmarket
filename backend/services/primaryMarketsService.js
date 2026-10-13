@@ -19,6 +19,7 @@ let bhavcopySummaryStats = {
   asOfDate: ''
 };
 let marketDealsCache = [];
+let cachedTradingDates = [];
 let marketDealsSummaryStats = {
   totalDeals: 0,
   bulkCount: 0,
@@ -27,7 +28,9 @@ let marketDealsSummaryStats = {
   totalFlowCr: 0,
   buyFlowCr: 0,
   sellFlowCr: 0,
-  latestDate: ''
+  latestDate: '',
+  yesterdayDate: '',
+  recentDates: []
 };
 let ipoListCache = [];
 let sharedPriceCacheRef = null;
@@ -721,6 +724,8 @@ function populateRollingMarketDeals(liveDeals = []) {
     }
   }
   const latestDate = tradingDates[0] || getIstDateInfo(0).iso;
+  const yesterdayDate = tradingDates[1] || getIstDateInfo(1).iso;
+  cachedTradingDates = tradingDates;
 
   // Use ALL active equities across NSE and BSE so deal universe includes all stocks
   const verifiedStocks = bhavcopyDeliveryCache.filter(s => s && s.symbol && s.ltp > 0);
@@ -854,6 +859,22 @@ function populateRollingMarketDeals(liveDeals = []) {
   });
 
   marketDealsCache = combinedDeals;
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const recentDates = tradingDates.slice(0, 7).map((iso, idx) => {
+    const parts = iso.split('-');
+    const dd = parseInt(parts[2], 10);
+    const mm = parseInt(parts[1], 10);
+    const mmm = monthsShort[mm - 1] || 'Oct';
+    return {
+      iso,
+      shortLabel: `${dd}-${mmm}`,
+      display: `${dd}-${mmm}-${parts[0]}`,
+      label: idx === 0 ? `Today (${dd}-${mmm})` : idx === 1 ? `Yesterday (${dd}-${mmm})` : `${dd}-${mmm}`,
+      isToday: idx === 0,
+      isYesterday: idx === 1
+    };
+  });
+
   marketDealsSummaryStats = {
     totalDeals: combinedDeals.length,
     bulkCount,
@@ -866,7 +887,9 @@ function populateRollingMarketDeals(liveDeals = []) {
     totalFlowCr: Math.round(totalFlowCr),
     buyFlowCr: Math.round(buyFlowCr),
     sellFlowCr: Math.round(sellFlowCr),
-    latestDate
+    latestDate,
+    yesterdayDate,
+    recentDates
   };
 }
 
@@ -2422,21 +2445,28 @@ function getMarketDeals(query = {}) {
   const colPrice = opts.colPrice || '';
   const colValue = opts.colValue || '';
 
-  const latestIso = marketDealsSummaryStats.latestDate || getIstDateInfo(0).iso;
+  const latestIso = marketDealsSummaryStats.latestDate || (cachedTradingDates[0]) || getIstDateInfo(0).iso;
+  const yesterdayIso = marketDealsSummaryStats.yesterdayDate || (cachedTradingDates[1]) || getIstDateInfo(1).iso;
 
   // 1. Establish base scope matching active Date, Exchange, and MinSize filters
   // This provides accurate counts for the Category pills and Institution Desk buttons!
   const scopeBase = marketDealsCache.filter(d => {
     if (exchange !== 'ALL' && d.exchange !== exchange) return false;
     if (minSize > 0 && (d.valueCr || 0) < minSize) return false;
-    if (dateRange === 'TODAY') {
+    if (dateRange === 'TODAY' || dateRange === 'LATEST') {
       if (d.date !== latestIso) return false;
-    } else if (dateRange === 'WEEK') {
+    } else if (dateRange === 'YESTERDAY' || dateRange === 'LAST_DAY' || dateRange === 'PREV') {
+      if (d.date !== yesterdayIso) return false;
+    } else if (dateRange === 'WEEK' || dateRange === 'PAST_7_DAYS') {
       const diff = getDaysDiff(latestIso, d.date);
       if (diff < 0 || diff > 7) return false;
-    } else if (dateRange === 'MONTH') {
+    } else if (dateRange === 'MONTH' || dateRange === 'PAST_30_DAYS') {
       const diff = getDaysDiff(latestIso, d.date);
       if (diff < 0 || diff > 31) return false;
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(opts.dateRange || '')) {
+      if (d.date !== opts.dateRange) return false;
+    } else if (opts.selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.selectedDate)) {
+      if (d.date !== opts.selectedDate) return false;
     }
     return true;
   });
@@ -2568,7 +2598,9 @@ function getMarketDeals(query = {}) {
       totalFlowCr: Math.round(totalFlowCr),
       buyFlowCr: Math.round(buyFlowCr),
       sellFlowCr: Math.round(sellFlowCr),
-      latestDate: marketDealsSummaryStats.latestDate || latestIso
+      latestDate: marketDealsSummaryStats.latestDate || latestIso,
+      yesterdayDate: yesterdayIso,
+      recentDates: marketDealsSummaryStats.recentDates || []
     }
   };
 }

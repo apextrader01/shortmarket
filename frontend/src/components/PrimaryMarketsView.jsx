@@ -34,7 +34,42 @@ function getClientCompletedTradingDate() {
   };
 }
 
+// Helper: Get list of recent completed trading days in IST (skipping weekends)
+function getClientRecentTradingDays(count = 7) {
+  const days = [];
+  const now = new Date();
+  const istMs = now.getTime() + (5.5 * 60 * 60 * 1000);
+  const d = new Date(istMs);
+  if (d.getUTCHours() < 18 || (d.getUTCHours() === 18 && d.getUTCMinutes() < 55)) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  for (let i = 0; i < count; i++) {
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const shortLabel = `${parseInt(dd, 10)}-${months[d.getUTCMonth()]}`;
+    days.push({
+      iso: `${yyyy}-${mm}-${dd}`,
+      display: `${dd}-${months[d.getUTCMonth()]}-${yyyy}`,
+      shortLabel,
+      label: i === 0 ? `Today (${shortLabel})` : i === 1 ? `Yesterday (${shortLabel})` : shortLabel,
+      isToday: i === 0,
+      isYesterday: i === 1
+    });
+    d.setUTCDate(d.getUTCDate() - 1);
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+      d.setUTCDate(d.getUTCDate() - 1);
+    }
+  }
+  return days;
+}
+
 const DEFAULT_TRADING_DATE = getClientCompletedTradingDate();
+const DEFAULT_RECENT_TRADING_DAYS = getClientRecentTradingDays(7);
 
 const SEED_BHAVCOPY_DATA = [
   { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'BOTH', bseCode: '500180', isFnO: true, ltp: 1682.40, vwap: 1676.20, high: 1692.00, low: 1665.00, change: 0.90, volume: 15420000, delivQty: 12490200, delivPct: 81.0, turnoverCr: 259.42, surgeMult: 3.1, is52wHigh: false, is52wLow: false, aboveVwap: true, sector: 'Banking & Financials' },
@@ -178,7 +213,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     totalFlowCr: 161763,
     buyFlowCr: 92689,
     sellFlowCr: 69074,
-    latestDate: DEFAULT_TRADING_DATE.iso
+    latestDate: DEFAULT_TRADING_DATE.iso,
+    yesterdayDate: DEFAULT_RECENT_TRADING_DAYS[1]?.iso || '',
+    recentDates: DEFAULT_RECENT_TRADING_DAYS
   });
   const [dealsTotalFiltered, setDealsTotalFiltered] = useState(1141);
   const [dealsPage, setDealsPage] = useState(1);
@@ -661,7 +698,23 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     document.body.removeChild(link);
   };
 
-  const latestDealBadge = formatDateBadge(dealsStats.latestDate);
+  const latestDealBadge = formatDateBadge(dealsStats.latestDate || DEFAULT_TRADING_DATE.iso);
+  const yesterdayDealBadge = formatDateBadge(dealsStats.yesterdayDate || DEFAULT_RECENT_TRADING_DAYS[1]?.iso);
+  const recentDaysList = (dealsStats.recentDates && dealsStats.recentDates.length > 0)
+    ? dealsStats.recentDates
+    : DEFAULT_RECENT_TRADING_DAYS;
+
+  const activeDateHeaderLabel = useMemo(() => {
+    if (dealsDateRange === 'ALL') return 'All Rolling 30 Days';
+    if (dealsDateRange === 'TODAY') return `Today (${latestDealBadge} EOD)`;
+    if (dealsDateRange === 'YESTERDAY') return `Yesterday (${yesterdayDealBadge} EOD)`;
+    if (dealsDateRange === 'WEEK') return 'Past 7 Days';
+    if (dealsDateRange === 'MONTH') return 'Past 30 Days';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange)) {
+      return `${formatDateBadge(dealsDateRange)} EOD`;
+    }
+    return dealsDateRange;
+  }, [dealsDateRange, latestDealBadge, yesterdayDealBadge]);
 
   return (
     <div style={{
@@ -1195,7 +1248,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Deals KPI Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Deals (As of {latestDealBadge} EOD)</div>
+              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Deals ({activeDateHeaderLabel})</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
                 {dealsTotalFiltered.toLocaleString('en-IN')} / {dealsStats.totalDeals.toLocaleString('en-IN')} Deals
               </div>
@@ -1326,7 +1379,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Date:</span>
                 {[
                   { id: 'ALL', label: 'All Dates' },
-                  { id: 'TODAY', label: `Latest EOD (${latestDealBadge})` },
+                  { id: 'TODAY', label: `Today (${latestDealBadge})` },
+                  { id: 'YESTERDAY', label: `Yesterday (${yesterdayDealBadge})` },
                   { id: 'WEEK', label: 'Past 7 Days' },
                   { id: 'MONTH', label: 'Past 30 Days' }
                 ].map(dt => (
@@ -1391,6 +1445,131 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Row 4: Last 7 Trading Days Quick-Select Bar + Small Calendar Picker */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#c084fc', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
+                <Calendar size={13} />
+                <span>Last 7 Days:</span>
+              </div>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {recentDaysList.map((dItem, idx) => {
+                  const isSelected = dealsDateRange === dItem.iso ||
+                    (idx === 0 && dealsDateRange === 'TODAY') ||
+                    (idx === 1 && dealsDateRange === 'YESTERDAY');
+                  return (
+                    <button
+                      key={dItem.iso}
+                      type="button"
+                      onClick={() => setDealsDateRange(dItem.iso)}
+                      style={{
+                        padding: '3px 9px',
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        background: isSelected ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.04)',
+                        color: isSelected ? '#f3e8ff' : '#cbd5e1',
+                        border: isSelected ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                        boxShadow: isSelected ? '0 0 10px rgba(168,85,247,0.25)' : 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`Filter deals for ${dItem.display || dItem.iso}`}
+                    >
+                      {dItem.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Small Calendar Picker */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '3px 8px',
+                  borderRadius: '10px',
+                  background: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? 'rgba(168,85,247,0.25)' : 'rgba(255,255,255,0.04)',
+                  border: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.08)',
+                  color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#c084fc' : '#94a3b8',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}
+                title="Pick custom date from calendar"
+              >
+                <Calendar size={13} color={/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#c084fc' : '#94a3b8'} />
+                <span style={{ fontSize: '11px', fontWeight: '700' }}>Calendar:</span>
+                <input
+                  type="date"
+                  aria-label="Pick date from calendar"
+                  value={/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? dealsDateRange : ''}
+                  max={dealsStats.latestDate || DEFAULT_TRADING_DATE.iso}
+                  onChange={e => {
+                    if (e.target.value) {
+                      setDealsDateRange(e.target.value);
+                    }
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#f3e8ff' : '#94a3b8',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    colorScheme: 'dark',
+                    fontFamily: 'inherit'
+                  }}
+                />
+                {/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) && (
+                  <button
+                    type="button"
+                    title="Clear custom date"
+                    onClick={() => setDealsDateRange('ALL')}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      color: '#fff',
+                      width: '15px',
+                      height: '15px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {dealsDateRange !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setDealsDateRange('ALL')}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    background: 'rgba(239,68,68,0.12)',
+                    color: '#f87171',
+                    border: '1px solid rgba(239,68,68,0.3)',
+                    marginLeft: isMobile ? '0' : 'auto'
+                  }}
+                >
+                  Show All Dates
+                </button>
+              )}
             </div>
           </div>
 
@@ -1512,7 +1691,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ) : (
                   dealsData.map((deal, idx) => (
                     <tr key={deal.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '12px 14px', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: '600' }}>{deal.date}</td>
+                      <td
+                        onClick={() => setDealsDateRange(deal.date)}
+                        style={{ padding: '12px 14px', color: '#c084fc', whiteSpace: 'nowrap', fontWeight: '600', cursor: 'pointer' }}
+                        title={`Click to filter deals by ${deal.date}`}
+                      >
+                        {deal.date}
+                      </td>
                       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontWeight: '700', color: '#fff' }}>{deal.symbol}</span>
