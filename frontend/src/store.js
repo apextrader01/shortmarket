@@ -2545,7 +2545,11 @@ export const useStore = create(persist((set, get) => ({
 
   fetchAdminTelemetry: async (timeframe = 'all') => {
     try {
-      const res = await fetch(`${API}/api/admin/telemetry?timeframe=${timeframe}`, { credentials: 'omit' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telemetry?timeframe=${timeframe}`, {
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       if (data && !data.error) {
         set({ adminTelemetry: data });
@@ -2561,6 +2565,7 @@ export const useStore = create(persist((set, get) => ({
       const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/admin/telemetry/reset`, {
         method: 'POST',
+        credentials: 'include',
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       const data = await res.json();

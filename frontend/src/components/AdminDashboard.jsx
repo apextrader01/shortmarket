@@ -1925,9 +1925,9 @@ export default function AdminDashboard() {
       );
     }
     if (userFilter === 'ACTIVE_ONLY') {
-      list = list.filter(u => !String(u.username || '').includes('Deleted') && !String(u.username || '').includes('Anonymous') && u.userId !== 'unknown');
+      list = list.filter(u => !u.isDeleted && Boolean(u.clientId || u.existsInDb) && !String(u.username || '').toLowerCase().includes('deleted') && !String(u.username || '').toLowerCase().includes('anonymous') && u.userId !== 'unknown');
     } else if (userFilter === 'DELETED_ONLY') {
-      list = list.filter(u => String(u.username || '').includes('Deleted') || String(u.username || '').includes('Anonymous') || u.userId === 'unknown');
+      list = list.filter(u => u.isDeleted === true || !u.clientId || String(u.username || '').toLowerCase().includes('deleted') || String(u.username || '').toLowerCase().includes('anonymous') || u.userId === 'unknown');
     } else if (userFilter === 'HEAVY') {
       list = list.filter(u => (u.apiCalls || 0) >= 500 || (u.apiBytes || 0) >= 1048576);
     }
@@ -7526,6 +7526,47 @@ export default function AdminDashboard() {
                   <Download size={10} /> CSV
                 </button>
 
+                {/* Purge Ghost/Test Users */}
+                <button
+                  onClick={async () => {
+                    if (window.confirm('🧹 Clean ghost/test users from Redis? This will delete all telemetry records for users who no longer exist in PostgreSQL.')) {
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API}/api/admin/telemetry/purge-ghosts`, {
+                          method: 'POST',
+                          credentials: 'include',
+                          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+                        });
+                        const data = await res.json();
+                        if (data?.success) {
+                          alert(`✅ Successfully purged ${data.purgedCount || 0} ghost/test users from Redis!`);
+                          fetchAdminTelemetry?.(telemetryTimeframe);
+                        } else {
+                          alert(data?.error || 'Failed to purge ghost users');
+                        }
+                      } catch (err) {
+                        alert(`Error: ${err.message}`);
+                      }
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    border: '1px solid rgba(234,179,8,0.3)',
+                    background: 'rgba(234,179,8,0.1)',
+                    color: '#eab308',
+                    cursor: 'pointer'
+                  }}
+                  title="Remove purged test/dummy users from Redis telemetry"
+                >
+                  <Sparkles size={10} /> Purge Test Users
+                </button>
+
                 {/* Reset Metrics */}
                 <button
                   onClick={async () => {
@@ -7958,7 +7999,7 @@ export default function AdminDashboard() {
                       ) : (
                         filteredUsers.map((u, idx) => {
                           const sizeMb = (u.apiBytes / (1024 * 1024)).toFixed(3);
-                          const isDeleted = String(u.username || '').includes('Deleted') || String(u.username || '').includes('Anonymous');
+                          const isDeleted = u.isDeleted === true || !u.clientId || String(u.username || '').toLowerCase().includes('deleted') || String(u.username || '').toLowerCase().includes('anonymous');
                           
                           return (
                             <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -7974,9 +8015,14 @@ export default function AdminDashboard() {
                                   }}>
                                     #{idx + 1}
                                   </span>
-                                  {(u.clientId || (u.userId && u.userId !== 'anonymous')) && (
+                                  {u.clientId && (
                                     <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
-                                      {u.clientId || `SE${String(u.userId).padStart(6, '0')}`}
+                                      {u.clientId}
+                                    </span>
+                                  )}
+                                  {!u.clientId && isDeleted && u.userId !== 'anonymous' && (
+                                    <span style={{ color: 'var(--color-red-light)', fontFamily: 'monospace', fontWeight: '600', fontSize: '9px', background: 'rgba(239,68,68,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                      PURGED
                                     </span>
                                   )}
                                   <span style={{ fontWeight: 'bold', color: isDeleted ? 'var(--text-secondary)' : 'var(--text-primary)' }}>

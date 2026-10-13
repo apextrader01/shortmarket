@@ -5527,10 +5527,19 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const data = userResults[i] || {};
                 const isNumeric = userId && !isNaN(Number(userId));
                 const dbUser = isNumeric ? await db('users').where({ id: Number(userId) }).first().catch(() => null) : null;
+
+                // Auto-purge ghost test users who no longer exist in DB from Redis
+                if (isNumeric && !dbUser) {
+                    generalClient.del(`telemetry:user:${userId}`).catch(() => {});
+                    generalClient.sRem('telemetry:users', String(userId)).catch(() => {});
+                }
+
                 userStats.push({
                     userId,
                     clientId: dbUser ? dbUser.client_id : null,
-                    username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `User (#${userId})`),
+                    username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${userId})`),
+                    isDeleted: !dbUser && userId !== 'anonymous',
+                    existsInDb: Boolean(dbUser),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
                     wsMinutes: parseInt(data.ws_minutes || 0)
@@ -5617,10 +5626,16 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             for (const u of Object.values(userMap)) {
                 const isNumeric = u.userId && !isNaN(Number(u.userId));
                 const dbUser = isNumeric ? await db('users').where({ id: Number(u.userId) }).first().catch(() => null) : null;
+                if (isNumeric && !dbUser) {
+                    generalClient.del(`telemetry:user:${u.userId}`).catch(() => {});
+                    generalClient.sRem('telemetry:users', String(u.userId)).catch(() => {});
+                }
                 userStats.push({
                     userId: u.userId,
                     clientId: dbUser ? dbUser.client_id : null,
-                    username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `User (#${u.userId})`),
+                    username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${u.userId})`),
+                    isDeleted: !dbUser && u.userId !== 'anonymous',
+                    existsInDb: Boolean(dbUser),
                     apiCalls: u.apiCalls,
                     apiBytes: u.apiBytes,
                     wsMinutes: u.wsMinutes
@@ -5657,6 +5672,53 @@ app.post('/api/admin/telemetry/reset', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to reset telemetry' });
+    }
+});
+
+app.post('/api/admin/telemetry/purge-ghosts', authenticateToken, async (req, res) => {
+    try {
+        const caller = await db('users').where({ id: req.user.id }).first();
+        if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+        const { generalClient } = require('./services/redisClient');
+        if (!generalClient || !generalClient.isReady) return res.status(503).json({ error: 'Redis offline' });
+
+        let userIds = await generalClient.sMembers('telemetry:users').catch(() => []);
+        if (!userIds || userIds.length === 0) {
+            userIds = [];
+            for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:user:*', COUNT: 100 })) {
+                const keys = Array.isArray(chunk) ? chunk : [chunk];
+                for (const k of keys) {
+                    if (typeof k === 'string') userIds.push(k.replace('telemetry:user:', ''));
+                }
+            }
+        }
+
+        let purgedCount = 0;
+        const keysToDelete = [];
+        const setRemovals = [];
+
+        for (const uid of userIds) {
+            if (uid === 'anonymous' || isNaN(Number(uid))) continue;
+            const exists = await db('users').where({ id: Number(uid) }).first().catch(() => null);
+            if (!exists) {
+                keysToDelete.push(`telemetry:user:${uid}`);
+                setRemovals.push(String(uid));
+                purgedCount++;
+            }
+        }
+
+        if (keysToDelete.length > 0) {
+            await generalClient.del(keysToDelete).catch(() => {});
+        }
+        if (setRemovals.length > 0) {
+            await generalClient.sRem('telemetry:users', setRemovals).catch(() => {});
+        }
+
+        res.json({ success: true, purgedCount, message: `Successfully purged ${purgedCount} ghost/test users from Redis telemetry` });
+    } catch (err) {
+        console.error('Purge ghost users error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 
