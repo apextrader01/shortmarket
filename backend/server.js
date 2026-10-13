@@ -7060,7 +7060,7 @@ app.get('/api/market-deals', apiLimiter, (req, res) => {
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
-    const list = primaryMarketsService.getIpoList(req.query.category || 'ALL');
+    const list = primaryMarketsService.getIpoList(req.query.category || 'ALL', req.query.status || 'ALL');
     res.json({ success: true, count: list.length, ipos: list });
   } catch (err) {
     res.status(500).json({ error: err.message });

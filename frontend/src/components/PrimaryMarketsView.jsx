@@ -91,70 +91,200 @@ const SEED_DEALS_DATA = [
 
 const SEED_IPO_DATA = [
   {
-    id: 101,
-    name: 'Longfian Scitech (India) Ltd.',
-    badge: 'SME',
-    category: 'SME',
-    status: 'OPEN',
-    priceBand: '₹128 - ₹135',
-    minPrice: 128,
-    maxPrice: 135,
-    lotSize: 1000,
-    issueSizeCr: 23.02,
-    openDate: '2026-10-09',
-    closeDate: '2026-10-13',
-    listingDate: '2026-10-16',
-    gmp: 28,
-    gmpPct: 20.74,
-    subscription: { qib: 14.11, snii: 1.79, bnii: 1.77, nii: 1.77, retail: 3.11, employee: null, shareholder: null, others: null, total: 2.70 },
-    applications: 2615,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
-  },
-  {
-    id: 102,
-    name: 'E2E Transportation Infrastructure Ltd.',
-    badge: 'LT',
+    id: 1,
+    name: 'Afcons Infrastructure Ltd.',
+    badge: 'MAINBOARD',
     category: 'MAINBOARD',
     status: 'OPEN',
-    priceBand: '₹165 - ₹174',
-    minPrice: 165,
-    maxPrice: 174,
-    lotSize: 85,
-    issueSizeCr: 84.22,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 145,
-    gmpPct: 83.33,
-    subscription: { qib: 236.30, snii: 670.31, bnii: 883.86, nii: 812.68, retail: 544.28, employee: 54.99, shareholder: null, others: null, total: 526.56 },
-    applications: 9734520,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'MUFG Intime (Link Intime)',
-    registrarUrl: 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'
+    priceBand: '₹440 – ₹463',
+    minPrice: 440,
+    maxPrice: 463,
+    lotSize: 32,
+    issueSizeCr: 5430.00,
+    openDate: '25-Oct-2024',
+    closeDate: '29-Oct-2024',
+    listingDate: '04-Nov-2024',
+    gmp: 38,
+    gmpPct: 8.21,
+    subscription: { qib: 3.79, snii: 3.82, bnii: 5.31, nii: 5.05, retail: 0.94, employee: 1.67, shareholder: null, others: null, total: 2.63 },
+    applications: 521400,
+    asOn: '29-Oct-2024 17:00',
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html',
+    sector: 'Infrastructure & Engineering'
   },
   {
-    id: 103,
-    name: 'Apollo Techno Industries Ltd.',
-    badge: 'LT',
-    category: 'SME',
+    id: 2,
+    name: 'Godavari Biorefineries Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
     status: 'OPEN',
-    priceBand: '₹123 - ₹130',
-    minPrice: 123,
-    maxPrice: 130,
-    lotSize: 1000,
-    issueSizeCr: 47.96,
-    openDate: '2026-10-08',
-    closeDate: '2026-10-12',
-    listingDate: '2026-10-15',
-    gmp: 42,
-    gmpPct: 32.31,
-    subscription: { qib: 28.60, snii: 85.44, bnii: 104.22, nii: 97.96, retail: 44.52, employee: null, shareholder: null, others: null, total: 50.63 },
-    applications: 27747,
-    asOn: '12-Oct-2026 17:55',
-    registrar: 'Bigshare Services',
-    registrarUrl: 'https://ipo.bigshareonline.com/IPO_Status.html'
+    priceBand: '₹334 – ₹352',
+    minPrice: 334,
+    maxPrice: 352,
+    lotSize: 42,
+    issueSizeCr: 554.75,
+    openDate: '23-Oct-2024',
+    closeDate: '25-Oct-2024',
+    listingDate: '30-Oct-2024',
+    gmp: 24,
+    gmpPct: 6.82,
+    subscription: { qib: 2.76, snii: 0.82, bnii: 0.94, nii: 0.90, retail: 1.71, employee: null, shareholder: null, others: null, total: 1.83 },
+    applications: 182300,
+    asOn: '25-Oct-2024 17:00',
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html',
+    sector: 'Bio-based Chemicals & Ethanol'
+  },
+  {
+    id: 9,
+    name: 'Hexaware Technologies Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'UPCOMING',
+    priceBand: '₹750 – ₹800 (Est.)',
+    minPrice: 750,
+    maxPrice: 800,
+    lotSize: 18,
+    issueSizeCr: 9950.00,
+    openDate: 'Opening Soon',
+    closeDate: 'Announced Soon',
+    listingDate: 'SEBI Approved',
+    gmp: 125,
+    gmpPct: 15.63,
+    subscription: { qib: 0, snii: 0, bnii: 0, nii: 0, retail: 0, employee: null, shareholder: null, others: null, total: 0 },
+    applications: 0,
+    asOn: 'SEBI DRHP Approved',
+    registrar: 'KFintech',
+    registrarUrl: 'https://kosmic.kfintech.com/ipostatus/',
+    sector: 'IT Services & Digital Solutions'
+  },
+  {
+    id: 10,
+    name: 'HDB Financial Services Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'UPCOMING',
+    priceBand: '₹700 – ₹740 (Est.)',
+    minPrice: 700,
+    maxPrice: 740,
+    lotSize: 20,
+    issueSizeCr: 12500.00,
+    openDate: 'Opening Soon',
+    closeDate: 'Announced Soon',
+    listingDate: 'SEBI Approved',
+    gmp: 160,
+    gmpPct: 21.62,
+    subscription: { qib: 0, snii: 0, bnii: 0, nii: 0, retail: 0, employee: null, shareholder: null, others: null, total: 0 },
+    applications: 0,
+    asOn: 'HDFC Bank Board Approved',
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html',
+    sector: 'NBFC & Retail Lending'
+  },
+  {
+    id: 25,
+    name: 'Waaree Energies Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'LISTED',
+    priceBand: '₹1,427 – ₹1,503',
+    minPrice: 1427,
+    maxPrice: 1503,
+    issuePrice: 1503,
+    listingPrice: 2550,
+    listingGainPct: 69.66,
+    lotSize: 9,
+    issueSizeCr: 4321.44,
+    openDate: '21-Oct-2024',
+    closeDate: '23-Oct-2024',
+    listingDate: '28-Oct-2024',
+    gmp: 1047,
+    gmpPct: 69.66,
+    subscription: { qib: 208.63, snii: 51.79, bnii: 68.42, nii: 62.48, retail: 10.79, employee: null, shareholder: null, others: null, total: 76.34 },
+    applications: 9734520,
+    asOn: 'Listed on 28-Oct-2024',
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html',
+    sector: 'Solar PV Module Manufacturing'
+  },
+  {
+    id: 26,
+    name: 'Hyundai Motor India Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'LISTED',
+    priceBand: '₹1,865 – ₹1,960',
+    minPrice: 1865,
+    maxPrice: 1960,
+    issuePrice: 1960,
+    listingPrice: 1931,
+    listingGainPct: -1.48,
+    lotSize: 7,
+    issueSizeCr: 27870.16,
+    openDate: '15-Oct-2024',
+    closeDate: '17-Oct-2024',
+    listingDate: '22-Oct-2024',
+    gmp: -29,
+    gmpPct: -1.48,
+    subscription: { qib: 6.97, snii: 0.62, bnii: 0.59, nii: 0.60, retail: 0.50, employee: 1.74, shareholder: null, others: null, total: 2.37 },
+    applications: 1428910,
+    asOn: 'Listed on 22-Oct-2024',
+    registrar: 'KFintech',
+    registrarUrl: 'https://kosmic.kfintech.com/ipostatus/',
+    sector: 'Automobile & Passenger Vehicles'
+  },
+  {
+    id: 27,
+    name: 'Vishal Mega Mart Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'LISTED',
+    priceBand: '₹74 – ₹78',
+    minPrice: 74,
+    maxPrice: 78,
+    issuePrice: 78,
+    listingPrice: 105,
+    listingGainPct: 34.62,
+    lotSize: 190,
+    issueSizeCr: 8000.00,
+    openDate: '11-Dec-2024',
+    closeDate: '13-Dec-2024',
+    listingDate: '16-Dec-2024',
+    gmp: 27,
+    gmpPct: 34.62,
+    subscription: { qib: 85.20, snii: 12.40, bnii: 15.60, nii: 14.60, retail: 2.80, employee: 3.20, shareholder: null, others: null, total: 28.40 },
+    applications: 3840000,
+    asOn: 'Listed on 16-Dec-2024',
+    registrar: 'KFintech',
+    registrarUrl: 'https://kosmic.kfintech.com/ipostatus/',
+    sector: 'Hypermarket & Value Fashion Retail'
+  },
+  {
+    id: 28,
+    name: 'Swiggy Ltd.',
+    badge: 'MAINBOARD',
+    category: 'MAINBOARD',
+    status: 'LISTED',
+    priceBand: '₹371 – ₹390',
+    minPrice: 371,
+    maxPrice: 390,
+    issuePrice: 390,
+    listingPrice: 420,
+    listingGainPct: 7.69,
+    lotSize: 38,
+    issueSizeCr: 11327.43,
+    openDate: '06-Nov-2024',
+    closeDate: '08-Nov-2024',
+    listingDate: '13-Nov-2024',
+    gmp: 30,
+    gmpPct: 7.69,
+    subscription: { qib: 6.02, snii: 0.84, bnii: 1.45, nii: 1.24, retail: 1.14, employee: 1.65, shareholder: null, others: null, total: 3.59 },
+    applications: 1980000,
+    asOn: 'Listed on 13-Nov-2024',
+    registrar: 'Link Intime',
+    registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html',
+    sector: 'Food Delivery & Quick Commerce'
   }
 ];
 
@@ -502,7 +632,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       list = list.filter(i => i.category === ipoCategory);
     }
     if (ipoStatusFilter !== 'ALL') {
-      list = list.filter(i => i.status === ipoStatusFilter);
+      if (ipoStatusFilter === 'LISTED' || ipoStatusFilter === 'CLOSED') {
+        list = list.filter(i => i.status === 'LISTED' || i.status === 'CLOSED');
+      } else {
+        list = list.filter(i => i.status === ipoStatusFilter);
+      }
     }
     if (ipoSearch.trim()) {
       const q = ipoSearch.toLowerCase().trim();
@@ -1766,27 +1900,27 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Top IPO Summary KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(190px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total IPOs Tracked</div>
+              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Issues Tracked</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
                 {filteredIpos.length} of {ipoData.length} Issues
               </div>
             </div>
             <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#86efac', textTransform: 'uppercase' }}>🟢 Live / Open Issues</div>
+              <div style={{ fontSize: '10.5px', color: '#86efac', textTransform: 'uppercase' }}>🟢 Live / Bidding Open</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#22c55e', marginTop: '2px' }}>
                 {ipoData.filter(i => i.status === 'OPEN').length} Active Now
               </div>
             </div>
             <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#bae6fd', textTransform: 'uppercase' }}>Total Issue Capital</div>
+              <div style={{ fontSize: '10.5px', color: '#bae6fd', textTransform: 'uppercase' }}>⏳ Confirmed Upcoming</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#60a5fa', marginTop: '2px' }}>
-                ₹{Math.round(filteredIpos.reduce((acc, i) => acc + (i.issueSizeCr || 0), 0)).toLocaleString('en-IN')} Cr
+                {ipoData.filter(i => i.status === 'UPCOMING').length} Pipeline
               </div>
             </div>
             <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#e9d5ff', textTransform: 'uppercase' }}>Total Applications</div>
+              <div style={{ fontSize: '10.5px', color: '#e9d5ff', textTransform: 'uppercase' }}>🚀 On Listing &amp; Listed</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#c084fc', marginTop: '2px' }}>
-                {(filteredIpos.reduce((acc, i) => acc + (i.applications || 0), 0) / 100000).toFixed(2)} Lakh+
+                {ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length} Completed
               </div>
             </div>
           </div>
@@ -1845,20 +1979,20 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'ALL', label: 'All Status' },
-                  { id: 'OPEN', label: '🟢 Open / Active' },
-                  { id: 'UPCOMING', label: '⏳ Upcoming' },
-                  { id: 'CLOSED', label: '✅ Recent / Listed' }
+                  { id: 'ALL', label: `All Status (${ipoData.length})` },
+                  { id: 'OPEN', label: `🟢 Live / Bidding Open (${ipoData.filter(i => i.status === 'OPEN').length})` },
+                  { id: 'UPCOMING', label: `⏳ Confirmed Upcoming (${ipoData.filter(i => i.status === 'UPCOMING').length})` },
+                  { id: 'LISTED', label: `🚀 On Listing & Listed (${ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length})` }
                 ].map(st => (
                   <button
                     key={st.id}
                     type="button"
                     onClick={() => setIpoStatusFilter(st.id)}
                     style={{
-                      padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                      padding: '5px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
                       background: ipoStatusFilter === st.id ? 'rgba(59,130,246,0.2)' : 'transparent',
                       color: ipoStatusFilter === st.id ? '#60a5fa' : '#94a3b8',
-                      border: ipoStatusFilter === st.id ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.06)'
+                      border: ipoStatusFilter === st.id ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)'
                     }}
                   >
                     {st.label}
@@ -2053,6 +2187,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                                   LIVE
                                 </span>
                               )}
+                              {ipo.status === 'UPCOMING' && (
+                                <span style={{ fontSize: '9px', background: 'rgba(59,130,246,0.2)', color: '#60a5fa', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                  UPCOMING
+                                </span>
+                              )}
+                              {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') && (
+                                <span style={{ fontSize: '9px', background: 'rgba(168,85,247,0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                  LISTED
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
                               {ipo.priceBand} • Lot: {ipo.lotSize} • {ipo.registrar}
@@ -2060,8 +2204,12 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           </td>
 
                           <td style={{ padding: '10px 8px', textAlign: 'center', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-                            <div style={{ fontWeight: '600' }}>{ipo.closeDate}</div>
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>Open: {ipo.openDate}</div>
+                            <div style={{ fontWeight: '600' }}>
+                              {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Listed: ${ipo.listingDate}` : ipo.closeDate}
+                            </div>
+                            <div style={{ fontSize: '10px', color: '#64748b' }}>
+                              {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Issue: ₹${ipo.issuePrice || ipo.maxPrice}` : `Open: ${ipo.openDate}`}
+                            </div>
                           </td>
 
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
@@ -2109,10 +2257,23 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           </td>
 
                           <td style={{ padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-                            <div style={{ fontWeight: '800', color: '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
-                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>
-                              Lot Profit: ₹{((ipo.gmp || 0) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
-                            </div>
+                            {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
+                              <>
+                                <div style={{ fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                                  {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} Gain
+                                </div>
+                                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                  List: ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div style={{ fontWeight: '800', color: '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
+                                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                  Lot Profit: ₹{((ipo.gmp || 0) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
+                                </div>
+                              </>
+                            )}
                           </td>
 
                           <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94a3b8', fontSize: '11px', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
@@ -2167,20 +2328,47 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           </div>
                           <h3 style={{ margin: '6px 0 0', fontSize: '15px', fontWeight: '700' }}>{ipo.name}</h3>
                         </div>
-                        <span style={{ fontSize: '11px', background: ipo.status === 'OPEN' ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.08)', color: ipo.status === 'OPEN' ? '#22c55e' : '#94a3b8', border: `1px solid ${ipo.status === 'OPEN' ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, padding: '3px 8px', borderRadius: '6px', fontWeight: '700' }}>
-                          {ipo.status}
+                        <span style={{
+                          fontSize: '11px',
+                          background: ipo.status === 'OPEN' ? 'rgba(34,197,94,0.15)' : (ipo.status === 'UPCOMING' ? 'rgba(59,130,246,0.15)' : 'rgba(168,85,247,0.15)'),
+                          color: ipo.status === 'OPEN' ? '#22c55e' : (ipo.status === 'UPCOMING' ? '#60a5fa' : '#c084fc'),
+                          border: `1px solid ${ipo.status === 'OPEN' ? 'rgba(34,197,94,0.3)' : (ipo.status === 'UPCOMING' ? 'rgba(59,130,246,0.3)' : 'rgba(168,85,247,0.3)')}`,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontWeight: '700'
+                        }}>
+                          {ipo.status === 'OPEN' ? '🟢 LIVE' : (ipo.status === 'UPCOMING' ? '⏳ UPCOMING' : '🚀 LISTED')}
                         </span>
                       </div>
 
-                      <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>Live GMP &amp; Est. Lot Profit</div>
-                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#22c55e' }}>
-                            +₹{ipo.gmp} ({ipo.gmpPct}%) • ₹{lotProfit.toLocaleString('en-IN')}/Lot
+                      {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
+                        <div style={{
+                          background: (ipo.listingGainPct || 0) >= 0 ? 'rgba(34,197,94,0.09)' : 'rgba(239,68,68,0.09)',
+                          border: `1px solid ${(ipo.listingGainPct || 0) >= 0 ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)'}`,
+                          padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Official Listing Gain &amp; Price</div>
+                            <div style={{ fontSize: '15px', fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                              {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} • Listed at ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                              Issue Price: ₹{ipo.issuePrice || ipo.maxPrice} • Lot Gain: ₹{Math.round(((ipo.listingPrice || ipo.maxPrice) - (ipo.issuePrice || ipo.maxPrice)) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
+                            </div>
                           </div>
+                          <Award size={22} color={(ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444'} />
                         </div>
-                        <Award size={22} color="#22c55e" />
-                      </div>
+                      ) : (
+                        <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Live GMP &amp; Est. Lot Profit</div>
+                            <div style={{ fontSize: '15px', fontWeight: '800', color: '#22c55e' }}>
+                              +₹{ipo.gmp} ({ipo.gmpPct}%) • ₹{lotProfit.toLocaleString('en-IN')}/Lot
+                            </div>
+                          </div>
+                          <Award size={22} color="#22c55e" />
+                        </div>
+                      )}
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
                         <div>
@@ -2198,7 +2386,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         <div>
                           <div style={{ color: '#64748b' }}>Total Subscription</div>
                           <div style={{ fontWeight: '800', color: '#60a5fa', marginTop: '2px' }}>
-                            {sub.total > 0 ? `${sub.total}x (${(ipo.applications || 0).toLocaleString('en-IN')} Apps)` : 'Opens Soon'}
+                            {sub.total > 0 ? `${sub.total}x (${(ipo.applications || 0).toLocaleString('en-IN')} Apps)` : ((ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `${sub.total || 1}x` : 'Opens Soon')}
                           </div>
                         </div>
                       </div>
@@ -2223,8 +2411,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                        <span>📅 {ipo.openDate} → {ipo.closeDate}</span>
-                        <span style={{ color: '#facc15', fontWeight: '700' }}>🎯 Retail Odds: {retailOdds}%</span>
+                        <span>{(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `🎉 Listed: ${ipo.listingDate}` : `📅 ${ipo.openDate} → ${ipo.closeDate}`}</span>
+                        <span style={{ color: (ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? '#c084fc' : '#facc15', fontWeight: '700' }}>
+                          {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Total Sub: ${sub.total || 1}x` : `🎯 Retail Odds: ${retailOdds}%`}
+                        </span>
                       </div>
 
                       <button
