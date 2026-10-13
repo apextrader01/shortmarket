@@ -252,13 +252,13 @@ assert(mfModalCode.includes("Queue Redeem (Next Day NAV)"), "MutualFundDetailsMo
 
 
 // ─────────────────────────────────────────────────────────────────────────
-// MODULE 5: CRON SCHEDULES AUDIT (09:00 AM & 10:30 PM IST)
+// MODULE 5: CRON SCHEDULES AUDIT (09:00 AM & 11:15 PM IST)
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\n▶ MODULE 5: Automated Cron Schedule Audit');
 
 const sipEngineCode = fs.readFileSync(path.join(__dirname, 'services/sipEngine.js'), 'utf8');
 assert(sipEngineCode.includes("'0 9 * * 1-5'"), 'SIPEngine schedules morning Next-Day settlement cycle at 09:00 AM IST (Mon-Fri)');
-assert(sipEngineCode.includes("'30 22 * * 1-5'"), 'SIPEngine schedules evening Next-Day settlement cycle at 10:30 PM IST (Mon-Fri)');
+assert(sipEngineCode.includes("'15 23 * * 1-5'"), 'SIPEngine schedules evening Next-Day settlement cycle at 11:15 PM IST (Mon-Fri)');
 assert(sipEngineCode.includes('processPendingMutualFundOrders'), 'SIPEngine calls processPendingMutualFundOrders during cron cycles');
 assert(sipEngineCode.includes('Redeemed @ Next Day NAV'), 'SIPEngine settles queued SELL orders at Next Day NAV');
 
@@ -284,7 +284,7 @@ const SIPEngine = require('./services/sipEngine');
 // Order placed Monday 2026-10-12 at 03:00 PM IST (09:30 UTC - after 2:00 PM cut-off)
 const monAfterCutoff = new Date('2026-10-12T09:30:00Z');
 assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-12T09:35:00Z')) === false, 'After-2PM order on Monday is NOT settled on Monday afternoon restart');
-assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-12T17:00:00Z')) === false, 'After-2PM order on Monday is NOT settled at Monday 10:30 PM IST cron');
+assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-12T17:45:00Z')) === false, 'After-2PM order on Monday is NOT settled at Monday 11:15 PM IST cron');
 assert(SIPEngine.isOrderEligibleForSettlement(monAfterCutoff, new Date('2026-10-13T03:30:00Z')) === true, 'After-2PM order on Monday IS settled on Tuesday 09:00 AM IST cron');
 
 // Order placed Friday 2026-10-16 at 03:00 PM IST (09:30 UTC)

@@ -938,7 +938,7 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
         phase3SquareOff('COM');
     }, TZ);
 
-    // Note: Daily/Weekly/Monthly SIP and Next-Day Mutual Fund settlement are authoritatively handled by sipEngine.js at 09:00 AM, 09:30 AM, 03:30 PM, and 10:30 PM
+    // Note: Daily/Weekly/Monthly SIP and Next-Day Mutual Fund settlement are authoritatively handled by sipEngine.js at 09:00 AM, 09:30 AM, 03:30 PM, and 11:15 PM
 
     // ═══════════════════════════════════════════════════════════════════════════
     // 🌙 NIGHTLY MASTER EOD TRIPLE AUTOMATION SWEEP

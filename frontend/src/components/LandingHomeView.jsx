@@ -433,9 +433,9 @@ export default function LandingHomeView({
       badgeColor: '#10b981',
       kpiLeft: { label: 'Delivery Filter', value: '>60% Institutional' },
       kpiRight: { label: 'Primary Desk', value: 'IPO GMP & Deals' },
-      tags: ['5:35 PM Daily Cron', 'Bulk & Block Deals', 'Live GMP', 'PAN Allotment'],
+      tags: ['6:55 PM Daily Cron', 'Bulk & Block Deals', 'Live GMP', 'PAN Allotment'],
       tagActions: {
-        '5:35 PM Daily Cron': () => onOpenPrimaryMarkets('BHAVCOPY'),
+        '6:55 PM Daily Cron': () => onOpenPrimaryMarkets('BHAVCOPY'),
         'Bulk & Block Deals': () => onOpenPrimaryMarkets('DEALS'),
         'Live GMP': () => onOpenPrimaryMarkets('IPO'),
         'PAN Allotment': () => onOpenPrimaryMarkets('ALLOTMENT')

@@ -659,7 +659,7 @@ export default function MutualFundsView() {
                         </span>
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                        These buy &amp; redeem orders were placed after the 2:00 PM cut-off and will be settled at the next business day's official NAV during automated settlement (10:30 PM / 09:00 AM IST).
+                        These buy &amp; redeem orders were placed after the 2:00 PM cut-off and will be settled at the next business day's official NAV during automated settlement (11:15 PM / 09:00 AM IST).
                       </p>
                     </div>
                   </div>
@@ -763,7 +763,7 @@ export default function MutualFundsView() {
                               </td>
                               <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                                 <span style={{ fontSize: '11.5px', color: 'var(--color-yellow)', fontWeight: '600' }}>
-                                  Next Working Day NAV (10:30 PM / 09:00 AM IST)
+                                  Next Working Day NAV (11:15 PM / 09:00 AM IST)
                                 </span>
                               </td>
                             </tr>

@@ -793,9 +793,9 @@ class SIPEngine {
       SIPEngine.processDueSips(priceCache);
     }, { timezone: 'Asia/Kolkata' });
 
-    // 4. Run at 10:30 PM IST every business day: Evening Next-Day MF settlement cycle (as AMCs publish official NAV)
-    cron.schedule('30 22 * * 1-5', () => {
-      console.log('[SIPEngine] [CRON 10:30 PM] Running evening Next-Day Mutual Fund settlement cycle...');
+    // 4. Run at 11:15 PM IST every business day: Evening Next-Day MF settlement cycle (as AMCs publish official NAV)
+    cron.schedule('15 23 * * 1-5', () => {
+      console.log('[SIPEngine] [CRON 11:15 PM] Running evening Next-Day Mutual Fund settlement cycle...');
       SIPEngine.processPendingMutualFundOrders(priceCache);
     }, { timezone: 'Asia/Kolkata' });
 

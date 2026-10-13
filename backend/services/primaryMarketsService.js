@@ -36,7 +36,7 @@ function setPriceCacheRef(priceCache) {
   sharedPriceCacheRef = priceCache;
 }
 
-// Helper: Get completed trading day in IST (before 5:35 PM IST, latest EOD session is previous trading day)
+// Helper: Get completed trading day in IST (before 6:55 PM IST, latest EOD session is previous trading day)
 function getIstDateInfo(tradingDaysAgo = 0) {
   const now = new Date();
   const istMs = now.getTime() + (5.5 * 60 * 60 * 1000);
@@ -44,9 +44,9 @@ function getIstDateInfo(tradingDaysAgo = 0) {
 
   const istHour = d.getUTCHours();
   const istMin = d.getUTCMinutes();
-  // Official NSE & BSE Bhavcopy and Bulk/Block EOD files are published after 5:35 PM IST (17:35).
-  // Before 17:35 IST on any day, today's EOD data does not exist yet, so anchor to the previous day.
-  if (istHour < 17 || (istHour === 17 && istMin < 35)) {
+  // Official NSE & BSE Bhavcopy and Bulk/Block EOD files are synced at 6:55 PM IST (18:55).
+  // Before 18:55 IST on any day, today's EOD data is scheduled for 6:55 PM, so anchor to previous day.
+  if (istHour < 18 || (istHour === 18 && istMin < 55)) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
   // Roll back if landing on Sunday (0) or Saturday (6)
@@ -622,7 +622,7 @@ function parseExchangeDateToIso(rawDate) {
 
 /**
  * 🏛️ Build & Sync 1,000+ Rolling 30-Day Institutional Bulk, Block & Promoter/Insider Deals
- * Always anchored up to the last completed trading session (respecting 5:35 PM IST rule) and merged with live NSE bulk.csv & block.csv!
+ * Always anchored up to the last completed trading session (respecting 6:55 PM IST rule) and merged with live NSE bulk.csv & block.csv!
  */
 async function syncOfficialMarketDeals() {
   const liveDeals = [];
@@ -2200,9 +2200,9 @@ syncOfficialNseBhavcopy().then(() => {
   syncOfficialMarketDeals().catch(() => {});
 });
 
-// Schedule 5:35 PM IST Cron (Monday through Friday)
+// Schedule 6:55 PM IST Cron (Monday through Friday)
 function initPrimaryMarketCrons() {
-  cron.schedule('35 17 * * 1-5', () => {
+  cron.schedule('55 18 * * 1-5', () => {
     syncOfficialNseBhavcopy().then(() => {
       syncOfficialMarketDeals().catch(() => {});
     }).catch(e => console.error(e));

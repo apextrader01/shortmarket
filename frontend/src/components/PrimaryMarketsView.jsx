@@ -13,12 +13,12 @@ import {
 import { API } from '../store';
 import logoImg from '../assets/logo.png';
 
-// Helper: Compute completed trading session date in IST on client (before 5:35 PM IST -> previous trading day)
+// Helper: Compute completed trading session date in IST on client (before 6:55 PM IST -> previous trading day)
 function getClientCompletedTradingDate() {
   const now = new Date();
   const istMs = now.getTime() + (5.5 * 60 * 60 * 1000);
   const d = new Date(istMs);
-  if (d.getUTCHours() < 17 || (d.getUTCHours() === 17 && d.getUTCMinutes() < 35)) {
+  if (d.getUTCHours() < 18 || (d.getUTCHours() === 18 && d.getUTCMinutes() < 55)) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
