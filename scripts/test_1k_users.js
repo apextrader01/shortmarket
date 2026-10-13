@@ -165,30 +165,31 @@ function formatMMSS(totalSeconds) {
 }
 
 async function detectTarget() {
-    if (process.argv[2] && process.argv[2].startsWith('http')) {
-        return process.argv[2];
-    }
-    // Wait for localhost:5000 to become ready (up to 15 attempts in case pm2 was just restarted)
-    for (let attempt = 1; attempt <= 15; attempt++) {
-        try {
-            const res = await fetch('http://localhost:5000/api/health', { signal: AbortSignal.timeout(1500) });
-            if (res.ok) {
-                if (attempt > 1) console.log('\n');
-                return 'http://localhost:5000';
-            }
-        } catch (e) {}
-        try {
-            const res = await fetch('http://127.0.0.1:5000/api/health', { signal: AbortSignal.timeout(1500) });
-            if (res.ok) {
-                if (attempt > 1) console.log('\n');
-                return 'http://127.0.0.1:5000';
-            }
-        } catch (e) {}
-        if (attempt === 1) process.stdout.write('⏳ Waiting for backend on http://localhost:5000 to be ready...');
+    let candidate = process.argv[2] && process.argv[2].startsWith('http') ? process.argv[2] : null;
+    if (candidate === 'http://localhost:5000') candidate = 'http://127.0.0.1:5000';
+
+    const testUrls = candidate ? [candidate] : ['http://127.0.0.1:5000', 'http://localhost:5000'];
+
+    // Wait for the backend to finish booting (up to 30 attempts in case pm2 was just restarted)
+    for (let attempt = 1; attempt <= 30; attempt++) {
+        for (const url of testUrls) {
+            try {
+                const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(2000) });
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    if (data?.status === 'ok') {
+                        if (attempt > 1) console.log(`\n✅ Backend is healthy and ready on ${url}!`);
+                        return url;
+                    }
+                }
+            } catch (e) {}
+        }
+        if (attempt === 1) process.stdout.write('⏳ Waiting for PM2 backend cluster to finish booting...');
         else process.stdout.write('.');
         await new Promise(r => setTimeout(r, 1000));
     }
-    return 'http://localhost:5000';
+    console.log('\n');
+    return candidate || 'http://127.0.0.1:5000';
 }
 
 async function ensureTestTraderAccounts(count = 1000) {
@@ -348,8 +349,10 @@ async function run() {
 
         const socket = io(targetUrl, {
             transports: ['websocket'],
-            reconnection: false,
-            timeout: 15000
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            timeout: 20000
         });
 
         socket._userId = userId;
@@ -383,8 +386,16 @@ async function run() {
             }
         });
 
-        socket.on('disconnect', () => disconnectedCount++);
-        socket.on('connect_error', () => disconnectedCount++);
+        socket.on('disconnect', () => {
+            connectedCount = Math.max(0, connectedCount - 1);
+            disconnectedCount++;
+        });
+        socket.on('connect_error', (err) => {
+            if (disconnectedCount === 0) {
+                console.log(`\n   ⚠️ [SOCKET CONNECT ERROR SAMPLE]: ${err.message}`);
+            }
+            disconnectedCount++;
+        });
 
         if (i % batchSize === 0) {
             process.stdout.write(`\r   Connecting: ${i}/${totalUsers} users queued... (Active WS: ${connectedCount})`);
@@ -392,7 +403,14 @@ async function run() {
         }
     }
 
-    console.log(`\n\n✅ All ${totalUsers} user connections established!`);
+    // Stabilize connections before starting heavy trading cycle
+    const rampWaitStart = Date.now();
+    while (connectedCount < totalUsers * 0.9 && (Date.now() - rampWaitStart) < 15000) {
+        await new Promise(r => setTimeout(r, 500));
+        process.stdout.write(`\r   ⏳ Connecting: ${totalUsers}/${totalUsers} queued... (Active WS: ${connectedCount})`);
+    }
+
+    console.log(`\n\n✅ ${connectedCount}/${totalUsers} WebSocket user connections active!`);
     console.log(`🔥 2. Starting continuous 10-minute heavy trading cycle (Watch 'pm2 monit' on your server!)\n`);
 
     // Continuous 1-Second Heavy Trading Loop
