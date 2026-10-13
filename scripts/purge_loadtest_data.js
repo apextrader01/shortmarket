@@ -107,7 +107,18 @@ async function runPurge() {
             }
         }
 
-        // E. Reset Redis Telemetry & APM counters
+        // E. Reset PostgreSQL users_id_seq back to MAX(id) so new real customers get sequential Client IDs
+        try {
+            const maxUser = await db('users').max('id as max_id').first();
+            const nextVal = Math.max(1, parseInt(maxUser?.max_id || 1, 10));
+            await db.raw(`SELECT setval(pg_get_serial_sequence('users', 'id'), ?)`, [nextVal]);
+            const nextClientCode = 'SE' + Number(nextVal + 1).toString(36).toUpperCase().padStart(6, '0');
+            console.log(`✅ Reset PostgreSQL 'users' ID sequence to ${nextVal}. The next real customer will receive sequential Client ID ${nextClientCode}!`);
+        } catch (seqErr) {
+            console.warn('⚠️ Note on sequence reset:', seqErr.message);
+        }
+
+        // F. Reset Redis Telemetry & APM counters
         try {
             const redisModulePath = path.join(__dirname, '../backend/services/redisClient');
             if (fs.existsSync(redisModulePath + '.js')) {

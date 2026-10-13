@@ -319,6 +319,13 @@ async function run() {
                     .where('email', 'like', 'loadtest_trader_%@skandx.in')
                     .del();
                 console.log(`✅ Cleaned up ${deleted} test accounts and associated subscriptions/orders from PostgreSQL. Database is 100% clean!\n`);
+
+                // Reset PostgreSQL users sequence back to MAX(id)
+                try {
+                    const maxUser = await db('users').max('id as max_id').first();
+                    const nextVal = Math.max(1, parseInt(maxUser?.max_id || 1, 10));
+                    await db.raw(`SELECT setval(pg_get_serial_sequence('users', 'id'), ?)`, [nextVal]);
+                } catch (seqErr) {}
             } catch (e) {}
         }
         process.exit(0);
@@ -604,6 +611,13 @@ async function run() {
                 .where('email', 'like', 'loadtest_trader_%@skandx.in')
                 .del();
             console.log(`   ✔ Cleaned up ${deleted} test accounts and associated subscriptions/orders. Database is 100% clean!`);
+
+            // Reset PostgreSQL users sequence back to MAX(id)
+            try {
+                const maxUser = await db('users').max('id as max_id').first();
+                const nextVal = Math.max(1, parseInt(maxUser?.max_id || 1, 10));
+                await db.raw(`SELECT setval(pg_get_serial_sequence('users', 'id'), ?)`, [nextVal]);
+            } catch (seqErr) {}
         } catch (e) {
             console.warn('   ⚠️ Cleanup note:', e.message);
         }
