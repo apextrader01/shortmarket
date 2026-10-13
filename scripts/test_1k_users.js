@@ -87,12 +87,18 @@ if (process.argv.includes('--cleanup')) {
             console.error('❌ Database not available for cleanup.');
             process.exit(1);
         }
-        console.log('\n🧹 Cleaning up all test trader accounts and orders from PostgreSQL...');
+        console.log('\n🧹 Cleaning up all test trader accounts, subscription logs, and orders from PostgreSQL...');
         try {
+            await db('subscription_payments')
+                .where('email', 'like', 'loadtest_trader_%@skandx.in')
+                .orWhere('username', 'like', 'loadtest_user_%')
+                .del()
+                .catch(() => 0);
+
             const deleted = await db('users')
                 .where('email', 'like', 'loadtest_trader_%@skandx.in')
                 .del();
-            console.log(`✅ Successfully deleted ${deleted} test accounts and all associated orders/positions! Database is clean.\n`);
+            console.log(`✅ Successfully deleted ${deleted} test accounts and all associated subscription/order records! Database is clean.\n`);
         } catch (e) {
             console.error('❌ Cleanup error:', e.message);
         }
@@ -212,7 +218,7 @@ async function ensureTestTraderAccounts(count = 1000) {
                 email: `loadtest_trader_${num}@skandx.in`,
                 password_hash: dummyHash,
                 balance: 1000000.0,
-                subscription_tier: 'PRO',
+                subscription_tier: 'BASIC',
                 watchlists: '[]'
             });
         }
@@ -303,10 +309,16 @@ async function run() {
         sockets.forEach(s => { try { s.disconnect(); } catch (e) {} });
         if (db && !process.argv.includes('--keep')) {
             try {
+                await db('subscription_payments')
+                    .where('email', 'like', 'loadtest_trader_%@skandx.in')
+                    .orWhere('username', 'like', 'loadtest_user_%')
+                    .del()
+                    .catch(() => 0);
+
                 const deleted = await db('users')
                     .where('email', 'like', 'loadtest_trader_%@skandx.in')
                     .del();
-                console.log(`✅ Cleaned up ${deleted} test accounts and associated orders from PostgreSQL. Database is 100% clean!\n`);
+                console.log(`✅ Cleaned up ${deleted} test accounts and associated subscriptions/orders from PostgreSQL. Database is 100% clean!\n`);
             } catch (e) {}
         }
         process.exit(0);
@@ -580,12 +592,18 @@ async function run() {
     if (process.argv.includes('--keep')) {
         console.log('\n📌 Test accounts preserved in database (--keep specified). Run with --cleanup to delete them.');
     } else if (db) {
-        console.log('\n🧹 4. Automatically cleaning up test accounts and orders from PostgreSQL...');
+        console.log('\n🧹 4. Automatically cleaning up test accounts, subscription logs, and orders from PostgreSQL...');
         try {
+            await db('subscription_payments')
+                .where('email', 'like', 'loadtest_trader_%@skandx.in')
+                .orWhere('username', 'like', 'loadtest_user_%')
+                .del()
+                .catch(() => 0);
+
             const deleted = await db('users')
                 .where('email', 'like', 'loadtest_trader_%@skandx.in')
                 .del();
-            console.log(`   ✔ Cleaned up ${deleted} test accounts and associated orders. Database is 100% clean!`);
+            console.log(`   ✔ Cleaned up ${deleted} test accounts and associated subscriptions/orders. Database is 100% clean!`);
         } catch (e) {
             console.warn('   ⚠️ Cleanup note:', e.message);
         }

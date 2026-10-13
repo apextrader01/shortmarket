@@ -6247,6 +6247,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
     try {
       const paidUsers = await db('users')
         .whereRaw("UPPER(COALESCE(subscription_tier, 'BASIC')) NOT IN ('BASIC', 'FREE', 'NORMAL', '')")
+        .whereNot('email', 'like', 'loadtest_trader_%@skandx.in')
         .select('id', 'username', 'email', 'phone', 'client_id', 'subscription_tier', 'subscription_expires', 'updated_at', 'created_at');
 
       if (paidUsers.length > 0) {
@@ -6334,6 +6335,8 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
       .whereRaw("UPPER(COALESCE(subscription_payments.plan, '')) NOT LIKE 'ALGO_%'")
       .whereNotIn('subscription_payments.plan', ['STATIC_IP', 'LINK_USER', 'ALGO_LINK_SLOT', 'PLAN_PRO', 'PLAN_INSTITUTIONAL', 'WALLET_RECHARGE', 'ALGO_ADDON'])
       .whereNotIn('subscription_payments.amount', [250, 350, 500, 999, 2499])
+      .whereNot('subscription_payments.email', 'like', 'loadtest_trader_%@skandx.in')
+      .whereNot('subscription_payments.username', 'like', 'loadtest_user_%')
       .select(
         'subscription_payments.*',
         db.raw('COALESCE(users.username, subscription_payments.username) as username'),
