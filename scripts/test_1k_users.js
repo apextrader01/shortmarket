@@ -413,15 +413,15 @@ async function run() {
                 const orderRoll = (sec + o) % 3;
 
                 if (orderRoll === 0) {
-                    // Regular Limit Sell Order (priced above market so it remains PENDING for edit/cancel)
+                    // Regular Limit BUY Order (placed below market ~174 so it remains PENDING for edit/cancel)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:TATASTEEL-EQ',
-                            side: 'SELL',
+                            side: 'BUY',
                             type: 'LIMIT',
-                            price: 450.00 + (Math.random() * 5),
+                            price: parseFloat((165.00 + (Math.random() * 2)).toFixed(2)),
                             quantity: 10,
                             product_type: 'INT'
                         })
@@ -434,22 +434,29 @@ async function run() {
                         } else {
                             orderErrors++;
                             apiCallsFailed++;
+                            if (orderErrors === 1) {
+                                console.log('\n   ⚠️ [SAMPLE ORDER 1 ERROR]:', data?.error || JSON.stringify(data));
+                            }
                         }
-                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                    }).catch(err => {
+                        orderErrors++;
+                        apiCallsFailed++;
+                        if (orderErrors === 1) console.log('\n   ⚠️ [SAMPLE ORDER 1 FETCH ERROR]:', err.message);
+                    });
                 } else if (orderRoll === 1) {
-                    // Bracket Order (BO) Sell with Target & SL (stays PENDING)
+                    // Bracket Order (BO) BUY with Target & SL (stays PENDING)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:RELIANCE-EQ',
-                            side: 'SELL',
+                            side: 'BUY',
                             type: 'LIMIT',
-                            price: 3500.00 + (Math.random() * 10),
+                            price: parseFloat((1140.00 + (Math.random() * 5)).toFixed(2)),
                             quantity: 5,
                             product_type: 'BO',
-                            sl_price: 3600.00,
-                            tgt_price: 3300.00
+                            sl_price: 1090.00,
+                            tgt_price: 1250.00
                         })
                     }).then(async r => {
                         const data = await r.json().catch(() => ({}));
@@ -460,21 +467,29 @@ async function run() {
                         } else {
                             orderErrors++;
                             apiCallsFailed++;
+                            if (orderErrors === 1) {
+                                console.log('\n   ⚠️ [SAMPLE BO ORDER ERROR]:', data?.error || JSON.stringify(data));
+                            }
                         }
-                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                    }).catch(err => {
+                        orderErrors++;
+                        apiCallsFailed++;
+                        if (orderErrors === 1) console.log('\n   ⚠️ [SAMPLE BO FETCH ERROR]:', err.message);
+                    });
                 } else {
-                    // Cover Order (CO) Sell with SL trigger (stays PENDING)
+                    // Cover Order (CO) BUY with SL trigger (stays PENDING)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:HDFCBANK-EQ',
-                            side: 'SELL',
+                            side: 'BUY',
                             type: 'LIMIT',
-                            price: 2500.00 + (Math.random() * 5),
+                            price: parseFloat((690.00 + (Math.random() * 5)).toFixed(2)),
                             quantity: 5,
                             product_type: 'CO',
-                            trigger_price: 2600.00
+                            sl_price: 660.00,
+                            trigger_price: 660.00
                         })
                     }).then(async r => {
                         const data = await r.json().catch(() => ({}));
@@ -485,8 +500,15 @@ async function run() {
                         } else {
                             orderErrors++;
                             apiCallsFailed++;
+                            if (orderErrors === 1) {
+                                console.log('\n   ⚠️ [SAMPLE CO ORDER ERROR]:', data?.error || JSON.stringify(data));
+                            }
                         }
-                    }).catch(() => { orderErrors++; apiCallsFailed++; });
+                    }).catch(err => {
+                        orderErrors++;
+                        apiCallsFailed++;
+                        if (orderErrors === 1) console.log('\n   ⚠️ [SAMPLE CO FETCH ERROR]:', err.message);
+                    });
                 }
             }
         }
@@ -499,8 +521,8 @@ async function run() {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToEdit.token}` },
                     body: JSON.stringify({
-                        price: 460.00 + (Math.random() * 2),
-                        quantity: 15
+                        price: parseFloat((163.00 + (Math.random() * 2)).toFixed(2)),
+                        quantity: 12
                     })
                 }).then(r => { if (r.ok) { ordersEdited++; apiCallsCompleted++; } else { apiCallsFailed++; } }).catch(() => apiCallsFailed++);
             }

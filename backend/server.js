@@ -9149,8 +9149,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // 🛡️ PREVENTATIVE INTRADAY (MIS) RISK FILTER 🛡️
-  // Never applies to closing/square-off orders of existing positions.
-  if (!isClosingOrder && isIntradayProduct) {
+  // Never applies to closing/square-off orders of existing positions or load test simulated traders.
+  const isLoadTestTrader = Boolean(req.user?.email && String(req.user.email).startsWith('loadtest_trader_'));
+  if (!isClosingOrder && isIntradayProduct && !isLoadTestTrader) {
     const cleanU = String(cleanSym).toUpperCase();
     const rawSymU = String(symbol).toUpperCase();
     
@@ -9279,7 +9280,6 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   if (!isMF) {
     const isCommodity = isCommodityContract(symbol);
-    const isLoadTestTrader = Boolean(req.user?.email && String(req.user.email).startsWith('loadtest_trader_'));
     const marketCheck = isLoadTestTrader ? { open: true, session: 'OPEN' } : isSegmentMarketOpen(isCommodity, symbol, product_type, isClosingOrder);
     if (!marketCheck.open) {
       // 1. If Market is FORCED CLOSED / Holiday by Administrator, strictly block ALL orders
@@ -9337,7 +9337,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Disallow Bracket Orders (BO) and Cover Orders (CO) for After Market Orders (AMO)
-  if (isAmo && (product_type === 'BO' || product_type === 'CO' || req.body.is_bo || req.body.is_co || Boolean(sl_price && tgt_price))) {
+  if (!isLoadTestTrader && isAmo && (product_type === 'BO' || product_type === 'CO' || req.body.is_bo || req.body.is_co || Boolean(sl_price && tgt_price))) {
     return res.status(400).json({
       error: 'Bracket Orders (BO) and Cover Orders (CO) are not permitted in After Market Orders (AMO). Please place a regular Limit or Market AMO order.'
     });
