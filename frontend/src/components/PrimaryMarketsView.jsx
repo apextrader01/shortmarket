@@ -191,7 +191,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
   // --- Tab 1: Bhavcopy Filters (20 Checkboxes + Per-Column Filters + Sort) ---
   const [exchangeFilter, setExchangeFilter] = useState('ALL');
-  const [minDelivery, setMinDelivery] = useState(25);
+  const [minDelivery, setMinDelivery] = useState(0);
   const [bhavSearch, setBhavSearch] = useState('');
   const [sectorFilter, setSectorFilter] = useState('ALL');
 
@@ -537,7 +537,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   };
 
   const resetAllBhavFilters = () => {
-    setMinDelivery(25);
+    setMinDelivery(0);
     setBhavSearch('');
     setSectorFilter('ALL');
     setExchangeFilter('ALL');
@@ -576,6 +576,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   };
 
   const activeFilterCount = [
+    minDelivery > 0,
     onlySurge, onlyMegaSurge, onlyBreakout, only52wLow, onlyHighDelivery,
     onlySmartAccumulation, onlyDistribution, onlyTopGainers, onlyTopLosers,
     onlyFno, onlyUltraDelivery, onlyCloseNearHigh, onlyCloseNearLow,
@@ -587,6 +588,44 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     bhavColFilter.colVolume.trim().length > 0, bhavColFilter.colDelivVol.trim().length > 0,
     bhavColFilter.colDelivPct.trim().length > 0, bhavColFilter.colTurnover.trim().length > 0,
     bhavColFilter.colSignal !== 'ALL'
+  ].filter(Boolean).length;
+
+  const resetAllDealsFilters = () => {
+    setDealTypeFilter('ALL');
+    setDealsClientCategory('ALL');
+    setDealsExchangeFilter('ALL');
+    setDealsDateRange('ALL');
+    setDealsMinSize(0);
+    setDealsSearch('');
+    setDealsSortBy('DATE_DESC');
+    setDealsSortDir('DESC');
+    setDealsColFilter({
+      colDate: '',
+      colStock: '',
+      colExch: 'ALL',
+      colClient: '',
+      colType: 'ALL',
+      colQty: '',
+      colPrice: '',
+      colValue: ''
+    });
+  };
+
+  const activeDealsFilterCount = [
+    dealTypeFilter !== 'ALL',
+    dealsClientCategory !== 'ALL',
+    dealsExchangeFilter !== 'ALL',
+    dealsDateRange !== 'ALL',
+    dealsMinSize > 0,
+    dealsSearch.trim().length > 0,
+    dealsColFilter.colDate.trim().length > 0,
+    dealsColFilter.colStock.trim().length > 0,
+    dealsColFilter.colExch !== 'ALL',
+    dealsColFilter.colClient.trim().length > 0,
+    dealsColFilter.colType !== 'ALL',
+    dealsColFilter.colQty.trim().length > 0,
+    dealsColFilter.colPrice.trim().length > 0,
+    dealsColFilter.colValue.trim().length > 0
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -877,7 +916,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 </div>
                 <input
                   type="range"
-                  min="15"
+                  min="0"
                   max="85"
                   step="5"
                   value={minDelivery}
@@ -1208,15 +1247,26 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '260px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '380px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
-                <input
-                  type="text"
-                  placeholder="Search 1,140+ deals (e.g. Morgan Stanley, LIC, ZOMATO)..."
-                  value={dealsSearch}
-                  onChange={e => setDealsSearch(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobile ? '100%' : '260px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '460px' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    placeholder="Search 1,140+ deals (e.g. Morgan Stanley, LIC, ZOMATO)..."
+                    value={dealsSearch}
+                    onChange={e => setDealsSearch(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                  />
+                </div>
+                {activeDealsFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetAllDealsFilters}
+                    style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    Reset ({activeDealsFilterCount})
+                  </button>
+                )}
               </div>
             </div>
 

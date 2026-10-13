@@ -359,6 +359,18 @@ async function verifyFyersAuth(auth_code, customSecretKey = null, customAppId = 
                     pubClient.publish('fyers_token_updated', 'updated').catch(e => {});
                 }
             } catch (err) {}
+
+            // Immediately start or reconnect the live WebSocket on Master node
+            if (isMasterNode && !isMarketFeedPaused) {
+                setTimeout(() => {
+                    if (isMasterNode && !isMarketFeedPaused) {
+                        try {
+                            cleanupDataSocketInstance();
+                            startLiveWebSocket();
+                        } catch (e) {}
+                    }
+                }, 500);
+            }
             
             return { success: true };
         } else {

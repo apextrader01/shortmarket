@@ -164,30 +164,33 @@ async function performFyersAutoLogin(retryCount = 0) {
         console.log(`🔑 [FYERS AUTO-LOGIN] Attempting automated login for user: ${fy_id} (Attempt ${attemptIndex + 1})...`);
 
         try {
-            // Step 1: Send Login OTP (try send_login_otp_v2 Base64 first, then fallback to plain send_login_otp)
+            // Step 1: Send Login OTP (try standard send_login_otp first, fallback to send_login_otp_v2 Base64 if needed)
             let otpData = null;
             const cleanFyId = fy_id.trim();
-            const b64FyId = Buffer.from(cleanFyId, 'utf8').toString('base64');
 
             try {
-                const otpV2Res = await fetch('https://api-t2.fyers.in/vagator/v2/send_login_otp_v2', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fy_id: b64FyId, app_id: '2' })
-                });
-                const v2Parsed = await otpV2Res.json();
-                if (v2Parsed && v2Parsed.request_key) {
-                    otpData = v2Parsed;
-                }
-            } catch (e) {}
-
-            if (!otpData || !otpData.request_key) {
                 const otpRes = await fetch('https://api-t2.fyers.in/vagator/v2/send_login_otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fy_id: cleanFyId, app_id: '2' })
                 });
                 otpData = await otpRes.json();
+            } catch (e) {}
+
+            const firstMsg = (otpData?.message || '').toLowerCase();
+            if ((!otpData || !otpData.request_key) && !firstMsg.includes('too many requests') && !firstMsg.includes('rate limit')) {
+                try {
+                    const b64FyId = Buffer.from(cleanFyId, 'utf8').toString('base64');
+                    const otpV2Res = await fetch('https://api-t2.fyers.in/vagator/v2/send_login_otp_v2', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fy_id: b64FyId, app_id: '2' })
+                    });
+                    const v2Parsed = await otpV2Res.json();
+                    if (v2Parsed && v2Parsed.request_key) {
+                        otpData = v2Parsed;
+                    }
+                } catch (e) {}
             }
 
             if (!otpData || !otpData.request_key) {
