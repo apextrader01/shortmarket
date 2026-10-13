@@ -1476,7 +1476,7 @@ function App() {
   }
   const isImpersonating = typeof window !== 'undefined' && Boolean(localStorage.getItem('admin_token_backup'));
   const userSkippedOnboarding = user?.id ? (localStorage.getItem(`hasSkippedOnboarding_${user.id}`) === 'true') : false;
-  if (user && !user.is_onboarded && !userSkippedOnboarding && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel') {
+  if (user && !user.is_onboarded && !userSkippedOnboarding && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel' && activeTab !== 'Home') {
     return (
       <>
         <NetworkStatusBanner />

@@ -2658,6 +2658,7 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
 
     // Check if user exists in PostgreSQL
     let user = await db('users').whereRaw('LOWER(email) = ?', [email]).first();
+    let isNewUser = false;
 
     if (!user) {
       const cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -2735,6 +2736,7 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
       }).returning('*');
 
       user = inserted || await db('users').whereRaw('LOWER(email) = ?', [email]).first();
+      isNewUser = true;
 
       // Generate Sequential Professional Client ID: SE + Base36(user.id) padded to 6 chars (matches standard registration)
       const clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
@@ -2923,7 +2925,8 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
     res.json({
       success: true,
       token,
-      user: formattedUser
+      user: formattedUser,
+      is_new_user: isNewUser
     });
   } catch (err) {
     console.error('[GOOGLE AUTH ERROR]:', err);

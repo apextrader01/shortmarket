@@ -517,6 +517,10 @@ export const useStore = create(persist((set, get) => ({
           return { success: true, message: data.message, needs_verification: true, email: data.email };
         }
         if (data.token) localStorage.setItem('token', data.token);
+        try {
+          localStorage.setItem('skandx_new_registration', 'true');
+          localStorage.setItem('skandx_show_feature_tour', 'true');
+        } catch (_) {}
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,

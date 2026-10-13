@@ -189,9 +189,31 @@ export default function OnboardingWizard() {
       }}>
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '6px', color: '#ffffff' }}>Complete Your Profile</h1>
-          <p style={{ color: '#94a3b8', fontSize: '13px' }}>Help us customize your trading experience.</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', position: 'relative' }}>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '6px', color: '#ffffff' }}>Complete Your Profile</h1>
+            <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>Help us customize your trading experience.</p>
+          </div>
+          <button
+            type="button"
+            onClick={skipOnboarding}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              color: '#94a3b8',
+              fontSize: '12px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Skip for now →
+          </button>
         </div>
 
         {/* Progress Stepper */}
@@ -508,7 +530,20 @@ export default function OnboardingWizard() {
               <ChevronLeft size={16} /> Back
             </button>
           ) : (
-            <div />
+            <button
+              type="button"
+              onClick={skipOnboarding}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '13px'
+              }}
+            >
+              Skip setup
+            </button>
           )}
           
           {step < 3 ? (

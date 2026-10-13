@@ -3,7 +3,7 @@ import { Bell, ShieldAlert } from 'lucide-react';
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send, Sparkles } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
@@ -1022,6 +1022,22 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div className="glass-panel hoverable" onClick={() => setActiveTab('Pricing')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '13px', fontWeight: '600' }}>Subscription Plans</span>
+            </div>
+            <div 
+              className="glass-panel hoverable" 
+              onClick={() => {
+                try {
+                  localStorage.setItem('skandx_show_feature_tour', 'true');
+                  localStorage.removeItem('skandx_feature_tour_completed');
+                } catch (_) {}
+                setActiveTab('Home');
+              }}
+              style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+            >
+              <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '8px', borderRadius: '4px' }}>
+                <Sparkles size={16} color="#38bdf8" />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Platform Feature Tour</span>
             </div>
             <div 
               className="glass-panel hoverable" 

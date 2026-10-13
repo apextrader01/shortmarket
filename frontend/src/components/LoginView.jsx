@@ -63,6 +63,10 @@ export default function LoginView() {
     if (mode === 'verifyEmail') {
       setView('login');
       setMessage('✓ Email verified successfully with Firebase! You can now log in.');
+      try {
+        localStorage.setItem('skandx_new_registration', 'true');
+        localStorage.setItem('skandx_show_feature_tour', 'true');
+      } catch (_) {}
     } else if (mode === 'resetPassword' || oobCode) {
       setView('reset');
       if (oobCode) {
@@ -351,6 +355,10 @@ export default function LoginView() {
       const consentsPayload = { terms: consentTerms, dataProcessing: consentDataProcessing, marketing: consentMarketing };
       const res = await register(username.trim(), email.trim().toLowerCase(), cleanPhone, password, null, null, consentsPayload);
       if (res && res.success) {
+        try {
+          localStorage.setItem('skandx_new_registration', 'true');
+          localStorage.setItem('skandx_show_feature_tour', 'true');
+        } catch (_) {}
         setView('verify_email_sent');
         setMessage(res.message || `An official verification link has been dispatched to ${email.trim().toLowerCase()}.`);
       } else {
@@ -428,6 +436,10 @@ export default function LoginView() {
         clearPendingOauthStorage();
         setActiveOauthState(null);
         localStorage.setItem('token', data.token);
+        try {
+          localStorage.setItem('skandx_new_registration', 'true');
+          localStorage.setItem('skandx_show_feature_tour', 'true');
+        } catch (_) {}
         if (data.user) {
           try { localStorage.setItem('user', JSON.stringify(data.user)); } catch (_) {}
           useStore.setState({
@@ -610,6 +622,12 @@ export default function LoginView() {
       clearPendingOauthStorage();
       setActiveOauthState(null);
       localStorage.setItem('token', data.token);
+      if (data.is_new_user) {
+        try {
+          localStorage.setItem('skandx_new_registration', 'true');
+          localStorage.setItem('skandx_show_feature_tour', 'true');
+        } catch (_) {}
+      }
       if (data.user) {
         try { localStorage.setItem('user', JSON.stringify(data.user)); } catch (_) {}
         useStore.setState({
@@ -1144,6 +1162,12 @@ export default function LoginView() {
       }
 
       localStorage.setItem('token', data.token);
+      if (data.is_new_user) {
+        try {
+          localStorage.setItem('skandx_new_registration', 'true');
+          localStorage.setItem('skandx_show_feature_tour', 'true');
+        } catch (_) {}
+      }
       if (data.user) {
         useStore.setState({
           user: data.user,

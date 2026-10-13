@@ -2,7 +2,7 @@
 // 🌟 Institutional 6-Hub Fintech Command Center & Interactive Live Financial Sandbox
 // Fully responsive Desktop + Mobile Native-App UX (zero horizontal overflow, unified sticky header, safe-area aware, 4-tab live sandbox).
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useSocialLinks } from '../utils/socialLinks';
 import logoImg from '../assets/logo.png';
+import FeatureTourModal from './FeatureTourModal';
 
 export default function LandingHomeView({
   onOpenPaperTrading,
@@ -75,6 +76,58 @@ export default function LandingHomeView({
       setSelectedSymbol: state.setSelectedSymbol
     }))
   );
+
+  // ─── Guided Feature Introduction Tour State ───
+  const [showTour, setShowTour] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const explicitlyRequested = localStorage.getItem('skandx_show_feature_tour') === 'true' ||
+                                localStorage.getItem('skandx_new_registration') === 'true';
+    if (explicitlyRequested) return true;
+    return false;
+  });
+
+  // Automatically open tour for newly registered users landing on the page
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isNewRegistration = localStorage.getItem('skandx_new_registration') === 'true' ||
+                              localStorage.getItem('skandx_show_feature_tour') === 'true';
+    const tourDone = localStorage.getItem('skandx_feature_tour_completed') === 'true';
+    if (isNewRegistration && !tourDone && !showTour) {
+      setShowTour(true);
+    }
+  }, [user, showTour]);
+
+  const handleCloseTour = (reason) => {
+    setShowTour(false);
+    try {
+      localStorage.setItem('skandx_feature_tour_completed', 'true');
+      if (user?.id) {
+        localStorage.setItem(`skandx_feature_tour_completed_${user.id}`, 'true');
+      }
+      localStorage.removeItem('skandx_show_feature_tour');
+      localStorage.removeItem('skandx_new_registration');
+    } catch (_) {}
+  };
+
+  const handleTourNavigate = (hubKey) => {
+    handleCloseTour('navigated');
+    if (!hubKey) return;
+    if (hubKey === 'Markets') {
+      if (onOpenPaperTrading) onOpenPaperTrading();
+    } else if (hubKey === 'TradeDiary') {
+      if (onOpenTradeDiary) onOpenTradeDiary('DASHBOARD');
+    } else if (hubKey === 'Algo') {
+      if (onOpenAlgoBridge) onOpenAlgoBridge('Dashboard');
+    } else if (hubKey === 'Calculators') {
+      if (onOpenCalculators) onOpenCalculators('all');
+    } else if (hubKey === 'WealthOS') {
+      if (onOpenWealthFinance) onOpenWealthFinance('NET_WORTH');
+    } else if (hubKey === 'PrimaryMarkets') {
+      if (onOpenPrimaryMarkets) onOpenPrimaryMarkets('BHAVCOPY');
+    } else if (hubKey === 'Community') {
+      if (onOpenCommunity) onOpenCommunity();
+    }
+  };
 
   // Prefetch lazy chunks on hover so clicking any Hub opens in 0ms under high load
   const prefetchHubChunk = (hubId) => {
@@ -829,29 +882,56 @@ export default function LandingHomeView({
             </button>
           </div>
 
-          {/* Direct Action Button (Single-Line on Both Mobile & Desktop) */}
-          <button
-            onClick={onOpenPaperTrading}
-            style={{
-              padding: '8px 14px',
-              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-              border: '1px solid rgba(125, 211, 252, 0.45)',
-              borderRadius: '9px',
-              color: '#fff',
-              fontWeight: '800',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-          >
-            <Zap size={13} />
-            <span>Launch Terminal</span>
-          </button>
+          {/* Direct Action Buttons (Single-Line on Both Mobile & Desktop) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setShowTour(true)}
+              title="Launch interactive platform feature walkthrough"
+              style={{
+                padding: '7px 12px',
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                borderRadius: '9px',
+                color: '#38bdf8',
+                fontWeight: '700',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.15)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              <Sparkles size={13} />
+              <span>Feature Tour</span>
+            </button>
+
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                padding: '8px 14px',
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                border: '1px solid rgba(125, 211, 252, 0.45)',
+                borderRadius: '9px',
+                color: '#fff',
+                fontWeight: '800',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              <Zap size={13} />
+              <span>Launch Terminal</span>
+            </button>
+          </div>
         </header>
 
         {/* Second Row inside Unified Sticky Deck: Real-Time Clickable Market Ribbon */}
@@ -938,6 +1018,7 @@ export default function LandingHomeView({
         {/* Third Row (Mobile Only): Swipeable Quick-Jump Hub Bar for 1-Tap Mobile Navigation */}
         <div className="skx-mobile-quicknav skx-no-scrollbar">
           {[
+            { label: '✨ Feature Tour', action: () => setShowTour(true), color: '#38bdf8' },
             { label: '⚡ Sandbox', action: () => scrollToSection('mobile-sandbox-anchor'), color: '#38bdf8' },
             { label: '🧭 6 Hubs', action: () => scrollToSection('hubs-command-center'), color: '#818cf8' },
             { label: '⛓️ Option Chain', action: () => (onOpenOptionChain ? onOpenOptionChain() : onOpenPaperTrading()), color: '#a5b4fc' },
@@ -2965,6 +3046,15 @@ export default function LandingHomeView({
           </div>
         </div>
       </footer>
+
+      {/* 🌟 Interactive Guided Feature Tour Walkthrough */}
+      {showTour && (
+        <FeatureTourModal
+          isOpen={showTour}
+          onClose={handleCloseTour}
+          onNavigateToHub={handleTourNavigate}
+        />
+      )}
     </div>
   );
 }
