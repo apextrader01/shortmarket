@@ -1674,6 +1674,7 @@ function AiWealthCopilotView({ isMobile }) {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/ai/wealth-copilot`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})

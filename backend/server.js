@@ -14777,10 +14777,14 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
       updateData.screenshot_url = JSON.stringify(updateData.screenshot_url);
     }
 
-    const [updated] = await db('journal_trades')
-      .where({ id, user_id: req.user.id })
-      .update(updateData)
-      .returning('*');
+    let query = db('journal_trades').where({ user_id: req.user.id });
+    if (/^\d+$/.test(String(id))) {
+      query = query.where({ id: parseInt(id) });
+    } else {
+      query = query.where({ trade_id: id });
+    }
+
+    const [updated] = await query.update(updateData).returning('*');
 
     res.json({ success: true, trade: updated });
   } catch (err) {
@@ -14792,7 +14796,13 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
 app.delete('/api/journal/trades/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    await db('journal_trades').where({ id, user_id: req.user.id }).del();
+    let query = db('journal_trades').where({ user_id: req.user.id });
+    if (/^\d+$/.test(String(id))) {
+      query = query.where({ id: parseInt(id) });
+    } else {
+      query = query.where({ trade_id: id });
+    }
+    await query.del();
     res.json({ success: true, message: 'Trade deleted successfully' });
   } catch (err) {
     console.error('Delete Journal Trade Error:', err);
@@ -15248,12 +15258,11 @@ Key Knowledge & Rules:
 
     const geminiApiKey = await resolveGeminiApiKey();
     const modelsToTry = [
-      'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest'
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-flash-latest'
     ];
     let aiResponseText = null;
     let modelUsed = null;
@@ -15485,13 +15494,11 @@ app.post('/api/journal/ai-audit', authenticateToken, aiCopilotLimiter, async (re
     }
 
     const modelsToTry = [
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-flash-8b',
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite',
       'gemini-flash-lite-latest',
-      'gemini-flash-latest',
-      'gemini-3.5-flash'
+      'gemini-flash-latest'
     ];
 
     const promptText = `Analyze this trader's journal record:
@@ -15524,22 +15531,37 @@ Provide an honest, professional prop-firm grade audit in valid JSON format only:
               contents: [{ role: 'user', parts: [{ text: promptText }] }],
               generationConfig: {
                 temperature: 0.2,
-                maxOutputTokens: 800,
+                maxOutputTokens: 1000,
                 responseMimeType: 'application/json'
               }
-            })
+            }),
+            signal: AbortSignal.timeout(12000)
           }
         );
 
         if (geminiRes.ok) {
           const data = await geminiRes.json();
           const parts = data.candidates?.[0]?.content?.parts || [];
-          const text = parts.filter(p => !p.thought && p.text).map(p => p.text).join('\n').trim() || parts[0]?.text;
+          const nonThoughtParts = parts.filter(p => !p.thought && p.text);
+          const text = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('\n') : (parts[0]?.text || '')).trim();
           if (text) {
             try {
-              const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-              const parsed = JSON.parse(cleaned);
-              if (parsed.strengths && parsed.leaks && parsed.actionPlan) {
+              let parsed = null;
+              try {
+                parsed = JSON.parse(text);
+              } catch (_) {
+                const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                try {
+                  parsed = JSON.parse(cleaned);
+                } catch (_) {
+                  const firstBrace = text.indexOf('{');
+                  const lastBrace = text.lastIndexOf('}');
+                  if (firstBrace !== -1 && lastBrace > firstBrace) {
+                    parsed = JSON.parse(text.substring(firstBrace, lastBrace + 1));
+                  }
+                }
+              }
+              if (parsed && parsed.strengths && parsed.leaks && parsed.actionPlan) {
                 return res.json({
                   success: true,
                   audit: {

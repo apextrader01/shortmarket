@@ -1364,6 +1364,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (token && !String(tradeId).startsWith('MANUAL-') && !String(tradeId).startsWith('POS-')) {
         await fetch(`${API}/api/journal/trades/${tradeId}`, {
           method: 'DELETE',
+          credentials: 'include',
           headers: { 'Authorization': `Bearer ${token}` }
         });
       }
@@ -1424,6 +1425,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (token && !String(id).startsWith('MANUAL-') && !String(id).startsWith('POS-')) {
         await fetch(`${API}/api/journal/trades/${id}`, {
           method: 'PUT',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(updated)
         });
@@ -1517,11 +1519,16 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch(`${API}/api/journal/trades`, {
+        const res = await fetch(`${API}/api/journal/trades`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(tradeData)
         });
+        const data = await res.json();
+        if (data && data.success && data.trade) {
+          setDbTrades(prev => prev.map(t => t.id === tradeData.id ? { ...t, ...data.trade } : t));
+        }
       }
     } catch (err) {
       console.warn('Trade save to backend error:', err);
@@ -1529,6 +1536,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
     setNewTradeForm(prev => ({
       ...prev,
+      entry_price: '',
+      exit_price: '',
+      realized_pnl: '',
       screenshots: []
     }));
     setShowNewTradeModal(false);
@@ -1895,14 +1905,21 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
     try {
       const token = localStorage.getItem('token');
+      // Strip base64 screenshot strings from trades payload to prevent large payload network bottlenecks
+      const sanitizedTrades = (dbTrades || []).map(t => {
+        const { screenshots, screenshot_url, ...rest } = t;
+        return rest;
+      });
+
       const res = await fetch(`${API}/api/journal/ai-audit`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          trades: dbTrades,
+          trades: sanitizedTrades,
           marketSegment
         })
       });
