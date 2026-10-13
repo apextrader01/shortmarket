@@ -1750,10 +1750,14 @@ export default function AdminDashboard() {
   const [fyersUserId, setFyersUserId] = useState('');
   const [fyersPin, setFyersPin] = useState('');
   const [fyersTotpKey, setFyersTotpKey] = useState('');
+  const [fyersAppId, setFyersAppId] = useState('');
+  const [fyersSecretId, setFyersSecretId] = useState('');
   const [hasSavedPin, setHasSavedPin] = useState(false);
   const [hasSavedTotpKey, setHasSavedTotpKey] = useState(false);
+  const [hasSavedSecretId, setHasSavedSecretId] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [showTotpKey, setShowTotpKey] = useState(false);
+  const [showSecretId, setShowSecretId] = useState(false);
 
   const fetchFyersCredentials = async () => {
     try {
@@ -1765,8 +1769,10 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         if (data.fyers_user_id) setFyersUserId(data.fyers_user_id);
+        if (data.app_id) setFyersAppId(data.app_id);
         setHasSavedPin(!!data.has_pin);
         setHasSavedTotpKey(!!data.has_totp_key);
+        setHasSavedSecretId(!!data.has_secret_id);
       }
     } catch (e) {
       console.error('Failed to load Fyers credentials', e);
@@ -1814,7 +1820,9 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           fyers_user_id: fyersUserId.trim(),
           fyers_pin: fyersPin ? fyersPin.trim() : undefined,
-          fyers_totp_key: fyersTotpKey ? fyersTotpKey.trim() : undefined
+          fyers_totp_key: fyersTotpKey ? fyersTotpKey.trim() : undefined,
+          fyers_app_id: fyersAppId ? fyersAppId.trim() : undefined,
+          fyers_secret_id: fyersSecretId ? fyersSecretId.trim() : undefined
         })
       });
       const data = await res.json();
@@ -8824,6 +8832,45 @@ export default function AdminDashboard() {
                   >
                     {showTotpKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
+                </div>
+              </div>
+
+              {/* Fyers App ID & Secret Key (Optional Override) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    FYERS APP ID {fyersAppId && <span style={{ color: 'var(--color-green)', fontWeight: 'normal' }}>(✓ Active)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. HBIQP0RPMK-200"
+                    value={fyersAppId}
+                    onChange={e => setFyersAppId(e.target.value.trim())}
+                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    FYERS SECRET KEY {hasSavedSecretId && <span style={{ color: 'var(--color-green)', fontWeight: 'normal' }}>(✓ Configured)</span>}
+                  </label>
+                  <div className="input-group" style={{ position: 'relative' }}>
+                    <input
+                      type={showSecretId ? 'text' : 'password'}
+                      className="input-field"
+                      placeholder={hasSavedSecretId ? '•••••••• (Keep existing)' : 'Enter Secret ID'}
+                      value={fyersSecretId}
+                      onChange={e => setFyersSecretId(e.target.value.trim())}
+                      style={{ paddingRight: '34px', fontFamily: 'monospace', fontSize: '12px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecretId(!showSecretId)}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    >
+                      {showSecretId ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 

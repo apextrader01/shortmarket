@@ -13430,11 +13430,12 @@ app.get('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
     const creds = await getFyersCredentials();
     res.json({
       success: true,
-      hasCredentials: !!(creds.fy_id && creds.pin && creds.totp_key),
+      hasCredentials: !!(creds.fy_id && creds.pin && creds.totp_key && creds.app_id && creds.secret_id),
       fyers_user_id: creds.fy_id || '',
       has_pin: !!creds.pin,
       has_totp_key: !!creds.totp_key,
-      app_id: creds.app_id || ''
+      app_id: creds.app_id || '',
+      has_secret_id: !!creds.secret_id
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -13445,12 +13446,20 @@ app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => 
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-    const { fyers_user_id, fyers_pin, fyers_totp_key } = req.body;
+    const { fyers_user_id, fyers_pin, fyers_totp_key, fyers_app_id, fyers_secret_id } = req.body;
+    const { encryptSecret } = require('./services/fyersAutoLogin');
     if (fyers_user_id) {
       await db('system_settings').insert({ key: 'fyers_user_id', value: fyers_user_id.trim(), updated_at: new Date() }).onConflict('key').merge();
     }
     if (fyers_pin) {
       await db('system_settings').insert({ key: 'fyers_pin', value: fyers_pin.trim(), updated_at: new Date() }).onConflict('key').merge();
+    }
+    if (fyers_app_id) {
+      await db('system_settings').insert({ key: 'fyers_app_id', value: fyers_app_id.trim(), updated_at: new Date() }).onConflict('key').merge();
+      try { fs.writeFileSync(path.join(__dirname, 'fyers_appid.txt'), fyers_app_id.trim()); } catch (_) {}
+    }
+    if (fyers_secret_id) {
+      await db('system_settings').insert({ key: 'fyers_secret_id', value: encryptSecret(fyers_secret_id.trim()), updated_at: new Date() }).onConflict('key').merge();
     }
     if (fyers_totp_key) {
       const cleanKey = fyers_totp_key.replace(/\s+/g, '').toUpperCase();
@@ -13459,7 +13468,6 @@ app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => 
           error: 'You entered a 6-digit temporary OTP instead of the permanent 32-character TOTP Secret Key. Please copy the alphanumeric secret key from your Fyers 2FA / Authenticator setup.'
         });
       }
-      const { encryptSecret } = require('./services/fyersAutoLogin');
       await db('system_settings').insert({ key: 'fyers_totp_key', value: encryptSecret(cleanKey), updated_at: new Date() }).onConflict('key').merge();
     }
 
@@ -19037,7 +19045,7 @@ server.listen(PORT, async () => {
     const schedule = require('node-schedule');
 
     if (isFyersMaster) {
-      // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Production Master only to prevent TOTP collision with Staging)
+      // Automated Fyers TOTP Login daily at 08:00 AM & multi-window self-healing checks (Production Master only)
       const loginRule = new schedule.RecurrenceRule();
       loginRule.hour = 8;
       loginRule.minute = 0;
@@ -19052,10 +19060,10 @@ server.listen(PORT, async () => {
 
       const loginBackupRule = new schedule.RecurrenceRule();
       loginBackupRule.hour = 8;
-      loginBackupRule.minute = 30;
+      loginBackupRule.minute = [5, 10, 20, 30, 45];
       loginBackupRule.tz = 'Asia/Kolkata';
       schedule.scheduleJob(loginBackupRule, async () => {
-        console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
+        console.log('⏰ Morning Backup Cron: Checking / Re-verifying Fyers Token...');
         try {
           const { getFyersStatus } = require('./services/fyers');
           const status = getFyersStatus ? getFyersStatus() : {};
