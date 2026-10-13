@@ -412,22 +412,23 @@ async function run() {
                 const orderRoll = (sec + o) % 3;
 
                 if (orderRoll === 0) {
-                    // Regular Limit Order
+                    // Regular Limit Order (price below LTP to remain PENDING for edit/cancel)
                     fetch(`${targetUrl}/api/order`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${trader.token}` },
                         body: JSON.stringify({
                             symbol: 'NSE:TATASTEEL-EQ',
-                            side: Math.random() > 0.5 ? 'BUY' : 'SELL',
+                            side: 'BUY',
                             type: 'LIMIT',
-                            price: 154.00 + (Math.random() * 4),
+                            price: 130.00 + (Math.random() * 5),
                             quantity: 10,
                             product_type: 'INT'
                         })
                     }).then(r => r.json()).then(data => {
                         regularOrdersPlaced++;
                         apiCallsCompleted++;
-                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'REGULAR' });
+                        const id = data?.orderId || data?.id || data?.order?.id;
+                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'REGULAR' });
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 } else if (orderRoll === 1) {
                     // Bracket Order (BO) with Target & SL
@@ -438,16 +439,17 @@ async function run() {
                             symbol: 'NSE:RELIANCE-EQ',
                             side: 'BUY',
                             type: 'LIMIT',
-                            price: 1080.00 + (Math.random() * 10),
+                            price: 950.00 + (Math.random() * 10),
                             quantity: 5,
                             product_type: 'BO',
-                            sl_price: 1040.00,
-                            tgt_price: 1210.00
+                            sl_price: 900.00,
+                            tgt_price: 1100.00
                         })
                     }).then(r => r.json()).then(data => {
                         boOrdersPlaced++;
                         apiCallsCompleted++;
-                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'BO' });
+                        const id = data?.orderId || data?.id || data?.order?.id;
+                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'BO' });
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 } else {
                     // Cover Order (CO) with SL trigger
@@ -458,15 +460,16 @@ async function run() {
                             symbol: 'NSE:HDFCBANK-EQ',
                             side: 'BUY',
                             type: 'LIMIT',
-                            price: 640.00 + (Math.random() * 5),
+                            price: 550.00 + (Math.random() * 5),
                             quantity: 5,
                             product_type: 'CO',
-                            trigger_price: 625.00
+                            trigger_price: 530.00
                         })
                     }).then(r => r.json()).then(data => {
                         coOrdersPlaced++;
                         apiCallsCompleted++;
-                        if (data?.order?.id) openOrdersPool.push({ id: data.order.id, token: trader.token, type: 'CO' });
+                        const id = data?.orderId || data?.id || data?.order?.id;
+                        if (id) openOrdersPool.push({ id, token: trader.token, type: 'CO' });
                     }).catch(() => { orderErrors++; apiCallsFailed++; });
                 }
             }
@@ -480,7 +483,7 @@ async function run() {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ordToEdit.token}` },
                     body: JSON.stringify({
-                        price: 155.20 + (Math.random() * 2),
+                        price: 132.50 + (Math.random() * 2),
                         quantity: 15
                     })
                 }).then(r => { if (r.ok) { ordersEdited++; apiCallsCompleted++; } else { apiCallsFailed++; } }).catch(() => apiCallsFailed++);
