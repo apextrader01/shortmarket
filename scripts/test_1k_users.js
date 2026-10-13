@@ -162,15 +162,27 @@ async function detectTarget() {
     if (process.argv[2] && process.argv[2].startsWith('http')) {
         return process.argv[2];
     }
-    try {
-        const res = await fetch('http://localhost:5000/api/health', { signal: AbortSignal.timeout(1200) });
-        if (res.ok) return 'http://localhost:5000';
-    } catch (e) {}
-    try {
-        const res = await fetch('http://127.0.0.1:5000/api/health', { signal: AbortSignal.timeout(1200) });
-        if (res.ok) return 'http://127.0.0.1:5000';
-    } catch (e) {}
-    return 'https://skandx.in';
+    // Wait for localhost:5000 to become ready (up to 15 attempts in case pm2 was just restarted)
+    for (let attempt = 1; attempt <= 15; attempt++) {
+        try {
+            const res = await fetch('http://localhost:5000/api/health', { signal: AbortSignal.timeout(1500) });
+            if (res.ok) {
+                if (attempt > 1) console.log('\n');
+                return 'http://localhost:5000';
+            }
+        } catch (e) {}
+        try {
+            const res = await fetch('http://127.0.0.1:5000/api/health', { signal: AbortSignal.timeout(1500) });
+            if (res.ok) {
+                if (attempt > 1) console.log('\n');
+                return 'http://127.0.0.1:5000';
+            }
+        } catch (e) {}
+        if (attempt === 1) process.stdout.write('⏳ Waiting for backend on http://localhost:5000 to be ready...');
+        else process.stdout.write('.');
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    return 'http://localhost:5000';
 }
 
 async function ensureTestTraderAccounts(count = 1000) {
