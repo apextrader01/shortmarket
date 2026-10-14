@@ -5,6 +5,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWit
 import { auth } from '../firebase';
 import { Eye, EyeOff } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import { safeParseJsonResponse, formatAuthErrorMessage } from '../utils/apiHelper';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -129,7 +130,7 @@ export default function LoginView() {
         const API_URL = import.meta.env.VITE_API_URL || '';
         const excludeParam = view === 'google_complete' && email ? `&exclude_email=${encodeURIComponent(email)}` : '';
         const res = await fetch(`${API_URL}/api/auth/check-username?username=${encodeURIComponent(cleanName)}${excludeParam}`);
-        const data = await res.json();
+        const data = await safeParseJsonResponse(res);
         if (data && data.valid === false) {
           setNameAvailability({ status: 'idle', message: '' });
         } else if (data && data.available) {
@@ -427,9 +428,9 @@ export default function LoginView() {
             referral_code: localStorage.getItem('referral_code') || undefined
           })
         });
-        const data = await res.json();
+        const data = await safeParseJsonResponse(res, 'Failed to complete Google sign-up.');
         if (!res.ok || !data.success) {
-          useStore.setState({ authError: data.error || 'Failed to complete Google sign-up.' });
+          useStore.setState({ authError: formatAuthErrorMessage(data.error || 'Failed to complete Google sign-up.') });
           setLoading(false);
           return;
         }
@@ -468,7 +469,7 @@ export default function LoginView() {
           window.history.pushState({}, '', '/');
         }
       } catch (err) {
-        useStore.setState({ authError: err.message || 'Failed to complete Google sign-up.' });
+        useStore.setState({ authError: formatAuthErrorMessage(err || 'Failed to complete Google sign-up.') });
       }
       setLoading(false);
       return;
@@ -605,7 +606,7 @@ export default function LoginView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken: idTokenToSend, state: pendingState })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Google login failed.');
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Google login failed');
       }
@@ -657,7 +658,7 @@ export default function LoginView() {
       }
     } catch (err) {
       console.warn('Google sign-in error:', err);
-      useStore.setState({ authError: err.message || 'Google sign-in failed. Please try again.' });
+      useStore.setState({ authError: formatAuthErrorMessage(err || 'Google sign-in failed. Please try again.') });
     } finally {
       setGoogleLoading(false);
       setLoading(false);
@@ -955,7 +956,7 @@ export default function LoginView() {
           { cache: 'no-store' }
         );
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await safeParseJsonResponse(res);
         if (cancelled || oauthProcessingRef.current) return;
 
         if (data && data.status === 'completed' && data.token) {
@@ -1147,7 +1148,7 @@ export default function LoginView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Google login failed.');
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Google login failed');
       }
@@ -1193,7 +1194,7 @@ export default function LoginView() {
       } else if (err.message && (err.message.includes('missing initial state') || err.message.includes('sessionStorage'))) {
         userFriendlyMsg = 'Browser privacy settings prevented Google login. Please log in directly using Email & Password or standard Chrome.';
       } else if (err.message) {
-        userFriendlyMsg = err.message;
+        userFriendlyMsg = formatAuthErrorMessage(err.message);
       }
       useStore.setState({ authError: userFriendlyMsg });
     } finally {
@@ -1354,7 +1355,7 @@ export default function LoginView() {
             alignItems:   'center',
             gap:          '8px'
           }}>
-            ⚠️ {authError}
+            ⚠️ {formatAuthErrorMessage(authError)}
           </div>
         )}
 

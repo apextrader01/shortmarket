@@ -7,6 +7,7 @@ import { calculateOrderSlices, getFreezeLimit, updateLiveFreezeConfig, syncLiveF
 import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound } from './utils/soundManager';
 import { setAppLocked } from './utils/biometricAuth';
 import { filterStaleAlerts } from './utils/alertUtils';
+import { safeParseJsonResponse, formatAuthErrorMessage } from './utils/apiHelper';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -334,7 +335,7 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, trusted_device_token: deviceToken })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Login verification failed. Please try again.');
       if (data.success) {
         if (data.trusted && data.token && data.user) {
           localStorage.setItem('token', data.token);
@@ -359,11 +360,13 @@ export const useStore = create(persist((set, get) => ({
           totp_enabled: data.totp_enabled
         };
       }
-      set({ authError: data.error });
-      return { success: false, error: data.error, needs_email_verification: data.needs_email_verification, email: data.email };
+      const cleanErr = formatAuthErrorMessage(data.error);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr, needs_email_verification: data.needs_email_verification, email: data.email };
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false, error: err.message };
+      const cleanErr = formatAuthErrorMessage(err);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     }
   },
 
@@ -374,10 +377,10 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to send OTP. Please try again.');
       return data;
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: formatAuthErrorMessage(err) };
     }
   },
 
@@ -389,7 +392,7 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, method, code, trust_device, device_name })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Verification failed. Please check your code and try again.');
       if (data.success) {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.trusted_device_token) {
@@ -408,11 +411,13 @@ export const useStore = create(persist((set, get) => ({
         syncClientTelemetry(API, true);
         return { success: true, user: data.user };
       }
-      set({ authError: data.error });
-      return { success: false, error: data.error };
+      const cleanErr = formatAuthErrorMessage(data.error);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false, error: err.message };
+      const cleanErr = formatAuthErrorMessage(err);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     }
   },
 
@@ -432,7 +437,7 @@ export const useStore = create(persist((set, get) => ({
       const res  = await fetch(`${API}/api/auth/login`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Login failed. Please check your credentials.');
       if (data.success) {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.trusted_device_token) {
@@ -451,17 +456,19 @@ export const useStore = create(persist((set, get) => ({
         syncClientTelemetry(API, true);
         return { success: true };
       } else {
-        set({ authError: data.error });
+        const cleanErr = formatAuthErrorMessage(data.error);
+        set({ authError: cleanErr });
         return {
           success: false,
-          error: data.error,
+          error: cleanErr,
           needs_email_verification: Boolean(data.needs_email_verification),
           email: data.email
         };
       }
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false, error: err.message };
+      const cleanErr = formatAuthErrorMessage(err);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     }
   },
 
@@ -473,16 +480,18 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, phone })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to send verification OTP.');
       if (data.success) {
         return { success: true, message: data.message };
       } else {
-        set({ authError: data.error });
-        return { success: false, error: data.error };
+        const cleanErr = formatAuthErrorMessage(data.error);
+        set({ authError: cleanErr });
+        return { success: false, error: cleanErr };
       }
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false, error: err.message };
+      const cleanErr = formatAuthErrorMessage(err);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     }
   },
 
@@ -508,7 +517,7 @@ export const useStore = create(persist((set, get) => ({
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Registration failed. Please check your details.');
       if (data.success) {
         if (data.needs_verification) {
           // Keep user in strictly unauthenticated state until email link is verified
@@ -530,12 +539,14 @@ export const useStore = create(persist((set, get) => ({
         syncClientTelemetry(API, true);
         return { success: true, message: data.message, needs_verification: false, email: data.email };
       } else {
-        set({ authError: data.error });
-        return { success: false, error: data.error };
+        const cleanErr = formatAuthErrorMessage(data.error);
+        set({ authError: cleanErr });
+        return { success: false, error: cleanErr };
       }
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false, error: err.message };
+      const cleanErr = formatAuthErrorMessage(err);
+      set({ authError: cleanErr });
+      return { success: false, error: cleanErr };
     }
   },
 
@@ -546,10 +557,10 @@ export const useStore = create(persist((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to resend verification email.');
       return data;
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: formatAuthErrorMessage(err) };
     }
   },
 
@@ -558,11 +569,11 @@ export const useStore = create(persist((set, get) => ({
       const res = await fetch(`${API}/api/auth/forgot-password`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to send password reset code.');
       if (!res.ok) throw new Error(data.error);
       return data;
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: formatAuthErrorMessage(err) };
     }
   },
 
@@ -571,11 +582,11 @@ export const useStore = create(persist((set, get) => ({
       const res = await fetch(`${API}/api/auth/verify-reset-otp`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to verify OTP.');
       if (!res.ok) throw new Error(data.error);
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: formatAuthErrorMessage(err) };
     }
   },
 
@@ -584,11 +595,11 @@ export const useStore = create(persist((set, get) => ({
       const res = await fetch(`${API}/api/auth/reset-password`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp, newPassword })
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res, 'Failed to reset password.');
       if (!res.ok) throw new Error(data.error);
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: formatAuthErrorMessage(err) };
     }
   },
 

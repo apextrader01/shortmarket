@@ -2922,9 +2922,11 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
     try {
       const { ensureFirebaseUser } = require('./services/firebaseAuth');
       if (typeof ensureFirebaseUser === 'function') {
-        ensureFirebaseUser(email, user.phone || null, null, { markEmailVerified: true }).catch(() => {});
+        await ensureFirebaseUser(email, user.phone || null, null, { markEmailVerified: true });
       }
-    } catch (_) {}
+    } catch (fbErr) {
+      console.warn('[GOOGLE AUTH] Failed to mark email verified in Firebase:', fbErr?.message);
+    }
 
     // Standardize any legacy random SKX... or missing client_id to sequential SE00000... format
     let clientId = user.client_id;
