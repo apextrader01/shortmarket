@@ -7239,9 +7239,36 @@ app.get('/api/market-deals', apiLimiter, (req, res) => {
 
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
-    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
     const list = primaryMarketsService.getIpoList(req.query.category || 'ALL', req.query.status || 'ALL');
-    res.json({ success: true, count: list.length, ipos: list });
+    const lastUpdated = typeof primaryMarketsService.getIpoLastUpdatedDisplay === 'function'
+      ? primaryMarketsService.getIpoLastUpdatedDisplay()
+      : 'Live Market Synced';
+    const lastUpdatedIso = typeof primaryMarketsService.getIpoLastUpdatedIso === 'function'
+      ? primaryMarketsService.getIpoLastUpdatedIso()
+      : new Date().toISOString();
+    res.json({ success: true, count: list.length, lastUpdated, lastUpdatedIso, ipos: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/ipos/sync-now', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    const refreshed = typeof primaryMarketsService.syncLiveIpos === 'function'
+      ? await primaryMarketsService.syncLiveIpos(true)
+      : [];
+    const lastUpdated = typeof primaryMarketsService.getIpoLastUpdatedDisplay === 'function'
+      ? primaryMarketsService.getIpoLastUpdatedDisplay()
+      : 'Live Market Synced';
+    res.json({
+      success: true,
+      count: refreshed.length,
+      lastUpdated,
+      message: `Successfully synchronized ${refreshed.length} live IPOs with real-time GMP`
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

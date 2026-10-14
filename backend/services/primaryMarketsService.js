@@ -900,6 +900,7 @@ function populateRollingMarketDeals(liveDeals = []) {
  * Retail (x), Employee (x), Shareholder (x), Others (x), Total (x), Applications, Subscription As On, GMP & Registrar!
  */
 const { BASE_IPOS } = require('./ipoCatalogData');
+const ipoLiveSyncService = require('./ipoLiveSyncService');
 
 function buildComprehensiveIpoCatalog() {
   ipoListCache = BASE_IPOS.map(ipo => {
@@ -934,13 +935,19 @@ syncOfficialNseBhavcopy().then(() => {
   syncOfficialMarketDeals().catch(() => {});
 });
 
-// Schedule 6:55 PM IST Cron (Monday through Friday)
+// Schedule 6:55 PM IST Cron (Monday through Friday) + Real-Time Live IPO & GMP Engine
 function initPrimaryMarketCrons() {
+  // 1. Bhavcopy & Institutional Deals EOD Cron
   cron.schedule('55 18 * * 1-5', () => {
     syncOfficialNseBhavcopy().then(() => {
       syncOfficialMarketDeals().catch(() => {});
     }).catch(e => console.error(e));
   }, { timezone: 'Asia/Kolkata' });
+
+  // 2. Real-Time Live IPO, Hourly GMP & Subscription Engine
+  if (typeof ipoLiveSyncService.initIpoCrons === 'function') {
+    ipoLiveSyncService.initIpoCrons();
+  }
 }
 
 // Helper: Exact timezone-independent calendar days difference
@@ -1317,6 +1324,12 @@ function getMarketDeals(query = {}) {
 }
 
 function getIpoList(category = 'ALL', status = 'ALL') {
+  if (typeof ipoLiveSyncService.getLiveIpoList === 'function') {
+    const live = ipoLiveSyncService.getLiveIpoList(category, status);
+    if (Array.isArray(live) && live.length > 0) {
+      return live;
+    }
+  }
   let list = ipoListCache;
   if (category && category !== 'ALL') {
     list = list.filter(i => i.category === category.toUpperCase());
@@ -1334,6 +1347,9 @@ module.exports = {
   syncOfficialMarketDeals,
   getBhavcopyDeliveryScreener,
   getMarketDeals,
-  getIpoList
+  getIpoList,
+  syncLiveIpos: ipoLiveSyncService.syncLiveIpos,
+  getIpoLastUpdatedDisplay: ipoLiveSyncService.getLastUpdatedDisplay,
+  getIpoLastUpdatedIso: ipoLiveSyncService.getLastUpdatedIso
 };
 

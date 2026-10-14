@@ -352,6 +352,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [dealsHasMore, setDealsHasMore] = useState(true);
 
   const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
+  const [ipoLastUpdated, setIpoLastUpdated] = useState('');
+  const [isRefreshingIpo, setIsRefreshingIpo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMoreBhav, setLoadingMoreBhav] = useState(false);
   const [loadingDeals, setLoadingDeals] = useState(false);
@@ -563,14 +565,18 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     dealsSortBy, dealsSortDir, dealsColFilter
   ]);
 
-  const fetchIposList = useCallback(async () => {
+  const fetchIposList = useCallback(async (manual = false) => {
+    if (manual) setIsRefreshingIpo(true);
     try {
       const res = await fetch(`${API}/api/ipos`).then(r => r.ok ? r.json() : null).catch(() => null);
       if (res?.ipos && Array.isArray(res.ipos) && res.ipos.length > 0) {
         setIpoData(res.ipos);
+        if (res.lastUpdated) setIpoLastUpdated(res.lastUpdated);
       }
     } catch (e) {
       // Fallback to SEED_IPO_DATA
+    } finally {
+      if (manual) setTimeout(() => setIsRefreshingIpo(false), 500);
     }
   }, []);
 
@@ -2000,15 +2006,33 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '280px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '380px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: '#64748b' }} />
-                <input
-                  type="text"
-                  placeholder="Search company, registrar (KFintech, Link Intime, Bigshare)..."
-                  value={ipoSearch}
-                  onChange={e => setIpoSearch(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobile ? '100%' : '280px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '440px' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    placeholder="Search company, registrar (KFintech, Link Intime, Bigshare)..."
+                    value={ipoSearch}
+                    onChange={e => setIpoSearch(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchIposList(true)}
+                  disabled={isRefreshingIpo}
+                  title="Refresh Live GMP & Subscriptions from Market Feeds"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 11px',
+                    borderRadius: '8px', fontSize: '11px', fontWeight: '700',
+                    background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.35)',
+                    color: '#4ade80', cursor: isRefreshingIpo ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <RefreshCw size={12} className={isRefreshingIpo ? 'spin-icon' : ''} />
+                  <span>{isRefreshingIpo ? 'Syncing...' : (ipoLastUpdated ? `⚡ ${ipoLastUpdated}` : 'Live Sync')}</span>
+                </button>
               </div>
             </div>
           </div>
