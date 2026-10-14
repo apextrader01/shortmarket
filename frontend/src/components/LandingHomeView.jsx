@@ -80,20 +80,25 @@ export default function LandingHomeView({
   // ─── Guided Feature Introduction Tour State ───
   const [showTour, setShowTour] = useState(() => {
     if (typeof window === 'undefined') return false;
-    const explicitlyRequested = localStorage.getItem('skandx_show_feature_tour') === 'true' ||
-                                localStorage.getItem('skandx_new_registration') === 'true';
+    const explicitlyRequested = localStorage.getItem('skandx_show_feature_tour') === 'true';
     if (explicitlyRequested) return true;
+    const tourDone = localStorage.getItem('skandx_feature_tour_completed') === 'true';
+    const isNewRegistration = localStorage.getItem('skandx_new_registration') === 'true';
+    if (isNewRegistration && !tourDone) return true;
     return false;
   });
 
   // Automatically open tour for newly registered users landing on the page
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const isNewRegistration = localStorage.getItem('skandx_new_registration') === 'true' ||
-                              localStorage.getItem('skandx_show_feature_tour') === 'true';
+    const explicitlyRequested = localStorage.getItem('skandx_show_feature_tour') === 'true';
+    const isNewRegistration = localStorage.getItem('skandx_new_registration') === 'true';
     const tourDone = localStorage.getItem('skandx_feature_tour_completed') === 'true';
-    if (isNewRegistration && !tourDone && !showTour) {
-      setShowTour(true);
+    const userTourDone = user?.id ? localStorage.getItem(`skandx_feature_tour_completed_${user.id}`) === 'true' : false;
+    if (explicitlyRequested) {
+      if (!showTour) setShowTour(true);
+    } else if (isNewRegistration && !tourDone && !userTourDone) {
+      if (!showTour) setShowTour(true);
     }
   }, [user, showTour]);
 

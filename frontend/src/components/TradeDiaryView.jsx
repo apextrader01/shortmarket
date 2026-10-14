@@ -80,7 +80,7 @@ export const compressImageToDataUrl = (file, targetMaxKb = 48) => {
       img.onload = () => {
         const origW = img.width;
         const origH = img.height;
-        if (!origW || !origH) return resolve(e.target.result);
+        if (!origW || !origH) return resolve('');
 
         // Check WebP support (WebP gives 30% smaller size at higher clarity for charts)
         let mimeType = 'image/webp';
@@ -146,7 +146,8 @@ export const compressImageToDataUrl = (file, targetMaxKb = 48) => {
         if (finalKb > targetMaxKb) {
           let testW = Math.round(canvas.width * 0.85);
           let testH = Math.round(canvas.height * 0.85);
-          for (let pass = 0; pass < 4 && finalKb > targetMaxKb; pass++) {
+          for (let pass = 0; pass < 6 && finalKb > targetMaxKb; pass++) {
+            if (testW < 180 || testH < 120) break;
             canvas.width = testW;
             canvas.height = testH;
             if (ctx) {
@@ -154,17 +155,17 @@ export const compressImageToDataUrl = (file, targetMaxKb = 48) => {
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, testW, testH);
             }
-            const currentUrl = canvas.toDataURL(mimeType, 0.35);
+            const currentUrl = canvas.toDataURL(mimeType, Math.max(0.20, 0.35 - (pass * 0.03)));
             finalKb = (currentUrl.length * 0.75) / 1024;
             bestDataUrl = currentUrl;
-            testW = Math.round(testW * 0.85);
-            testH = Math.round(testH * 0.85);
+            testW = Math.round(testW * 0.80);
+            testH = Math.round(testH * 0.80);
           }
         }
 
         resolve(bestDataUrl);
       };
-      img.onerror = () => resolve(e.target.result);
+      img.onerror = () => resolve('');
       img.src = e.target.result;
     };
     reader.onerror = () => resolve('');

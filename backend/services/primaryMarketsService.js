@@ -648,7 +648,7 @@ async function syncOfficialMarketDeals() {
         const company = cols[2] || symbol;
         const client = cols[3] || 'Institutional Participant';
         const side = cols[4].toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
-        const qty = parseInt(cols[5].replace(/,/g, ''), 10) || 0;
+        let qty = parseInt(cols[5].replace(/,/g, ''), 10) || 0;
         const price = parseFloat(cols[6].replace(/,/g, '')) || 0;
         if (qty <= 0 || price <= 0) continue;
         let valueCr = Number(((qty * price) / 10000000).toFixed(2));

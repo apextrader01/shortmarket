@@ -5472,6 +5472,11 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [], system: getSystemTelemetry() });
 
+        const { flushTelemetry } = require('./middleware/telemetry');
+        if (typeof flushTelemetry === 'function') {
+            await flushTelemetry().catch(() => {});
+        }
+
         const system = getSystemTelemetry();
         const tf = req.query.timeframe || 'all';
         let minutes = 0;
@@ -5529,10 +5534,16 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const userId = users[i];
                 const data = userResults[i] || {};
                 const isNumeric = userId && !isNaN(Number(userId));
-                const dbUser = isNumeric ? await db('users').where({ id: Number(userId) }).first().catch(() => null) : null;
+                let dbUser = null;
+                if (isNumeric) {
+                    dbUser = await db('users').where({ id: Number(userId) }).first().catch(() => null);
+                } else if (userId && userId !== 'anonymous' && userId !== 'undefined' && userId !== 'null') {
+                    dbUser = await db('users').where({ username: String(userId) }).orWhere({ client_id: String(userId) }).first().catch(() => null);
+                }
 
                 // Auto-purge ghost test users who no longer exist in DB from Redis
-                if (isNumeric && !dbUser) {
+                const isGhost = userId !== 'anonymous' && !dbUser;
+                if (isGhost) {
                     generalClient.del(`telemetry:user:${userId}`).catch(() => {});
                     generalClient.sRem('telemetry:users', String(userId)).catch(() => {});
                 }
@@ -5541,7 +5552,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     userId,
                     clientId: dbUser ? dbUser.client_id : null,
                     username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${userId})`),
-                    isDeleted: !dbUser && userId !== 'anonymous',
+                    isDeleted: isGhost,
                     existsInDb: Boolean(dbUser),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
@@ -5628,8 +5639,14 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             const userStats = [];
             for (const u of Object.values(userMap)) {
                 const isNumeric = u.userId && !isNaN(Number(u.userId));
-                const dbUser = isNumeric ? await db('users').where({ id: Number(u.userId) }).first().catch(() => null) : null;
-                if (isNumeric && !dbUser) {
+                let dbUser = null;
+                if (isNumeric) {
+                    dbUser = await db('users').where({ id: Number(u.userId) }).first().catch(() => null);
+                } else if (u.userId && u.userId !== 'anonymous' && u.userId !== 'undefined' && u.userId !== 'null') {
+                    dbUser = await db('users').where({ username: String(u.userId) }).orWhere({ client_id: String(u.userId) }).first().catch(() => null);
+                }
+                const isGhost = u.userId !== 'anonymous' && !dbUser;
+                if (isGhost) {
                     generalClient.del(`telemetry:user:${u.userId}`).catch(() => {});
                     generalClient.sRem('telemetry:users', String(u.userId)).catch(() => {});
                 }
@@ -5637,7 +5654,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     userId: u.userId,
                     clientId: dbUser ? dbUser.client_id : null,
                     username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${u.userId})`),
-                    isDeleted: !dbUser && u.userId !== 'anonymous',
+                    isDeleted: isGhost,
                     existsInDb: Boolean(dbUser),
                     apiCalls: u.apiCalls,
                     apiBytes: u.apiBytes,
@@ -5686,6 +5703,11 @@ app.post('/api/admin/telemetry/purge-ghosts', authenticateToken, async (req, res
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.status(503).json({ error: 'Redis offline' });
 
+        const { flushTelemetry } = require('./middleware/telemetry');
+        if (typeof flushTelemetry === 'function') {
+            await flushTelemetry().catch(() => {});
+        }
+
         let userIds = await generalClient.sMembers('telemetry:users').catch(() => []);
         if (!userIds || userIds.length === 0) {
             userIds = [];
@@ -5702,8 +5724,13 @@ app.post('/api/admin/telemetry/purge-ghosts', authenticateToken, async (req, res
         const setRemovals = [];
 
         for (const uid of userIds) {
-            if (uid === 'anonymous' || isNaN(Number(uid))) continue;
-            const exists = await db('users').where({ id: Number(uid) }).first().catch(() => null);
+            if (!uid || uid === 'anonymous') continue;
+            let exists = null;
+            if (!isNaN(Number(uid))) {
+                exists = await db('users').where({ id: Number(uid) }).first().catch(() => null);
+            } else if (uid !== 'undefined' && uid !== 'null' && uid !== 'NaN') {
+                exists = await db('users').where({ username: String(uid) }).orWhere({ client_id: String(uid) }).first().catch(() => null);
+            }
             if (!exists) {
                 keysToDelete.push(`telemetry:user:${uid}`);
                 setRemovals.push(String(uid));

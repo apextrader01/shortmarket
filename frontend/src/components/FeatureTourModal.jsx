@@ -327,6 +327,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
         .skx-tour-card {
           width: 100%;
           max-width: 660px;
+          max-height: min(92vh, 720px);
           border-radius: 20px;
           border: 1px solid rgba(56, 189, 248, 0.28);
           background: #090e1a;
@@ -337,6 +338,33 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
           color: #f8fafc;
           position: relative;
           contain: layout style;
+        }
+        .skx-tour-header {
+          flex-shrink: 0;
+        }
+        .skx-tour-body {
+          flex: 1;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          min-height: 0;
+        }
+        .skx-tour-footer {
+          flex-shrink: 0;
+        }
+        @media (max-width: 640px) {
+          .skx-tour-card {
+            max-height: 94vh !important;
+            border-radius: 16px !important;
+          }
+          .skx-tour-header {
+            padding: 14px 16px 12px 16px !important;
+          }
+          .skx-tour-body {
+            padding: 16px 16px 14px 16px !important;
+          }
+          .skx-tour-footer {
+            padding: 12px 16px 16px 16px !important;
+          }
         }
         .skx-tour-step-dot {
           height: 6px;
@@ -366,6 +394,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
       >
         {/* Top Header Deck */}
         <div
+          className="skx-tour-header"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -425,7 +454,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
         </div>
 
         {/* Modal Main Content Area */}
-        <div style={{ padding: '22px 24px 20px 24px' }}>
+        <div className="skx-tour-body" style={{ padding: '22px 24px 20px 24px' }}>
           {/* Feature Header with Halo Icon */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
             <div
@@ -654,6 +683,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
 
         {/* Bottom Navigation & Progress Footer */}
         <div
+          className="skx-tour-footer"
           style={{
             padding: '16px 24px 20px 24px',
             borderTop: '1px solid rgba(255, 255, 255, 0.07)',

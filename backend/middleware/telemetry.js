@@ -143,7 +143,7 @@ function recordTelemetry(req, res, next) {
             pendingMbStats[mbApiKey].time_ms += timeMs;
             pendingMbStats[mbApiKey].bytes += responseBodySize;
 
-            if (userId !== 'anonymous') {
+            if (userId && userId !== 'anonymous' && userId !== 'undefined' && userId !== 'null') {
                 if (!pendingUserStats[userId]) pendingUserStats[userId] = { api_calls: 0, api_time_ms: 0, api_bytes: 0 };
                 pendingUserStats[userId].api_calls += 1;
                 pendingUserStats[userId].api_time_ms += timeMs;
@@ -163,4 +163,7 @@ function recordTelemetry(req, res, next) {
     next();
 }
 
+recordTelemetry.flushTelemetry = flushTelemetry;
+recordTelemetry.recordTelemetry = recordTelemetry;
 module.exports = recordTelemetry;
+
