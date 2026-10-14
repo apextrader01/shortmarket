@@ -2449,10 +2449,11 @@ export default function AdminDashboard() {
     totalCancelled: 0,
     totalInitiated: 0,
     totalRevenue: 0,
+    totalAdminUpgrades: 0,
     activeSubscribersCount: 0,
     planBreakdown: { MONTHLY: 0, YEARLY: 0, HIGHEST: 0, MASTERCLASS: 0, LIFETIME: 0 }
   });
-  const [subStatusFilter, setSubStatusFilter] = useState('ALL'); // 'ALL' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'INITIATED' | 'ACTIVE_SUBSCRIBERS'
+  const [subStatusFilter, setSubStatusFilter] = useState('ALL'); // 'ALL' | 'SUCCESS' | 'ADMIN_UPGRADES' | 'FAILED' | 'CANCELLED' | 'INITIATED' | 'ACTIVE_SUBSCRIBERS'
   const [subPlanFilter, setSubPlanFilter] = useState('ALL'); // 'ALL' | 'MONTHLY' | 'YEARLY' | 'HIGHEST' | 'MASTERCLASS' | 'LIFETIME'
   const [subSearch, setSubSearch] = useState('');
   const [subDatePreset, setSubDatePreset] = useState('all');
@@ -2493,13 +2494,30 @@ export default function AdminDashboard() {
         let totalCancelled = 0;
         let totalInitiated = 0;
         let totalRevenue = 0;
+        let totalAdminUpgrades = 0;
         for (const p of cleanPaperPayments) {
           const st = String(p.status || '').toUpperCase();
-          if (st === 'SUCCESS') {
+          const pType = String(p.payment_type || '').toUpperCase();
+          const amt = Number(p.amount || 0);
+          const reason = String(p.failure_reason || '').toLowerCase();
+
+          const isAdmin = (
+            pType === 'ADMIN_GRANT' ||
+            pType === 'ACTIVE_SUBSCRIPTION' ||
+            pType === 'ADMIN_UPGRADE' ||
+            st === 'ADMIN_UPGRADE' ||
+            reason.includes('admin') ||
+            reason.includes('profile override') ||
+            reason.includes('active plan set by admin') ||
+            reason.includes('manually set') ||
+            reason.includes('active plan synced')
+          );
+
+          if (isAdmin) {
+            totalAdminUpgrades++;
+          } else if (st === 'SUCCESS' && amt > 0) {
             totalSuccess++;
-            if (p.payment_type !== 'ADMIN_GRANT') {
-              totalRevenue += Number(p.amount) || 0;
-            }
+            totalRevenue += amt;
           } else if (st === 'FAILED') {
             totalFailed++;
           } else if (st === 'CANCELLED') {
@@ -2515,6 +2533,7 @@ export default function AdminDashboard() {
           totalCancelled,
           totalInitiated,
           totalRevenue,
+          totalAdminUpgrades: data.summary?.totalAdminUpgrades ?? totalAdminUpgrades,
           activeSubscribersCount: (data.activeSubscribers || []).length
         });
       }
@@ -2559,7 +2578,43 @@ export default function AdminDashboard() {
       return true;
     });
 
-    if (subStatusFilter !== 'ALL' && subStatusFilter !== 'ACTIVE_SUBSCRIBERS') {
+    if (subStatusFilter === 'SUCCESS') {
+      list = list.filter(item => {
+        const st = String(item.status || '').toUpperCase();
+        const amt = Number(item.amount || 0);
+        const pType = String(item.payment_type || '').toUpperCase();
+        const reason = String(item.failure_reason || '').toLowerCase();
+        const isAdmin = (
+          pType === 'ADMIN_GRANT' ||
+          pType === 'ACTIVE_SUBSCRIPTION' ||
+          pType === 'ADMIN_UPGRADE' ||
+          st === 'ADMIN_UPGRADE' ||
+          reason.includes('admin') ||
+          reason.includes('profile override') ||
+          reason.includes('active plan set by admin') ||
+          reason.includes('manually set') ||
+          reason.includes('active plan synced')
+        );
+        return st === 'SUCCESS' && amt > 0 && !isAdmin;
+      });
+    } else if (subStatusFilter === 'ADMIN_UPGRADES') {
+      list = list.filter(item => {
+        const st = String(item.status || '').toUpperCase();
+        const pType = String(item.payment_type || '').toUpperCase();
+        const reason = String(item.failure_reason || '').toLowerCase();
+        return (
+          pType === 'ADMIN_GRANT' ||
+          pType === 'ACTIVE_SUBSCRIPTION' ||
+          pType === 'ADMIN_UPGRADE' ||
+          st === 'ADMIN_UPGRADE' ||
+          reason.includes('admin') ||
+          reason.includes('profile override') ||
+          reason.includes('active plan set by admin') ||
+          reason.includes('manually set') ||
+          reason.includes('active plan synced')
+        );
+      });
+    } else if (subStatusFilter !== 'ALL' && subStatusFilter !== 'ACTIVE_SUBSCRIBERS') {
       list = list.filter(item => String(item.status || '').toUpperCase() === subStatusFilter);
     }
 
@@ -2601,9 +2656,30 @@ export default function AdminDashboard() {
         { header: 'Email', key: 'email', formatter: val => val || '-' },
         { header: 'Phone', key: 'phone', formatter: val => val || '-' },
         { header: 'Plan', key: 'plan', formatter: val => val || '-' },
-        { header: 'Amount (INR)', key: 'amount', formatter: val => `₹${Number(val || 0).toLocaleString('en-IN')}` },
-        { header: 'Payment Type', key: 'payment_type', formatter: val => val || '-' },
-        { header: 'Status', key: 'status', formatter: val => val || '-' },
+        { header: 'Amount (INR)', key: 'amount', formatter: (val, row) => {
+          const pType = String(row?.payment_type || '').toUpperCase();
+          const st = String(row?.status || '').toUpperCase();
+          const reason = String(row?.failure_reason || '').toLowerCase();
+          const isAdmin = pType === 'ADMIN_GRANT' || pType === 'ACTIVE_SUBSCRIPTION' || pType === 'ADMIN_UPGRADE' || st === 'ADMIN_UPGRADE' || reason.includes('admin') || reason.includes('profile override') || reason.includes('active plan set by admin') || reason.includes('manually set');
+          if (isAdmin) return '₹0 (Admin Upgrade)';
+          return `₹${Number(val || 0).toLocaleString('en-IN')}`;
+        }},
+        { header: 'Payment Type', key: 'payment_type', formatter: (val, row) => {
+          const pType = String(row?.payment_type || '').toUpperCase();
+          const st = String(row?.status || '').toUpperCase();
+          const reason = String(row?.failure_reason || '').toLowerCase();
+          const isAdmin = pType === 'ADMIN_GRANT' || pType === 'ACTIVE_SUBSCRIPTION' || pType === 'ADMIN_UPGRADE' || st === 'ADMIN_UPGRADE' || reason.includes('admin') || reason.includes('profile override') || reason.includes('active plan set by admin') || reason.includes('manually set');
+          if (isAdmin) return 'ADMIN_GRANT';
+          return val || '-';
+        }},
+        { header: 'Status', key: 'status', formatter: (val, row) => {
+          const pType = String(row?.payment_type || '').toUpperCase();
+          const st = String(row?.status || '').toUpperCase();
+          const reason = String(row?.failure_reason || '').toLowerCase();
+          const isAdmin = pType === 'ADMIN_GRANT' || pType === 'ACTIVE_SUBSCRIPTION' || pType === 'ADMIN_UPGRADE' || st === 'ADMIN_UPGRADE' || reason.includes('admin') || reason.includes('profile override') || reason.includes('active plan set by admin') || reason.includes('manually set');
+          if (isAdmin) return 'ADMIN_UPGRADE';
+          return val || '-';
+        }},
         { header: 'Payment / Order ID', key: 'razorpay_payment_id', formatter: (val, row) => val || row.razorpay_subscription_id || row.razorpay_order_id || '-' },
         { header: 'Details / Failure Reason', key: 'failure_reason', formatter: val => val || '-' },
         { header: 'Plan Expiry', key: 'expires_at', formatter: (val, row) => (val || row.current_user_expires) ? new Date(val || row.current_user_expires).toLocaleDateString('en-IN') : '-' }
@@ -3604,7 +3680,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* KPI Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: '10px' }}>
               <div
                 onClick={() => setSubStatusFilter('ACTIVE_SUBSCRIBERS')}
                 style={{ background: 'rgba(16, 185, 129, 0.07)', border: subStatusFilter === 'ACTIVE_SUBSCRIBERS' ? '1.5px solid #10b981' : '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
@@ -3624,6 +3700,17 @@ export default function AdminDashboard() {
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#4ade80', marginTop: '4px' }}>{subscriptionSummary.totalSuccess || 0}</div>
                 <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: '600' }}>
                   Revenue: ₹{Number(subscriptionSummary.totalRevenue || 0).toLocaleString('en-IN')}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSubStatusFilter('ADMIN_UPGRADES')}
+                style={{ background: 'rgba(168, 85, 247, 0.08)', border: subStatusFilter === 'ADMIN_UPGRADES' ? '1.5px solid #a855f7' : '1px solid rgba(168, 85, 247, 0.28)', borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '10.5px', color: '#c084fc', fontWeight: '700', textTransform: 'uppercase' }}>🛡️ Admin Upgrades</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#c084fc', marginTop: '4px' }}>{subscriptionSummary.totalAdminUpgrades || 0}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Manual grants / Overrides
                 </div>
               </div>
 
@@ -3667,6 +3754,7 @@ export default function AdminDashboard() {
                 {[
                   { id: 'ALL', label: `All Logs (${subscriptionPayments.length})` },
                   { id: 'SUCCESS', label: `✅ Successful (${subscriptionSummary.totalSuccess || 0})` },
+                  { id: 'ADMIN_UPGRADES', label: `🛡️ Admin Upgrades (${subscriptionSummary.totalAdminUpgrades || 0})` },
                   { id: 'FAILED', label: `❌ Failed (${subscriptionSummary.totalFailed || 0})` },
                   { id: 'CANCELLED', label: `⚠️ Cancelled (${subscriptionSummary.totalCancelled || 0})` },
                   { id: 'INITIATED', label: `⏳ Initiated (${subscriptionSummary.totalInitiated || 0})` },
@@ -3777,6 +3865,20 @@ export default function AdminDashboard() {
                   ) : (
                     filteredSubscriptionRows.map(row => {
                       const st = String(row.status || 'INITIATED').toUpperCase();
+                      const pType = String(row.payment_type || '').toUpperCase();
+                      const reason = String(row.failure_reason || '').toLowerCase();
+                      const amt = Number(row.amount || 0);
+                      const isAdmin = (
+                        pType === 'ADMIN_GRANT' ||
+                        pType === 'ACTIVE_SUBSCRIPTION' ||
+                        pType === 'ADMIN_UPGRADE' ||
+                        st === 'ADMIN_UPGRADE' ||
+                        reason.includes('admin') ||
+                        reason.includes('profile override') ||
+                        reason.includes('active plan set by admin') ||
+                        reason.includes('manually set') ||
+                        reason.includes('active plan synced')
+                      );
                       const planUpper = String(row.plan || 'MONTHLY').toUpperCase();
                       const planColor =
                         planUpper === 'LIFETIME' ? '#f43f5e' :
@@ -3784,10 +3886,12 @@ export default function AdminDashboard() {
                         ['HIGHEST', 'FEATURE', 'VIP', 'ELITE'].includes(planUpper) ? '#a855f7' :
                         planUpper === 'YEARLY' ? '#f59e0b' : '#3b82f6';
                       const statusBg =
+                        isAdmin ? 'rgba(168, 85, 247, 0.15)' :
                         st === 'SUCCESS' ? 'rgba(34, 197, 94, 0.15)' :
                         st === 'FAILED' ? 'rgba(239, 68, 68, 0.15)' :
                         st === 'CANCELLED' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)';
                       const statusColor =
+                        isAdmin ? '#c084fc' :
                         st === 'SUCCESS' ? '#4ade80' :
                         st === 'FAILED' ? '#f87171' :
                         st === 'CANCELLED' ? '#fbbf24' : '#60a5fa';
@@ -3826,11 +3930,11 @@ export default function AdminDashboard() {
                               {planUpper}
                             </span>
                             <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                              {row.payment_type === 'AUTOPAY' ? '🔄 AutoPay Mandate' : row.payment_type === 'ADMIN_GRANT' ? '🛡️ Admin Assigned' : row.payment_type === 'ACTIVE_SUBSCRIPTION' ? '👑 Active Profile Plan' : '💳 One-Time Order'}
+                              {isAdmin ? '🛡️ Admin Upgrade (Manual)' : row.payment_type === 'AUTOPAY' ? '🔄 AutoPay Mandate' : row.payment_type === 'ACTIVE_SUBSCRIPTION' ? '👑 Active Profile Plan' : '💳 One-Time Order'}
                             </div>
                           </td>
                           <td style={{ padding: '9px 12px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                            {row.payment_type === 'ADMIN_GRANT' ? '₹0 (Admin)' : `₹${Number(row.amount || 0).toLocaleString('en-IN')}`}
+                            {isAdmin ? '₹0 (Admin Upgrade)' : `₹${amt.toLocaleString('en-IN')}`}
                           </td>
                           <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
                             <span style={{
@@ -3845,7 +3949,7 @@ export default function AdminDashboard() {
                               fontSize: '10.5px',
                               fontWeight: '800'
                             }}>
-                              {st === 'SUCCESS' ? '✅ SUCCESS' : st === 'FAILED' ? '❌ FAILED' : st === 'CANCELLED' ? '⚠️ CANCELLED' : '⏳ INITIATED'}
+                              {isAdmin ? '🛡️ ADMIN UPGRADE' : st === 'SUCCESS' ? '✅ SUCCESS' : st === 'FAILED' ? '❌ FAILED' : st === 'CANCELLED' ? '⚠️ CANCELLED' : '⏳ INITIATED'}
                             </span>
                           </td>
                           <td style={{ padding: '9px 12px', maxWidth: '300px' }}>

@@ -6356,7 +6356,7 @@ app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res)
       plan: cleanTier === 'BASIC' ? 'BASIC' : meta.tier,
       amount: 0,
       paymentType: 'ADMIN_GRANT',
-      status: 'SUCCESS',
+      status: 'ADMIN_UPGRADE',
       failureReason: `Manually set to ${cleanTier} by Admin (${admin.username})`,
       expiresAt: expires || null
     });
@@ -6403,10 +6403,10 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
               phone: u.phone,
               client_id: u.client_id,
               plan: String(u.subscription_tier).toUpperCase(),
-              amount: meta.amountInr,
-              payment_type: 'ACTIVE_SUBSCRIPTION',
-              status: 'SUCCESS',
-              failure_reason: 'Active plan synced from user profile',
+              amount: 0,
+              payment_type: 'ADMIN_GRANT',
+              status: 'ADMIN_UPGRADE',
+              failure_reason: 'Active plan set by Admin / Profile Override',
               expires_at: u.subscription_expires || null,
               created_at: u.updated_at || u.created_at || new Date(),
               updated_at: u.updated_at || new Date()
@@ -6502,6 +6502,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
     let totalCancelled = 0;
     let totalInitiated = 0;
     let totalRevenue = 0;
+    let totalAdminUpgrades = 0;
     const planBreakdown = {
       MONTHLY: 0,
       YEARLY: 0,
@@ -6512,11 +6513,27 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
 
     for (const p of payments) {
       const st = String(p.status || '').toUpperCase();
-      if (st === 'SUCCESS') {
+      const pType = String(p.payment_type || '').toUpperCase();
+      const amt = Number(p.amount || 0);
+      const reason = String(p.failure_reason || '').toLowerCase();
+
+      const isAdmin = (
+        pType === 'ADMIN_GRANT' ||
+        pType === 'ACTIVE_SUBSCRIPTION' ||
+        pType === 'ADMIN_UPGRADE' ||
+        st === 'ADMIN_UPGRADE' ||
+        reason.includes('admin') ||
+        reason.includes('active plan synced') ||
+        reason.includes('manually set') ||
+        reason.includes('profile override')
+      );
+
+      if (isAdmin) {
+        totalAdminUpgrades++;
+      } else if (st === 'SUCCESS' && amt > 0) {
+        // Only real paid subscriptions count towards totalSuccess and totalRevenue
         totalSuccess++;
-        if (p.payment_type !== 'ADMIN_GRANT') {
-          totalRevenue += Number(p.amount) || 0;
-        }
+        totalRevenue += amt;
       } else if (st === 'FAILED') {
         totalFailed++;
       } else if (st === 'CANCELLED') {
@@ -6547,6 +6564,7 @@ app.get('/api/admin/subscriptions', authenticateToken, async (req, res) => {
         totalCancelled,
         totalInitiated,
         totalRevenue,
+        totalAdminUpgrades,
         activeSubscribersCount: activeSubscribers.length,
         planBreakdown
       }
