@@ -1098,18 +1098,20 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
         </div>
       </div>
 
-      {/* 3 Master Tabs - Clean Horizontal Scroll on Mobile */}
+      {/* 3 Master Tabs - Clean Horizontal Scroll on Mobile, Full Height Wrap on Desktop */}
       <div style={{
         display: 'flex',
-        flexWrap: 'nowrap',
-        overflowX: 'auto',
+        flexWrap: isMobile ? 'nowrap' : 'wrap',
+        overflowX: isMobile ? 'auto' : 'visible',
+        overflowY: 'visible',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
         gap: isMobile ? '6px' : '10px',
         marginBottom: isMobile ? '12px' : '20px',
         borderBottom: `1px solid ${t.borderSubtle}`,
-        paddingBottom: isMobile ? '8px' : '14px',
+        paddingTop: '6px',
+        paddingBottom: isMobile ? '10px' : '14px',
         alignItems: 'center'
       }}>
         <button

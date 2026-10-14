@@ -867,7 +867,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                               onChange={(e) => { setMaxTrades(e.target.value); setTradesSaved(false); }}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
                               placeholder="Trades"
-                              style={{ width: '65px', background: 'var(--bg-hover)', border: '1px solid #f59e0b', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                              style={{ width: '65px', background: 'var(--bg-hover)', border: '1px solid #f59e0b', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
                             />
                             <button
                               onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
@@ -913,7 +913,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                               onChange={(e) => { setMaxLoss(e.target.value); setLossSaved(false); }}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
                               placeholder="₹ Max Loss"
-                              style={{ width: '85px', background: 'var(--bg-hover)', border: '1px solid #ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                              style={{ width: '85px', background: 'var(--bg-hover)', border: '1px solid #ef4444', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
                             />
                             <button
                               onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}

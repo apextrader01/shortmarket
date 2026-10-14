@@ -33,7 +33,8 @@ export default function SettingsView() {
     user, updatePassword, logout, oneClickMode, setOneClickMode, 
     oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails,
     userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
-    telegramSettings, telegramSettingsLoading, fetchTelegramSettings, saveTelegramSettings, sendTelegramTest
+    telegramSettings, telegramSettingsLoading, fetchTelegramSettings, saveTelegramSettings, sendTelegramTest,
+    theme
   } = useStore(useShallow(state => ({ 
     user: state.user, 
     updatePassword: state.updatePassword, 
@@ -53,8 +54,11 @@ export default function SettingsView() {
     telegramSettingsLoading: state.telegramSettingsLoading,
     fetchTelegramSettings: state.fetchTelegramSettings,
     saveTelegramSettings: state.saveTelegramSettings,
-    sendTelegramTest: state.sendTelegramTest
+    sendTelegramTest: state.sendTelegramTest,
+    theme: state.theme
   })));
+
+  const isLight = theme === 'light';
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
@@ -528,9 +532,9 @@ export default function SettingsView() {
           </div>
 
           {/* Master Volume Slider */}
-          <div style={{ marginTop: '16px', padding: '14px 18px', background: 'var(--bg-dark)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
+          <div style={{ marginTop: '16px', padding: '14px 18px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '8px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Volume2 size={16} color="var(--color-blue-light)" /> Master Audio Volume: {soundVolume}%
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -557,7 +561,7 @@ export default function SettingsView() {
 
           {/* Granular Sound Triggers */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '14px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
               <input 
                 type="checkbox" 
                 checked={soundConfig.targetHit} 
@@ -571,7 +575,7 @@ export default function SettingsView() {
               <span>🎯 Target Hit</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
               <input 
                 type="checkbox" 
                 checked={soundConfig.stopLoss} 
@@ -585,7 +589,7 @@ export default function SettingsView() {
               <span>🛑 Stop Loss</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
               <input 
                 type="checkbox" 
                 checked={soundConfig.orderExecuted} 
@@ -599,7 +603,7 @@ export default function SettingsView() {
               <span>🔔 Order Fill</span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
               <input 
                 type="checkbox" 
                 checked={soundConfig.riskAlert} 
@@ -718,7 +722,7 @@ export default function SettingsView() {
                 <Send size={22} />
               </div>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', color: isLight ? '#0f172a' : '#fff' }}>
                   Telegram Live Trade & Risk Alerts
                   <span style={{
                     fontSize: '10.5px',
@@ -885,12 +889,12 @@ export default function SettingsView() {
 
           {/* Granular Alert Preferences Toggles */}
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', marginBottom: '12px' }}>
               🔔 Active Alert Triggers:
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={telegramOrders}
@@ -898,12 +902,12 @@ export default function SettingsView() {
                   style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
                 />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚡ Order Executions</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: isLight ? '#0f172a' : '#fff' }}>⚡ Order Executions</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant fill pings for Market & Limit</div>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={telegramTargets}
@@ -911,12 +915,12 @@ export default function SettingsView() {
                   style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
                 />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🎯 Target Hits</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: isLight ? '#0f172a' : '#fff' }}>🎯 Target Hits</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Take-Profit reached with realized profit</div>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={telegramStoploss}
@@ -924,12 +928,12 @@ export default function SettingsView() {
                   style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
                 />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🛑 Stop-Loss Triggers</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: isLight ? '#0f172a' : '#fff' }}>🛑 Stop-Loss Triggers</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant risk exit alerts</div>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={telegramRisk}
@@ -937,7 +941,7 @@ export default function SettingsView() {
                   style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
                 />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚠️ Risk Guardian</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: isLight ? '#0f172a' : '#fff' }}>⚠️ Risk Guardian</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Daily loss / trade limit warnings</div>
                 </div>
               </label>
@@ -1324,8 +1328,8 @@ export function BiometricSettingsSection({ user }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         {/* Google Authenticator (TOTP) Status Tile - Highlighted as Top Security Option */}
         <div style={{
-          background: user?.totp_enabled ? 'rgba(34,197,94,0.04)' : 'rgba(59,130,246,0.05)',
-          border: user?.totp_enabled ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(59,130,246,0.4)',
+          background: user?.totp_enabled ? (isLight ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.04)') : (isLight ? '#f8fafc' : 'rgba(59,130,246,0.05)'),
+          border: user?.totp_enabled ? '1px solid rgba(34,197,94,0.35)' : (isLight ? '1px solid #cbd5e1' : '1px solid rgba(59,130,246,0.4)'),
           padding: '18px',
           borderRadius: '10px',
           display: 'flex',
@@ -1338,7 +1342,7 @@ export function BiometricSettingsSection({ user }) {
               <ShieldCheck size={20} />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Google Authenticator (2FA)</div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff' }}>Google Authenticator (2FA)</div>
               <div style={{ fontSize: '11.5px', color: user?.totp_enabled ? '#22c55e' : '#f59e0b', fontWeight: '600', marginTop: '2px' }}>
                 {user?.totp_enabled ? '✅ Active (Dynamic 6-Digit App Code)' : '⚠️ Recommended (Scan QR & Save Key)'}
               </div>
@@ -1369,8 +1373,8 @@ export function BiometricSettingsSection({ user }) {
 
         {/* PIN Status Tile */}
         <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)',
+          border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.07)',
           padding: '18px',
           borderRadius: '10px',
           display: 'flex',
@@ -1379,11 +1383,11 @@ export function BiometricSettingsSection({ user }) {
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: pinEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+            <div style={{ background: pinEnabled ? 'rgba(34,197,94,0.15)' : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'), padding: '10px', borderRadius: '50%', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
               <KeyRound size={20} />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>4-Digit Quick PIN</div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff' }}>4-Digit Quick PIN</div>
               <div style={{ fontSize: '11.5px', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
                 {pinEnabled ? '✅ Active & Protected' : '⚪ Not Set Up'}
               </div>
@@ -1422,8 +1426,8 @@ export function BiometricSettingsSection({ user }) {
 
         {/* Biometrics Status Tile */}
         <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)',
+          border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.07)',
           padding: '18px',
           borderRadius: '10px',
           display: 'flex',
@@ -1432,11 +1436,11 @@ export function BiometricSettingsSection({ user }) {
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: bioEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+            <div style={{ background: bioEnabled ? 'rgba(34,197,94,0.15)' : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'), padding: '10px', borderRadius: '50%', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
               <Fingerprint size={20} />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff' }}>Touch ID / Face ID</div>
               <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : (!pinEnabled ? '#f59e0b' : (bioAvailable ? 'var(--text-secondary)' : '#94a3b8')), fontWeight: '600', marginTop: '2px' }}>
                 {bioEnabled ? '✅ Biometrics Active' : (!pinEnabled ? '⚠️ Requires 4-Digit PIN First' : (bioAvailable ? 'Supported on Device' : 'Requires Chrome/Safari or Native APK'))}
               </div>
@@ -1467,8 +1471,8 @@ export function BiometricSettingsSection({ user }) {
         {/* Auto-Lock Inactivity Timer Card (Side-by-Side) */}
         {pinEnabled && (
           <div style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.07)',
+            background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)',
+            border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.07)',
             padding: '18px',
             borderRadius: '10px',
             display: 'flex',
@@ -1477,11 +1481,11 @@ export function BiometricSettingsSection({ user }) {
             gap: '12px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ background: autoLockMinutes > 0 ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
+              <div style={{ background: autoLockMinutes > 0 ? 'rgba(59,130,246,0.15)' : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'), padding: '10px', borderRadius: '50%', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
                 <Clock size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Auto-Lock Timer</div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff' }}>Auto-Lock Timer</div>
                 <div style={{ fontSize: '11.5px', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
                   {autoLockMinutes === 0 ? '⚡ Immediately on Background' : autoLockMinutes === -1 ? 'Off / Never' : `Locks after ${autoLockMinutes}m idle`}
                 </div>
@@ -1499,8 +1503,8 @@ export function BiometricSettingsSection({ user }) {
                     style={{
                       padding: '5px 8px',
                       borderRadius: '5px',
-                      background: isSel ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.04)',
-                      border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      background: isSel ? 'rgba(59, 130, 246, 0.25)' : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'),
+                      border: isSel ? '1px solid var(--color-blue)' : (isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)'),
                       color: isSel ? 'var(--color-blue-light)' : 'var(--text-secondary)',
                       fontSize: '11px',
                       fontWeight: isSel ? '700' : '500',
@@ -1519,9 +1523,9 @@ export function BiometricSettingsSection({ user }) {
 
       {/* Google Authenticator Setup Card / Modal */}
       {showTotpSetup && totpSetupData && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid var(--color-blue)', padding: '24px', borderRadius: '12px', marginTop: '10px' }}>
+        <div style={{ background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.85)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--color-blue)', padding: '24px', borderRadius: '12px', marginTop: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={18} color="var(--color-blue-light)" /> Set Up Google Authenticator (TOTP)
             </h4>
             <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpSetup(false)} />
@@ -1555,7 +1559,7 @@ export function BiometricSettingsSection({ user }) {
                     type="text"
                     readOnly
                     value={totpSetupData.secret}
-                    style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '1px', fontSize: '13px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#38bdf8', padding: '8px 12px', borderRadius: '6px' }}
+                    style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '1px', fontSize: '13px', fontWeight: '700', background: isLight ? '#f1f5f9' : 'var(--bg-dark)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)', color: isLight ? '#0284c7' : '#38bdf8', padding: '8px 12px', borderRadius: '6px' }}
                   />
                   <button
                     type="button"
@@ -1584,7 +1588,7 @@ export function BiometricSettingsSection({ user }) {
                     value={totpVerificationCode}
                     onChange={e => setTotpVerificationCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
-                    style={{ width: '100%', boxSizing: 'border-box', letterSpacing: '6px', textAlign: 'center', fontSize: '18px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', letterSpacing: '6px', textAlign: 'center', fontSize: '18px', fontWeight: '700', background: isLight ? '#f8fafc' : 'var(--bg-dark)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)', color: isLight ? '#0f172a' : '#fff', padding: '8px', borderRadius: '6px' }}
                     required
                   />
                 </div>
@@ -1603,7 +1607,7 @@ export function BiometricSettingsSection({ user }) {
 
       {/* Google Authenticator Disable Modal */}
       {showTotpDisable && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+        <div style={{ background: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.08)', border: isLight ? '1px solid #fecaca' : '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#ef4444' }}>Disable Google Authenticator</h4>
             <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpDisable(false)} />
@@ -1617,7 +1621,7 @@ export function BiometricSettingsSection({ user }) {
               placeholder="Account Password"
               value={totpDisablePassword}
               onChange={e => setTotpDisablePassword(e.target.value)}
-              style={{ flex: 1, minWidth: '180px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}
+              style={{ flex: 1, minWidth: '180px', background: isLight ? '#ffffff' : 'var(--bg-dark)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)', color: isLight ? '#0f172a' : '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}
               required
             />
             <button
@@ -1633,9 +1637,9 @@ export function BiometricSettingsSection({ user }) {
 
       {/* PIN Setup Form Overlay / Modal */}
       {showPinSetup && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--color-blue)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+        <div style={{ background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.6)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--color-blue)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#fff' }}>Configure 4-Digit PIN</h4>
+            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: isLight ? '#0f172a' : '#fff' }}>Configure 4-Digit PIN</h4>
             <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowPinSetup(false)} />
           </div>
 
@@ -1648,7 +1652,7 @@ export function BiometricSettingsSection({ user }) {
                 value={newPin}
                 onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="••••"
-                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: isLight ? '#f8fafc' : 'var(--bg-dark)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)', color: isLight ? '#0f172a' : '#fff', padding: '8px', borderRadius: '6px' }}
                 required
               />
             </div>
@@ -1660,7 +1664,7 @@ export function BiometricSettingsSection({ user }) {
                 value={confirmPin}
                 onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="••••"
-                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: isLight ? '#f8fafc' : 'var(--bg-dark)', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)', color: isLight ? '#0f172a' : '#fff', padding: '8px', borderRadius: '6px' }}
                 required
               />
             </div>
@@ -1722,7 +1726,7 @@ export function BiometricSettingsSection({ user }) {
                 <ShieldAlert size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: '17px', fontWeight: '800', margin: 0, color: '#fff', letterSpacing: '-0.3px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: '800', margin: 0, color: isLight ? '#0f172a' : '#fff', letterSpacing: '-0.3px' }}>
                   Device & Session Security Center
                 </h3>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '12.5px', marginTop: '2px' }}>
@@ -1836,8 +1840,8 @@ export function BiometricSettingsSection({ user }) {
         }}>
           {/* Card 1: Account Defense Level */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid var(--border-color)',
+            background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+            border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '14px 16px',
             display: 'flex',
@@ -1871,8 +1875,8 @@ export function BiometricSettingsSection({ user }) {
 
           {/* Card 2: Connected Hardware Summary */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid var(--border-color)',
+            background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+            border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '14px 16px',
             display: 'flex',
@@ -1895,7 +1899,7 @@ export function BiometricSettingsSection({ user }) {
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Recognized Devices
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginTop: '1px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: isLight ? '#0f172a' : '#fff', marginTop: '1px' }}>
                 {deviceGroups.length} Unique {deviceGroups.length === 1 ? 'Device' : 'Devices'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -1906,8 +1910,8 @@ export function BiometricSettingsSection({ user }) {
 
           {/* Card 3: Quick Security Status */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid var(--border-color)',
+            background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+            border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
             borderRadius: '12px',
             padding: '14px 16px',
             display: 'flex',
@@ -2129,8 +2133,8 @@ export function BiometricSettingsSection({ user }) {
               </div>
             ) : otherDeviceGroups.length === 0 ? (
               <div style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid var(--border-color)',
+                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
                 borderRadius: '10px',
                 padding: '24px',
                 textAlign: 'center',
@@ -2138,7 +2142,7 @@ export function BiometricSettingsSection({ user }) {
                 fontSize: '13px'
               }}>
                 <CheckCheck size={24} color="#10B981" style={{ margin: '0 auto 8px auto' }} />
-                <div style={{ fontWeight: '700', color: '#fff', fontSize: '14px', marginBottom: '2px' }}>
+                <div style={{ fontWeight: '700', color: isLight ? '#0f172a' : '#fff', fontSize: '14px', marginBottom: '2px' }}>
                   No other active devices
                 </div>
                 Your trading account is only signed in on this current device.
@@ -2153,8 +2157,8 @@ export function BiometricSettingsSection({ user }) {
                   <div
                     key={device.key}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid var(--border-color)',
+                      background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                      border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
                       borderRadius: '12px',
                       overflow: 'hidden',
                       transition: 'all 0.15s ease'
@@ -2184,7 +2188,7 @@ export function BiometricSettingsSection({ user }) {
 
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '800', color: isLight ? '#0f172a' : '#fff' }}>
                               {device.device_model}
                             </span>
                             <span style={{
@@ -2292,8 +2296,8 @@ export function BiometricSettingsSection({ user }) {
                     {/* Expandable Session Details Tray */}
                     {isExpanded && device.sessions.length > 1 && (
                       <div style={{
-                        background: 'rgba(0,0,0,0.25)',
-                        borderTop: '1px solid var(--border-color)',
+                        background: isLight ? '#f1f5f9' : 'rgba(0,0,0,0.25)',
+                        borderTop: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
                         padding: '12px 18px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -2311,14 +2315,14 @@ export function BiometricSettingsSection({ user }) {
                               justifyContent: 'space-between',
                               fontSize: '11.5px',
                               padding: '6px 10px',
-                              background: 'rgba(255,255,255,0.02)',
+                              background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)',
                               borderRadius: '6px',
-                              border: '1px solid rgba(255,255,255,0.04)'
+                              border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.04)'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ color: 'var(--text-muted)' }}>#{idx + 1}</span>
-                              <span style={{ color: '#fff' }}>IP: {sess.ip_address || '—'}</span>
+                              <span style={{ color: isLight ? '#0f172a' : '#fff' }}>IP: {sess.ip_address || '—'}</span>
                               <span style={{ color: 'var(--text-secondary)' }}>· {formatRelativeTime(sess.last_active_at)}</span>
                             </div>
                             <button
@@ -2366,8 +2370,8 @@ export function BiometricSettingsSection({ user }) {
                       <div
                         key={session.id}
                         style={{
-                          background: session.is_current ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-                          border: session.is_current ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
+                          background: session.is_current ? (isLight ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.05)') : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)'),
+                          border: session.is_current ? '1px solid rgba(16, 185, 129, 0.3)' : (isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)'),
                           borderRadius: '8px',
                           padding: '10px 14px',
                           display: 'flex',
@@ -2380,7 +2384,7 @@ export function BiometricSettingsSection({ user }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           {session.is_current ? <Monitor size={16} color="#10B981" /> : (isPhone ? <Smartphone size={16} color="#94A3B8" /> : <Monitor size={16} color="#94A3B8" />)}
                           <div>
-                            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '12.5px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {session.device_model}
                               {session.is_current && (
                                 <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px' }}>
@@ -2421,8 +2425,8 @@ export function BiometricSettingsSection({ user }) {
                       onClick={() => setShowAllLogs(!showAllLogs)}
                       style={{
                         padding: '8px',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid var(--border-color)',
+                        background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.03)',
+                        border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
                         borderRadius: '6px',
                         color: 'var(--color-blue)',
                         fontWeight: '700',
@@ -2473,7 +2477,7 @@ export function BiometricSettingsSection({ user }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: isLight ? '#0f172a' : '#fff' }}>
               <ShieldCheck size={18} color="var(--color-blue)" /> 60-Day Trusted Devices (Bypass Daily 2FA)
             </h3>
             <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
@@ -2501,7 +2505,7 @@ export function BiometricSettingsSection({ user }) {
               Loading trusted devices...
             </div>
           ) : trustedDevices.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)', borderRadius: '8px', border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)' }}>
               No trusted devices registered yet. Check <strong>"Trust this device for 60 days"</strong> during login to remember this device.
             </div>
           ) : (
@@ -2510,8 +2514,8 @@ export function BiometricSettingsSection({ user }) {
               const daysRemaining = Math.max(0, Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
               return (
                 <div key={device.id} style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid var(--border-color)',
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid var(--border-color)',
                   borderRadius: '8px',
                   padding: '14px 18px',
                   display: 'flex',
@@ -2525,7 +2529,7 @@ export function BiometricSettingsSection({ user }) {
                       <Laptop size={18} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {device.device_name || `${device.browser_name || 'Browser'} on ${device.os_name || 'Device'}`}
                         <span style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '700' }}>
                           TRUSTED ({daysRemaining}d left)
