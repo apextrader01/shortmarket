@@ -70,9 +70,12 @@ class PositionsEngine {
                         console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement for Equities & Derivatives...');
                         this.settleExpiries(false).catch(e => console.error('Startup catchup expiry error:', e));
                     }
-                    if (timeVal >= 2335 || timeVal <= 10) {
+                    if (timeVal >= 2335) {
                         console.log('⏰ [BOOT CATCHUP] Past 11:35 PM IST — running immediate catchup expiry settlement for MCX Commodities...');
-                        this.settleExpiries(true, true).catch(e => console.error('Startup catchup MCX expiry error:', e));
+                        this.settleExpiries(true, true, false).catch(e => console.error('Startup catchup MCX expiry error:', e));
+                    } else if (timeVal <= 10) {
+                        console.log('⏰ [BOOT CATCHUP] Past Midnight (00:00 - 00:10 AM) — running past-expiry catchup for yesterday only...');
+                        this.settleExpiries(true, true, true).catch(e => console.error('Startup catchup MCX expiry error:', e));
                     }
                 } catch(e) {}
             }, 20000);
@@ -103,7 +106,9 @@ class PositionsEngine {
             console.log('[CRON] 12:05 AM Final Cleanup for Commodities triggered.');
             this.sweepPendingOrders('COMMODITY');
             this.forceSquareOff('COMMODITY');
-            this.settleExpiries(true, true); // true = Commodity, true = includeYesterday
+            // CRITICAL: At 12:05 AM the calendar date has rolled over to today.
+            // Settle ONLY past expiries (yesterday or older). Today's contracts must trade until 11:30 PM!
+            this.settleExpiries(true, true, true); // true = Commodity, true = includeYesterday, true = onlyPastExpiries
         }, { timezone: 'Asia/Kolkata' });
 
         // Note: 03:40 PM ('40 15 * * *'), 04:00 PM ('0 16 * * *'), and 11:35 PM ('35 23 * * *') expiry settlements are centrally scheduled in cronJobs.js
@@ -477,6 +482,11 @@ class PositionsEngine {
                         sym,
                         cleanSym
                     );
+                    const isOption = /(?:CE|PE)$/i.test(cleanSym);
+                    if (isOption) {
+                        const comFut = cleanSym.replace(/\d+(?:\.\d+)?(CE|PE).*$/i, 'FUT');
+                        spotSymbolsToFetch.push(`MCX:${comFut}`, comFut);
+                    }
                     const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
                     if (m && m[1]) {
                         const u = m[1];
@@ -588,37 +598,57 @@ class PositionsEngine {
                 if (underlying) {
                     const rawUnderlying = underlying.replace(/\d+L$/, '');
                     const isCom = isCommoditySymbol(item.symbol);
-                    const candidates = isCom ? [
-                        `MCX:${cleanSym}`,
-                        `MCX:${underlying}`,
-                        `MCX:${rawUnderlying}`,
-                        `MCX:${underlying}FUT`,
-                        `MCX:${rawUnderlying}FUT`,
-                        `MCX:${underlying}-INDEX`,
-                        item.symbol,
-                        cleanSym,
-                        underlying,
-                        rawUnderlying
-                    ] : [
-                        underlying,
-                        rawUnderlying,
-                        `${underlying}-NSE`,
-                        `${rawUnderlying}-NSE`,
-                        `${underlying}-BSE`,
-                        `${rawUnderlying}-BSE`,
-                        `NSE:${underlying}`,
-                        `NSE:${rawUnderlying}`,
-                        `NSE:${underlying}-EQ`,
-                        `NSE:${rawUnderlying}-EQ`,
-                        `NSE:${underlying}-INDEX`,
-                        `NSE:${rawUnderlying}-INDEX`,
-                        `NSE:${underlying}50-INDEX`,
-                        `NSE:${rawUnderlying}50-INDEX`,
-                        `BSE:${underlying}`,
-                        `BSE:${rawUnderlying}`,
-                        `BSE:${underlying}-INDEX`,
-                        `BSE:${rawUnderlying}-INDEX`
-                    ];
+                    let candidates = [];
+                    if (isCom) {
+                        if (isOpt) {
+                            // For commodity options, underlying spot is the near-month futures contract
+                            const comFutSym = cleanSym.replace(/\d+(?:\.\d+)?(CE|PE).*$/i, 'FUT');
+                            candidates = [
+                                `MCX:${comFutSym}`,
+                                comFutSym,
+                                `MCX:${underlying}FUT`,
+                                `MCX:${rawUnderlying}FUT`,
+                                `MCX:${underlying}`,
+                                `MCX:${rawUnderlying}`,
+                                underlying,
+                                rawUnderlying
+                            ];
+                        } else {
+                            candidates = [
+                                `MCX:${cleanSym}`,
+                                `MCX:${underlying}`,
+                                `MCX:${rawUnderlying}`,
+                                `MCX:${underlying}FUT`,
+                                `MCX:${rawUnderlying}FUT`,
+                                `MCX:${underlying}-INDEX`,
+                                item.symbol,
+                                cleanSym,
+                                underlying,
+                                rawUnderlying
+                            ];
+                        }
+                    } else {
+                        candidates = [
+                            underlying,
+                            rawUnderlying,
+                            `${underlying}-NSE`,
+                            `${rawUnderlying}-NSE`,
+                            `${underlying}-BSE`,
+                            `${rawUnderlying}-BSE`,
+                            `NSE:${underlying}`,
+                            `NSE:${rawUnderlying}`,
+                            `NSE:${underlying}-EQ`,
+                            `NSE:${rawUnderlying}-EQ`,
+                            `NSE:${underlying}-INDEX`,
+                            `NSE:${rawUnderlying}-INDEX`,
+                            `NSE:${underlying}50-INDEX`,
+                            `NSE:${rawUnderlying}50-INDEX`,
+                            `BSE:${underlying}`,
+                            `BSE:${rawUnderlying}`,
+                            `BSE:${underlying}-INDEX`,
+                            `BSE:${rawUnderlying}-INDEX`
+                        ];
+                    }
                     if (!isCom) {
                         if (underlying === 'BANKNIFTY' || rawUnderlying === 'BANKNIFTY') {
                             candidates.unshift('NSE:NIFTYBANK-INDEX', 'NSE:BANKNIFTY-INDEX');
@@ -648,7 +678,9 @@ class PositionsEngine {
                         }
                     }
 
-                    if (spotPrice === 0) {
+                    // For non-options (futures / equities), fallback to item's own closing price
+                    // NEVER set spotPrice of an option to the option's own market price!
+                    if (spotPrice === 0 && !isOpt) {
                         const itemClose = priceCache[item.symbol]?.close || priceCache[cleanSym]?.close || priceCache[`MCX:${cleanSym}`]?.close;
                         const itemPrev = priceCache[item.symbol]?.prev_close_price || priceCache[cleanSym]?.prev_close_price || priceCache[`MCX:${cleanSym}`]?.prev_close_price;
                         if (itemClose > 0) spotPrice = Number(itemClose);
@@ -674,6 +706,13 @@ class PositionsEngine {
                             'MIDCPNIFTY': 13150.00,
                             'SENSEX': 72529.07,
                             'BANKEX': 57100.00,
+                            'CRUDEOIL': 9000.00,
+                            'GOLD': 76000.00,
+                            'SILVER': 91000.00,
+                            'NATURALGAS': 240.00,
+                            'COPPER': 830.00,
+                            'ZINC': 275.00,
+                            'ALUMINIUM': 235.00,
                             'TATAPOWER': 353.00,
                             'TCS': 2050.00
                         };
@@ -688,7 +727,11 @@ class PositionsEngine {
                 }
 
                 if (isOpt) {
-                    if (spotPrice > 0 && strike > 0 && optType) {
+                    // Safety check: spot price must be realistic relative to strike
+                    // (An underlying asset cannot trade at less than 25% or more than 400% of strike for strike > 100)
+                    const isSpotRealistic = spotPrice > 0 && !(strike > 100 && (spotPrice < strike * 0.25 || spotPrice > strike * 4.0));
+
+                    if (isSpotRealistic && strike > 0 && optType) {
                         if (optType === 'CE') {
                             ltp = Math.max(0, spotPrice - strike);
                         } else {
