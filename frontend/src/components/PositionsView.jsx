@@ -8,7 +8,7 @@ import SkeletonLoader from './SkeletonLoader';
 import EmptyState from './EmptyState';
 import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract, getInstantLotsize } from '../utils/lotsizeHelper';
 import { calculateOrderSlices } from '../utils/freezeLimits';
-import { getTodayClosedPositions, isToday } from '../utils/pnlHelper';
+import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
 import { getMarketSession } from '../utils/marketTiming';
 import { triggerPreExitAd } from './AdBannerWidget';
 

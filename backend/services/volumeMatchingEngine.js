@@ -196,7 +196,7 @@ class VolumeMatchingEngine {
         const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
         if (filtered.length === 0) {
           this.symbolQueues.delete(normSym);
-          // Retain this.lastSymbolVolume so sequential orders maintain continuous volume tracking
+          this.lastSymbolVolume.delete(normSym);
         } else {
           this.symbolQueues.set(normSym, filtered);
         }
