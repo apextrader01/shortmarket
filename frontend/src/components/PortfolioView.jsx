@@ -142,13 +142,15 @@ export default function PortfolioView() {
     openMf();
   };
 
-  const { positions, holdings, orders } = useStore(
+  const { positions, holdings, orders, theme } = useStore(
     useShallow(state => ({ 
       positions: state.positions, 
       holdings: state.holdings, 
-      orders: state.orders 
+      orders: state.orders,
+      theme: state.theme
     }))
   );
+  const isLight = theme === 'light';
 
   // Proactively sync user portfolio data whenever PortfolioView is opened
   useEffect(() => {
@@ -644,11 +646,11 @@ export default function PortfolioView() {
         alignItems: 'center', 
         padding: isMobile ? '0 12px' : '0 20px', 
         height: isMobile ? '44px' : '48px',
-        borderBottom: '1px solid var(--border-color)', 
-        background: '#0d1527',
+        borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', 
+        background: isLight ? '#ffffff' : '#0d1527',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.05)' : '0 2px 8px rgba(0,0,0,0.3)',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: isMobile ? '12px' : '20px', height: '100%', alignItems: 'stretch', overflowX: isMobile ? 'auto' : 'visible' }}>
@@ -673,7 +675,7 @@ export default function PortfolioView() {
                   boxSizing: 'border-box',
                   fontSize: isMobile ? '12px' : '13px',
                   fontWeight: active ? '700' : '500',
-                  color: active ? '#2563eb' : 'var(--text-secondary)',
+                  color: active ? '#2563eb' : (isLight ? '#475569' : 'var(--text-secondary)'),
                   borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
                   marginBottom: '-1px',
                   cursor: 'pointer',
@@ -682,7 +684,7 @@ export default function PortfolioView() {
                   flexShrink: 0
                 }}
               >
-                <Icon size={15} style={{ color: active ? '#2563eb' : 'var(--text-secondary)' }} />
+                <Icon size={15} style={{ color: active ? '#2563eb' : (isLight ? '#64748b' : 'var(--text-secondary)') }} />
                 <span>{tab.label}</span>
               </div>
             );
@@ -1003,13 +1005,13 @@ export default function PortfolioView() {
                         <Tooltip 
                           formatter={(val) => formatCurrency(val)}
                           contentStyle={{ 
-                            background: 'rgba(11, 17, 33, 0.95)', 
-                            border: '1px solid rgba(255, 255, 255, 0.15)', 
+                            background: isLight ? '#ffffff' : 'rgba(11, 17, 33, 0.95)', 
+                            border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.15)', 
                             borderRadius: '10px',
                             fontSize: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                            boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.1)' : '0 8px 24px rgba(0,0,0,0.5)'
                           }}
-                          itemStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                          itemStyle={{ color: isLight ? '#0f172a' : '#FFFFFF', fontWeight: '600' }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1461,7 +1463,7 @@ export default function PortfolioView() {
                 /* 🖥️ Modern Desktop Holdings Table */
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
-                    <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                    <tr style={{ background: isLight ? '#f8fafc' : '#0d1527', color: isLight ? '#475569' : 'var(--text-secondary)', textAlign: 'left', borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)' }}>
                       <th style={{ padding: '8px 12px', fontWeight: '600', whiteSpace: 'nowrap', width: '230px' }}>Symbol / Scheme</th>
                       <th style={{ padding: '8px 6px', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', width: '62px', lineHeight: '1.25' }}>
                         <div>Qty /</div>

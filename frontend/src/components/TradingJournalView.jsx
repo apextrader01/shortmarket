@@ -30,11 +30,13 @@ export const EMOTION_TAGS = [
 ];
 
 export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mode }) {
-  const { user, positions, orders } = useStore(useShallow(state => ({
+  const { user, positions, orders, theme } = useStore(useShallow(state => ({
     user: state.user,
     positions: state.positions,
-    orders: state.orders
+    orders: state.orders,
+    theme: state.theme
   })));
+  const isLight = theme === 'light';
 
   const userId = user?.id || 'default';
   const storageKey = `skandx_journal_${userId}`;
@@ -867,23 +869,23 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '14px'
           }}>
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+            <div style={{ background: 'var(--bg-panel)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.04)' : 'none' }}>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
                 {monthNames[calendarMonth]} Net P&L
               </div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: monthStats.netPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', marginTop: '4px' }}>
-                {monthStats.netPnl >= 0 ? '+' : ''}₹{monthStats.netPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <div style={{ fontSize: '22px', fontWeight: '900', color: monthStats.netPnl >= 0 ? (isLight ? '#16a34a' : 'var(--color-green-light)') : (isLight ? '#dc2626' : 'var(--color-red-light)'), marginTop: '4px' }}>
+                {monthStats.netPnl > 0 ? '+' : (monthStats.netPnl < 0 ? '-' : '')}₹{Math.abs(monthStats.netPnl).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 {monthStats.greenDays} Profitable Days • {monthStats.redDays} Loss Days
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+            <div style={{ background: 'var(--bg-panel)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.04)' : 'none' }}>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
                 Monthly Win Rate
               </div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '4px' }}>
+              <div style={{ fontSize: '22px', fontWeight: '900', color: isLight ? '#0284c7' : '#38bdf8', marginTop: '4px' }}>
                 {monthStats.winRate}%
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -891,24 +893,24 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+            <div style={{ background: 'var(--bg-panel)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.04)' : 'none' }}>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
                 Best Trading Day
               </div>
-              <div style={{ fontSize: '20px', fontWeight: '800', color: '#34d399', marginTop: '4px' }}>
-                +₹{monthStats.bestDay.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <div style={{ fontSize: '20px', fontWeight: '800', color: monthStats.bestDay > 0 ? (isLight ? '#16a34a' : '#34d399') : (monthStats.bestDay < 0 ? (isLight ? '#dc2626' : '#f87171') : 'var(--text-secondary)'), marginTop: '4px' }}>
+                {monthStats.bestDay > 0 ? '+' : (monthStats.bestDay < 0 ? '-' : '')}₹{Math.abs(monthStats.bestDay).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 Max Single-Day Gain
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+            <div style={{ background: 'var(--bg-panel)', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: isLight ? '0 1px 4px rgba(0,0,0,0.04)' : 'none' }}>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
                 Max Day Drawdown
               </div>
-              <div style={{ fontSize: '20px', fontWeight: '800', color: '#f87171', marginTop: '4px' }}>
-                {monthStats.worstDay < 0 ? '-' : ''}₹{Math.abs(monthStats.worstDay).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <div style={{ fontSize: '20px', fontWeight: '800', color: isLight ? '#dc2626' : '#f87171', marginTop: '4px' }}>
+                {monthStats.worstDay < 0 ? '-' : (monthStats.worstDay > 0 ? '+' : '')}₹{Math.abs(monthStats.worstDay).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 Max Single-Day Loss
@@ -968,9 +970,9 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
               <button
                 onClick={handleTodayMonth}
                 style={{
-                  background: 'rgba(59, 130, 246, 0.15)',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  color: 'var(--color-blue-light)',
+                  background: isLight ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.15)',
+                  border: isLight ? '1px solid rgba(37, 99, 235, 0.25)' : '1px solid rgba(59, 130, 246, 0.3)',
+                  color: isLight ? '#2563eb' : 'var(--color-blue-light)',
                   borderRadius: '6px',
                   padding: '6px 14px',
                   fontSize: '12px',
@@ -982,10 +984,10 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
               </button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(16, 185, 129, 0.6)' }}></span> Profit
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: isLight ? 'rgba(22, 163, 74, 0.8)' : 'rgba(16, 185, 129, 0.6)' }}></span> Profit
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(239, 68, 68, 0.6)' }}></span> Loss
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: isLight ? 'rgba(220, 38, 38, 0.8)' : 'rgba(239, 68, 68, 0.6)' }}></span> Loss
                 </span>
               </div>
             </div>
@@ -1025,20 +1027,24 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
                 const isLoss = hasTrades && dayData.pnl < 0;
                 const isSelected = selectedCalendarDay === dateKey;
 
-                let tileBg = 'rgba(255, 255, 255, 0.02)';
-                let tileBorder = 'var(--border-color)';
+                let tileBg = isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)';
+                let tileBorder = isLight ? '#e2e8f0' : 'var(--border-color)';
                 if (isProfit) {
-                  tileBg = 'linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.12) 100%)';
-                  tileBorder = 'rgba(16, 185, 129, 0.45)';
+                  tileBg = isLight
+                    ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(34, 197, 94, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.12) 100%)';
+                  tileBorder = isLight ? 'rgba(34, 197, 94, 0.4)' : 'rgba(16, 185, 129, 0.45)';
                 } else if (isLoss) {
-                  tileBg = 'linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.12) 100%)';
-                  tileBorder = 'rgba(239, 68, 68, 0.45)';
+                  tileBg = isLight
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.12) 100%)';
+                  tileBorder = isLight ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.45)';
                 } else if (hasTrades) {
-                  tileBg = 'rgba(255, 255, 255, 0.08)';
+                  tileBg = isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)';
                 }
 
                 if (isSelected) {
-                  tileBorder = '2px solid var(--color-blue)';
+                  tileBorder = isLight ? '2px solid #2563eb' : '2px solid var(--color-blue)';
                 }
 
                 return (
@@ -1056,15 +1062,15 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
                       justifyContent: 'space-between',
                       cursor: hasTrades ? 'pointer' : 'default',
                       transition: 'all 0.15s',
-                      boxShadow: isSelected ? '0 0 12px rgba(59, 130, 246, 0.4)' : 'none'
+                      boxShadow: isSelected ? (isLight ? '0 0 12px rgba(37, 99, 235, 0.25)' : '0 0 12px rgba(59, 130, 246, 0.4)') : 'none'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: hasTrades ? '#ffffff' : 'var(--text-secondary)' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: hasTrades ? (isLight ? '#0f172a' : '#ffffff') : 'var(--text-secondary)' }}>
                         {dayNum}
                       </span>
                       {hasTrades && (
-                        <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.3)', padding: '2px 5px', borderRadius: '4px' }}>
+                        <span style={{ fontSize: '9.5px', color: isLight ? '#475569' : 'var(--text-secondary)', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.3)', padding: '2px 5px', borderRadius: '4px' }}>
                           {dayData.tradesCount}T
                         </span>
                       )}
@@ -1075,7 +1081,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
                         <div style={{
                           fontSize: '12.5px',
                           fontWeight: '900',
-                          color: isProfit ? '#34d399' : isLoss ? '#f87171' : 'var(--text-primary)'
+                          color: isProfit ? (isLight ? '#16a34a' : '#34d399') : isLoss ? (isLight ? '#dc2626' : '#f87171') : 'var(--text-primary)'
                         }}>
                           {dayData.pnl >= 0 ? '+' : ''}₹{dayData.pnl.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </div>
@@ -1113,7 +1119,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
                     Trades for {selectedCalendarDay}
                   </h3>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                    Day Net P&L: <strong style={{ color: calendarDailyMap[selectedCalendarDay].pnl >= 0 ? '#34d399' : '#f87171' }}>
+                    Day Net P&L: <strong style={{ color: calendarDailyMap[selectedCalendarDay].pnl >= 0 ? (isLight ? '#16a34a' : '#34d399') : (isLight ? '#dc2626' : '#f87171') }}>
                       {calendarDailyMap[selectedCalendarDay].pnl >= 0 ? '+' : ''}₹{calendarDailyMap[selectedCalendarDay].pnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </strong> ({calendarDailyMap[selectedCalendarDay].tradesCount} closed trades)
                   </div>
@@ -1148,13 +1154,13 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                           <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>{trade.symbol}</span>
-                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: trade.side === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: trade.side === 'BUY' ? '#34d399' : '#f87171', fontWeight: '700' }}>
+                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: trade.side === 'BUY' ? (isLight ? 'rgba(22, 163, 74, 0.12)' : 'rgba(34,197,94,0.15)') : (isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(239,68,68,0.15)'), color: trade.side === 'BUY' ? (isLight ? '#16a34a' : '#34d399') : (isLight ? '#dc2626' : '#f87171'), fontWeight: '700' }}>
                             {trade.side}
                           </span>
                           <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Qty: {trade.qty}</span>
                         </div>
                         {entry.strategy && (
-                          <div style={{ fontSize: '11px', color: '#fbbf24', marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: isLight ? '#d97706' : '#fbbf24', marginTop: '2px' }}>
                             Setup: {entry.strategy} {entry.emotion ? `• ${entry.emotion}` : ''}
                           </div>
                         )}
@@ -1167,7 +1173,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '15px', fontWeight: '900', color: isWin ? '#34d399' : '#f87171' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '900', color: isWin ? (isLight ? '#16a34a' : '#34d399') : (isLight ? '#dc2626' : '#f87171') }}>
                             {isWin ? '+' : ''}₹{Number(trade.pnl || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
                           <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
@@ -1177,7 +1183,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
 
                         <button
                           onClick={() => setSelectedTradeForShare(trade)}
-                          style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ background: isLight ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.15)', border: isLight ? '1px solid rgba(37, 99, 235, 0.25)' : '1px solid rgba(59, 130, 246, 0.3)', color: isLight ? '#2563eb' : 'var(--color-blue-light)', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                         >
                           <Share2 size={12} /> Share Card
                         </button>
