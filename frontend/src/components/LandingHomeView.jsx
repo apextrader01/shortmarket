@@ -10,7 +10,7 @@ import {
   Sparkles, ShieldCheck, ArrowRight, CheckCircle2,
   Zap, Layers, Cpu, PieChart,
   Search, ChevronDown, Activity, ArrowUpRight,
-  Sliders, Target, Play
+  Sliders, Target, Play, Sun, Moon
 } from 'lucide-react';
 import { useSocialLinks } from '../utils/socialLinks';
 import logoImg from '../assets/logo.png';
@@ -67,15 +67,54 @@ export default function LandingHomeView({
   const [brokLots, setBrokLots] = useState(4);
   const [disciplineChecks, setDisciplineChecks] = useState([true, true, true, false]);
 
-  const { user, prices, positions, orders, setSelectedSymbol } = useStore(
+  const { user, prices, positions, orders, setSelectedSymbol, theme, toggleTheme } = useStore(
     useShallow(state => ({
       user: state.user,
       prices: state.prices,
       positions: state.positions,
       orders: state.orders,
-      setSelectedSymbol: state.setSelectedSymbol
+      setSelectedSymbol: state.setSelectedSymbol,
+      theme: state.theme,
+      toggleTheme: state.toggleTheme
     }))
   );
+  const isLight = theme === 'light';
+
+  // Memoized Theme Design Token Palette
+  const t = useMemo(() => ({
+    isLight,
+    bg: isLight ? '#f8fafc' : '#060911',
+    bgGradient: isLight
+      ? 'radial-gradient(circle at 18% 12%, rgba(2, 132, 199, 0.08) 0%, transparent 42%), radial-gradient(circle at 84% 18%, rgba(99, 102, 241, 0.06) 0%, transparent 45%), radial-gradient(circle at 50% 65%, rgba(16, 185, 129, 0.05) 0%, transparent 50%)'
+      : 'radial-gradient(circle at 18% 12%, rgba(2, 132, 199, 0.14) 0%, transparent 42%), radial-gradient(circle at 84% 18%, rgba(99, 102, 241, 0.13) 0%, transparent 45%), radial-gradient(circle at 50% 65%, rgba(16, 185, 129, 0.07) 0%, transparent 50%)',
+    text: isLight ? '#0f172a' : '#f8fafc',
+    textSecondary: isLight ? '#475569' : '#94a3b8',
+    textMuted: isLight ? '#64748b' : '#64748b',
+    heading: isLight ? '#0f172a' : '#ffffff',
+    border: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)',
+    borderLight: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)',
+    cardBg: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.75)',
+    cardBgDeep: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)',
+    deckBg: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(6, 9, 17, 0.96)',
+    deckBorder: isLight ? '#e2e8f0' : 'rgba(56, 189, 248, 0.16)',
+    ribbonBg: isLight ? '#f8fafc' : 'rgba(10, 15, 28, 0.95)',
+    ribbonBorder: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.05)',
+    tickerItemBg: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+    tickerItemBorder: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.07)',
+    footerBg: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.65)',
+    footerBorder: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)',
+    socialBg: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.78)',
+    socialBorder: isLight ? '#e2e8f0' : 'rgba(56, 189, 248, 0.2)',
+    telemetryCardBg: isLight
+      ? 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)'
+      : 'linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 132, 199, 0.15))',
+    telemetryBorder: isLight ? '#bbf7d0' : 'rgba(56, 189, 248, 0.3)',
+    sandboxBg: isLight
+      ? 'linear-gradient(165deg, #ffffff 0%, #f8fafc 100%)'
+      : 'linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(9, 13, 24, 0.98))',
+    sandboxBorder: isLight ? '#cbd5e1' : 'rgba(56, 189, 248, 0.32)',
+    shadow: isLight ? '0 10px 25px rgba(0, 0, 0, 0.06)' : '0 20px 50px rgba(0, 0, 0, 0.6)',
+  }), [isLight]);
 
   // ─── Guided Feature Introduction Tour State ───
   const [showTour, setShowTour] = useState(() => {
@@ -421,10 +460,10 @@ export default function LandingHomeView({
       shortDesc: 'Trade NSE/BSE Equities, F&O Options & MCX Futures with ₹10,00,000 to ₹10 Crore live virtual capital and sub-second WebSocket ticks.',
       icon: TrendingUp,
       color: '#0284c7',
-      gradient: 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(56, 189, 248, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(2, 132, 199, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(2, 132, 199, 0.35)' : 'rgba(56, 189, 248, 0.35)',
       badge: 'Free ₹10L–₹10Cr',
-      badgeColor: '#38bdf8',
+      badgeColor: isLight ? '#0284c7' : '#38bdf8',
       kpiLeft: { label: 'Virtual Margin', value: `₹${(liveTelemetry.balance / 100000).toFixed(2)}L` },
       kpiRight: { label: 'Active Positions', value: `${liveTelemetry.openCount} Open` },
       tags: ['Live WebSockets', 'F&O Options Chain', 'Bracket Orders', 'TradingView Charts'],
@@ -451,8 +490,8 @@ export default function LandingHomeView({
       shortDesc: 'Institutional performance journaling covering pre-trade checklists, strategy tags, emotional leak detection, and expectancy analytics.',
       icon: BookOpen,
       color: '#818cf8',
-      gradient: 'linear-gradient(145deg, rgba(99, 102, 241, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(129, 140, 248, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(99, 102, 241, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(99, 102, 241, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(99, 102, 241, 0.35)' : 'rgba(129, 140, 248, 0.35)',
       badge: '8 Core Pillars',
       badgeColor: '#818cf8',
       kpiLeft: { label: 'Architecture', value: '8-Pillar Audit' },
@@ -485,8 +524,8 @@ export default function LandingHomeView({
       shortDesc: 'Daily NSE institutional delivery screener (>60% delivery), 2x volume surges, Bulk/Block deals tape & 1-click PAN IPO allotment.',
       icon: Building2,
       color: '#10b981',
-      gradient: 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(16, 185, 129, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(16, 185, 129, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.35)',
       badge: '₹0 NSE Feed',
       badgeColor: '#10b981',
       kpiLeft: { label: 'Delivery Filter', value: '>60% Institutional' },
@@ -515,8 +554,8 @@ export default function LandingHomeView({
       shortDesc: '10 institutional calculators: Reducing & Flat EMI Loans, SIP Step-Up Compounder, MTF 4x Leverage, Stock Averaging, STT & Black-Scholes Greeks.',
       icon: Calculator,
       color: '#f59e0b',
-      gradient: 'linear-gradient(145deg, rgba(245, 158, 11, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(245, 158, 11, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(245, 158, 11, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(245, 158, 11, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(245, 158, 11, 0.35)' : 'rgba(245, 158, 11, 0.35)',
       badge: '10 Calculators',
       badgeColor: '#f59e0b',
       kpiLeft: { label: 'Active Engines', value: '10 Calculators' },
@@ -551,8 +590,8 @@ export default function LandingHomeView({
       shortDesc: 'Complete 360° personal financial command center: Multi-asset net worth tracking, 50/30/20 budget leak detector, actuarial HLV gap, and FY25 tax harvesting.',
       icon: PieChart,
       color: '#10b981',
-      gradient: 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(16, 185, 129, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(16, 185, 129, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.35)',
       badge: '360° Tax & Wealth',
       badgeColor: '#10b981',
       kpiLeft: { label: 'Tax Regime', value: 'FY25 STCG/LTCG' },
@@ -583,10 +622,10 @@ export default function LandingHomeView({
       shortDesc: 'Angel One SmartAPI Demat connection, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account API sync.',
       icon: Cpu,
       color: '#0284c7',
-      gradient: 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
-      border: 'rgba(56, 189, 248, 0.35)',
+      gradient: isLight ? 'linear-gradient(145deg, rgba(2, 132, 199, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
+      border: isLight ? 'rgba(2, 132, 199, 0.35)' : 'rgba(56, 189, 248, 0.35)',
       badge: 'ALGO PRO',
-      badgeColor: '#38bdf8',
+      badgeColor: isLight ? '#0284c7' : '#38bdf8',
       kpiLeft: { label: 'Supported Broker', value: 'Angel One SmartAPI' },
       kpiRight: { label: 'Bridge Latency', value: '<15ms Webhook' },
       tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts', 'Multi-Account Sync'],
@@ -637,9 +676,9 @@ export default function LandingHomeView({
       width: '100%',
       maxWidth: '100vw',
       minHeight: '100%',
-      backgroundColor: '#060911',
-      backgroundImage: 'radial-gradient(circle at 18% 12%, rgba(2, 132, 199, 0.14) 0%, transparent 42%), radial-gradient(circle at 84% 18%, rgba(99, 102, 241, 0.13) 0%, transparent 45%), radial-gradient(circle at 50% 65%, rgba(16, 185, 129, 0.07) 0%, transparent 50%)',
-      color: '#f8fafc',
+      backgroundColor: t.bg,
+      backgroundImage: t.bgGradient,
+      color: t.text,
       display: 'flex',
       flexDirection: 'column',
       fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
@@ -655,9 +694,9 @@ export default function LandingHomeView({
         .skx-no-scrollbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
         .skx-no-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
         .skx-hub-card { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease; min-width: 0; }
-        .skx-hub-card:hover { transform: translateY(-4px); box-shadow: 0 20px 42px rgba(0, 0, 0, 0.55) !important; }
+        .skx-hub-card:hover { transform: translateY(-4px); box-shadow: ${isLight ? '0 16px 36px rgba(15, 23, 42, 0.12) !important' : '0 20px 42px rgba(0, 0, 0, 0.55) !important'}; }
         .skx-pill-btn { transition: all 0.16s ease; min-width: 0; }
-        .skx-pill-btn:hover { transform: translateY(-1px); background: rgba(56, 189, 248, 0.14) !important; border-color: rgba(56, 189, 248, 0.45) !important; }
+        .skx-pill-btn:hover { transform: translateY(-1px); background: ${isLight ? '#e0f2fe !important' : 'rgba(56, 189, 248, 0.14) !important'}; border-color: ${isLight ? '#7dd3fc !important' : 'rgba(56, 189, 248, 0.45) !important'}; }
 
         /* Unified Sticky Top Deck (prevents any gap between navbar and ticker on scroll & clears Android status bar) */
         .skx-sticky-top-deck {
@@ -665,10 +704,14 @@ export default function LandingHomeView({
           top: 0;
           z-index: 80;
           width: 100%;
-          background: rgba(6, 9, 17, 0.96);
+          background: ${t.deckBg};
           backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(56, 189, 248, 0.16);
+          border-bottom: 1px solid ${t.deckBorder};
           padding-top: env(safe-area-inset-top, 0px);
+        }
+
+        .show-on-mobile-inline {
+          display: none;
         }
 
         .skx-hero-grid {
@@ -726,11 +769,14 @@ export default function LandingHomeView({
         }
 
         @media (max-width: 768px) {
+          .show-on-mobile-inline {
+            display: inline !important;
+          }
           .skx-sticky-top-deck {
             padding-top: max(env(safe-area-inset-top, 0px), 26px);
           }
           .skx-nav-bar {
-            padding: 10px 14px !important;
+            padding: 8px 12px !important;
           }
           .skx-brand-subtitle {
             display: none !important;
@@ -740,8 +786,8 @@ export default function LandingHomeView({
             gap: 6px;
             overflow-x: auto;
             padding: 7px 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            background: rgba(9, 13, 24, 0.95);
+            border-top: 1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'};
+            background: ${isLight ? 'rgba(255, 255, 255, 0.97)' : 'rgba(9, 13, 24, 0.95)'};
           }
           .skx-section-pad {
             padding-left: 14px !important;
@@ -806,22 +852,22 @@ export default function LandingHomeView({
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                boxShadow: '0 0 18px rgba(56, 189, 248, 0.42)',
-                border: '1px solid rgba(125, 211, 252, 0.4)',
+                boxShadow: isLight ? '0 2px 8px rgba(2, 132, 199, 0.25)' : '0 0 18px rgba(56, 189, 248, 0.42)',
+                border: isLight ? '1px solid #7dd3fc' : '1px solid rgba(125, 211, 252, 0.4)',
                 flexShrink: 0,
                 objectFit: 'cover'
               }}
             />
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontWeight: '900', fontSize: '18px', letterSpacing: '-0.3px', color: '#ffffff', fontFamily: "'Outfit', Inter, sans-serif" }}>
-                  Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
+                <span style={{ fontWeight: '900', fontSize: '18px', letterSpacing: '-0.3px', color: t.heading, fontFamily: "'Outfit', Inter, sans-serif" }}>
+                  Skand<span style={{ background: 'linear-gradient(135deg, #0284c7 0%, #10b981 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
                 </span>
-                <span style={{ fontSize: '9px', background: 'rgba(56, 189, 248, 0.16)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', padding: '1px 5px', borderRadius: '4px', fontWeight: '800', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '9px', background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.16)', border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.35)'}`, color: isLight ? '#0284c7' : '#38bdf8', padding: '1px 5px', borderRadius: '4px', fontWeight: '800', whiteSpace: 'nowrap' }}>
                   PRO OS
                 </span>
               </div>
-              <span className="skx-brand-subtitle" style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '500', display: 'block', whiteSpace: 'nowrap' }}>
+              <span className="skx-brand-subtitle" style={{ fontSize: '10.5px', color: t.textSecondary, fontWeight: '500', display: 'block', whiteSpace: 'nowrap' }}>
                 Institutional Paper Trade, Options &amp; Wealth OS
               </span>
             </div>
@@ -831,14 +877,14 @@ export default function LandingHomeView({
           <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <button
               onClick={() => scrollToSection('interactive-edge-lab')}
-              style={{ padding: '6px 11px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '5px' }}
+              style={{ padding: '6px 11px', background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.1)', border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)'}`, color: isLight ? '#15803d' : '#34d399', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
               <Sliders size={13} />
               <span>Trader Edge Lab</span>
             </button>
             <button
               onClick={() => scrollToSection('hubs-command-center')}
-              style={{ padding: '6px 11px', background: 'rgba(56, 189, 248, 0.09)', border: '1px solid rgba(56, 189, 248, 0.25)', color: '#38bdf8', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              style={{ padding: '6px 11px', background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.09)', border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.25)'}`, color: isLight ? '#0284c7' : '#38bdf8', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <span>6 Platform Hubs</span>
               <ChevronDown size={13} />
@@ -846,78 +892,102 @@ export default function LandingHomeView({
             <button
               onClick={() => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading())}
               onMouseEnter={() => prefetchHubChunk(7)}
-              style={{ padding: '6px 11px', background: 'rgba(37, 99, 235, 0.14)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#60a5fa', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px' }}
+              style={{ padding: '6px 11px', background: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.14)', border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(59, 130, 246, 0.35)'}`, color: isLight ? '#1d4ed8' : '#60a5fa', fontSize: '12px', fontWeight: '700', cursor: 'pointer', borderRadius: '7px' }}
             >
               💬 Community &amp; Clubs
             </button>
             <button
               onClick={() => onOpenTradeDiary('CHECKLIST')}
               onMouseEnter={() => prefetchHubChunk(2)}
-              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: isLight ? '#475569' : '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
             >
               Trade Diary
             </button>
             <button
               onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}
               onMouseEnter={() => prefetchHubChunk(3)}
-              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: isLight ? '#475569' : '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
             >
               Bhavcopy &amp; IPO
             </button>
             <button
               onClick={() => onOpenCalculators('all')}
               onMouseEnter={() => prefetchHubChunk(4)}
-              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#fbbf24', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: isLight ? '#b45309' : '#fbbf24', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
             >
               10 Calculators
             </button>
             <button
               onClick={() => onOpenWealthFinance('NET_WORTH')}
               onMouseEnter={() => prefetchHubChunk(5)}
-              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#34d399', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: isLight ? '#15803d' : '#34d399', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <PieChart size={13} /> Wealth &amp; Tax
             </button>
             <button
               onClick={() => onOpenAlgoBridge('Dashboard')}
               onMouseEnter={() => prefetchHubChunk(6)}
-              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
+              style={{ padding: '6px 10px', background: 'transparent', border: 'none', color: isLight ? '#475569' : '#cbd5e1', fontSize: '12px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' }}
             >
               SkandX Algo
             </button>
           </div>
 
           {/* Direct Action Buttons (Single-Line on Both Mobile & Desktop) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {/* Direct 1-Click Theme Switcher */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${isLight ? 'Dark' : 'Light'} Mode`}
+              aria-label="Toggle theme"
+              style={{
+                padding: '6px 8px',
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                borderRadius: '9px',
+                color: isLight ? '#475569' : '#fbbf24',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isLight ? <Moon size={14} color="#475569" /> : <Sun size={14} color="#fbbf24" />}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowTour(true)}
               title="Launch interactive platform feature walkthrough"
               style={{
-                padding: '7px 12px',
-                background: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
+                padding: '6px 10px',
+                background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.1)',
+                border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.35)'}`,
                 borderRadius: '9px',
-                color: '#38bdf8',
+                color: isLight ? '#0284c7' : '#38bdf8',
                 fontWeight: '700',
                 fontSize: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.15)',
+                boxShadow: isLight ? '0 1px 4px rgba(2, 132, 199, 0.12)' : '0 2px 10px rgba(56, 189, 248, 0.15)',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
               }}
             >
               <Sparkles size={13} />
-              <span>Feature Tour</span>
+              <span className="hide-on-mobile">Feature Tour</span>
+              <span className="show-on-mobile-inline">Tour</span>
             </button>
 
             <button
               onClick={onOpenPaperTrading}
               style={{
-                padding: '8px 14px',
+                padding: '6px 12px',
                 background: 'linear-gradient(135deg, #0284c7, #2563eb)',
                 border: '1px solid rgba(125, 211, 252, 0.45)',
                 borderRadius: '9px',
@@ -926,15 +996,16 @@ export default function LandingHomeView({
                 fontSize: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)',
+                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.35)',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
               }}
             >
               <Zap size={13} />
-              <span>Launch Terminal</span>
+              <span className="hide-on-mobile">Launch Terminal</span>
+              <span className="show-on-mobile-inline">Terminal</span>
             </button>
           </div>
         </header>
@@ -943,8 +1014,8 @@ export default function LandingHomeView({
         <div
           className="skx-no-scrollbar"
           style={{
-            background: 'rgba(10, 15, 28, 0.95)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            background: t.ribbonBg,
+            borderTop: `1px solid ${t.ribbonBorder}`,
             padding: '6px 14px',
             overflowX: 'auto',
             display: 'flex',
@@ -960,11 +1031,11 @@ export default function LandingHomeView({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.32)',
+              background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.12)',
+              border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.32)'}`,
               padding: '2px 8px',
               borderRadius: '20px',
-              color: '#34d399',
+              color: isLight ? '#15803d' : '#34d399',
               fontWeight: '800',
               fontSize: '10px',
               letterSpacing: '0.3px'
@@ -982,30 +1053,34 @@ export default function LandingHomeView({
             </div>
 
             <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
-              {LIVE_TICKERS.map((t, idx) => {
+              {LIVE_TICKERS.map((item, idx) => {
                 const isSelected = activeTickerIdx === idx;
                 return (
                   <button
                     key={idx}
-                    onClick={() => handleTickerClick(t.targetSymbol, idx)}
-                    title={`Tap to test ${t.label} in Sandbox`}
+                    onClick={() => handleTickerClick(item.targetSymbol, idx)}
+                    title={`Tap to test ${item.label} in Sandbox`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '5px',
-                      background: isSelected ? 'rgba(2, 132, 199, 0.24)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isSelected ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.07)',
+                      background: isSelected
+                        ? (isLight ? '#e0f2fe' : 'rgba(2, 132, 199, 0.24)')
+                        : t.tickerItemBg,
+                      border: isSelected
+                        ? `1px solid ${isLight ? '#0284c7' : 'rgba(56, 189, 248, 0.5)'}`
+                        : `1px solid ${t.tickerItemBorder}`,
                       borderRadius: '6px',
                       padding: '3px 8px',
                       cursor: 'pointer',
-                      color: '#f8fafc',
+                      color: t.text,
                       fontSize: '11px'
                     }}
                   >
-                    <span style={{ fontWeight: '700', color: isSelected ? '#38bdf8' : '#cbd5e1' }}>{t.short}</span>
-                    <span style={{ fontWeight: '800', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>{t.ltp}</span>
-                    <span style={{ color: t.isUp ? '#10b981' : '#ef4444', fontWeight: '700', fontSize: '10.5px', fontVariantNumeric: 'tabular-nums' }}>
-                      {t.shortChange}
+                    <span style={{ fontWeight: '700', color: isSelected ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#475569' : '#cbd5e1') }}>{item.short}</span>
+                    <span style={{ fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>{item.ltp}</span>
+                    <span style={{ color: item.isUp ? '#10b981' : '#ef4444', fontWeight: '700', fontSize: '10.5px', fontVariantNumeric: 'tabular-nums' }}>
+                      {item.shortChange}
                     </span>
                   </button>
                 );
@@ -1013,10 +1088,10 @@ export default function LandingHomeView({
             </div>
           </div>
 
-          <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap', fontSize: '11px', color: '#94a3b8' }}>
-            <span>INDIA VIX: <strong style={{ color: '#34d399' }}>13.42 (-1.8%)</strong></span>
+          <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap', fontSize: '11px', color: t.textSecondary }}>
+            <span>INDIA VIX: <strong style={{ color: isLight ? '#15803d' : '#34d399' }}>13.42 (-1.8%)</strong></span>
             <span>•</span>
-            <span>NIFTY PCR: <strong style={{ color: '#38bdf8' }}>1.14 (Bullish)</strong></span>
+            <span>NIFTY PCR: <strong style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>1.14 (Bullish)</strong></span>
           </div>
         </div>
 
@@ -1041,9 +1116,9 @@ export default function LandingHomeView({
               style={{
                 padding: '5px 10px',
                 borderRadius: '16px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${item.color}40`,
-                color: '#f8fafc',
+                background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${isLight ? '#cbd5e1' : `${item.color}40`}`,
+                color: isLight ? '#0f172a' : '#f8fafc',
                 fontSize: '11px',
                 fontWeight: '700',
                 whiteSpace: 'nowrap',
@@ -1081,16 +1156,16 @@ export default function LandingHomeView({
                 alignItems: 'center',
                 gap: '6px',
                 padding: '5px 11px',
-                background: 'linear-gradient(90deg, rgba(2, 132, 199, 0.16), rgba(99, 102, 241, 0.16))',
-                border: '1px solid rgba(56, 189, 248, 0.32)',
+                background: isLight ? '#e0f2fe' : 'linear-gradient(90deg, rgba(2, 132, 199, 0.16), rgba(99, 102, 241, 0.16))',
+                border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.32)'}`,
                 borderRadius: '20px',
-                color: '#7dd3fc',
+                color: isLight ? '#0284c7' : '#7dd3fc',
                 fontSize: '11px',
                 fontWeight: '700',
                 marginBottom: '12px',
                 maxWidth: '100%'
               }}>
-                <Sparkles size={13} color="#38bdf8" style={{ flexShrink: 0 }} />
+                <Sparkles size={13} color="#0284c7" style={{ flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   India&apos;s #1 Real-Time Paper Trade, Option Greeks &amp; Wealth OS
                 </span>
@@ -1103,12 +1178,12 @@ export default function LandingHomeView({
                 lineHeight: '1.16',
                 margin: '0 0 12px',
                 letterSpacing: '-0.5px',
-                color: '#ffffff',
+                color: t.heading,
                 wordBreak: 'break-word'
               }}>
                 Trade Live NSE/BSE Markets with{' '}
                 <span style={{
-                  background: 'linear-gradient(90deg, #38bdf8 0%, #818cf8 55%, #34d399 100%)',
+                  background: 'linear-gradient(90deg, #0284c7 0%, #6366f1 55%, #10b981 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent'
                 }}>
@@ -1120,7 +1195,7 @@ export default function LandingHomeView({
               {/* Subtitle */}
               <p style={{
                 fontSize: '13.5px',
-                color: '#94a3b8',
+                color: t.textSecondary,
                 lineHeight: '1.58',
                 margin: '0 0 16px'
               }}>
@@ -1157,10 +1232,10 @@ export default function LandingHomeView({
                   className="skx-cta-secondary"
                   style={{
                     padding: '12px 16px',
-                    background: 'rgba(99, 102, 241, 0.14)',
-                    border: '1px solid rgba(129, 140, 248, 0.4)',
+                    background: isLight ? '#e0e7ff' : 'rgba(99, 102, 241, 0.14)',
+                    border: `1px solid ${isLight ? '#a5b4fc' : 'rgba(129, 140, 248, 0.4)'}`,
                     borderRadius: '11px',
-                    color: '#c7d2fe',
+                    color: isLight ? '#4338ca' : '#c7d2fe',
                     fontWeight: '700',
                     fontSize: '13px',
                     display: 'flex',
@@ -1169,7 +1244,7 @@ export default function LandingHomeView({
                     cursor: 'pointer'
                   }}
                 >
-                  <Layers size={15} color="#818cf8" style={{ flexShrink: 0 }} />
+                  <Layers size={15} color={isLight ? '#4f46e5' : '#818cf8'} style={{ flexShrink: 0 }} />
                   <span style={{ whiteSpace: 'nowrap' }}>Option Chain</span>
                 </button>
 
@@ -1179,10 +1254,10 @@ export default function LandingHomeView({
                   className="skx-cta-secondary"
                   style={{
                     padding: '12px 16px',
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    border: '1px solid rgba(245, 158, 11, 0.38)',
+                    background: isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.12)',
+                    border: `1px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.38)'}`,
                     borderRadius: '11px',
-                    color: '#fde68a',
+                    color: isLight ? '#b45309' : '#fde68a',
                     fontWeight: '700',
                     fontSize: '13px',
                     display: 'flex',
@@ -1191,7 +1266,7 @@ export default function LandingHomeView({
                     cursor: 'pointer'
                   }}
                 >
-                  <Calculator size={15} color="#fbbf24" style={{ flexShrink: 0 }} />
+                  <Calculator size={15} color={isLight ? '#d97706' : '#fbbf24'} style={{ flexShrink: 0 }} />
                   <span style={{ whiteSpace: 'nowrap' }}>10 Calculators</span>
                 </button>
               </div>
@@ -1199,11 +1274,11 @@ export default function LandingHomeView({
 
             {/* Live Account & Session Telemetry Card (100% Mobile-Contained, Zero Cutoff) */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 132, 199, 0.15))',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
+              background: t.telemetryCardBg,
+              border: `1px solid ${t.telemetryBorder}`,
               borderRadius: '15px',
               padding: '14px 15px',
-              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.35)',
+              boxShadow: t.shadow,
               width: '100%',
               minWidth: 0
             }}>
@@ -1213,23 +1288,23 @@ export default function LandingHomeView({
                     width: '38px',
                     height: '38px',
                     borderRadius: '10px',
-                    background: 'rgba(16, 185, 129, 0.16)',
-                    border: '1px solid rgba(16, 185, 129, 0.38)',
+                    background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.16)',
+                    border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.38)'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#10b981',
+                    color: isLight ? '#15803d' : '#10b981',
                     flexShrink: 0
                   }}>
                     <Activity size={20} />
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '800', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '10px', color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '800', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {user?.username ? `LIVE DESK • ${user.username.toUpperCase()}` : 'LIVE SIMULATED DESK'}
                     </div>
-                    <div style={{ fontSize: 'clamp(16px, 4.2vw, 19px)', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums', lineHeight: '1.2' }}>
+                    <div style={{ fontSize: 'clamp(16px, 4.2vw, 19px)', fontWeight: '900', color: t.heading, fontVariantNumeric: 'tabular-nums', lineHeight: '1.2' }}>
                       ₹{Math.round(liveTelemetry.balance).toLocaleString('en-IN')}{' '}
-                      <span style={{ fontSize: '11px', fontWeight: '600', color: '#38bdf8', display: 'inline-block' }}>Virtual Capital</span>
+                      <span style={{ fontSize: '11px', fontWeight: '600', color: isLight ? '#0284c7' : '#38bdf8', display: 'inline-block' }}>Virtual Capital</span>
                     </div>
                   </div>
                 </div>
@@ -1238,10 +1313,10 @@ export default function LandingHomeView({
                   onClick={onOpenPaperTrading}
                   style={{
                     padding: '6px 10px',
-                    background: 'rgba(56, 189, 248, 0.14)',
-                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.14)',
+                    border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.35)'}`,
                     borderRadius: '8px',
-                    color: '#38bdf8',
+                    color: isLight ? '#0284c7' : '#38bdf8',
                     fontSize: '11px',
                     fontWeight: '700',
                     cursor: 'pointer',
@@ -1262,19 +1337,19 @@ export default function LandingHomeView({
                 gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
                 gap: '8px',
                 paddingTop: '10px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.07)'
+                borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.07)'}`
               }}>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                <div style={{ background: isLight ? '#ffffff' : 'rgba(0,0,0,0.3)', border: isLight ? '1px solid #e2e8f0' : 'none', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
                   <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Positions</div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.openCount} Open</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: t.heading, marginTop: '2px' }}>{liveTelemetry.openCount} Open</div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                <div style={{ background: isLight ? '#ffffff' : 'rgba(0,0,0,0.3)', border: isLight ? '1px solid #e2e8f0' : 'none', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
                   <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Orders</div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>{liveTelemetry.executedCount} Fills</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: t.heading, marginTop: '2px' }}>{liveTelemetry.executedCount} Fills</div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
+                <div style={{ background: isLight ? '#ffffff' : 'rgba(0,0,0,0.3)', border: isLight ? '1px solid #e2e8f0' : 'none', padding: '7px 8px', borderRadius: '8px', minWidth: 0 }}>
                   <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Realized P&amp;L</div>
-                  <div style={{ fontSize: '12px', fontWeight: '800', color: liveTelemetry.realizedPnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: liveTelemetry.realizedPnl >= 0 ? (isLight ? '#15803d' : '#34d399') : '#ef4444', marginTop: '2px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {liveTelemetry.realizedPnl >= 0 ? '+' : ''}₹{Math.round(liveTelemetry.realizedPnl).toLocaleString('en-IN')}
                   </div>
                 </div>
@@ -1283,10 +1358,11 @@ export default function LandingHomeView({
 
             {/* 1-Click Direct Tool Spotlight Dock (2x4 Grid on Mobile, 4x2 on Desktop) */}
             <div style={{
-              background: 'rgba(15, 23, 42, 0.72)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.72)',
+              border: `1px solid ${t.border}`,
               borderRadius: '14px',
               padding: '12px',
+              boxShadow: t.shadow,
               width: '100%',
               minWidth: 0
             }}>
@@ -1296,10 +1372,10 @@ export default function LandingHomeView({
                 justifyContent: 'space-between',
                 marginBottom: '8px'
               }}>
-                <span style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: '10px', fontWeight: '800', color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   ⚡ Instant 1-Click Tool Launcher:
                 </span>
-                <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '700' }}>Direct Access</span>
+                <span style={{ fontSize: '10px', color: isLight ? '#0284c7' : '#38bdf8', fontWeight: '700' }}>Direct Access</span>
               </div>
               <div className="skx-spotlight-grid">
                 {SPOTLIGHT_TOOLS.map((tool, idx) => (
@@ -1310,9 +1386,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '7px 9px',
                       borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.035)',
-                      border: `1px solid ${tool.color}33`,
-                      color: '#e2e8f0',
+                      background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.035)',
+                      border: `1px solid ${isLight ? '#e2e8f0' : `${tool.color}33`}`,
+                      color: isLight ? '#1e293b' : '#e2e8f0',
                       fontSize: '11px',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -1336,11 +1412,11 @@ export default function LandingHomeView({
           <div
             id="mobile-sandbox-anchor"
             style={{
-              background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.96), rgba(9, 13, 24, 0.98))',
-              border: '1px solid rgba(56, 189, 248, 0.32)',
+              background: t.sandboxBg,
+              border: `1px solid ${t.sandboxBorder}`,
               borderRadius: '18px',
               padding: '15px',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              boxShadow: t.shadow,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -1357,7 +1433,7 @@ export default function LandingHomeView({
                 justifyContent: 'space-between',
                 gap: '8px',
                 paddingBottom: '10px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+                borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
@@ -1365,7 +1441,7 @@ export default function LandingHomeView({
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                   </div>
-                  <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#cbd5e1', letterSpacing: '0.4px', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '10.5px', fontWeight: '800', color: isLight ? '#334155' : '#cbd5e1', letterSpacing: '0.4px', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     LIVE INTERACTIVE SANDBOX
                   </span>
                 </div>
@@ -1374,8 +1450,8 @@ export default function LandingHomeView({
                   fontSize: '10px',
                   padding: '2px 7px',
                   borderRadius: '12px',
-                  background: 'rgba(16, 185, 129, 0.14)',
-                  color: '#34d399',
+                  background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.14)',
+                  color: isLight ? '#15803d' : '#34d399',
                   fontWeight: '700',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
@@ -1390,10 +1466,10 @@ export default function LandingHomeView({
                 gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                 gap: '4px',
                 marginTop: '10px',
-                background: 'rgba(0, 0, 0, 0.35)',
+                background: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)',
                 padding: '4px',
                 borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.06)'
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`
               }}>
                 {[
                   { id: 'TRADE', label: '⚡ Trade' },
@@ -1410,16 +1486,17 @@ export default function LandingHomeView({
                       style={{
                         padding: '7px 4px',
                         borderRadius: '7px',
-                        border: active ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
-                        background: active ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(37, 99, 235, 0.35))' : 'transparent',
-                        color: active ? '#ffffff' : '#94a3b8',
+                        border: active ? (isLight ? '1px solid #7dd3fc' : '1px solid rgba(56, 189, 248, 0.45)') : '1px solid transparent',
+                        background: active ? (isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(37, 99, 235, 0.35))') : 'transparent',
+                        color: active ? (isLight ? '#0284c7' : '#ffffff') : (isLight ? '#64748b' : '#94a3b8'),
                         fontSize: '11px',
                         fontWeight: active ? '800' : '600',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis'
+                        textOverflow: 'ellipsis',
+                        boxShadow: active && isLight ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
                       }}
                     >
                       {tab.label}
@@ -1447,9 +1524,9 @@ export default function LandingHomeView({
                         style={{
                           padding: '5px 9px',
                           borderRadius: '7px',
-                          border: active ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
-                          background: active ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.03)',
-                          color: active ? '#38bdf8' : '#cbd5e1',
+                          border: active ? (isLight ? '1px solid #0284c7' : '1px solid #38bdf8') : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                          background: active ? (isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.16)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                          color: active ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#475569' : '#cbd5e1'),
                           fontSize: '10.5px',
                           fontWeight: '700',
                           cursor: 'pointer',
@@ -1465,8 +1542,8 @@ export default function LandingHomeView({
 
                 {/* Live Price Header + Timeframe Switcher + Interactive SVG Chart */}
                 <div style={{
-                  background: 'rgba(0, 0, 0, 0.38)',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.38)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.07)'}`,
                   borderRadius: '12px',
                   padding: '10px 12px',
                   minWidth: 0
@@ -1474,22 +1551,22 @@ export default function LandingHomeView({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '900', color: '#ffffff' }}>{activeInstrument.label}</span>
-                        <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', fontWeight: '700' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: t.heading }}>{activeInstrument.label}</span>
+                        <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.14)', color: isLight ? '#0284c7' : '#38bdf8', fontWeight: '700' }}>
                           Lot: {activeInstrument.lotSize}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '19px', fontWeight: '900', color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ fontSize: '19px', fontWeight: '900', color: t.heading, fontVariantNumeric: 'tabular-nums' }}>
                           ₹{activeInstrument.ltp}
                         </span>
-                        <span style={{ fontSize: '11px', fontWeight: '700', color: activeInstrument.isUp ? '#10b981' : '#ef4444' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: activeInstrument.isUp ? (isLight ? '#15803d' : '#10b981') : '#ef4444' }}>
                           {activeInstrument.change}
                         </span>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '3px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '7px' }}>
+                    <div style={{ display: 'flex', gap: '3px', background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '7px' }}>
                       {['1m', '5m', '15m', '1D'].map(tf => (
                         <button
                           key={tf}
@@ -1500,7 +1577,7 @@ export default function LandingHomeView({
                             borderRadius: '5px',
                             border: 'none',
                             background: chartTimeframe === tf ? '#0284c7' : 'transparent',
-                            color: chartTimeframe === tf ? '#fff' : '#94a3b8',
+                            color: chartTimeframe === tf ? '#fff' : (isLight ? '#64748b' : '#94a3b8'),
                             fontSize: '10px',
                             fontWeight: '700',
                             cursor: 'pointer'
@@ -1517,7 +1594,7 @@ export default function LandingHomeView({
                     <svg viewBox={`0 0 ${chartData.width} ${chartData.height}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
                       <defs>
                         <linearGradient id="skxChartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
+                          <stop offset="0%" stopColor="#38bdf8" stopOpacity={isLight ? '0.25' : '0.38'} />
                           <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
                         </linearGradient>
                       </defs>
@@ -1528,12 +1605,12 @@ export default function LandingHomeView({
                           y1={chartData.height * g}
                           x2={chartData.width}
                           y2={chartData.height * g}
-                          stroke="rgba(255,255,255,0.05)"
+                          stroke={isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)'}
                           strokeDasharray="3 3"
                         />
                       ))}
                       <path d={chartData.areaPath} fill="url(#skxChartGrad)" />
-                      <path d={chartData.linePath} fill="none" stroke="#38bdf8" strokeWidth="2.4" strokeLinecap="round" />
+                      <path d={chartData.linePath} fill="none" stroke="#0284c7" strokeWidth="2.4" strokeLinecap="round" />
                       {chartData.candles.map((c, idx) => {
                         const x = (idx / (chartData.candles.length - 1)) * chartData.width;
                         const yOpen = chartData.height - ((c.open - chartData.minVal) / chartData.span) * (chartData.height - 22) - 11;
@@ -1561,8 +1638,8 @@ export default function LandingHomeView({
 
                 {/* Interactive Order Ticket Controls */}
                 <div style={{
-                  background: 'rgba(15, 23, 42, 0.75)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.75)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
                   borderRadius: '12px',
                   padding: '11px 12px',
                   display: 'flex',
@@ -1578,9 +1655,9 @@ export default function LandingHomeView({
                         style={{
                           padding: '5px 11px',
                           borderRadius: '7px',
-                          border: tradeSide === 'BUY' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                          background: tradeSide === 'BUY' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(255,255,255,0.03)',
-                          color: tradeSide === 'BUY' ? '#34d399' : '#94a3b8',
+                          border: tradeSide === 'BUY' ? '1px solid #10b981' : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                          background: tradeSide === 'BUY' ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.22)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                          color: tradeSide === 'BUY' ? (isLight ? '#15803d' : '#34d399') : (isLight ? '#64748b' : '#94a3b8'),
                           fontSize: '11px',
                           fontWeight: '800',
                           cursor: 'pointer'
@@ -1594,9 +1671,9 @@ export default function LandingHomeView({
                         style={{
                           padding: '5px 11px',
                           borderRadius: '7px',
-                          border: tradeSide === 'SELL' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)',
-                          background: tradeSide === 'SELL' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(255,255,255,0.03)',
-                          color: tradeSide === 'SELL' ? '#f87171' : '#94a3b8',
+                          border: tradeSide === 'SELL' ? '1px solid #ef4444' : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                          background: tradeSide === 'SELL' ? (isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.22)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                          color: tradeSide === 'SELL' ? (isLight ? '#b91c1c' : '#f87171') : (isLight ? '#64748b' : '#94a3b8'),
                           fontSize: '11px',
                           fontWeight: '800',
                           cursor: 'pointer'
@@ -1619,9 +1696,9 @@ export default function LandingHomeView({
                           style={{
                             padding: '4px 8px',
                             borderRadius: '6px',
-                            border: tradeProduct === p.id ? '1px solid rgba(56,189,248,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                            background: tradeProduct === p.id ? 'rgba(56,189,248,0.16)' : 'transparent',
-                            color: tradeProduct === p.id ? '#38bdf8' : '#94a3b8',
+                            border: tradeProduct === p.id ? (isLight ? '1px solid #0284c7' : '1px solid rgba(56,189,248,0.5)') : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                            background: tradeProduct === p.id ? (isLight ? '#e0f2fe' : 'rgba(56,189,248,0.16)') : 'transparent',
+                            color: tradeProduct === p.id ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                             fontSize: '10.5px',
                             fontWeight: '700',
                             cursor: 'pointer'
@@ -1636,7 +1713,7 @@ export default function LandingHomeView({
                   {/* Lot Stepper & SL / Target Sliders */}
                   <div className="skx-trade-controls-grid">
                     <div>
-                      <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '10.5px', color: t.textSecondary, fontWeight: '700', marginBottom: '4px' }}>
                         Lots ({tradeMetrics.qty} Qty)
                       </div>
                       <div style={{ display: 'flex', gap: '4px' }}>
@@ -1649,9 +1726,9 @@ export default function LandingHomeView({
                               flex: 1,
                               padding: '5px 0',
                               borderRadius: '6px',
-                              border: tradeLots === l ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
-                              background: tradeLots === l ? 'rgba(56,189,248,0.2)' : 'rgba(0,0,0,0.3)',
-                              color: tradeLots === l ? '#fff' : '#94a3b8',
+                              border: tradeLots === l ? '1px solid #0284c7' : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                              background: tradeLots === l ? (isLight ? '#e0f2fe' : 'rgba(56,189,248,0.2)') : (isLight ? '#f8fafc' : 'rgba(0,0,0,0.3)'),
+                              color: tradeLots === l ? (isLight ? '#0284c7' : '#fff') : (isLight ? '#475569' : '#94a3b8'),
                               fontSize: '11px',
                               fontWeight: '800',
                               cursor: 'pointer'
@@ -1664,9 +1741,9 @@ export default function LandingHomeView({
                     </div>
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: t.textSecondary, fontWeight: '700', marginBottom: '2px' }}>
                         <span>Stop-Loss</span>
-                        <span style={{ color: '#f87171' }}>-{slPoints} pts</span>
+                        <span style={{ color: '#ef4444' }}>-{slPoints} pts</span>
                       </div>
                       <input
                         type="range"
@@ -1680,9 +1757,9 @@ export default function LandingHomeView({
                     </div>
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#94a3b8', fontWeight: '700', marginBottom: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: t.textSecondary, fontWeight: '700', marginBottom: '2px' }}>
                         <span>Target Profit</span>
-                        <span style={{ color: '#34d399' }}>+{tpPoints} pts</span>
+                        <span style={{ color: isLight ? '#15803d' : '#34d399' }}>+{tpPoints} pts</span>
                       </div>
                       <input
                         type="range"
@@ -1698,34 +1775,35 @@ export default function LandingHomeView({
 
                   {/* Live Margin, Target Profit & Risk-Reward Summary Bar (2x2 on Mobile, 4x1 on Desktop) */}
                   <div className="skx-trade-metrics-grid" style={{
-                    background: 'rgba(0, 0, 0, 0.35)',
+                    background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
+                    border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`,
                     padding: '8px 10px',
                     borderRadius: '8px',
                     fontSize: '11px'
                   }}>
                     <div>
                       <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>REQ. MARGIN</div>
-                      <div style={{ fontWeight: '800', color: '#e2e8f0' }}>₹{tradeMetrics.marginRequired.toLocaleString('en-IN')}</div>
+                      <div style={{ fontWeight: '800', color: t.heading }}>₹{tradeMetrics.marginRequired.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>TARGET PROFIT</div>
-                      <div style={{ fontWeight: '800', color: '#34d399' }}>+₹{tradeMetrics.maxProfit.toLocaleString('en-IN')}</div>
+                      <div style={{ fontWeight: '800', color: isLight ? '#15803d' : '#34d399' }}>+₹{tradeMetrics.maxProfit.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>MAX SL RISK</div>
-                      <div style={{ fontWeight: '800', color: '#f87171' }}>-₹{tradeMetrics.maxRisk.toLocaleString('en-IN')}</div>
+                      <div style={{ fontWeight: '800', color: '#ef4444' }}>-₹{tradeMetrics.maxRisk.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700' }}>RISK : REWARD</div>
-                      <div style={{ fontWeight: '800', color: '#38bdf8' }}>1 : {tradeMetrics.rrRatio}</div>
+                      <div style={{ fontWeight: '800', color: isLight ? '#0284c7' : '#38bdf8' }}>1 : {tradeMetrics.rrRatio}</div>
                     </div>
                   </div>
 
                   {/* Simulated Fill Feedback Banner */}
                   {simulatedOrder && (
                     <div style={{
-                      background: 'rgba(16, 185, 129, 0.14)',
-                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.14)',
+                      border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.4)'}`,
                       borderRadius: '9px',
                       padding: '8px 10px',
                       display: 'flex',
@@ -1736,10 +1814,10 @@ export default function LandingHomeView({
                       fontSize: '11px'
                     }}>
                       <div>
-                        <strong style={{ color: '#34d399' }}>✔ SIMULATED {simulatedOrder.side}:</strong>{' '}
+                        <strong style={{ color: isLight ? '#15803d' : '#34d399' }}>✔ SIMULATED {simulatedOrder.side}:</strong>{' '}
                         {simulatedOrder.symbol} ({simulatedOrder.qty} Qty)
                       </div>
-                      <span style={{ fontWeight: '800', color: '#34d399' }}>
+                      <span style={{ fontWeight: '800', color: isLight ? '#15803d' : '#34d399' }}>
                         Est. P&amp;L: +₹{simulatedOrder.simulatedPnl.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -1753,9 +1831,9 @@ export default function LandingHomeView({
                       style={{
                         padding: '10px 8px',
                         borderRadius: '8px',
-                        border: '1px solid rgba(56, 189, 248, 0.45)',
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        color: '#38bdf8',
+                        border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.45)'}`,
+                        background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.12)',
+                        color: isLight ? '#0284c7' : '#38bdf8',
                         fontWeight: '800',
                         fontSize: '11.5px',
                         cursor: 'pointer',
@@ -1787,7 +1865,7 @@ export default function LandingHomeView({
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '5px',
-                        boxShadow: '0 4px 14px rgba(0,0,0,0.35)'
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.2)'
                       }}
                     >
                       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Execute {tradeSide} Live</span>
@@ -1805,7 +1883,8 @@ export default function LandingHomeView({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: 'rgba(0,0,0,0.35)',
+                  background: isLight ? '#f1f5f9' : 'rgba(0,0,0,0.35)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`,
                   padding: '8px 10px',
                   borderRadius: '10px',
                   fontSize: '11px',
@@ -1813,21 +1892,21 @@ export default function LandingHomeView({
                   gap: '6px'
                 }}>
                   <div>
-                    <span style={{ color: '#94a3b8' }}>NIFTY SPOT: </span>
-                    <strong style={{ color: '#f8fafc' }}>₹{niftySpot.toLocaleString('en-IN')}</strong>
-                    <span style={{ marginLeft: '8px', color: '#94a3b8' }}>ATM: </span>
-                    <strong style={{ color: '#38bdf8' }}>{atmStrike}</strong>
+                    <span style={{ color: t.textSecondary }}>NIFTY SPOT: </span>
+                    <strong style={{ color: t.heading }}>₹{niftySpot.toLocaleString('en-IN')}</strong>
+                    <span style={{ marginLeft: '8px', color: t.textSecondary }}>ATM: </span>
+                    <strong style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>{atmStrike}</strong>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <span>PCR: <strong style={{ color: '#34d399' }}>1.14</strong></span>
-                    <span>Max Pain: <strong style={{ color: '#fbbf24' }}>{atmStrike}</strong></span>
+                    <span>PCR: <strong style={{ color: isLight ? '#15803d' : '#34d399' }}>1.14</strong></span>
+                    <span>Max Pain: <strong style={{ color: isLight ? '#b45309' : '#fbbf24' }}>{atmStrike}</strong></span>
                   </div>
                 </div>
 
                 {/* Interactive 7-Strike Option Chain Table */}
                 <div style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: isLight ? '#ffffff' : 'rgba(0,0,0,0.35)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)'}`,
                   borderRadius: '10px',
                   overflowX: 'auto',
                   fontSize: '10.5px'
@@ -1836,17 +1915,17 @@ export default function LandingHomeView({
                     display: 'grid',
                     gridTemplateColumns: '0.9fr 0.75fr 1fr 1.15fr 1fr 0.75fr 0.9fr',
                     padding: '6px 6px',
-                    background: 'rgba(255,255,255,0.04)',
-                    color: '#94a3b8',
+                    background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
+                    color: t.textSecondary,
                     fontWeight: '800',
                     textAlign: 'center',
                     fontSize: '9.5px'
                   }}>
                     <span>CE OI</span>
                     <span>CE Δ</span>
-                    <span style={{ color: '#34d399' }}>CE LTP</span>
-                    <span style={{ color: '#38bdf8' }}>STRIKE</span>
-                    <span style={{ color: '#f87171' }}>PE LTP</span>
+                    <span style={{ color: isLight ? '#15803d' : '#34d399' }}>CE LTP</span>
+                    <span style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>STRIKE</span>
+                    <span style={{ color: '#ef4444' }}>PE LTP</span>
                     <span>PE Δ</span>
                     <span>PE OI</span>
                   </div>
@@ -1865,26 +1944,26 @@ export default function LandingHomeView({
                           textAlign: 'center',
                           cursor: 'pointer',
                           background: isSelected
-                            ? 'rgba(56, 189, 248, 0.16)'
+                            ? (isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.16)')
                             : row.isAtm
-                            ? 'rgba(245, 158, 11, 0.08)'
+                            ? (isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.08)')
                             : 'transparent',
-                          borderTop: '1px solid rgba(255,255,255,0.04)',
+                          borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.04)'}`,
                           fontVariantNumeric: 'tabular-nums'
                         }}
                       >
-                        <span style={{ color: '#cbd5e1' }}>{row.callOiLakhs}L</span>
-                        <span style={{ color: '#94a3b8' }}>{row.callDelta}</span>
+                        <span style={{ color: isLight ? '#475569' : '#cbd5e1' }}>{row.callOiLakhs}L</span>
+                        <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>{row.callDelta}</span>
                         <span
                           onClick={(e) => { e.stopPropagation(); setSelectedStrikeOffset(row.offset); setSelectedOptionType('CE'); }}
-                          style={{ color: '#34d399', fontWeight: '800' }}
+                          style={{ color: isLight ? '#15803d' : '#34d399', fontWeight: '800' }}
                         >
                           ₹{row.callLtp}
                         </span>
                         <span style={{
                           fontWeight: '900',
-                          color: row.isAtm ? '#fbbf24' : '#f8fafc',
-                          background: row.isAtm ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
+                          color: row.isAtm ? (isLight ? '#b45309' : '#fbbf24') : t.heading,
+                          background: row.isAtm ? (isLight ? '#fde68a' : 'rgba(245,158,11,0.18)') : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'),
                           borderRadius: '4px',
                           padding: '2px 3px',
                           fontSize: '10px'
@@ -1893,12 +1972,12 @@ export default function LandingHomeView({
                         </span>
                         <span
                           onClick={(e) => { e.stopPropagation(); setSelectedStrikeOffset(row.offset); setSelectedOptionType('PE'); }}
-                          style={{ color: '#f87171', fontWeight: '800' }}
+                          style={{ color: '#ef4444', fontWeight: '800' }}
                         >
                           ₹{row.putLtp}
                         </span>
-                        <span style={{ color: '#94a3b8' }}>{row.putDelta}</span>
-                        <span style={{ color: '#cbd5e1' }}>{row.putOiLakhs}L</span>
+                        <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>{row.putDelta}</span>
+                        <span style={{ color: isLight ? '#475569' : '#cbd5e1' }}>{row.putOiLakhs}L</span>
                       </div>
                     );
                   })}
@@ -1906,8 +1985,8 @@ export default function LandingHomeView({
 
                 {/* Selected Strike Live Greeks Inspector */}
                 <div style={{
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  border: '1px solid rgba(129, 140, 248, 0.35)',
+                  background: isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.85)',
+                  border: `1px solid ${isLight ? '#c7d2fe' : 'rgba(129, 140, 248, 0.35)'}`,
                   borderRadius: '10px',
                   padding: '10px 12px',
                   display: 'flex',
@@ -1917,11 +1996,11 @@ export default function LandingHomeView({
                   flexWrap: 'wrap'
                 }}>
                   <div style={{ fontSize: '11px' }}>
-                    <div style={{ fontWeight: '800', color: '#e2e8f0' }}>
+                    <div style={{ fontWeight: '800', color: t.heading }}>
                       NIFTY {selectedChainRow.strike} {selectedOptionType} @ ₹{selectedOptionType === 'CE' ? selectedChainRow.callLtp : selectedChainRow.putLtp}
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '10.5px', marginTop: '2px' }}>
-                      IV: <strong style={{ color: '#38bdf8' }}>{selectedChainRow.iv}%</strong> • Theta: <strong style={{ color: '#f87171' }}>{selectedChainRow.theta}/d</strong> • Δ: <strong style={{ color: '#34d399' }}>{selectedOptionType === 'CE' ? selectedChainRow.callDelta : selectedChainRow.putDelta}</strong>
+                    <div style={{ color: t.textSecondary, fontSize: '10.5px', marginTop: '2px' }}>
+                      IV: <strong style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>{selectedChainRow.iv}%</strong> • Theta: <strong style={{ color: '#ef4444' }}>{selectedChainRow.theta}/d</strong> • Δ: <strong style={{ color: isLight ? '#15803d' : '#34d399' }}>{selectedOptionType === 'CE' ? selectedChainRow.callDelta : selectedChainRow.putDelta}</strong>
                     </div>
                   </div>
 
@@ -1959,9 +2038,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '8px 6px',
                       borderRadius: '8px',
-                      border: calcMode === 'SIP' ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
-                      background: calcMode === 'SIP' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.03)',
-                      color: calcMode === 'SIP' ? '#38bdf8' : '#94a3b8',
+                      border: calcMode === 'SIP' ? (isLight ? '1px solid #0284c7' : '1px solid #38bdf8') : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                      background: calcMode === 'SIP' ? (isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.16)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                      color: calcMode === 'SIP' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                       fontSize: '11px',
                       fontWeight: '800',
                       cursor: 'pointer'
@@ -1975,9 +2054,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '8px 6px',
                       borderRadius: '8px',
-                      border: calcMode === 'EMI' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                      background: calcMode === 'EMI' ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255,255,255,0.03)',
-                      color: calcMode === 'EMI' ? '#34d399' : '#94a3b8',
+                      border: calcMode === 'EMI' ? '1px solid #10b981' : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                      background: calcMode === 'EMI' ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.16)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                      color: calcMode === 'EMI' ? (isLight ? '#15803d' : '#34d399') : (isLight ? '#64748b' : '#94a3b8'),
                       fontSize: '11px',
                       fontWeight: '800',
                       cursor: 'pointer'
@@ -1988,61 +2067,61 @@ export default function LandingHomeView({
                 </div>
 
                 {calcMode === 'SIP' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: 'rgba(0,0,0,0.32)', padding: '11px 12px', borderRadius: '11px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: isLight ? '#ffffff' : 'rgba(0,0,0,0.32)', border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`, padding: '11px 12px', borderRadius: '11px' }}>
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '3px' }}>
-                        <span style={{ color: '#cbd5e1' }}>Monthly SIP Investment</span>
-                        <span style={{ color: '#38bdf8' }}>₹{sipMonthly.toLocaleString('en-IN')}/mo</span>
+                        <span style={{ color: isLight ? '#334155' : '#cbd5e1' }}>Monthly SIP Investment</span>
+                        <span style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>₹{sipMonthly.toLocaleString('en-IN')}/mo</span>
                       </div>
-                      <input type="range" min="2000" max="200000" step="1000" value={sipMonthly} onChange={e => setSipMonthly(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
+                      <input type="range" min="2000" max="200000" step="1000" value={sipMonthly} onChange={e => setSipMonthly(Number(e.target.value))} style={{ width: '100%', accentColor: '#0284c7', cursor: 'pointer' }} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
-                          <span style={{ color: '#94a3b8' }}>Return</span>
-                          <span style={{ color: '#34d399' }}>{sipRate}%</span>
+                          <span style={{ color: t.textSecondary }}>Return</span>
+                          <span style={{ color: isLight ? '#15803d' : '#34d399' }}>{sipRate}%</span>
                         </div>
                         <input type="range" min="8" max="25" step="0.5" value={sipRate} onChange={e => setSipRate(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }} />
                       </div>
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
-                          <span style={{ color: '#94a3b8' }}>Years</span>
-                          <span style={{ color: '#f8fafc' }}>{sipYears}Y</span>
+                          <span style={{ color: t.textSecondary }}>Years</span>
+                          <span style={{ color: t.heading }}>{sipYears}Y</span>
                         </div>
                         <input type="range" min="3" max="30" step="1" value={sipYears} onChange={e => setSipYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#818cf8', cursor: 'pointer' }} />
                       </div>
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
-                          <span style={{ color: '#94a3b8' }}>StepUp</span>
-                          <span style={{ color: '#fbbf24' }}>{sipStepUp}%</span>
+                          <span style={{ color: t.textSecondary }}>StepUp</span>
+                          <span style={{ color: isLight ? '#b45309' : '#fbbf24' }}>{sipStepUp}%</span>
                         </div>
                         <input type="range" min="0" max="25" step="5" value={sipStepUp} onChange={e => setSipStepUp(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: 'rgba(0,0,0,0.32)', padding: '11px 12px', borderRadius: '11px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', background: isLight ? '#ffffff' : 'rgba(0,0,0,0.32)', border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`, padding: '11px 12px', borderRadius: '11px' }}>
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '3px' }}>
-                        <span style={{ color: '#cbd5e1' }}>Loan Principal Amount</span>
-                        <span style={{ color: '#34d399' }}>₹{loanAmount.toLocaleString('en-IN')}</span>
+                        <span style={{ color: isLight ? '#334155' : '#cbd5e1' }}>Loan Principal Amount</span>
+                        <span style={{ color: isLight ? '#15803d' : '#34d399' }}>₹{loanAmount.toLocaleString('en-IN')}</span>
                       </div>
                       <input type="range" min="200000" max="20000000" step="100000" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
-                          <span style={{ color: '#94a3b8' }}>Interest Rate</span>
-                          <span style={{ color: '#fbbf24' }}>{loanRate}%</span>
+                          <span style={{ color: t.textSecondary }}>Interest Rate</span>
+                          <span style={{ color: isLight ? '#b45309' : '#fbbf24' }}>{loanRate}%</span>
                         </div>
                         <input type="range" min="6.5" max="18" step="0.25" value={loanRate} onChange={e => setLoanRate(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
                       </div>
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '2px' }}>
-                          <span style={{ color: '#94a3b8' }}>Tenure</span>
-                          <span style={{ color: '#f8fafc' }}>{loanYears} Yrs</span>
+                          <span style={{ color: t.textSecondary }}>Tenure</span>
+                          <span style={{ color: t.heading }}>{loanYears} Yrs</span>
                         </div>
-                        <input type="range" min="1" max="30" step="1" value={loanYears} onChange={e => setLoanYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
+                        <input type="range" min="1" max="30" step="1" value={loanYears} onChange={e => setLoanYears(Number(e.target.value))} style={{ width: '100%', accentColor: '#0284c7', cursor: 'pointer' }} />
                       </div>
                     </div>
                   </div>
@@ -2050,29 +2129,29 @@ export default function LandingHomeView({
 
                 {/* Result Output Box */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(16, 185, 129, 0.14))',
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  background: isLight ? 'linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%)' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(16, 185, 129, 0.14))',
+                  border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56, 189, 248, 0.35)'}`,
                   borderRadius: '12px',
                   padding: '11px 12px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
                     <div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>{calcSandboxResult.primaryLabel}</div>
-                      <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>{calcSandboxResult.primaryValue}</div>
+                      <div style={{ fontSize: '10px', color: t.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>{calcSandboxResult.primaryLabel}</div>
+                      <div style={{ fontSize: '20px', fontWeight: '900', color: t.heading, fontVariantNumeric: 'tabular-nums' }}>{calcSandboxResult.primaryValue}</div>
                     </div>
-                    <span style={{ padding: '3px 8px', borderRadius: '7px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: '800', fontSize: '11px' }}>
+                    <span style={{ padding: '3px 8px', borderRadius: '7px', background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)', color: isLight ? '#15803d' : '#34d399', fontWeight: '800', fontSize: '11px' }}>
                       {calcSandboxResult.multiplier}
                     </span>
                   </div>
 
-                  <div style={{ height: '6px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden', margin: '8px 0', display: 'flex' }}>
-                    <div style={{ width: `${100 - calcSandboxResult.barPct}%`, background: '#38bdf8' }} />
+                  <div style={{ height: '6px', borderRadius: '4px', background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)', overflow: 'hidden', margin: '8px 0', display: 'flex' }}>
+                    <div style={{ width: `${100 - calcSandboxResult.barPct}%`, background: '#0284c7' }} />
                     <div style={{ width: `${calcSandboxResult.barPct}%`, background: '#10b981' }} />
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1', marginBottom: '9px', flexWrap: 'wrap', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: isLight ? '#334155' : '#cbd5e1', marginBottom: '9px', flexWrap: 'wrap', gap: '4px' }}>
                     <span>{calcSandboxResult.subLeftLabel}: <strong>{calcSandboxResult.subLeftValue}</strong></span>
-                    <span>{calcSandboxResult.subRightLabel}: <strong style={{ color: '#34d399' }}>{calcSandboxResult.subRightValue}</strong></span>
+                    <span>{calcSandboxResult.subRightLabel}: <strong style={{ color: isLight ? '#15803d' : '#34d399' }}>{calcSandboxResult.subRightValue}</strong></span>
                   </div>
 
                   <button
@@ -2105,12 +2184,12 @@ export default function LandingHomeView({
             {cockpitTab === 'MOVERS' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
                 <div style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: isLight ? '#ffffff' : 'rgba(0,0,0,0.35)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)'}`,
                   borderRadius: '10px',
                   padding: '10px 11px'
                 }}>
-                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: isLight ? '#15803d' : '#34d399', textTransform: 'uppercase', marginBottom: '8px' }}>
                     🏛️ High-Delivery Accumulation (&gt;60% NSE Bhavcopy)
                   </div>
                   {[
@@ -2126,29 +2205,29 @@ export default function LandingHomeView({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '7px 0',
-                        borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                        borderTop: i > 0 ? `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}` : 'none',
                         fontSize: '11px',
                         gap: '6px'
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <strong style={{ color: '#f8fafc' }}>{item.sym}</strong>
-                        <span style={{ color: '#94a3b8', marginLeft: '6px' }}>₹{item.ltp}</span>
+                        <strong style={{ color: t.heading }}>{item.sym}</strong>
+                        <span style={{ color: t.textSecondary, marginLeft: '6px' }}>₹{item.ltp}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '5px', background: 'rgba(16,185,129,0.15)', color: '#34d399', fontWeight: '700', fontSize: '10px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '5px', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.15)', color: isLight ? '#15803d' : '#34d399', fontWeight: '700', fontSize: '10px' }}>
                           {item.deliv}
                         </span>
-                        <span style={{ color: '#38bdf8', fontSize: '10px', fontWeight: '700' }}>{item.vol}</span>
+                        <span style={{ color: isLight ? '#0284c7' : '#38bdf8', fontSize: '10px', fontWeight: '700' }}>{item.vol}</span>
                         <button
                           type="button"
                           onClick={() => handleLaunchSymbolInTerminal(item.target)}
                           style={{
                             padding: '3px 7px',
                             borderRadius: '5px',
-                            border: '1px solid rgba(56,189,248,0.4)',
-                            background: 'rgba(56,189,248,0.12)',
-                            color: '#38bdf8',
+                            border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56,189,248,0.4)'}`,
+                            background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.12)',
+                            color: isLight ? '#0284c7' : '#38bdf8',
                             fontSize: '10px',
                             fontWeight: '700',
                             cursor: 'pointer'
@@ -2168,9 +2247,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '9px 6px',
                       borderRadius: '8px',
-                      border: '1px solid rgba(16,185,129,0.4)',
-                      background: 'rgba(16,185,129,0.14)',
-                      color: '#34d399',
+                      border: `1px solid ${isLight ? '#86efac' : 'rgba(16,185,129,0.4)'}`,
+                      background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.14)',
+                      color: isLight ? '#15803d' : '#34d399',
                       fontWeight: '800',
                       fontSize: '11px',
                       cursor: 'pointer'
@@ -2184,9 +2263,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '9px 6px',
                       borderRadius: '8px',
-                      border: '1px solid rgba(56,189,248,0.4)',
-                      background: 'rgba(56,189,248,0.14)',
-                      color: '#38bdf8',
+                      border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56,189,248,0.4)'}`,
+                      background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.14)',
+                      color: isLight ? '#0284c7' : '#38bdf8',
                       fontWeight: '800',
                       fontSize: '11px',
                       cursor: 'pointer'
@@ -2224,16 +2303,16 @@ export default function LandingHomeView({
             <span style={{
               padding: '3px 9px',
               borderRadius: '6px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.35)',
-              color: '#34d399',
+              background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.15)',
+              border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.35)'}`,
+              color: isLight ? '#15803d' : '#34d399',
               fontSize: '10px',
               fontWeight: '800',
               textTransform: 'uppercase'
             }}>
               Interactive Trader Edge Lab
             </span>
-            <h2 style={{ margin: 0, fontSize: 'clamp(15px, 4vw, 18px)', fontWeight: '800', color: '#f8fafc' }}>
+            <h2 style={{ margin: 0, fontSize: 'clamp(15px, 4vw, 18px)', fontWeight: '800', color: t.heading }}>
               Size Your Position, Audit Oct-2024 STT Charges &amp; Check Readiness
             </h2>
           </div>
@@ -2242,10 +2321,11 @@ export default function LandingHomeView({
         <div className="skx-lab-grid">
           {/* WIDGET 1: Instant Position Size & Stop-Loss Risk Calculator */}
           <div style={{
-            background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            background: isLight ? '#ffffff' : 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(56, 189, 248, 0.25)'}`,
             borderRadius: '16px',
             padding: '16px',
+            boxShadow: t.shadow,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -2255,33 +2335,33 @@ export default function LandingHomeView({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <Target size={17} color="#38bdf8" />
-                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>1. Instant Position Sizer</span>
+                  <Target size={17} color={isLight ? '#0284c7' : '#38bdf8'} />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: t.heading }}>1. Instant Position Sizer</span>
                 </div>
-                <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '700' }}>Risk Guard</span>
+                <span style={{ fontSize: '10px', color: isLight ? '#0284c7' : '#38bdf8', fontWeight: '700' }}>Risk Guard</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                    <span style={{ color: '#94a3b8' }}>Trading Capital</span>
-                    <strong style={{ color: '#f8fafc' }}>₹{(riskCapital / 100000).toFixed(1)} Lakh</strong>
+                    <span style={{ color: t.textSecondary }}>Trading Capital</span>
+                    <strong style={{ color: t.heading }}>₹{(riskCapital / 100000).toFixed(1)} Lakh</strong>
                   </div>
-                  <input type="range" min="100000" max="5000000" step="100000" value={riskCapital} onChange={e => setRiskCapital(Number(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }} />
+                  <input type="range" min="100000" max="5000000" step="100000" value={riskCapital} onChange={e => setRiskCapital(Number(e.target.value))} style={{ width: '100%', accentColor: '#0284c7', cursor: 'pointer' }} />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ color: '#94a3b8' }}>Risk / Trade</span>
-                      <strong style={{ color: '#fbbf24' }}>{riskPercent.toFixed(1)}%</strong>
+                      <span style={{ color: t.textSecondary }}>Risk / Trade</span>
+                      <strong style={{ color: isLight ? '#b45309' : '#fbbf24' }}>{riskPercent.toFixed(1)}%</strong>
                     </div>
                     <input type="range" min="0.5" max="3.0" step="0.5" value={riskPercent} onChange={e => setRiskPercent(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ color: '#94a3b8' }}>Stop-Loss</span>
-                      <strong style={{ color: '#f87171' }}>{riskSlPts} pts</strong>
+                      <span style={{ color: t.textSecondary }}>Stop-Loss</span>
+                      <strong style={{ color: '#ef4444' }}>{riskSlPts} pts</strong>
                     </div>
                     <input type="range" min="10" max="100" step="5" value={riskSlPts} onChange={e => setRiskSlPts(Number(e.target.value))} style={{ width: '100%', accentColor: '#ef4444', cursor: 'pointer' }} />
                   </div>
@@ -2290,7 +2370,8 @@ export default function LandingHomeView({
             </div>
 
             <div style={{
-              background: 'rgba(0,0,0,0.35)',
+              background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.35)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`,
               borderRadius: '10px',
               padding: '10px 11px',
               display: 'flex',
@@ -2300,15 +2381,15 @@ export default function LandingHomeView({
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>MAX SAFE QUANTITY</div>
-                <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#38bdf8' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '900', color: isLight ? '#0284c7' : '#38bdf8' }}>
                   {positionSizerResult.safeQty} Qty ({positionSizerResult.niftyLots} Lots)
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8' }}>Max Risk: ₹{positionSizerResult.maxRiskRs.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '10px', color: t.textSecondary }}>Max Risk: ₹{positionSizerResult.maxRiskRs.toLocaleString('en-IN')}</div>
               </div>
               <button
                 type="button"
                 onClick={() => onOpenCalculators('position-sizing')}
-                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(56,189,248,0.12)', color: '#38bdf8', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: `1px solid ${isLight ? '#7dd3fc' : 'rgba(56,189,248,0.4)'}`, background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.12)', color: isLight ? '#0284c7' : '#38bdf8', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Full Sizer ↗
               </button>
@@ -2317,10 +2398,11 @@ export default function LandingHomeView({
 
           {/* WIDGET 2: Live Oct-2024 STT & Breakeven Estimator */}
           <div style={{
-            background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
-            border: '1px solid rgba(245, 158, 11, 0.25)',
+            background: isLight ? '#ffffff' : 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(245, 158, 11, 0.25)'}`,
             borderRadius: '16px',
             padding: '16px',
+            boxShadow: t.shadow,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -2330,10 +2412,10 @@ export default function LandingHomeView({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <Calculator size={17} color="#fbbf24" />
-                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>2. STT &amp; Breakeven Audit</span>
+                  <Calculator size={17} color={isLight ? '#d97706' : '#fbbf24'} />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: t.heading }}>2. STT &amp; Breakeven Audit</span>
                 </div>
-                <span style={{ fontSize: '10px', color: '#fbbf24', fontWeight: '700' }}>Oct 2024 Rules</span>
+                <span style={{ fontSize: '10px', color: isLight ? '#b45309' : '#fbbf24', fontWeight: '700' }}>Oct 2024 Rules</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '4px', marginBottom: '10px' }}>
@@ -2350,9 +2432,9 @@ export default function LandingHomeView({
                     style={{
                       padding: '5px 3px',
                       borderRadius: '6px',
-                      border: brokSegment === seg.id ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.08)',
-                      background: brokSegment === seg.id ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.03)',
-                      color: brokSegment === seg.id ? '#fde68a' : '#94a3b8',
+                      border: brokSegment === seg.id ? (isLight ? '1px solid #f59e0b' : '1px solid #fbbf24') : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'),
+                      background: brokSegment === seg.id ? (isLight ? '#fef3c7' : 'rgba(245,158,11,0.18)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)'),
+                      color: brokSegment === seg.id ? (isLight ? '#b45309' : '#fde68a') : (isLight ? '#64748b' : '#94a3b8'),
                       fontSize: '10px',
                       fontWeight: '700',
                       cursor: 'pointer',
@@ -2366,15 +2448,16 @@ export default function LandingHomeView({
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
-                  <span style={{ color: '#94a3b8' }}>Order Size ({brokerageLabResult.qty} Qty)</span>
-                  <strong style={{ color: '#fbbf24' }}>{brokLots} Lots</strong>
+                  <span style={{ color: t.textSecondary }}>Order Size ({brokerageLabResult.qty} Qty)</span>
+                  <strong style={{ color: isLight ? '#b45309' : '#fbbf24' }}>{brokLots} Lots</strong>
                 </div>
                 <input type="range" min="1" max="20" step="1" value={brokLots} onChange={e => setBrokLots(Number(e.target.value))} style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }} />
               </div>
             </div>
 
             <div style={{
-              background: 'rgba(0,0,0,0.35)',
+              background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.35)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`,
               borderRadius: '10px',
               padding: '10px 11px',
               display: 'flex',
@@ -2384,15 +2467,15 @@ export default function LandingHomeView({
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '9.5px', color: '#64748b', fontWeight: '700' }}>TOTAL TAXES &amp; BREAKEVEN</div>
-                <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fbbf24' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '900', color: isLight ? '#b45309' : '#fbbf24' }}>
                   ₹{brokerageLabResult.totalTax} • {brokerageLabResult.breakevenPts} pts to BE
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8' }}>STT: ₹{brokerageLabResult.stt} • GST: ₹{brokerageLabResult.gst}</div>
+                <div style={{ fontSize: '10px', color: t.textSecondary }}>STT: ₹{brokerageLabResult.stt} • GST: ₹{brokerageLabResult.gst}</div>
               </div>
               <button
                 type="button"
                 onClick={() => onOpenCalculators('brokerage')}
-                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#fbbf24', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: `1px solid ${isLight ? '#fde68a' : 'rgba(245,158,11,0.4)'}`, background: isLight ? '#fef3c7' : 'rgba(245,158,11,0.12)', color: isLight ? '#b45309' : '#fbbf24', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Tax Sheet ↗
               </button>
@@ -2401,10 +2484,11 @@ export default function LandingHomeView({
 
           {/* WIDGET 3: Pre-Trade 8-Pillar Discipline Readiness Checklist */}
           <div style={{
-            background: 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            background: isLight ? '#ffffff' : 'linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 22, 0.96))',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(16, 185, 129, 0.25)'}`,
             borderRadius: '16px',
             padding: '16px',
+            boxShadow: t.shadow,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -2414,15 +2498,15 @@ export default function LandingHomeView({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <CheckCircle2 size={17} color="#10b981" />
-                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: '#f8fafc' }}>3. Discipline Gate</span>
+                  <CheckCircle2 size={17} color={isLight ? '#15803d' : '#10b981'} />
+                  <span style={{ fontWeight: '800', fontSize: '13.5px', color: t.heading }}>3. Discipline Gate</span>
                 </div>
                 <span style={{
                   fontSize: '10.5px',
                   padding: '2px 8px',
                   borderRadius: '10px',
-                  background: disciplineScore === 100 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)',
-                  color: disciplineScore === 100 ? '#34d399' : '#fbbf24',
+                  background: disciplineScore === 100 ? (isLight ? '#dcfce7' : 'rgba(16,185,129,0.2)') : (isLight ? '#fef3c7' : 'rgba(245,158,11,0.2)'),
+                  color: disciplineScore === 100 ? (isLight ? '#15803d' : '#34d399') : (isLight ? '#b45309' : '#fbbf24'),
                   fontWeight: '800'
                 }}>
                   {disciplineScore}% Ready
@@ -2443,11 +2527,11 @@ export default function LandingHomeView({
                       alignItems: 'center',
                       gap: '8px',
                       fontSize: '11px',
-                      color: disciplineChecks[idx] ? '#e2e8f0' : '#94a3b8',
+                      color: disciplineChecks[idx] ? t.heading : t.textSecondary,
                       cursor: 'pointer',
                       padding: '4px 6px',
                       borderRadius: '6px',
-                      background: disciplineChecks[idx] ? 'rgba(16,185,129,0.08)' : 'transparent'
+                      background: disciplineChecks[idx] ? (isLight ? '#f0fdf4' : 'rgba(16,185,129,0.08)') : 'transparent'
                     }}
                   >
                     <input
@@ -2467,7 +2551,8 @@ export default function LandingHomeView({
             </div>
 
             <div style={{
-              background: 'rgba(0,0,0,0.35)',
+              background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.35)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'transparent'}`,
               borderRadius: '10px',
               padding: '10px 11px',
               display: 'flex',
@@ -2475,13 +2560,13 @@ export default function LandingHomeView({
               justifyContent: 'space-between',
               gap: '8px'
             }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: disciplineScore === 100 ? '#34d399' : '#cbd5e1' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: disciplineScore === 100 ? (isLight ? '#15803d' : '#34d399') : (isLight ? '#334155' : '#cbd5e1') }}>
                 {disciplineScore === 100 ? '✔ All 4 Rules Cleared!' : 'Check rules for 100% score'}
               </div>
               <button
                 type="button"
                 onClick={() => onOpenTradeDiary('CHECKLIST')}
-                style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.12)', color: '#34d399', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                style={{ padding: '6px 10px', borderRadius: '7px', border: `1px solid ${isLight ? '#86efac' : 'rgba(16,185,129,0.4)'}`, background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.12)', color: isLight ? '#15803d' : '#34d399', fontSize: '10.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Open Journal ↗
               </button>
@@ -2511,14 +2596,14 @@ export default function LandingHomeView({
           gap: '12px'
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '11.5px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isLight ? '#0284c7' : '#38bdf8', fontSize: '11.5px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
               <Sparkles size={14} />
               <span>Complete Platform Ecosystem</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(21px, 5vw, 26px)', fontWeight: '900', color: '#f8fafc', margin: 0 }}>
+            <h2 style={{ fontSize: 'clamp(21px, 5vw, 26px)', fontWeight: '900', color: t.heading, margin: 0 }}>
               6 Specialized Institutional Hubs &amp; Suites
             </h2>
-            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+            <p style={{ fontSize: '12.5px', color: t.textSecondary, margin: '4px 0 0' }}>
               Tap any Hub card or feature pill below to jump straight into that workspace.
             </p>
           </div>
@@ -2528,14 +2613,15 @@ export default function LandingHomeView({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'rgba(15, 23, 42, 0.8)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.8)',
+            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(56, 189, 248, 0.25)'}`,
             borderRadius: '10px',
             padding: '9px 13px',
             minWidth: '260px',
-            maxWidth: '380px'
+            maxWidth: '380px',
+            boxShadow: isLight ? '0 2px 8px rgba(0, 0, 0, 0.05)' : 'none'
           }}>
-            <Search size={15} color="#38bdf8" style={{ flexShrink: 0 }} />
+            <Search size={15} color={isLight ? '#0284c7' : '#38bdf8'} style={{ flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Search tools (Loan, SIP, Tax, Algo, IPO)..."
@@ -2544,7 +2630,7 @@ export default function LandingHomeView({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#fff',
+                color: isLight ? '#0f172a' : '#fff',
                 fontSize: '12px',
                 width: '100%',
                 outline: 'none'
@@ -2553,7 +2639,7 @@ export default function LandingHomeView({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
+                style={{ background: 'transparent', border: 'none', color: isLight ? '#64748b' : '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
               >
                 ✕
               </button>
@@ -2571,7 +2657,7 @@ export default function LandingHomeView({
             overflowX: 'auto',
             paddingBottom: '12px',
             marginBottom: '16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+            borderBottom: `1px solid ${t.border}`
           }}
         >
           {[
@@ -2589,14 +2675,15 @@ export default function LandingHomeView({
                 style={{
                   padding: '7px 13px',
                   borderRadius: '20px',
-                  border: isActive ? '1px solid rgba(125,211,252,0.5)' : '1px solid rgba(255,255,255,0.07)',
-                  background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.04)',
-                  color: isActive ? '#fff' : '#94a3b8',
+                  border: isActive ? (isLight ? '1px solid #0284c7' : '1px solid rgba(125,211,252,0.5)') : `1px solid ${t.borderLight}`,
+                  background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
+                  color: isActive ? '#fff' : (isLight ? '#334155' : '#94a3b8'),
                   fontSize: '12px',
                   fontWeight: isActive ? '800' : '600',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  boxShadow: isLight && isActive ? '0 2px 6px rgba(2, 132, 199, 0.25)' : 'none'
                 }}
               >
                 {cat.label}
@@ -2607,7 +2694,7 @@ export default function LandingHomeView({
 
         {/* 6-Hub Bento Grid Cards */}
         {filteredHubs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: t.textSecondary }}>
             No tools found matching &ldquo;{searchQuery}&rdquo;. Try searching for &ldquo;SIP&rdquo;, &ldquo;Loan&rdquo;, &ldquo;IPO&rdquo;, &ldquo;Option&rdquo;, or &ldquo;Tax&rdquo;.
           </div>
         ) : (
@@ -2628,7 +2715,7 @@ export default function LandingHomeView({
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     gap: '14px',
-                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
+                    boxShadow: isLight ? '0 8px 24px rgba(0, 0, 0, 0.06)' : '0 12px 32px rgba(0, 0, 0, 0.4)',
                     position: 'relative',
                     overflow: 'hidden'
                   }}
@@ -2640,7 +2727,7 @@ export default function LandingHomeView({
                     right: '14px',
                     fontSize: '44px',
                     fontWeight: '900',
-                    color: 'rgba(255, 255, 255, 0.03)',
+                    color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.03)',
                     userSelect: 'none',
                     pointerEvents: 'none'
                   }}>
@@ -2666,10 +2753,10 @@ export default function LandingHomeView({
                           <Icon size={20} />
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '800', letterSpacing: '0.8px' }}>
+                          <span style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8', fontWeight: '800', letterSpacing: '0.8px' }}>
                             HUB {hub.hubNum}
                           </span>
-                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.22' }}>
+                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: t.heading, lineHeight: '1.22' }}>
                             {hub.title}
                           </h3>
                         </div>
@@ -2691,7 +2778,7 @@ export default function LandingHomeView({
                     </div>
 
                     {/* Description */}
-                    <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: '12px', color: t.textSecondary, lineHeight: '1.5' }}>
                       {hub.shortDesc}
                     </p>
 
@@ -2704,15 +2791,15 @@ export default function LandingHomeView({
                         marginBottom: '12px',
                         padding: '8px 10px',
                         borderRadius: '10px',
-                        background: 'rgba(0, 0, 0, 0.34)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)'
+                        background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.34)',
+                        border: `1px solid ${t.border}`
                       }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiLeft.label}</div>
-                          <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#f8fafc', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hub.kpiLeft.value}</div>
+                          <div style={{ fontSize: '9.5px', color: isLight ? '#64748b' : '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiLeft.label}</div>
+                          <div style={{ fontSize: '12.5px', fontWeight: '800', color: t.heading, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hub.kpiLeft.value}</div>
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiRight.label}</div>
+                          <div style={{ fontSize: '9.5px', color: isLight ? '#64748b' : '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>{hub.kpiRight.label}</div>
                           <div style={{ fontSize: '12.5px', fontWeight: '800', color: hub.badgeColor, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hub.kpiRight.value}</div>
                         </div>
                       </div>
@@ -2737,9 +2824,9 @@ export default function LandingHomeView({
                           title={`Open ${tag}`}
                           style={{
                             fontSize: '11px',
-                            background: 'rgba(255, 255, 255, 0.045)',
-                            border: '1px solid rgba(255, 255, 255, 0.11)',
-                            color: '#e2e8f0',
+                            background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.045)',
+                            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.11)'}`,
+                            color: isLight ? '#1e293b' : '#e2e8f0',
                             padding: '6px 8px',
                             borderRadius: '7px',
                             cursor: 'pointer',
@@ -2748,7 +2835,8 @@ export default function LandingHomeView({
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             textAlign: 'left',
-                            minWidth: 0
+                            minWidth: 0,
+                            boxShadow: isLight ? '0 1px 2px rgba(0, 0, 0, 0.04)' : 'none'
                           }}
                         >
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag}</span>
@@ -2791,9 +2879,9 @@ export default function LandingHomeView({
 
       {/* 6. High-Concurrency & Enterprise Performance Guarantee Banner */}
       <section className="skx-section-pad" style={{
-        background: 'rgba(15, 23, 42, 0.72)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        background: isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.72)',
+        borderTop: `1px solid ${t.border}`,
+        borderBottom: `1px solid ${t.border}`,
         padding: '24px 22px',
         width: '100%'
       }}>
@@ -2805,42 +2893,42 @@ export default function LandingHomeView({
           gap: '18px'
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLight ? '#0284c7' : '#38bdf8', flexShrink: 0 }}>
               <Zap size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: t.heading }}>
                 1 Lakh+ User Multi-Core Cluster
               </h4>
-              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: t.textSecondary, lineHeight: '1.45' }}>
                 Singleflight request coalescing, zero-zlib WebSocket fan-out, and pooled PostgreSQL engineered for 1,00,000+ active traders.
               </p>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLight ? '#15803d' : '#10b981', flexShrink: 0 }}>
               <ShieldCheck size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: t.heading }}>
                 Sub-Millisecond RAM Edge Cache
               </h4>
-              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: t.textSecondary, lineHeight: '1.45' }}>
                 Live option chains, Bhavcopy screeners, and batch quotes served straight from RAM with zero database bottlenecks.
               </p>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(129, 140, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: isLight ? '#ede9fe' : 'rgba(129, 140, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLight ? '#6366f1' : '#818cf8', flexShrink: 0 }}>
               <Cpu size={18} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: t.heading }}>
                 0ms Hover Chunk Prefetching
               </h4>
-              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.45' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: t.textSecondary, lineHeight: '1.45' }}>
                 Intelligent bundle preloading and jittered WebSocket reconnection ensure instant page transitions without loading spinners.
               </p>
             </div>
@@ -2851,10 +2939,11 @@ export default function LandingHomeView({
       {/* 7. Crawlable SEO Deep-Link Footer for Google Search Indexing */}
       <footer className="skx-section-pad" style={{
         marginTop: 'auto',
-        background: 'rgba(0, 0, 0, 0.65)',
+        background: t.footerBg,
+        borderTop: `1px solid ${t.border}`,
         padding: '24px 22px',
         fontSize: '12px',
-        color: '#94a3b8'
+        color: t.textSecondary
       }}>
         <div style={{
           maxWidth: '1320px',
@@ -2868,29 +2957,29 @@ export default function LandingHomeView({
             flexWrap: 'wrap',
             gap: '10px',
             paddingBottom: '14px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            borderBottom: `1px solid ${t.border}`,
             fontSize: '11px'
           }}>
-            <span style={{ color: '#64748b', fontWeight: '700' }}>Direct Tools &amp; Calculators:</span>
-            <a href="/paper-trading" onClick={(e) => { e.preventDefault(); onOpenPaperTrading(); }} style={{ color: '#38bdf8', textDecoration: 'none' }}>SkandX Paper Trade</a>
-            <span>•</span>
-            <a href="/calculators/sip" onClick={(e) => { e.preventDefault(); onOpenCalculators('sip'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>SIP Calculator</a>
-            <span>•</span>
-            <a href="/calculators/reducing-loan" onClick={(e) => { e.preventDefault(); onOpenCalculators('reducing-loan'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>Reducing Balance Loan EMI</a>
-            <span>•</span>
-            <a href="/calculators/fixed-loan" onClick={(e) => { e.preventDefault(); onOpenCalculators('fixed-loan'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>Fixed Interest Loan Calculator</a>
-            <span>•</span>
-            <a href="/calculators/mtf" onClick={(e) => { e.preventDefault(); onOpenCalculators('mtf'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>MTF 4x Calculator</a>
-            <span>•</span>
-            <a href="/calculators/average-price" onClick={(e) => { e.preventDefault(); onOpenCalculators('average-price'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>Stock Average Calculator</a>
-            <span>•</span>
-            <a href="/calculators/brokerage" onClick={(e) => { e.preventDefault(); onOpenCalculators('brokerage'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>NSE/BSE Brokerage &amp; STT</a>
-            <span>•</span>
-            <a href="/wealth-hub" onClick={(e) => { e.preventDefault(); onOpenWealthFinance('NET_WORTH'); }} style={{ color: '#10b981', textDecoration: 'none' }}>Wealth OS &amp; Tax Hub</a>
-            <span>•</span>
-            <a href="/algo-trading" onClick={(e) => { e.preventDefault(); onOpenAlgoBridge('WEBHOOK'); }} style={{ color: '#38bdf8', textDecoration: 'none' }}>SkandX Algo Webhook Bridge</a>
-            <span>•</span>
-            <a href="/primary-markets" onClick={(e) => { e.preventDefault(); onOpenPrimaryMarkets('BHAVCOPY'); }} style={{ color: '#cbd5e1', textDecoration: 'none' }}>Bhavcopy &amp; IPO GMP</a>
+            <span style={{ color: isLight ? '#475569' : '#64748b', fontWeight: '700' }}>Direct Tools &amp; Calculators:</span>
+            <a href="/paper-trading" onClick={(e) => { e.preventDefault(); onOpenPaperTrading(); }} style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>SkandX Paper Trade</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/sip" onClick={(e) => { e.preventDefault(); onOpenCalculators('sip'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>SIP Calculator</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/reducing-loan" onClick={(e) => { e.preventDefault(); onOpenCalculators('reducing-loan'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>Reducing Balance Loan EMI</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/fixed-loan" onClick={(e) => { e.preventDefault(); onOpenCalculators('fixed-loan'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>Fixed Interest Loan Calculator</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/mtf" onClick={(e) => { e.preventDefault(); onOpenCalculators('mtf'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>MTF 4x Calculator</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/average-price" onClick={(e) => { e.preventDefault(); onOpenCalculators('average-price'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>Stock Average Calculator</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/calculators/brokerage" onClick={(e) => { e.preventDefault(); onOpenCalculators('brokerage'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>NSE/BSE Brokerage &amp; STT</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/wealth-hub" onClick={(e) => { e.preventDefault(); onOpenWealthFinance('NET_WORTH'); }} style={{ color: isLight ? '#15803d' : '#10b981', textDecoration: 'none', fontWeight: '600' }}>Wealth OS &amp; Tax Hub</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/algo-trading" onClick={(e) => { e.preventDefault(); onOpenAlgoBridge('WEBHOOK'); }} style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>SkandX Algo Webhook Bridge</a>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
+            <a href="/primary-markets" onClick={(e) => { e.preventDefault(); onOpenPrimaryMarkets('BHAVCOPY'); }} style={{ color: isLight ? '#334155' : '#cbd5e1', textDecoration: 'none' }}>Bhavcopy &amp; IPO GMP</a>
           </div>
 
           <div style={{
@@ -2901,23 +2990,23 @@ export default function LandingHomeView({
             gap: '12px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src={logoImg} alt="SkandX Logo" style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)', flexShrink: 0 }} />
+              <img src={logoImg} alt="SkandX Logo" style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: isLight ? '0 2px 6px rgba(2, 132, 199, 0.2)' : '0 0 12px rgba(56, 189, 248, 0.35)', flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: '800', color: '#f8fafc', fontSize: '12.5px', marginBottom: '2px' }}>
+                <div style={{ fontWeight: '800', color: t.heading, fontSize: '12.5px', marginBottom: '2px' }}>
                   SKANDX PRO • High-Concurrency Trading &amp; Wealth Operating System
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b' }}>
                   Paper trading simulator uses virtual currency for educational purposes. Fully compliant with Indian regulatory guidelines.
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', fontSize: '11.5px', flexWrap: 'wrap' }}>
-              <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={onOpenPaperTrading}>Paper Trading</span>
-              <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenTradeDiary('CHECKLIST')}>Trade Diary</span>
-              <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}>Bhavcopy &amp; Deals</span>
-              <span style={{ cursor: 'pointer', color: '#cbd5e1' }} onClick={() => onOpenCalculators('all')}>Calculators</span>
-              <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onOpenWealthFinance('NET_WORTH')}>Wealth OS &amp; Tax</span>
-              <span style={{ cursor: 'pointer', color: '#38bdf8' }} onClick={() => onOpenAlgoBridge('Dashboard')}>SkandX Algo</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#334155' : '#cbd5e1', fontWeight: '600' }} onClick={onOpenPaperTrading}>Paper Trading</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#334155' : '#cbd5e1', fontWeight: '600' }} onClick={() => onOpenTradeDiary('CHECKLIST')}>Trade Diary</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#334155' : '#cbd5e1', fontWeight: '600' }} onClick={() => onOpenPrimaryMarkets('BHAVCOPY')}>Bhavcopy &amp; Deals</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#334155' : '#cbd5e1', fontWeight: '600' }} onClick={() => onOpenCalculators('all')}>Calculators</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#15803d' : '#10b981', fontWeight: '600' }} onClick={() => onOpenWealthFinance('NET_WORTH')}>Wealth OS &amp; Tax</span>
+              <span style={{ cursor: 'pointer', color: isLight ? '#0284c7' : '#38bdf8', fontWeight: '600' }} onClick={() => onOpenAlgoBridge('Dashboard')}>SkandX Algo</span>
             </div>
           </div>
 
@@ -2929,13 +3018,14 @@ export default function LandingHomeView({
             justifyContent: 'space-between',
             gap: '12px',
             padding: '12px 14px',
-            background: 'rgba(15, 23, 42, 0.78)',
-            border: '1px solid rgba(56, 189, 248, 0.2)',
-            borderRadius: '12px'
+            background: t.socialBg,
+            border: `1px solid ${t.socialBorder}`,
+            borderRadius: '12px',
+            boxShadow: isLight ? '0 2px 10px rgba(0, 0, 0, 0.04)' : 'none'
           }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#38bdf8' }}>🌐 Connect with SkandX Official Channels:</span>
-              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '500' }}>Live Market Updates, Signals &amp; 24/7 Trader Support</span>
+            <div style={{ fontSize: '12px', fontWeight: '800', color: t.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>🌐 Connect with SkandX Official Channels:</span>
+              <span style={{ fontSize: '11px', color: t.textSecondary, fontWeight: '500' }}>Live Market Updates, Signals &amp; 24/7 Trader Support</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
               <a
@@ -2948,9 +3038,9 @@ export default function LandingHomeView({
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, rgba(225, 48, 108, 0.2), rgba(131, 58, 180, 0.2))',
-                  border: '1px solid rgba(225, 48, 108, 0.45)',
-                  color: '#f472b6',
+                  background: isLight ? 'rgba(225, 48, 108, 0.1)' : 'linear-gradient(135deg, rgba(225, 48, 108, 0.2), rgba(131, 58, 180, 0.2))',
+                  border: `1px solid ${isLight ? 'rgba(225, 48, 108, 0.35)' : 'rgba(225, 48, 108, 0.45)'}`,
+                  color: isLight ? '#be185d' : '#f472b6',
                   fontSize: '11.5px',
                   fontWeight: '800',
                   textDecoration: 'none'
@@ -2969,9 +3059,9 @@ export default function LandingHomeView({
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  background: 'rgba(24, 119, 242, 0.16)',
-                  border: '1px solid rgba(24, 119, 242, 0.45)',
-                  color: '#60a5fa',
+                  background: isLight ? 'rgba(24, 119, 242, 0.1)' : 'rgba(24, 119, 242, 0.16)',
+                  border: `1px solid ${isLight ? 'rgba(24, 119, 242, 0.35)' : 'rgba(24, 119, 242, 0.45)'}`,
+                  color: isLight ? '#1d4ed8' : '#60a5fa',
                   fontSize: '11.5px',
                   fontWeight: '800',
                   textDecoration: 'none'
@@ -2990,9 +3080,9 @@ export default function LandingHomeView({
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  background: 'rgba(37, 211, 102, 0.16)',
-                  border: '1px solid rgba(37, 211, 102, 0.45)',
-                  color: '#4ade80',
+                  background: isLight ? 'rgba(37, 211, 102, 0.12)' : 'rgba(37, 211, 102, 0.16)',
+                  border: `1px solid ${isLight ? 'rgba(37, 211, 102, 0.35)' : 'rgba(37, 211, 102, 0.45)'}`,
+                  color: isLight ? '#15803d' : '#4ade80',
                   fontSize: '11.5px',
                   fontWeight: '800',
                   textDecoration: 'none'
@@ -3011,9 +3101,9 @@ export default function LandingHomeView({
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  background: 'rgba(0, 136, 204, 0.18)',
-                  border: '1px solid rgba(0, 136, 204, 0.45)',
-                  color: '#38bdf8',
+                  background: isLight ? 'rgba(0, 136, 204, 0.12)' : 'rgba(0, 136, 204, 0.18)',
+                  border: `1px solid ${isLight ? 'rgba(0, 136, 204, 0.35)' : 'rgba(0, 136, 204, 0.45)'}`,
+                  color: isLight ? '#0284c7' : '#38bdf8',
                   fontSize: '11.5px',
                   fontWeight: '800',
                   textDecoration: 'none'
@@ -3032,21 +3122,21 @@ export default function LandingHomeView({
             alignItems: 'center',
             gap: '10px',
             paddingTop: '10px',
-            borderTop: '1px solid rgba(148, 163, 184, 0.08)',
+            borderTop: `1px solid ${t.border}`,
             fontSize: '11px'
           }}>
-            <div style={{ color: '#64748b' }}>
-              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari • <a href="mailto:skandx.in@gmail.com" style={{ color: '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
+            <div style={{ color: isLight ? '#64748b' : '#64748b' }}>
+              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari • <a href="mailto:skandx.in@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <a href="/aboutus" style={{ color: '#94a3b8', textDecoration: 'none' }}>About Us</a>
-              <a href="/pricing" style={{ color: '#94a3b8', textDecoration: 'none' }}>Pricing</a>
-              <a href="/privacy-policy" style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
-              <a href="/terms" style={{ color: '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
-              <a href="/risk-policy" style={{ color: '#94a3b8', textDecoration: 'none' }}>Risk Disclosure</a>
-              <a href="/data-rights" style={{ color: '#94a3b8', textDecoration: 'none' }}>Data Rights (DPDP)</a>
-              <a href="/accessibility" style={{ color: '#94a3b8', textDecoration: 'none' }}>Accessibility</a>
-              <a href="/delete-account" style={{ color: '#f87171', textDecoration: 'none', fontWeight: '600' }}>Delete Account</a>
+              <a href="/aboutus" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>About Us</a>
+              <a href="/pricing" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Pricing</a>
+              <a href="/privacy-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
+              <a href="/terms" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
+              <a href="/risk-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Risk Disclosure</a>
+              <a href="/data-rights" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Data Rights (DPDP)</a>
+              <a href="/accessibility" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Accessibility</a>
+              <a href="/delete-account" style={{ color: isLight ? '#dc2626' : '#f87171', textDecoration: 'none', fontWeight: '600' }}>Delete Account</a>
             </div>
           </div>
         </div>

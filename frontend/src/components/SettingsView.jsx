@@ -970,7 +970,8 @@ export function BiometricSettingsSection({ user }) {
   const { 
     userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession, cleanDuplicateSessions,
     fetchTotpSetup, enableTotp, disableTotp, totpLoading,
-    trustedDevices, trustedDevicesLoading, fetchTrustedDevices, revokeTrustedDevice
+    trustedDevices, trustedDevicesLoading, fetchTrustedDevices, revokeTrustedDevice,
+    theme
   } = useStore(useShallow(state => ({ 
     userSessions: state.userSessions || [],
     userSessionsLoading: state.userSessionsLoading,
@@ -985,8 +986,11 @@ export function BiometricSettingsSection({ user }) {
     trustedDevices: state.trustedDevices || [],
     trustedDevicesLoading: state.trustedDevicesLoading,
     fetchTrustedDevices: state.fetchTrustedDevices,
-    revokeTrustedDevice: state.revokeTrustedDevice
+    revokeTrustedDevice: state.revokeTrustedDevice,
+    theme: state.theme
   })));
+
+  const isLight = theme === 'light';
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
@@ -1939,8 +1943,10 @@ export function BiometricSettingsSection({ user }) {
         {/* ─── Hero Showcase: CURRENT DEVICE (Active Now) ─── */}
         {currentDeviceGroup && (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.4)',
+            background: isLight
+              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(240, 253, 244, 0.95) 100%)'
+              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%)',
+            border: isLight ? '1px solid rgba(16, 185, 129, 0.45)' : '1px solid rgba(16, 185, 129, 0.4)',
             borderRadius: '14px',
             padding: isMobile ? '16px' : '18px 22px',
             display: 'flex',
@@ -1948,7 +1954,7 @@ export function BiometricSettingsSection({ user }) {
             justifyContent: 'space-between',
             flexDirection: isMobile ? 'column' : 'row',
             gap: '16px',
-            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.1)'
+            boxShadow: isLight ? '0 4px 16px rgba(16, 185, 129, 0.12)' : '0 8px 24px rgba(16, 185, 129, 0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{
@@ -1971,13 +1977,13 @@ export function BiometricSettingsSection({ user }) {
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <h4 style={{ fontSize: '15.5px', fontWeight: '800', margin: 0, color: '#fff' }}>
+                  <h4 style={{ fontSize: '15.5px', fontWeight: '800', margin: 0, color: isLight ? '#0f172a' : '#fff' }}>
                     {currentDeviceGroup.device_model || 'Windows PC'}
                   </h4>
                   <span style={{
                     background: 'rgba(16, 185, 129, 0.2)',
                     border: '1px solid #10B981',
-                    color: '#34D399',
+                    color: isLight ? '#059669' : '#34D399',
                     fontSize: '10.5px',
                     fontWeight: '900',
                     padding: '3px 9px',
@@ -1999,13 +2005,13 @@ export function BiometricSettingsSection({ user }) {
                   flexWrap: 'wrap',
                   marginTop: '6px',
                   fontSize: '12px',
-                  color: 'var(--text-secondary)'
+                  color: isLight ? '#475569' : 'var(--text-secondary)'
                 }}>
-                  <span style={{ color: '#E2E8F0', fontWeight: '600' }}>
+                  <span style={{ color: isLight ? '#1e293b' : '#E2E8F0', fontWeight: '600' }}>
                     {currentDeviceGroup.os_name} · {currentDeviceGroup.browser_name}
                   </span>
                   {(currentDeviceGroup.city || currentDeviceGroup.state) && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#93C5FD' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: isLight ? '#2563eb' : '#93C5FD' }}>
                       <MapPin size={12} /> {[currentDeviceGroup.city, currentDeviceGroup.state].filter(Boolean).join(', ')}
                     </span>
                   )}
@@ -2021,15 +2027,15 @@ export function BiometricSettingsSection({ user }) {
                         alignItems: 'center',
                         gap: '4px',
                         cursor: 'pointer',
-                        background: 'rgba(255,255,255,0.06)',
+                        background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
                         padding: '1px 7px',
                         borderRadius: '4px',
-                        color: 'var(--text-muted)'
+                        color: isLight ? '#334155' : 'var(--text-muted)'
                       }}
                       title="Click to copy IP"
                     >
                       IP: {currentDeviceGroup.ip_address}
-                      {copiedIp === currentDeviceGroup.ip_address ? <Check size={11} color="#34D399" /> : <Copy size={11} />}
+                      {copiedIp === currentDeviceGroup.ip_address ? <Check size={11} color="#10B981" /> : <Copy size={11} />}
                     </span>
                   )}
                 </div>

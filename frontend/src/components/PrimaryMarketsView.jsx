@@ -10,7 +10,7 @@ import {
   Flame, Snowflake, Zap, AlertTriangle, Copy, Check, SlidersHorizontal,
   DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown
 } from 'lucide-react';
-import { API } from '../store';
+import { API, useStore } from '../store';
 import logoImg from '../assets/logo.png';
 
 // Helper: Compute completed trading session date in IST on client (before 6:55 PM IST -> previous trading day)
@@ -350,6 +350,72 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [dealsTotalFiltered, setDealsTotalFiltered] = useState(1141);
   const [dealsPage, setDealsPage] = useState(1);
   const [dealsHasMore, setDealsHasMore] = useState(true);
+
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light';
+
+  const t = useMemo(() => {
+    if (isLight) {
+      return {
+        isLight: true,
+        bg: '#f8fafc',
+        text: '#0f172a',
+        textSecondary: '#334155',
+        textMuted: '#64748b',
+        textDim: '#94a3b8',
+        cardBg: '#ffffff',
+        cardBgSubtle: '#f8fafc',
+        cardBorder: '#e2e8f0',
+        cardBorderLight: '#cbd5e1',
+        cardShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        borderSubtle: '#e2e8f0',
+        inputBg: '#ffffff',
+        inputBorder: '#cbd5e1',
+        tableHeaderBg: '#f1f5f9',
+        tableHeaderBorder: '#e2e8f0',
+        tableRowBorder: '#f1f5f9',
+        tableRowHover: '#f8fafc',
+        pillInactiveBg: '#f1f5f9',
+        pillInactiveBorder: '#e2e8f0',
+        pillInactiveText: '#475569',
+        btnBg: '#ffffff',
+        btnBorder: '#cbd5e1',
+        btnText: '#0f172a',
+        refreshBtnBg: '#ffffff',
+        refreshBtnBorder: '#cbd5e1',
+        refreshBtnText: '#334155'
+      };
+    }
+    return {
+      isLight: false,
+      bg: '#0b0e14',
+      text: '#ffffff',
+      textSecondary: '#f8fafc',
+      textMuted: '#cbd5e1',
+      textDim: '#94a3b8',
+      cardBg: 'rgba(255, 255, 255, 0.03)',
+      cardBgSubtle: 'rgba(255, 255, 255, 0.02)',
+      cardBorder: 'rgba(255, 255, 255, 0.08)',
+      cardBorderLight: 'rgba(255, 255, 255, 0.15)',
+      cardShadow: 'none',
+      borderSubtle: 'rgba(255, 255, 255, 0.08)',
+      inputBg: 'rgba(0, 0, 0, 0.35)',
+      inputBorder: 'rgba(255, 255, 255, 0.12)',
+      tableHeaderBg: 'rgba(30, 41, 59, 0.75)',
+      tableHeaderBorder: 'rgba(255, 255, 255, 0.1)',
+      tableRowBorder: 'rgba(255, 255, 255, 0.05)',
+      tableRowHover: 'rgba(255, 255, 255, 0.03)',
+      pillInactiveBg: 'rgba(255, 255, 255, 0.04)',
+      pillInactiveBorder: 'rgba(255, 255, 255, 0.08)',
+      pillInactiveText: '#94a3b8',
+      btnBg: 'rgba(255, 255, 255, 0.08)',
+      btnBorder: 'rgba(255, 255, 255, 0.12)',
+      btnText: '#ffffff',
+      refreshBtnBg: 'rgba(255, 255, 255, 0.06)',
+      refreshBtnBorder: 'rgba(255, 255, 255, 0.1)',
+      refreshBtnText: '#cbd5e1'
+    };
+  }, [isLight]);
 
   const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
   const [ipoLastUpdated, setIpoLastUpdated] = useState('');
@@ -857,127 +923,235 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   }, [dealsDateRange, latestDealBadge, yesterdayDealBadge]);
 
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      width: '100%',
-      boxSizing: 'border-box',
-      minHeight: '100vh',
-      background: 'var(--bg-dark, #0b0e14)',
-      color: '#fff',
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      padding: isMobile ? 'max(12px, env(safe-area-inset-top, 12px)) 12px 90px' : '16px 20px 100px'
-    }}>
+    <div
+      className="skx-primary-markets-root"
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        boxSizing: 'border-box',
+        minHeight: '100vh',
+        background: t.bg,
+        color: t.text,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 10px 90px' : '16px 20px 100px'
+      }}
+    >
+      {/* Top Header - Mobile Optimized Clean 2-Row Architecture */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: isMobile ? '8px' : '12px',
+        marginBottom: isMobile ? '12px' : '20px',
+        borderBottom: `1px solid ${t.borderSubtle}`,
+        paddingBottom: isMobile ? '10px' : '16px'
+      }}>
+        {/* Row 1: Back + Logo + Title on left, Action buttons on right */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          width: '100%'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', minWidth: 0, flex: 1 }}>
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                background: t.btnBg,
+                border: `1px solid ${t.btnBorder}`,
+                color: t.btnText,
+                padding: isMobile ? '6px 10px' : '8px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: isMobile ? '12px' : '13px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              ← {isMobile ? 'Back' : 'Back to Hub'}
+            </button>
+            <img
+              src={logoImg}
+              alt="SkandX Logo"
+              style={{
+                width: isMobile ? '24px' : '30px',
+                height: isMobile ? '24px' : '30px',
+                borderRadius: '7px',
+                boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)',
+                border: '1px solid rgba(125, 211, 252, 0.35)',
+                objectFit: 'cover',
+                flexShrink: 0
+              }}
+            />
+            <h1 style={{
+              margin: 0,
+              fontSize: isMobile ? '15px' : '20px',
+              fontWeight: '800',
+              letterSpacing: '-0.3px',
+              lineHeight: 1.2,
+              color: t.text,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {isMobile ? 'Primary Markets' : 'Primary Markets & Institutional Intelligence'}
+            </h1>
+          </div>
 
-      {/* Top Header */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', marginBottom: isMobile ? '14px' : '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: isMobile ? '12px' : '16px', flexWrap: 'wrap', gap: isMobile ? '10px' : '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '10px' : '14px' }}>
-          <button
-            type="button"
-            onClick={onBack}
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: isMobile ? '6px 10px' : '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '12px' : '13px', fontWeight: '600', whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            ← {isMobile ? 'Back' : 'Back to Hub'}
-          </button>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <img src={logoImg} alt="SkandX Logo" style={{ width: isMobile ? '26px' : '30px', height: isMobile ? '26px' : '30px', borderRadius: '8px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)', border: '1px solid rgba(125, 211, 252, 0.35)', objectFit: 'cover', flexShrink: 0 }} />
-              <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '20px', fontWeight: '800', letterSpacing: '-0.3px', lineHeight: 1.25 }}>Primary Markets &amp; Institutional Intelligence</h1>
-              <span style={{ fontSize: '9.5px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>Official EOD Feed ({bhavStats.asOfDate})</span>
-              <span style={{ fontSize: '9.5px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 7px', borderRadius: '12px', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                {bhavStats.totalStocks.toLocaleString('en-IN')} Stocks • {dealsStats.totalDeals.toLocaleString('en-IN')} Deals • {ipoData.length} IPOs
-              </span>
-            </div>
-            {!isMobile && (
-              <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: 'var(--text-secondary, #94a3b8)' }}>
-                Full NSE &amp; BSE Bhavcopy delivery screener ({bhavStats.totalStocks.toLocaleString('en-IN')} equities, 20 institutional filters), daily SEBI bulk/block/insider deals (as of {latestDealBadge} EOD), and live 14-column IPO subscription &amp; GMP hub.
-              </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '5px' : '8px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={fetchPrimaryMarketData}
+              title="Refresh Screeners and Quotes"
+              style={{
+                background: t.refreshBtnBg,
+                border: `1px solid ${t.refreshBtnBorder}`,
+                color: t.refreshBtnText,
+                padding: isMobile ? '6px 9px' : '7px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              {!isMobile && 'Refresh'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportPrimaryCsv}
+              title="Export Loaded Bhavcopy Stocks to CSV"
+              style={{
+                background: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.12)',
+                border: isLight ? '1px solid #a7f3d0' : '1px solid rgba(16,185,129,0.35)',
+                color: isLight ? '#059669' : '#34d399',
+                padding: isMobile ? '6px 9px' : '7px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              ⬇ CSV
+            </button>
+            {onOpenPaperTrading && (
+              <button
+                type="button"
+                onClick={onOpenPaperTrading}
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  border: 'none',
+                  color: '#fff',
+                  padding: isMobile ? '6px 10px' : '7px 14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: isMobile ? '11px' : '12px',
+                  fontWeight: '700',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
+                📈 {!isMobile && 'Trade Live '}↗
+              </button>
             )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleExportPrimaryCsv}
-            style={{ flex: isMobile ? 1 : 'initial', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#34d399', padding: isMobile ? '7px 10px' : '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', whiteSpace: 'nowrap' }}
-            title="Export Loaded Bhavcopy Stocks to CSV"
-          >
-            ⬇ CSV ({bhavcopyData.length})
-          </button>
-          <button
-            type="button"
-            onClick={fetchPrimaryMarketData}
-            style={{ flex: isMobile ? 1 : 'initial', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', padding: isMobile ? '7px 10px' : '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '600', whiteSpace: 'nowrap' }}
-          >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          {onOpenPaperTrading && (
-            <button
-              type="button"
-              onClick={onOpenPaperTrading}
-              style={{ flex: isMobile ? 1 : 'initial', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', border: 'none', color: '#fff', padding: isMobile ? '7px 12px' : '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', whiteSpace: 'nowrap' }}
-            >
-              📈 Trade Live <ArrowUpRight size={13} />
-            </button>
-          )}
+        {/* Row 2: Subtitle badges */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{
+            fontSize: '10px',
+            background: isLight ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.15)',
+            color: isLight ? '#15803d' : '#22c55e',
+            border: isLight ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(34,197,94,0.3)',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            fontWeight: '700',
+            whiteSpace: 'nowrap'
+          }}>
+            Official EOD Feed ({bhavStats.asOfDate})
+          </span>
+          <span style={{
+            fontSize: '10px',
+            background: isLight ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.15)',
+            color: isLight ? '#1d4ed8' : '#60a5fa',
+            border: isLight ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.3)',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            fontWeight: '700',
+            whiteSpace: 'nowrap'
+          }}>
+            {bhavStats.totalStocks.toLocaleString('en-IN')} Stocks • {dealsStats.totalDeals.toLocaleString('en-IN')} Deals • {ipoData.length} IPOs
+          </span>
         </div>
       </div>
 
-      {/* 3 Master Tabs */}
+      {/* 3 Master Tabs - Clean Horizontal Scroll on Mobile */}
       <div style={{
         display: 'flex',
-        flexWrap: isMobile ? 'nowrap' : 'wrap',
-        overflowX: isMobile ? 'auto' : 'visible',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
-        gap: isMobile ? '8px' : '12px',
-        marginBottom: isMobile ? '16px' : '24px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        paddingBottom: isMobile ? '12px' : '16px',
+        gap: isMobile ? '6px' : '10px',
+        marginBottom: isMobile ? '12px' : '20px',
+        borderBottom: `1px solid ${t.borderSubtle}`,
+        paddingBottom: isMobile ? '8px' : '14px',
         alignItems: 'center'
       }}>
         <button
           type="button"
           onClick={() => setActiveTab('BHAVCOPY')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '8px 14px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '38px' : '44px',
-            background: activeTab === 'BHAVCOPY' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)',
-            border: activeTab === 'BHAVCOPY' ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)',
-            color: activeTab === 'BHAVCOPY' ? '#60a5fa' : '#94a3b8',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            background: activeTab === 'BHAVCOPY' ? (isLight ? '#eff6ff' : 'rgba(59,130,246,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'BHAVCOPY' ? '1px solid #3b82f6' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'BHAVCOPY' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <BarChart2 size={15} /> {isMobile ? `📈 1. Bhavcopy (${bhavTotalFiltered.toLocaleString('en-IN')})` : `📈 1. NSE & BSE Bhavcopy Screener (${bhavTotalFiltered.toLocaleString('en-IN')} / ${bhavStats.totalStocks.toLocaleString('en-IN')})`}
+          <BarChart2 size={14} /> {isMobile ? `📈 1. Bhavcopy (${bhavTotalFiltered.toLocaleString('en-IN')})` : `📈 1. NSE & BSE Bhavcopy Screener (${bhavTotalFiltered.toLocaleString('en-IN')} / ${bhavStats.totalStocks.toLocaleString('en-IN')})`}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('DEALS')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '8px 14px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '38px' : '44px',
-            background: activeTab === 'DEALS' ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
-            border: activeTab === 'DEALS' ? '1px solid rgba(168,85,247,0.5)' : '1px solid rgba(255,255,255,0.08)',
-            color: activeTab === 'DEALS' ? '#c084fc' : '#94a3b8',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            background: activeTab === 'DEALS' ? (isLight ? '#faf5ff' : 'rgba(168,85,247,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'DEALS' ? '1px solid #a855f7' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'DEALS' ? (isLight ? '#7e22ce' : '#c084fc') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <Building2 size={15} /> {isMobile ? `🏛️ 2. Bulk & Block (${dealsTotalFiltered.toLocaleString('en-IN')})` : `🏛️ 2. Bulk, Block & Insider Deals (${dealsTotalFiltered.toLocaleString('en-IN')})`}
+          <Building2 size={14} /> {isMobile ? `🏛️ 2. Bulk & Block (${dealsTotalFiltered.toLocaleString('en-IN')})` : `🏛️ 2. Bulk, Block & Insider Deals (${dealsTotalFiltered.toLocaleString('en-IN')})`}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('IPOS')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '8px 14px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '38px' : '44px',
-            background: activeTab === 'IPOS' ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.04)',
-            border: activeTab === 'IPOS' ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.08)',
-            color: activeTab === 'IPOS' ? '#4ade80' : '#94a3b8',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            background: activeTab === 'IPOS' ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'IPOS' ? '1px solid #22c55e' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'IPOS' ? (isLight ? '#15803d' : '#4ade80') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <Sparkles size={15} /> {isMobile ? `🚀 3. IPO & Sub (${filteredIpos.length})` : `🚀 3. IPO & SME Live Subscription & GMP Hub (${filteredIpos.length})`}
+          <Sparkles size={14} /> {isMobile ? `🚀 3. IPO & Sub (${filteredIpos.length})` : `🚀 3. IPO & SME Live Subscription & GMP Hub (${filteredIpos.length})`}
         </button>
       </div>
 
@@ -989,45 +1163,45 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* Quick Stats KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Stocks Screened ({bhavStats.asOfDate})</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>Stocks Screened ({bhavStats.asOfDate})</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: t.text, marginTop: '2px' }}>
                 {bhavTotalFiltered.toLocaleString('en-IN')} of {bhavStats.totalStocks.toLocaleString('en-IN')}
               </div>
             </div>
-            <div style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#fef08a', textTransform: 'uppercase' }}>🔥 52W High Breakouts</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#eab308', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#fefce8' : 'rgba(234,179,8,0.06)', border: isLight ? '1px solid #fef08a' : '1px solid rgba(234,179,8,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#a16207' : '#fef08a', textTransform: 'uppercase', fontWeight: '700' }}>🔥 52W High Breakouts</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#ca8a04' : '#eab308', marginTop: '2px' }}>
                 {bhavStats.breakouts52w.toLocaleString('en-IN')} Stocks
               </div>
             </div>
-            <div style={{ background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#bae6fd', textTransform: 'uppercase' }}>❄️ 52W Low Reversals</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#f0f9ff' : 'rgba(56,189,248,0.06)', border: isLight ? '1px solid #bae6fd' : '1px solid rgba(56,189,248,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#0284c7' : '#bae6fd', textTransform: 'uppercase', fontWeight: '700' }}>❄️ 52W Low Reversals</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#0284c7' : '#38bdf8', marginTop: '2px' }}>
                 {bhavStats.reversals52w.toLocaleString('en-IN')} Stocks
               </div>
             </div>
-            <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#86efac', textTransform: 'uppercase' }}>💎 High Delivery (≥75%)</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#22c55e', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.06)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#15803d' : '#86efac', textTransform: 'uppercase', fontWeight: '700' }}>💎 High Delivery (≥75%)</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#16a34a' : '#22c55e', marginTop: '2px' }}>
                 {bhavStats.highDelivery75.toLocaleString('en-IN')} Stocks
               </div>
             </div>
-            <div style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', gridColumn: isMobile ? 'span 2' : 'auto' }}>
-              <div style={{ fontSize: '10.5px', color: '#e9d5ff', textTransform: 'uppercase' }}>⚡ Volume Surges (2x+)</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#c084fc', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#faf5ff' : 'rgba(168,85,247,0.06)', border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168,85,247,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', gridColumn: isMobile ? 'span 2' : 'auto', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#7e22ce' : '#e9d5ff', textTransform: 'uppercase', fontWeight: '700' }}>⚡ Volume Surges (2x+)</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#9333ea' : '#c084fc', marginTop: '2px' }}>
                 {bhavStats.volumeSurges2x.toLocaleString('en-IN')} Stocks
               </div>
             </div>
           </div>
 
           {/* Screening & Filter Control Console */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: t.cardShadow }}>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <SlidersHorizontal size={16} color="#60a5fa" />
-                <h3 style={{ margin: 0, fontSize: isMobile ? '13px' : '14px', fontWeight: '800', color: '#f8fafc' }}>
+                <SlidersHorizontal size={16} color={isLight ? '#2563eb' : '#60a5fa'} />
+                <h3 style={{ margin: 0, fontSize: isMobile ? '13px' : '14px', fontWeight: '800', color: t.text }}>
                   20 Institutional Delivery, VWAP &amp; Price Action Filters ({activeFilterCount} Active)
                 </h3>
               </div>
@@ -1035,7 +1209,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 <button
                   type="button"
                   onClick={resetAllBhavFilters}
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                  style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.1)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Reset All Filters
                 </button>
@@ -1044,7 +1218,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
             {/* Exchange Toggle Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Exchange:</span>
+              <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Exchange:</span>
               {[
                 { id: 'ALL', label: `All (${bhavStats.totalStocks.toLocaleString('en-IN')})` },
                 { id: 'NSE', label: `NSE (${bhavStats.nseCount.toLocaleString('en-IN')})` },
@@ -1056,9 +1230,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   onClick={() => setExchangeFilter(ex.id)}
                   style={{
                     padding: '5px 12px', borderRadius: '16px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
-                    background: exchangeFilter === ex.id ? '#3b82f6' : 'rgba(255,255,255,0.06)',
-                    color: exchangeFilter === ex.id ? '#fff' : '#cbd5e1',
-                    border: 'none', transition: 'all 0.12s'
+                    background: exchangeFilter === ex.id ? '#3b82f6' : t.pillInactiveBg,
+                    color: exchangeFilter === ex.id ? '#fff' : t.textSecondary,
+                    border: exchangeFilter === ex.id ? '1px solid #2563eb' : `1px solid ${t.cardBorder}`, transition: 'all 0.12s'
                   }}
                 >
                   {ex.label}
@@ -1069,25 +1243,25 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             {/* Inputs: Search, Sector & Delivery Slider */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Search Any NSE Symbol / BSE Code</label>
+                <label style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Search Any NSE Symbol / BSE Code</label>
                 <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: t.textMuted }} />
                   <input
                     type="text"
                     placeholder="Search across all 5,797 stocks (e.g. RELIANCE, 500325, TATA)..."
                     value={bhavSearch}
                     onChange={e => setBhavSearch(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12.5px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '8px', color: t.text, fontSize: '12.5px' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Sector Filter</label>
+                <label style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>Sector Filter</label>
                 <select
                   value={sectorFilter}
                   onChange={e => setSectorFilter(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12.5px', cursor: 'pointer' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '8px', color: t.text, fontSize: '12.5px', cursor: 'pointer' }}
                 >
                   <option value="ALL">All Sectors ({bhavStats.totalStocks.toLocaleString('en-IN')} Stocks)</option>
                   <option value="Banking & Financials">Banking &amp; Financials</option>
@@ -1107,8 +1281,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Min Delivery %</label>
-                  <span style={{ fontSize: '12px', color: '#60a5fa', fontWeight: '800' }}>≥ {minDelivery}%</span>
+                  <label style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Min Delivery %</label>
+                  <span style={{ fontSize: '12px', color: isLight ? '#2563eb' : '#60a5fa', fontWeight: '800' }}>≥ {minDelivery}%</span>
                 </div>
                 <input
                   type="range"
@@ -1123,37 +1297,38 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
 
             {/* 20 Institutional Checkbox Screener Pills */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '12px' }}>
               {[
-                { state: onlyBreakout, setter: setOnlyBreakout, label: '🔥 52W High Breakouts', color: '#eab308', bg: 'rgba(234,179,8,0.2)', text: '#fef08a' },
-                { state: only52wLow, setter: setOnly52wLow, label: '❄️ 52W Low Reversals', color: '#38bdf8', bg: 'rgba(56,189,248,0.2)', text: '#38bdf8' },
-                { state: onlySurge, setter: setOnlySurge, label: '⚡ Volume Surge (2x+)', color: '#a855f7', bg: 'rgba(168,85,247,0.2)', text: '#c084fc' },
-                { state: onlyMegaSurge, setter: setOnlyMegaSurge, label: '🚀 Mega Surge (3.5x+)', color: '#f43f5e', bg: 'rgba(244,63,94,0.2)', text: '#fb7185' },
-                { state: onlyHighDelivery, setter: setOnlyHighDelivery, label: '💎 High Delivery (≥75%)', color: '#22c55e', bg: 'rgba(34,197,94,0.2)', text: '#86efac' },
-                { state: onlyUltraDelivery, setter: setOnlyUltraDelivery, label: '🎯 Ultra Delivery (≥85%)', color: '#10b981', bg: 'rgba(16,185,129,0.22)', text: '#6ee7b7' },
-                { state: onlySmartAccumulation, setter: setOnlySmartAccumulation, label: '📈 Smart Accumulation', color: '#10b981', bg: 'rgba(16,185,129,0.2)', text: '#6ee7b7' },
-                { state: onlyDistribution, setter: setOnlyDistribution, label: '🚨 Distribution', color: '#ef4444', bg: 'rgba(239,68,68,0.2)', text: '#fca5a5' },
-                { state: onlyTopGainers, setter: setOnlyTopGainers, label: '🟢 Top Gainers (>2%)', color: '#22c55e', bg: 'rgba(34,197,94,0.15)', text: '#4ade80' },
-                { state: onlyTopLosers, setter: setOnlyTopLosers, label: '🔴 Top Losers (<-1.5%)', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#f87171' },
-                { state: onlyFno, setter: setOnlyFno, label: `🏛️ F&O Liquid Only (${bhavStats.fnoCount || 196})`, color: '#3b82f6', bg: 'rgba(59,130,246,0.22)', text: '#93c5fd' },
-                { state: onlyAboveVwap, setter: setOnlyAboveVwap, label: '📊 Price > VWAP', color: '#06b6d4', bg: 'rgba(6,182,212,0.2)', text: '#67e8f9' },
-                { state: onlyCloseNearHigh, setter: setOnlyCloseNearHigh, label: '📈 Close Near Day High', color: '#22c55e', bg: 'rgba(34,197,94,0.18)', text: '#86efac' },
-                { state: onlyCloseNearLow, setter: setOnlyCloseNearLow, label: '📉 Close Near Day Low', color: '#f97316', bg: 'rgba(249,115,22,0.2)', text: '#fdba74' },
-                { state: onlyWideRange, setter: setOnlyWideRange, label: '💥 Wide Range (>4%)', color: '#ec4899', bg: 'rgba(236,72,153,0.2)', text: '#f9a8d4' },
-                { state: onlyTightCoil, setter: setOnlyTightCoil, label: '🔒 NR7 / Tight Coil (<1.2%)', color: '#8b5cf6', bg: 'rgba(139,92,246,0.2)', text: '#c4b5fd' },
-                { state: onlyHighTurnover, setter: setOnlyHighTurnover, label: '💰 High Turnover (≥₹50 Cr)', color: '#eab308', bg: 'rgba(234,179,8,0.18)', text: '#fde047' },
-                { state: onlyMidSmallAccum, setter: setOnlyMidSmallAccum, label: '🪙 Mid/Small Gems (₹50–₹500)', color: '#14b8a6', bg: 'rgba(20,184,166,0.2)', text: '#5eead4' },
-                { state: onlyCircuitGainers, setter: setOnlyCircuitGainers, label: '🚀 Momentum Runners (≥+4.5%)', color: '#16a34a', bg: 'rgba(22,163,74,0.22)', text: '#4ade80' },
-                { state: onlyCircuitLosers, setter: setOnlyCircuitLosers, label: '🩸 Heavy Sell-Off (≤-4%)', color: '#dc2626', bg: 'rgba(220,38,38,0.22)', text: '#fca5a5' }
+                { state: onlyBreakout, setter: setOnlyBreakout, label: '🔥 52W High Breakouts', color: isLight ? '#ca8a04' : '#eab308', bg: isLight ? '#fef9c3' : 'rgba(234,179,8,0.2)', text: isLight ? '#854d0e' : '#fef08a' },
+                { state: only52wLow, setter: setOnly52wLow, label: '❄️ 52W Low Reversals', color: isLight ? '#0284c7' : '#38bdf8', bg: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.2)', text: isLight ? '#0369a1' : '#38bdf8' },
+                { state: onlySurge, setter: setOnlySurge, label: '⚡ Volume Surge (2x+)', color: isLight ? '#9333ea' : '#a855f7', bg: isLight ? '#f3e8ff' : 'rgba(168,85,247,0.2)', text: isLight ? '#6b21a8' : '#c084fc' },
+                { state: onlyMegaSurge, setter: setOnlyMegaSurge, label: '🚀 Mega Surge (3.5x+)', color: isLight ? '#e11d48' : '#f43f5e', bg: isLight ? '#ffe4e6' : 'rgba(244,63,94,0.2)', text: isLight ? '#9f1239' : '#fb7185' },
+                { state: onlyHighDelivery, setter: setOnlyHighDelivery, label: '💎 High Delivery (≥75%)', color: isLight ? '#16a34a' : '#22c55e', bg: isLight ? '#dcfce7' : 'rgba(34,197,94,0.2)', text: isLight ? '#14532d' : '#86efac' },
+                { state: onlyUltraDelivery, setter: setOnlyUltraDelivery, label: '🎯 Ultra Delivery (≥85%)', color: isLight ? '#059669' : '#10b981', bg: isLight ? '#d1fae5' : 'rgba(16,185,129,0.22)', text: isLight ? '#064e3b' : '#6ee7b7' },
+                { state: onlySmartAccumulation, setter: setOnlySmartAccumulation, label: '📈 Smart Accumulation', color: isLight ? '#059669' : '#10b981', bg: isLight ? '#d1fae5' : 'rgba(16,185,129,0.2)', text: isLight ? '#064e3b' : '#6ee7b7' },
+                { state: onlyDistribution, setter: setOnlyDistribution, label: '🚨 Distribution', color: isLight ? '#dc2626' : '#ef4444', bg: isLight ? '#fee2e2' : 'rgba(239,68,68,0.2)', text: isLight ? '#991b1b' : '#fca5a5' },
+                { state: onlyTopGainers, setter: setOnlyTopGainers, label: '🟢 Top Gainers (>2%)', color: isLight ? '#16a34a' : '#22c55e', bg: isLight ? '#dcfce7' : 'rgba(34,197,94,0.15)', text: isLight ? '#14532d' : '#4ade80' },
+                { state: onlyTopLosers, setter: setOnlyTopLosers, label: '🔴 Top Losers (<-1.5%)', color: isLight ? '#dc2626' : '#ef4444', bg: isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)', text: isLight ? '#991b1b' : '#f87171' },
+                { state: onlyFno, setter: setOnlyFno, label: `🏛️ F&O Liquid Only (${bhavStats.fnoCount || 196})`, color: isLight ? '#2563eb' : '#3b82f6', bg: isLight ? '#dbeafe' : 'rgba(59,130,246,0.22)', text: isLight ? '#1e40af' : '#93c5fd' },
+                { state: onlyAboveVwap, setter: setOnlyAboveVwap, label: '📊 Price > VWAP', color: isLight ? '#0891b2' : '#06b6d4', bg: isLight ? '#cffafe' : 'rgba(6,182,212,0.2)', text: isLight ? '#155e75' : '#67e8f9' },
+                { state: onlyCloseNearHigh, setter: setOnlyCloseNearHigh, label: '📈 Close Near Day High', color: isLight ? '#16a34a' : '#22c55e', bg: isLight ? '#dcfce7' : 'rgba(34,197,94,0.18)', text: isLight ? '#14532d' : '#86efac' },
+                { state: onlyCloseNearLow, setter: setOnlyCloseNearLow, label: '📉 Close Near Day Low', color: isLight ? '#ea580c' : '#f97316', bg: isLight ? '#ffedd5' : 'rgba(249,115,22,0.2)', text: isLight ? '#9a3412' : '#fdba74' },
+                { state: onlyWideRange, setter: setOnlyWideRange, label: '💥 Wide Range (>4%)', color: isLight ? '#db2777' : '#ec4899', bg: isLight ? '#fce7f3' : 'rgba(236,72,153,0.2)', text: isLight ? '#9d174d' : '#f9a8d4' },
+                { state: onlyTightCoil, setter: setOnlyTightCoil, label: '🔒 NR7 / Tight Coil (<1.2%)', color: isLight ? '#7c3aed' : '#8b5cf6', bg: isLight ? '#ede9fe' : 'rgba(139,92,246,0.2)', text: isLight ? '#5b21b6' : '#c4b5fd' },
+                { state: onlyHighTurnover, setter: setOnlyHighTurnover, label: '💰 High Turnover (≥₹50 Cr)', color: isLight ? '#ca8a04' : '#eab308', bg: isLight ? '#fef9c3' : 'rgba(234,179,8,0.18)', text: isLight ? '#854d0e' : '#fde047' },
+                { state: onlyMidSmallAccum, setter: setOnlyMidSmallAccum, label: '🪙 Mid/Small Gems (₹50–₹500)', color: isLight ? '#0d9488' : '#14b8a6', bg: isLight ? '#ccfbf1' : 'rgba(20,184,166,0.2)', text: isLight ? '#115e59' : '#5eead4' },
+                { state: onlyCircuitGainers, setter: setOnlyCircuitGainers, label: '🚀 Momentum Runners (≥+4.5%)', color: isLight ? '#15803d' : '#16a34a', bg: isLight ? '#dcfce7' : 'rgba(22,163,74,0.22)', text: isLight ? '#14532d' : '#4ade80' },
+                { state: onlyCircuitLosers, setter: setOnlyCircuitLosers, label: '🩸 Heavy Sell-Off (≤-4%)', color: isLight ? '#b91c1c' : '#dc2626', bg: isLight ? '#fee2e2' : 'rgba(220,38,38,0.22)', text: isLight ? '#7f1d1d' : '#fca5a5' }
               ].map((pill, idx) => (
                 <label
                   key={idx}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    background: pill.state ? pill.bg : 'rgba(255,255,255,0.04)',
-                    border: pill.state ? `1px solid ${pill.color}` : '1px solid rgba(255,255,255,0.08)',
+                    background: pill.state ? pill.bg : t.cardBgSubtle,
+                    border: pill.state ? `1px solid ${pill.color}` : `1px solid ${t.borderSubtle}`,
                     padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px',
-                    color: pill.state ? pill.text : '#cbd5e1', fontWeight: pill.state ? '700' : '500'
+                    color: pill.state ? pill.text : t.textSecondary, fontWeight: pill.state ? '700' : '500',
+                    transition: 'all 0.12s ease'
                   }}
                 >
                   <input type="checkbox" checked={pill.state} onChange={e => pill.setter(e.target.checked)} style={{ accentColor: pill.color }} />
@@ -1164,33 +1339,33 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           </div>
 
           {/* Delivery Table with Per-Column Sort & Per-Column Filter Inputs */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: t.cardShadow }}>
             <table style={{ width: '100%', minWidth: '940px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
               <thead>
                 {/* Row 1: Clickable Sort Headers */}
-                <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
-                  <th onClick={() => handleSortBhavCol('symbol')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr style={{ background: t.tableHeaderBg, color: t.text, borderBottom: `1px solid ${t.tableHeaderBorder}`, textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
+                  <th onClick={() => handleSortBhavCol('symbol')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Stock / Company &amp; Sector ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('exchange')} style={{ padding: '11px 10px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('exchange')} style={{ padding: '11px 10px', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Exchange ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('ltp')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('ltp')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     LTP / VWAP (₹) ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('change')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('change')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Day Change ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('volume')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('volume')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Traded Vol ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('delivQty')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('delivQty')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Delivery Vol ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('delivPct')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('delivPct')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Delivery % ⇅
                   </th>
-                  <th onClick={() => handleSortBhavCol('turnoverCr')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th onClick={() => handleSortBhavCol('turnoverCr')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>
                     Turnover (Cr) ⇅
                   </th>
                   <th onClick={() => handleSortBhavCol('surgeMult')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer' }}>
@@ -1199,21 +1374,21 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 </tr>
 
                 {/* Row 2: Per-Column Filter Inputs (LTP, Day Change, Traded Vol, Delivery Vol, Delivery %, Turnover, Signals) */}
-                <tr style={{ background: 'rgba(15,23,42,0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <th style={{ padding: '6px 10px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr style={{ background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.9)', borderBottom: `1px solid ${t.cardBorder}` }}>
+                  <th style={{ padding: '6px 10px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Filter stock / sector..."
                       value={bhavColFilter.colStock}
                       onChange={e => setBhavColFilter(p => ({ ...p, colStock: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 8px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <select
                       value={bhavColFilter.colExchange}
                       onChange={e => setBhavColFilter(p => ({ ...p, colExchange: e.target.value }))}
-                      style={{ width: '100%', padding: '5px 6px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', padding: '5px 6px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     >
                       <option value="ALL">All Exch</option>
                       <option value="NSE">NSE</option>
@@ -1221,65 +1396,65 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       <option value="BOTH">NSE • BSE</option>
                     </select>
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="e.g. >200 or 50-500"
                       value={bhavColFilter.colLtp}
                       onChange={e => setBhavColFilter(p => ({ ...p, colLtp: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="e.g. >2 or <-1.5"
                       value={bhavColFilter.colChange}
                       onChange={e => setBhavColFilter(p => ({ ...p, colChange: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Min L (e.g. >10)"
                       value={bhavColFilter.colVolume}
                       onChange={e => setBhavColFilter(p => ({ ...p, colVolume: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Min L (e.g. >5)"
                       value={bhavColFilter.colDelivVol}
                       onChange={e => setBhavColFilter(p => ({ ...p, colDelivVol: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Min % (e.g. 75)"
                       value={bhavColFilter.colDelivPct}
                       onChange={e => setBhavColFilter(p => ({ ...p, colDelivPct: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'center' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Min Cr (e.g. 25)"
                       value={bhavColFilter.colTurnover}
                       onChange={e => setBhavColFilter(p => ({ ...p, colTurnover: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
                   <th style={{ padding: '6px 8px' }}>
                     <select
                       value={bhavColFilter.colSignal}
                       onChange={e => setBhavColFilter(p => ({ ...p, colSignal: e.target.value }))}
-                      style={{ width: '100%', padding: '5px 6px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', padding: '5px 6px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     >
                       <option value="ALL">All Signals</option>
                       <option value="52W_HIGH">🔥 52W High</option>
@@ -1295,62 +1470,62 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               <tbody>
                 {bhavcopyData.length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: t.textMuted }}>
                       No stocks matched your active filter combination. Click "Reset All Filters" or clear the column filter boxes.
                     </td>
                   </tr>
                 ) : (
                   bhavcopyData.map((stock, idx) => (
-                    <tr key={`${stock.symbol}_${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}>
+                    <tr key={`${stock.symbol}_${idx}`} style={{ borderBottom: `1px solid ${t.tableRowBorder}`, transition: 'background 0.15s', background: idx % 2 === 1 ? (isLight ? '#fbfcfe' : 'rgba(255,255,255,0.01)') : 'transparent' }}>
                       <td style={{ padding: '11px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: '700', color: '#fff' }}>{stock.symbol}</span>
+                          <span style={{ fontWeight: '700', color: t.text }}>{stock.symbol}</span>
                           {stock.isFnO && (
-                            <span style={{ fontSize: '9px', background: 'rgba(59,130,246,0.2)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>F&amp;O</span>
+                            <span style={{ fontSize: '9px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.2)', color: isLight ? '#1e40af' : '#93c5fd', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>F&amp;O</span>
                           )}
                           {stock.bseCode && (
-                            <span style={{ fontSize: '10px', color: '#64748b' }}>#{stock.bseCode}</span>
+                            <span style={{ fontSize: '10px', color: t.textMuted }}>#{stock.bseCode}</span>
                           )}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                          {stock.name && stock.name !== stock.symbol ? `${stock.name} • ` : ''}<span style={{ color: '#64748b' }}>{stock.sector}</span>
+                        <div style={{ fontSize: '11px', color: t.textSecondary }}>
+                          {stock.name && stock.name !== stock.symbol ? `${stock.name} • ` : ''}<span style={{ color: t.textMuted }}>{stock.sector}</span>
                         </div>
                       </td>
                       <td style={{ padding: '11px 10px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '10px', background: 'rgba(56,189,248,0.1)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                        <span style={{ fontSize: '10px', background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.1)', color: isLight ? '#0284c7' : '#38bdf8', border: isLight ? '1px solid #bae6fd' : '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                           {stock.exchange === 'BOTH' ? 'NSE • BSE' : stock.exchange}
                         </span>
                       </td>
                       <td style={{ padding: '11px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: '700', color: '#fff' }}>₹{stock.ltp?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                        <div style={{ fontWeight: '700', color: t.text }}>₹{stock.ltp?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                         {stock.vwap > 0 && (
-                          <div style={{ fontSize: '10px', color: stock.aboveVwap ? '#4ade80' : '#94a3b8' }}>
+                          <div style={{ fontSize: '10px', color: stock.aboveVwap ? (isLight ? '#15803d' : '#4ade80') : t.textMuted }}>
                             VWAP: ₹{Number(stock.vwap).toFixed(1)}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '700', color: stock.change >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '700', color: stock.change >= 0 ? (isLight ? '#16a34a' : '#22c55e') : '#ef4444', whiteSpace: 'nowrap' }}>
                         <div>{stock.change >= 0 ? `+${stock.change}%` : `${stock.change}%`}</div>
                         {stock.dayRangePct > 0 && (
-                          <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>H-L: {stock.dayRangePct}%</div>
+                          <div style={{ fontSize: '10px', color: t.textMuted, fontWeight: '500' }}>H-L: {stock.dayRangePct}%</div>
                         )}
                       </td>
-                      <td style={{ padding: '11px 12px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.volume / 100000).toFixed(2)} L</td>
-                      <td style={{ padding: '11px 12px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap' }}>{(stock.delivQty / 100000).toFixed(2)} L</td>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', color: t.textSecondary, whiteSpace: 'nowrap' }}>{(stock.volume / 100000).toFixed(2)} L</td>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', color: t.textSecondary, whiteSpace: 'nowrap' }}>{(stock.delivQty / 100000).toFixed(2)} L</td>
                       <td style={{ padding: '11px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: stock.delivPct >= 75 ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)', color: stock.delivPct >= 75 ? '#22c55e' : '#60a5fa', border: `1px solid ${stock.delivPct >= 75 ? 'rgba(34,197,94,0.3)' : 'rgba(59,130,246,0.3)'}`, padding: '3px 10px', borderRadius: '12px', fontWeight: '800' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: stock.delivPct >= 75 ? (isLight ? '#dcfce7' : 'rgba(34,197,94,0.15)') : (isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)'), color: stock.delivPct >= 75 ? (isLight ? '#15803d' : '#22c55e') : (isLight ? '#1d4ed8' : '#60a5fa'), border: `1px solid ${stock.delivPct >= 75 ? (isLight ? '#86efac' : 'rgba(34,197,94,0.3)') : (isLight ? '#93c5fd' : 'rgba(59,130,246,0.3)')}`, padding: '3px 10px', borderRadius: '12px', fontWeight: '800' }}>
                           {stock.delivPct}%
                         </div>
                       </td>
-                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: '600', color: t.text, whiteSpace: 'nowrap' }}>
                         ₹{Number(stock.turnoverCr || ((stock.volume * stock.ltp) / 10000000)).toFixed(2)} Cr
                       </td>
                       <td style={{ padding: '11px 12px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                          {stock.is52wHigh && <span title="52-Week High Breakout" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>🔥 52W High</span>}
-                          {stock.is52wLow && <span title="52-Week Low Bounce" style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>❄️ 52W Low</span>}
-                          {stock.surgeMult >= 2.0 && <span title="Volume Surge 2x+" style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>⚡ {stock.surgeMult}x Vol</span>}
-                          {stock.aboveVwap && <span title="Price Above VWAP" style={{ background: 'rgba(6,182,212,0.12)', color: '#67e8f9', border: '1px solid rgba(6,182,212,0.3)', padding: '2px 5px', borderRadius: '6px', fontSize: '9.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>&gt;VWAP</span>}
+                          {stock.is52wHigh && <span title="52-Week High Breakout" style={{ background: isLight ? '#fef9c3' : 'rgba(234,179,8,0.15)', color: isLight ? '#854d0e' : '#eab308', border: isLight ? '1px solid #fef08a' : '1px solid rgba(234,179,8,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>🔥 52W High</span>}
+                          {stock.is52wLow && <span title="52-Week Low Bounce" style={{ background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.15)', color: isLight ? '#0369a1' : '#38bdf8', border: isLight ? '1px solid #bae6fd' : '1px solid rgba(56,189,248,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>❄️ 52W Low</span>}
+                          {stock.surgeMult >= 2.0 && <span title="Volume Surge 2x+" style={{ background: isLight ? '#f3e8ff' : 'rgba(168,85,247,0.15)', color: isLight ? '#6b21a8' : '#c084fc', border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168,85,247,0.3)', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>⚡ {stock.surgeMult}x Vol</span>}
+                          {stock.aboveVwap && <span title="Price Above VWAP" style={{ background: isLight ? '#cffafe' : 'rgba(6,182,212,0.12)', color: isLight ? '#155e75' : '#67e8f9', border: isLight ? '1px solid #a5f3fc' : '1px solid rgba(6,182,212,0.3)', padding: '2px 5px', borderRadius: '6px', fontSize: '9.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>&gt;VWAP</span>}
                         </div>
                       </td>
                     </tr>
@@ -1387,34 +1562,34 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* Deals KPI Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Deals ({activeDateHeaderLabel})</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>Total Deals ({activeDateHeaderLabel})</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: t.text, marginTop: '2px' }}>
                 {dealsTotalFiltered.toLocaleString('en-IN')} / {dealsStats.totalDeals.toLocaleString('en-IN')} Deals
               </div>
             </div>
-            <div style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#e9d5ff', textTransform: 'uppercase' }}>Total Institutional Flow</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#c084fc', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#faf5ff' : 'rgba(168,85,247,0.08)', border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168,85,247,0.3)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#7e22ce' : '#e9d5ff', textTransform: 'uppercase', fontWeight: '700' }}>Total Institutional Flow</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#9333ea' : '#c084fc', marginTop: '2px' }}>
                 ₹{dealsStats.totalFlowCr.toLocaleString('en-IN')} Cr
               </div>
             </div>
-            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#86efac', textTransform: 'uppercase' }}>Institutional Buying</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#22c55e', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.08)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#15803d' : '#86efac', textTransform: 'uppercase', fontWeight: '700' }}>Institutional Buying</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#16a34a' : '#22c55e', marginTop: '2px' }}>
                 ₹{dealsStats.buyFlowCr.toLocaleString('en-IN')} Cr
               </div>
             </div>
-            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#fca5a5', textTransform: 'uppercase' }}>Institutional Selling</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#ef4444', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#fef2f2' : 'rgba(239,68,68,0.08)', border: isLight ? '1px solid #fecaca' : '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#b91c1c' : '#fca5a5', textTransform: 'uppercase', fontWeight: '700' }}>Institutional Selling</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#dc2626' : '#ef4444', marginTop: '2px' }}>
                 ₹{dealsStats.sellFlowCr.toLocaleString('en-IN')} Cr
               </div>
             </div>
           </div>
 
           {/* Advanced Filter Control Bar */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: t.cardShadow }}>
 
             {/* Row 1: Deal Type Pills & Search */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -1433,9 +1608,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setDealTypeFilter(f.id)}
                     style={{
                       padding: '6px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
-                      background: dealTypeFilter === f.id ? '#a855f7' : 'rgba(255,255,255,0.06)',
-                      color: dealTypeFilter === f.id ? '#fff' : '#cbd5e1',
-                      border: 'none', whiteSpace: 'nowrap'
+                      background: dealTypeFilter === f.id ? (isLight ? '#9333ea' : '#a855f7') : t.pillInactiveBg,
+                      color: dealTypeFilter === f.id ? '#fff' : t.textSecondary,
+                      border: dealTypeFilter === f.id ? '1px solid #7e22ce' : `1px solid ${t.cardBorder}`, whiteSpace: 'nowrap'
                     }}
                   >
                     {f.label}
@@ -1445,20 +1620,20 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobile ? '100%' : '260px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '460px' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#64748b' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: t.textMuted }} />
                   <input
                     type="text"
                     placeholder={`Search ${(dealsStats.globalTotal || dealsStats.totalDeals || 3000).toLocaleString('en-IN')}+ deals (e.g. Morgan Stanley, LIC, ZOMATO, RELIANCE)...`}
                     value={dealsSearch}
                     onChange={e => setDealsSearch(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '8px', color: t.text, fontSize: '12px' }}
                   />
                 </div>
                 {activeDealsFilterCount > 0 && (
                   <button
                     type="button"
                     onClick={resetAllDealsFilters}
-                    style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.12)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.35)', color: '#ef4444', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Reset ({activeDealsFilterCount})
                   </button>
@@ -1467,8 +1642,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
 
             {/* Row 2: Institution Category Pills (FII, DII/MF, HFT, Promoter, Multi-Deal Cluster) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Institution Desk:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
+              <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Institution Desk:</span>
               {[
                 { id: 'ALL', label: 'All Desks' },
                 { id: 'FII', label: `🌍 FII / Foreign Funds (${(dealsStats.fiiCount || 0).toLocaleString('en-IN')})` },
@@ -1483,9 +1658,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   onClick={() => setDealsClientCategory(cat.id)}
                   style={{
                     padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
-                    background: dealsClientCategory === cat.id ? 'rgba(59,130,246,0.22)' : 'rgba(255,255,255,0.04)',
-                    color: dealsClientCategory === cat.id ? '#60a5fa' : '#94a3b8',
-                    border: dealsClientCategory === cat.id ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                    background: dealsClientCategory === cat.id ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.22)') : t.pillInactiveBg,
+                    color: dealsClientCategory === cat.id ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textSecondary,
+                    border: dealsClientCategory === cat.id ? '1px solid #3b82f6' : `1px solid ${t.cardBorder}`
                   }}
                 >
                   {cat.label}
@@ -1494,10 +1669,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
 
             {/* Row 3: Exchange, Date Range, Size & Sort Filters */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Exchange:</span>
+                <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Exchange:</span>
                 {['ALL', 'NSE', 'BSE'].map(ex => (
                   <button
                     key={ex}
@@ -1505,9 +1680,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setDealsExchangeFilter(ex)}
                     style={{
                       padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                      background: dealsExchangeFilter === ex ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.04)',
-                      color: dealsExchangeFilter === ex ? '#60a5fa' : '#94a3b8',
-                      border: dealsExchangeFilter === ex ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                      background: dealsExchangeFilter === ex ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.25)') : t.pillInactiveBg,
+                      color: dealsExchangeFilter === ex ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textSecondary,
+                      border: dealsExchangeFilter === ex ? '1px solid #3b82f6' : `1px solid ${t.cardBorder}`
                     }}
                   >
                     {ex === 'ALL' ? 'All' : ex}
@@ -1516,7 +1691,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Date:</span>
+                <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Date:</span>
                 {[
                   { id: 'ALL', label: 'All Dates' },
                   { id: 'TODAY', label: `Today (${latestDealBadge})` },
@@ -1530,9 +1705,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setDealsDateRange(dt.id)}
                     style={{
                       padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                      background: dealsDateRange === dt.id ? 'rgba(168,85,247,0.25)' : 'rgba(255,255,255,0.04)',
-                      color: dealsDateRange === dt.id ? '#c084fc' : '#94a3b8',
-                      border: dealsDateRange === dt.id ? '1px solid rgba(168,85,247,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                      background: dealsDateRange === dt.id ? (isLight ? '#f3e8ff' : 'rgba(168,85,247,0.25)') : t.pillInactiveBg,
+                      color: dealsDateRange === dt.id ? (isLight ? '#7e22ce' : '#c084fc') : t.textSecondary,
+                      border: dealsDateRange === dt.id ? '1px solid #a855f7' : `1px solid ${t.cardBorder}`
                     }}
                   >
                     {dt.label}
@@ -1541,7 +1716,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Deal Size:</span>
+                <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Deal Size:</span>
                 {[
                   { id: 0, label: 'All' },
                   { id: 10, label: '≥₹10 Cr' },
@@ -1554,9 +1729,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setDealsMinSize(sz.id)}
                     style={{
                       padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                      background: dealsMinSize === sz.id ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.04)',
-                      color: dealsMinSize === sz.id ? '#4ade80' : '#94a3b8',
-                      border: dealsMinSize === sz.id ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                      background: dealsMinSize === sz.id ? (isLight ? '#dcfce7' : 'rgba(34,197,94,0.25)') : t.pillInactiveBg,
+                      color: dealsMinSize === sz.id ? (isLight ? '#15803d' : '#4ade80') : t.textSecondary,
+                      border: dealsMinSize === sz.id ? '1px solid #22c55e' : `1px solid ${t.cardBorder}`
                     }}
                   >
                     {sz.label}
@@ -1565,7 +1740,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Sort:</span>
+                <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Sort:</span>
                 {[
                   { id: 'DATE_DESC', label: 'Latest First' },
                   { id: 'VALUE_DESC', label: 'Largest Value' }
@@ -1576,9 +1751,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setDealsSortBy(s.id)}
                     style={{
                       padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                      background: dealsSortBy === s.id ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.04)',
-                      color: dealsSortBy === s.id ? '#38bdf8' : '#94a3b8',
-                      border: dealsSortBy === s.id ? '1px solid rgba(56,189,248,0.4)' : '1px solid rgba(255,255,255,0.08)'
+                      background: dealsSortBy === s.id ? (isLight ? '#e0f2fe' : 'rgba(56,189,248,0.2)') : t.pillInactiveBg,
+                      color: dealsSortBy === s.id ? (isLight ? '#0284c7' : '#38bdf8') : t.textSecondary,
+                      border: dealsSortBy === s.id ? '1px solid #0284c7' : `1px solid ${t.cardBorder}`
                     }}
                   >
                     {s.label}
@@ -1588,8 +1763,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             </div>
 
             {/* Row 4: Last 7 Trading Days Quick-Select Bar + Small Calendar Picker */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#c084fc', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: isLight ? '#7e22ce' : '#c084fc', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
                 <Calendar size={13} />
                 <span>Last 7 Days:</span>
               </div>
@@ -1609,9 +1784,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         fontSize: '11px',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        background: isSelected ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.04)',
-                        color: isSelected ? '#f3e8ff' : '#cbd5e1',
-                        border: isSelected ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                        background: isSelected ? (isLight ? '#f3e8ff' : 'rgba(168,85,247,0.3)') : t.pillInactiveBg,
+                        color: isSelected ? (isLight ? '#6b21a8' : '#f3e8ff') : t.textSecondary,
+                        border: isSelected ? '1px solid #a855f7' : `1px solid ${t.cardBorder}`,
                         boxShadow: isSelected ? '0 0 10px rgba(168,85,247,0.25)' : 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1634,15 +1809,15 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   gap: '5px',
                   padding: '3px 8px',
                   borderRadius: '10px',
-                  background: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? 'rgba(168,85,247,0.25)' : 'rgba(255,255,255,0.04)',
-                  border: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.08)',
-                  color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#c084fc' : '#94a3b8',
+                  background: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? (isLight ? '#f3e8ff' : 'rgba(168,85,247,0.25)') : t.pillInactiveBg,
+                  border: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '1px solid #a855f7' : `1px solid ${t.cardBorder}`,
+                  color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? (isLight ? '#7e22ce' : '#c084fc') : t.textSecondary,
                   fontSize: '11px',
                   fontWeight: '600'
                 }}
                 title="Pick custom date from calendar"
               >
-                <Calendar size={13} color={/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#c084fc' : '#94a3b8'} />
+                <Calendar size={13} color={/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? (isLight ? '#7e22ce' : '#c084fc') : t.textMuted} />
                 <span style={{ fontSize: '11px', fontWeight: '700' }}>Calendar:</span>
                 <input
                   type="date"
@@ -1657,12 +1832,12 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? '#f3e8ff' : '#94a3b8',
+                    color: /^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange) ? (isLight ? '#6b21a8' : '#f3e8ff') : t.textSecondary,
                     fontSize: '11px',
                     fontWeight: '600',
                     cursor: 'pointer',
                     outline: 'none',
-                    colorScheme: 'dark',
+                    colorScheme: isLight ? 'light' : 'dark',
                     fontFamily: 'inherit'
                   }}
                 />
@@ -1672,10 +1847,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     title="Clear custom date"
                     onClick={() => setDealsDateRange('ALL')}
                     style={{
-                      background: 'rgba(255,255,255,0.15)',
+                      background: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       borderRadius: '50%',
-                      color: '#fff',
+                      color: t.text,
                       width: '15px',
                       height: '15px',
                       display: 'inline-flex',
@@ -1701,9 +1876,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     fontSize: '11px',
                     fontWeight: '600',
                     cursor: 'pointer',
-                    background: 'rgba(239,68,68,0.12)',
-                    color: '#f87171',
-                    border: '1px solid rgba(239,68,68,0.3)',
+                    background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.12)',
+                    color: '#ef4444',
+                    border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.3)',
                     marginLeft: isMobile ? '0' : 'auto'
                   }}
                 >
@@ -1714,66 +1889,66 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           </div>
 
           {/* Deals Table with Per-Column Sort & Per-Column Filter Inputs */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: t.cardShadow }}>
             <table style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse', textAlign: 'left', fontSize: isMobile ? '12px' : '12.5px' }}>
               <thead>
                 {/* Row 1: Sortable Headers */}
-                <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.08)', textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
-                  <th onClick={() => handleSortDealsCol('DATE')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Date ⇅</th>
-                  <th onClick={() => handleSortDealsCol('SYMBOL')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Stock ⇅</th>
-                  <th style={{ padding: '11px 10px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Exch</th>
-                  <th onClick={() => handleSortDealsCol('CLIENT')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Client / Institution / Promoter ⇅</th>
-                  <th style={{ padding: '11px 10px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Type</th>
-                  <th onClick={() => handleSortDealsCol('QTY')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Shares Traded ⇅</th>
-                  <th onClick={() => handleSortDealsCol('PRICE')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: '1px solid rgba(255,255,255,0.05)' }}>Price (₹) ⇅</th>
+                <tr style={{ background: t.tableHeaderBg, color: t.text, borderBottom: `1px solid ${t.tableHeaderBorder}`, textTransform: 'uppercase', fontSize: '11px', fontWeight: '800' }}>
+                  <th onClick={() => handleSortDealsCol('DATE')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>Date ⇅</th>
+                  <th onClick={() => handleSortDealsCol('SYMBOL')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>Stock ⇅</th>
+                  <th style={{ padding: '11px 10px', borderRight: `1px solid ${t.borderSubtle}` }}>Exch</th>
+                  <th onClick={() => handleSortDealsCol('CLIENT')} style={{ padding: '11px 14px', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>Client / Institution / Promoter ⇅</th>
+                  <th style={{ padding: '11px 10px', textAlign: 'center', borderRight: `1px solid ${t.borderSubtle}` }}>Type</th>
+                  <th onClick={() => handleSortDealsCol('QTY')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>Shares Traded ⇅</th>
+                  <th onClick={() => handleSortDealsCol('PRICE')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer', borderRight: `1px solid ${t.borderSubtle}` }}>Price (₹) ⇅</th>
                   <th onClick={() => handleSortDealsCol('VALUECR')} style={{ padding: '11px 12px', textAlign: 'right', cursor: 'pointer' }}>Value (₹ Cr) ⇅</th>
                 </tr>
 
                 {/* Row 2: Per-Column Filter Inputs (Date, Stock, Exch, Client, Type, Shares Traded, Price, Value Cr) */}
-                <tr style={{ background: 'rgba(15,23,42,0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr style={{ background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.9)', borderBottom: `1px solid ${t.cardBorder}` }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="YYYY-MM-DD..."
                       value={dealsColFilter.colDate}
                       onChange={e => setDealsColFilter(p => ({ ...p, colDate: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Filter stock..."
                       value={dealsColFilter.colStock}
                       onChange={e => setDealsColFilter(p => ({ ...p, colStock: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <select
                       value={dealsColFilter.colExch}
                       onChange={e => setDealsColFilter(p => ({ ...p, colExch: e.target.value }))}
-                      style={{ width: '100%', padding: '5px 5px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', padding: '5px 5px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     >
                       <option value="ALL">All</option>
                       <option value="NSE">NSE</option>
                       <option value="BSE">BSE</option>
                     </select>
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Filter client / FII / MF / Promoter..."
                       value={dealsColFilter.colClient}
                       onChange={e => setDealsColFilter(p => ({ ...p, colClient: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <select
                       value={dealsColFilter.colType}
                       onChange={e => setDealsColFilter(p => ({ ...p, colType: e.target.value }))}
-                      style={{ width: '100%', padding: '5px 5px', background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px' }}
+                      style={{ width: '100%', padding: '5px 5px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     >
                       <option value="ALL">All</option>
                       <option value="BUY">BUY</option>
@@ -1783,22 +1958,22 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       <option value="INSIDER_PROMOTER">INSIDER</option>
                     </select>
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="Min shares (e.g. >100000)"
                       value={dealsColFilter.colQty}
                       onChange={e => setDealsColFilter(p => ({ ...p, colQty: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
-                  <th style={{ padding: '6px 8px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '6px 8px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
                       type="text"
                       placeholder="e.g. >200 or 50-500"
                       value={dealsColFilter.colPrice}
                       onChange={e => setDealsColFilter(p => ({ ...p, colPrice: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
                   <th style={{ padding: '6px 8px' }}>
@@ -1807,7 +1982,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       placeholder="Min Cr (e.g. >25)"
                       value={dealsColFilter.colValue}
                       onChange={e => setDealsColFilter(p => ({ ...p, colValue: e.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '5px', color: '#fff', fontSize: '11px', textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '5px 7px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px', textAlign: 'right' }}
                     />
                   </th>
                 </tr>
@@ -1815,7 +1990,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               <tbody>
                 {loadingDeals ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: t.textMuted }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         <div style={{ width: '16px', height: '16px', border: '2px solid #a855f7', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                         <span>Loading matching institutional deals...</span>
@@ -1824,53 +1999,53 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   </tr>
                 ) : dealsData.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: t.textMuted }}>
                       No institutional deals match this search or column filter. Try clearing the column filter boxes.
                     </td>
                   </tr>
                 ) : (
                   dealsData.map((deal, idx) => (
-                    <tr key={deal.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <tr key={deal.id || idx} style={{ borderBottom: `1px solid ${t.tableRowBorder}`, background: idx % 2 === 1 ? (isLight ? '#fbfcfe' : 'rgba(255,255,255,0.01)') : 'transparent' }}>
                       <td
                         onClick={() => setDealsDateRange(deal.date)}
-                        style={{ padding: '12px 14px', color: '#c084fc', whiteSpace: 'nowrap', fontWeight: '600', cursor: 'pointer' }}
+                        style={{ padding: '12px 14px', color: isLight ? '#7e22ce' : '#c084fc', whiteSpace: 'nowrap', fontWeight: '600', cursor: 'pointer' }}
                         title={`Click to filter deals by ${deal.date}`}
                       >
                         {deal.date}
                       </td>
                       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: '700', color: '#fff' }}>{deal.symbol}</span>
+                          <span style={{ fontWeight: '700', color: t.text }}>{deal.symbol}</span>
                           {deal.isMultiDeal && (
-                            <span title="Multiple Institutional Deals in this Stock" style={{ fontSize: '9px', background: 'rgba(234,179,8,0.18)', color: '#facc15', border: '1px solid rgba(234,179,8,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>🔥 CLUSTER</span>
+                            <span title="Multiple Institutional Deals in this Stock" style={{ fontSize: '9px', background: isLight ? '#fef9c3' : 'rgba(234,179,8,0.18)', color: isLight ? '#854d0e' : '#facc15', border: isLight ? '1px solid #fef08a' : '1px solid rgba(234,179,8,0.35)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>🔥 CLUSTER</span>
                           )}
                         </div>
-                        <div style={{ fontSize: '10.5px', color: '#64748b' }}>{deal.company}</div>
+                        <div style={{ fontSize: '10.5px', color: t.textMuted }}>{deal.company}</div>
                       </td>
                       <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.06)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                        <span style={{ fontSize: '10px', background: isLight ? '#e0f2fe' : 'rgba(56,189,248,0.1)', color: isLight ? '#0284c7' : '#38bdf8', border: isLight ? '1px solid #bae6fd' : '1px solid rgba(56,189,248,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                           {deal.exchange || 'NSE'}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 14px', color: '#cbd5e1' }}>
-                        <div style={{ fontWeight: '600' }}>{deal.client}</div>
+                      <td style={{ padding: '12px 14px', color: t.textSecondary }}>
+                        <div style={{ fontWeight: '600', color: t.text }}>{deal.client}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                          <span style={{ fontSize: '10px', color: '#64748b' }}>{deal.dealType?.replace('_', ' ')}</span>
+                          <span style={{ fontSize: '10px', color: t.textMuted }}>{deal.dealType?.replace('_', ' ')}</span>
                           {deal.clientCategory && (
-                            <span style={{ fontSize: '9.5px', background: 'rgba(168,85,247,0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                            <span style={{ fontSize: '9.5px', background: isLight ? '#f3e8ff' : 'rgba(168,85,247,0.15)', color: isLight ? '#7e22ce' : '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
                               {deal.clientCategory}
                             </span>
                           )}
                         </div>
                       </td>
                       <td style={{ padding: '12px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span style={{ background: deal.type === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: deal.type === 'BUY' ? '#22c55e' : '#ef4444', border: `1px solid ${deal.type === 'BUY' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px' }}>
+                        <span style={{ background: deal.type === 'BUY' ? (isLight ? '#dcfce7' : 'rgba(34,197,94,0.15)') : (isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)'), color: deal.type === 'BUY' ? (isLight ? '#15803d' : '#22c55e') : (isLight ? '#dc2626' : '#ef4444'), border: `1px solid ${deal.type === 'BUY' ? (isLight ? '#86efac' : 'rgba(34,197,94,0.3)') : (isLight ? '#fca5a5' : 'rgba(239,68,68,0.3)')}`, padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px' }}>
                           {deal.type}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>{deal.qty?.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>₹{deal.price?.toFixed(2)}</td>
-                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap', color: t.textSecondary }}>{deal.qty?.toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap', color: t.text }}>₹{deal.price?.toFixed(2)}</td>
+                      <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: isLight ? '#1e293b' : '#f8fafc', whiteSpace: 'nowrap' }}>₹{deal.valueCr?.toFixed(2)} Cr</td>
                     </tr>
                   ))
                 )}
@@ -1905,34 +2080,34 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* Top IPO Summary KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(190px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Issues Tracked</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>Total Issues Tracked</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: t.text, marginTop: '2px' }}>
                 {filteredIpos.length} of {ipoData.length} Issues
               </div>
             </div>
-            <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#86efac', textTransform: 'uppercase' }}>🟢 Live / Bidding Open</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#22c55e', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.07)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#15803d' : '#86efac', textTransform: 'uppercase', fontWeight: '700' }}>🟢 Live / Bidding Open</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#16a34a' : '#22c55e', marginTop: '2px' }}>
                 {ipoData.filter(i => i.status === 'OPEN').length} Active Now
               </div>
             </div>
-            <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#bae6fd', textTransform: 'uppercase' }}>⏳ Confirmed Upcoming</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#60a5fa', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#eff6ff' : 'rgba(59,130,246,0.07)', border: isLight ? '1px solid #bfdbfe' : '1px solid rgba(59,130,246,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#1d4ed8' : '#bae6fd', textTransform: 'uppercase', fontWeight: '700' }}>⏳ Confirmed Upcoming</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#2563eb' : '#60a5fa', marginTop: '2px' }}>
                 {ipoData.filter(i => i.status === 'UPCOMING').length} Pipeline
               </div>
             </div>
-            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#e9d5ff', textTransform: 'uppercase' }}>🚀 On Listing &amp; Listed</div>
-              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#c084fc', marginTop: '2px' }}>
+            <div style={{ background: isLight ? '#faf5ff' : 'rgba(168,85,247,0.07)', border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168,85,247,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
+              <div style={{ fontSize: '10.5px', color: isLight ? '#7e22ce' : '#e9d5ff', textTransform: 'uppercase', fontWeight: '700' }}>🚀 On Listing &amp; Listed</div>
+              <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#9333ea' : '#c084fc', marginTop: '2px' }}>
                 {ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length} Completed
               </div>
             </div>
           </div>
 
           {/* Category Toggle, View Mode Switcher & Search */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '14px', padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: t.cardShadow }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
@@ -1946,9 +2121,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setIpoCategory(cat.id)}
                     style={{
                       padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-                      background: ipoCategory === cat.id ? '#22c55e' : 'rgba(255,255,255,0.06)',
-                      color: ipoCategory === cat.id ? '#0b0e14' : '#cbd5e1',
-                      border: 'none', whiteSpace: 'nowrap'
+                      background: ipoCategory === cat.id ? '#22c55e' : t.pillInactiveBg,
+                      color: ipoCategory === cat.id ? '#fff' : t.textSecondary,
+                      border: ipoCategory === cat.id ? '1px solid #16a34a' : `1px solid ${t.cardBorder}`, whiteSpace: 'nowrap'
                     }}
                   >
                     {cat.label}
@@ -1956,14 +2131,15 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.35)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', gap: '6px', background: isLight ? '#f1f5f9' : 'rgba(0,0,0,0.35)', padding: '4px', borderRadius: '10px', border: `1px solid ${t.borderSubtle}` }}>
                 <button
                   type="button"
                   onClick={() => setIpoViewMode('SUBSCRIPTION_TABLE')}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '7px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', border: 'none',
-                    background: ipoViewMode === 'SUBSCRIPTION_TABLE' ? 'rgba(59,130,246,0.25)' : 'transparent',
-                    color: ipoViewMode === 'SUBSCRIPTION_TABLE' ? '#60a5fa' : '#94a3b8'
+                    background: ipoViewMode === 'SUBSCRIPTION_TABLE' ? (isLight ? '#ffffff' : 'rgba(59,130,246,0.25)') : 'transparent',
+                    color: ipoViewMode === 'SUBSCRIPTION_TABLE' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textMuted,
+                    boxShadow: ipoViewMode === 'SUBSCRIPTION_TABLE' ? (isLight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none') : 'none'
                   }}
                 >
                   <Table size={14} /> 📊 Live Subscription Status Table (14 Cols)
@@ -1973,8 +2149,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   onClick={() => setIpoViewMode('CARDS')}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '7px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', border: 'none',
-                    background: ipoViewMode === 'CARDS' ? 'rgba(34,197,94,0.22)' : 'transparent',
-                    color: ipoViewMode === 'CARDS' ? '#4ade80' : '#94a3b8'
+                    background: ipoViewMode === 'CARDS' ? (isLight ? '#ffffff' : 'rgba(34,197,94,0.22)') : 'transparent',
+                    color: ipoViewMode === 'CARDS' ? (isLight ? '#15803d' : '#4ade80') : t.textMuted,
+                    boxShadow: ipoViewMode === 'CARDS' ? (isLight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none') : 'none'
                   }}
                 >
                   <LayoutGrid size={14} /> 🗂️ GMP &amp; Allotment Cards
@@ -1982,7 +2159,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'ALL', label: `All Status (${ipoData.length})` },
@@ -1996,9 +2173,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     onClick={() => setIpoStatusFilter(st.id)}
                     style={{
                       padding: '5px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
-                      background: ipoStatusFilter === st.id ? 'rgba(59,130,246,0.2)' : 'transparent',
-                      color: ipoStatusFilter === st.id ? '#60a5fa' : '#94a3b8',
-                      border: ipoStatusFilter === st.id ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(255,255,255,0.08)'
+                      background: ipoStatusFilter === st.id ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.2)') : t.pillInactiveBg,
+                      color: ipoStatusFilter === st.id ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textSecondary,
+                      border: ipoStatusFilter === st.id ? '1px solid #3b82f6' : `1px solid ${t.cardBorder}`
                     }}
                   >
                     {st.label}
@@ -2008,13 +2185,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobile ? '100%' : '280px', flex: '1 1 260px', maxWidth: isMobile ? '100%' : '440px' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: '#64748b' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: t.textMuted }} />
                   <input
                     type="text"
                     placeholder="Search company, registrar (KFintech, Link Intime, Bigshare)..."
                     value={ipoSearch}
                     onChange={e => setIpoSearch(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '8px', color: t.text, fontSize: '12px' }}
                   />
                 </div>
                 <button
@@ -2025,8 +2202,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   style={{
                     display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 11px',
                     borderRadius: '8px', fontSize: '11px', fontWeight: '700',
-                    background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.35)',
-                    color: '#4ade80', cursor: isRefreshingIpo ? 'not-allowed' : 'pointer',
+                    background: isLight ? '#dcfce7' : 'rgba(34,197,94,0.12)', border: isLight ? '1px solid #86efac' : '1px solid rgba(34,197,94,0.35)',
+                    color: isLight ? '#15803d' : '#4ade80', cursor: isRefreshingIpo ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -2039,80 +2216,80 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* VIEW MODE 1: 14-COLUMN LIVE SUBSCRIPTION STATUS TABLE */}
           {ipoViewMode === 'SUBSCRIPTION_TABLE' && (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: t.cardShadow }}>
               <table style={{ width: '100%', minWidth: '1480px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(30,41,59,0.75)', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '11px', fontWeight: '800' }}>
-                    <th onClick={() => handleSortIpoCol('name')} style={{ padding: '10px 12px', cursor: 'pointer', minWidth: '230px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                  <tr style={{ background: t.tableHeaderBg, color: t.text, borderBottom: `1px solid ${t.tableHeaderBorder}`, fontSize: '11px', fontWeight: '800' }}>
+                    <th onClick={() => handleSortIpoCol('name')} style={{ padding: '10px 12px', cursor: 'pointer', minWidth: '230px', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span>Company</span>
-                        <ArrowUpDown size={11} color="#64748b" />
+                        <ArrowUpDown size={11} color={t.textMuted} />
                       </div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('closeDate')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('closeDate')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'center', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Closing</div>
                       <div>Date ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('issueSizeCr')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('issueSizeCr')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Issue Amount</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(Rs.Cr.) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(Rs.Cr.) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('qib')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('qib')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>QIB</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('snii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('snii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>SNII</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('bnii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('bnii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>BNII</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('nii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('nii')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>NII</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('retail')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('retail')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Retail</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('employee')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('employee')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Employee</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('shareholder')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('shareholder')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Shareholder</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('others')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('others')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Others</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('total')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)', color: '#60a5fa' }}>
+                    <th onClick={() => handleSortIpoCol('total')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}`, color: isLight ? '#1d4ed8' : '#60a5fa' }}>
                       <div>Total</div>
-                      <div style={{ fontSize: '10px', color: '#93c5fd' }}>(X) ⇅</div>
+                      <div style={{ fontSize: '10px', color: isLight ? '#2563eb' : '#93c5fd' }}>(X) ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('applications')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th onClick={() => handleSortIpoCol('applications')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Applications</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>Count ⇅</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>Count ⇅</div>
                     </th>
-                    <th onClick={() => handleSortIpoCol('gmpPct')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: '1px solid rgba(255,255,255,0.06)', color: '#4ade80' }}>
+                    <th onClick={() => handleSortIpoCol('gmpPct')} style={{ padding: '10px 8px', cursor: 'pointer', textAlign: 'right', borderRight: `1px solid ${t.borderSubtle}`, color: isLight ? '#15803d' : '#4ade80' }}>
                       <div>Live GMP</div>
-                      <div style={{ fontSize: '10px', color: '#86efac' }}>Est. Gain ⇅</div>
+                      <div style={{ fontSize: '10px', color: isLight ? '#16a34a' : '#86efac' }}>Est. Gain ⇅</div>
                     </th>
-                    <th style={{ padding: '10px 8px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th style={{ padding: '10px 8px', textAlign: 'center', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <div>Subscription</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>As On</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>As On</div>
                     </th>
                     <th style={{ padding: '10px 10px', textAlign: 'center' }}>
                       <div>Allotment</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>Status</div>
+                      <div style={{ fontSize: '10px', color: t.textMuted }}>Status</div>
                     </th>
                   </tr>
 
                   {/* Row 2: Per-Column Search Inputs */}
-                  <tr style={{ background: 'rgba(15,23,42,0.85)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <tr style={{ background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.85)', borderBottom: `1px solid ${t.cardBorder}` }}>
                     {[
                       { key: 'company', placeholder: 'Search company...' },
                       { key: 'closeDate', placeholder: 'Search date...' },
@@ -2128,7 +2305,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       { key: 'total', placeholder: 'Min x...' },
                       { key: 'applications', placeholder: 'Min apps...' }
                     ].map(col => (
-                      <th key={col.key} style={{ padding: '5px 6px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                      <th key={col.key} style={{ padding: '5px 6px', borderRight: `1px solid ${t.borderSubtle}` }}>
                         <input
                           type="text"
                           placeholder={col.placeholder}
@@ -2136,16 +2313,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           onChange={e => setColSearch(prev => ({ ...prev, [col.key]: e.target.value }))}
                           style={{
                             width: '100%', boxSizing: 'border-box', padding: '4px 6px',
-                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-                            borderRadius: '4px', color: '#fff', fontSize: '10.5px'
+                            background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+                            borderRadius: '4px', color: t.text, fontSize: '10.5px'
                           }}
                         />
                       </th>
                     ))}
-                    <th style={{ padding: '5px 6px', borderRight: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
+                    <th style={{ padding: '5px 6px', borderRight: `1px solid ${t.borderSubtle}`, textAlign: 'center', fontSize: '10px', color: t.textMuted }}>
                       Price / Lot
                     </th>
-                    <th style={{ padding: '5px 6px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                    <th style={{ padding: '5px 6px', borderRight: `1px solid ${t.borderSubtle}` }}>
                       <input
                         type="text"
                         placeholder="Search date..."
@@ -2153,8 +2330,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         onChange={e => setColSearch(prev => ({ ...prev, asOn: e.target.value }))}
                         style={{
                           width: '100%', boxSizing: 'border-box', padding: '4px 6px',
-                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-                          borderRadius: '4px', color: '#fff', fontSize: '10.5px'
+                          background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+                          borderRadius: '4px', color: t.text, fontSize: '10.5px'
                         }}
                       />
                     </th>
@@ -2165,7 +2342,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           company: '', closeDate: '', issueSizeCr: '', qib: '', snii: '', bnii: '', nii: '',
                           retail: '', employee: '', shareholder: '', others: '', total: '', applications: '', asOn: ''
                         })}
-                        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '4px', padding: '3px 7px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}
+                        style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '4px', padding: '3px 7px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}
                       >
                         Clear
                       </button>
@@ -2176,7 +2353,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 <tbody>
                   {filteredIpos.length === 0 ? (
                     <tr>
-                      <td colSpan="16" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan="16" style={{ padding: '40px', textAlign: 'center', color: t.textMuted }}>
                         No IPOs matched your column search filters. Click "Clear" to reset column filters.
                       </td>
                     </tr>
@@ -2188,18 +2365,18 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                         <tr
                           key={ipo.id || idx}
                           style={{
-                            borderBottom: '1px solid rgba(255,255,255,0.05)',
-                            background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'rgba(59,130,246,0.03)'
+                            borderBottom: `1px solid ${t.tableRowBorder}`,
+                            background: idx % 2 === 0 ? 'transparent' : (isLight ? '#f8fafc' : 'rgba(59,130,246,0.03)')
                           }}
                         >
-                          <td style={{ padding: '10px 12px', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 12px', borderRight: `1px solid ${t.borderSubtle}` }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: '700', color: '#60a5fa' }}>{ipo.name}</span>
+                              <span style={{ fontWeight: '700', color: isLight ? '#1d4ed8' : '#60a5fa' }}>{ipo.name}</span>
                               <span style={{
                                 fontSize: '9.5px',
-                                background: ipo.badge === 'SME' || ipo.category === 'SME' ? 'rgba(59,130,246,0.2)' : 'rgba(34,197,94,0.2)',
-                                color: ipo.badge === 'SME' || ipo.category === 'SME' ? '#93c5fd' : '#86efac',
-                                border: '1px solid rgba(255,255,255,0.15)',
+                                background: ipo.badge === 'SME' || ipo.category === 'SME' ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.2)') : (isLight ? '#dcfce7' : 'rgba(34,197,94,0.2)'),
+                                color: ipo.badge === 'SME' || ipo.category === 'SME' ? (isLight ? '#1d4ed8' : '#93c5fd') : (isLight ? '#15803d' : '#86efac'),
+                                border: `1px solid ${t.borderSubtle}`,
                                 padding: '1px 5px',
                                 borderRadius: '4px',
                                 fontWeight: '800'
@@ -2207,100 +2384,100 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                                 {ipo.badge || ipo.category}
                               </span>
                               {ipo.status === 'OPEN' && (
-                                <span style={{ fontSize: '9px', background: 'rgba(34,197,94,0.2)', color: '#4ade80', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                <span style={{ fontSize: '9px', background: isLight ? '#dcfce7' : 'rgba(34,197,94,0.2)', color: isLight ? '#15803d' : '#4ade80', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
                                   LIVE
                                 </span>
                               )}
                               {ipo.status === 'UPCOMING' && (
-                                <span style={{ fontSize: '9px', background: 'rgba(59,130,246,0.2)', color: '#60a5fa', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                <span style={{ fontSize: '9px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.2)', color: isLight ? '#1d4ed8' : '#60a5fa', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
                                   UPCOMING
                                 </span>
                               )}
                               {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') && (
-                                <span style={{ fontSize: '9px', background: 'rgba(168,85,247,0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                                <span style={{ fontSize: '9px', background: isLight ? '#f3e8ff' : 'rgba(168,85,247,0.2)', color: isLight ? '#7e22ce' : '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
                                   LISTED
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
+                            <div style={{ fontSize: '10.5px', color: t.textMuted, marginTop: '2px' }}>
                               {ipo.priceBand} • Lot: {ipo.lotSize} • {ipo.registrar}
                             </div>
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'center', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'center', color: t.textSecondary, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             <div style={{ fontWeight: '600' }}>
                               {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Listed: ${ipo.listingDate}` : ipo.closeDate}
                             </div>
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>
+                            <div style={{ fontSize: '10px', color: t.textMuted }}>
                               {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Issue: ₹${ipo.issuePrice || ipo.maxPrice}` : `Open: ${ipo.openDate}`}
                             </div>
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: t.text, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {Number(ipo.issueSizeCr || 0).toFixed(2)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.qib)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.snii)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.bnii)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: t.text, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.nii)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: t.text, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.retail)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textMuted, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.employee)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textMuted, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.shareholder)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: '#94a3b8', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textMuted, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {formatSubVal(sub.others)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)', color: totalSub >= 50 ? '#facc15' : (totalSub >= 10 ? '#4ade80' : '#60a5fa') }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}`, color: totalSub >= 50 ? (isLight ? '#ca8a04' : '#facc15') : (totalSub >= 10 ? (isLight ? '#15803d' : '#4ade80') : (isLight ? '#1d4ed8' : '#60a5fa')) }}>
                             {formatSubVal(sub.total)}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: '#e2e8f0', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: t.text, whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {ipo.applications ? ipo.applications.toLocaleString('en-IN') : '-'}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
                               <>
-                                <div style={{ fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                                <div style={{ fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
                                   {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} Gain
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                <div style={{ fontSize: '10px', color: t.textMuted }}>
                                   List: ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
                                 </div>
                               </>
                             ) : (
                               <>
-                                <div style={{ fontWeight: '800', color: '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
-                                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                <div style={{ fontWeight: '800', color: isLight ? '#15803d' : '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
+                                <div style={{ fontSize: '10px', color: t.textMuted }}>
                                   Lot Profit: ₹{((ipo.gmp || 0) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
                                 </div>
                               </>
                             )}
                           </td>
 
-                          <td style={{ padding: '10px 8px', textAlign: 'center', color: '#94a3b8', fontSize: '11px', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'center', color: t.textMuted, fontSize: '11px', whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {ipo.asOn || '12-Oct-2026 17:55'}
                           </td>
 
@@ -2308,7 +2485,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                             <button
                               type="button"
                               onClick={() => setSelectedIpoForCheck(ipo)}
-                              style={{ padding: '5px 10px', background: 'rgba(59,130,246,0.18)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                              style={{ padding: '5px 10px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.18)', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.4)', color: isLight ? '#1d4ed8' : '#60a5fa', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                             >
                               Check Status
                             </button>
@@ -2325,7 +2502,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* VIEW MODE 2: GMP, EST. LOT PROFIT & ALLOTMENT CARDS VIEW */}
           {ipoViewMode === 'CARDS' && (
             filteredIpos.length === 0 ? (
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '40px', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '14px', padding: '40px', textAlign: 'center', color: t.textMuted, boxShadow: t.cardShadow }}>
                 No IPOs found matching this category or status filter.
               </div>
             ) : (
@@ -2338,25 +2515,25 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   return (
                     <div
                       key={ipo.id}
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}
+                      style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: t.cardShadow }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '10.5px', background: ipo.category === 'MAINBOARD' ? 'rgba(59,130,246,0.15)' : 'rgba(234,179,8,0.15)', color: ipo.category === 'MAINBOARD' ? '#60a5fa' : '#eab308', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>
+                            <span style={{ fontSize: '10.5px', background: ipo.category === 'MAINBOARD' ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)') : (isLight ? '#fef9c3' : 'rgba(234,179,8,0.15)'), color: ipo.category === 'MAINBOARD' ? (isLight ? '#1d4ed8' : '#60a5fa') : (isLight ? '#ca8a04' : '#eab308'), padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>
                               {ipo.category}
                             </span>
-                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>
+                            <span style={{ fontSize: '10.5px', color: t.textMuted }}>
                               via {ipo.registrar}
                             </span>
                           </div>
-                          <h3 style={{ margin: '6px 0 0', fontSize: '15px', fontWeight: '700' }}>{ipo.name}</h3>
+                          <h3 style={{ margin: '6px 0 0', fontSize: '15px', fontWeight: '700', color: t.text }}>{ipo.name}</h3>
                         </div>
                         <span style={{
                           fontSize: '11px',
-                          background: ipo.status === 'OPEN' ? 'rgba(34,197,94,0.15)' : (ipo.status === 'UPCOMING' ? 'rgba(59,130,246,0.15)' : 'rgba(168,85,247,0.15)'),
-                          color: ipo.status === 'OPEN' ? '#22c55e' : (ipo.status === 'UPCOMING' ? '#60a5fa' : '#c084fc'),
-                          border: `1px solid ${ipo.status === 'OPEN' ? 'rgba(34,197,94,0.3)' : (ipo.status === 'UPCOMING' ? 'rgba(59,130,246,0.3)' : 'rgba(168,85,247,0.3)')}`,
+                          background: ipo.status === 'OPEN' ? (isLight ? '#dcfce7' : 'rgba(34,197,94,0.15)') : (ipo.status === 'UPCOMING' ? (isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)') : (isLight ? '#f3e8ff' : 'rgba(168,85,247,0.15)')),
+                          color: ipo.status === 'OPEN' ? (isLight ? '#15803d' : '#22c55e') : (ipo.status === 'UPCOMING' ? (isLight ? '#1d4ed8' : '#60a5fa') : (isLight ? '#7e22ce' : '#c084fc')),
+                          border: `1px solid ${ipo.status === 'OPEN' ? (isLight ? '#86efac' : 'rgba(34,197,94,0.3)') : (ipo.status === 'UPCOMING' ? (isLight ? '#93c5fd' : 'rgba(59,130,246,0.3)') : (isLight ? '#d8b4fe' : 'rgba(168,85,247,0.3)'))}`,
                           padding: '3px 8px',
                           borderRadius: '6px',
                           fontWeight: '700'
@@ -2367,26 +2544,26 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
                       {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
                         <div style={{
-                          background: (ipo.listingGainPct || 0) >= 0 ? 'rgba(34,197,94,0.09)' : 'rgba(239,68,68,0.09)',
-                          border: `1px solid ${(ipo.listingGainPct || 0) >= 0 ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)'}`,
+                          background: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.09)') : (isLight ? '#fef2f2' : 'rgba(239,68,68,0.09)'),
+                          border: `1px solid ${(ipo.listingGainPct || 0) >= 0 ? (isLight ? '#bbf7d0' : 'rgba(34,197,94,0.28)') : (isLight ? '#fecaca' : 'rgba(239,68,68,0.28)')}`,
                           padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                         }}>
                           <div>
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Official Listing Gain &amp; Price</div>
-                            <div style={{ fontSize: '15px', fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                            <div style={{ fontSize: '11px', color: t.textMuted }}>Official Listing Gain &amp; Price</div>
+                            <div style={{ fontSize: '15px', fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
                               {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} • Listed at ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
                             </div>
-                            <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                            <div style={{ fontSize: '10.5px', color: t.textSecondary, marginTop: '2px' }}>
                               Issue Price: ₹{ipo.issuePrice || ipo.maxPrice} • Lot Gain: ₹{Math.round(((ipo.listingPrice || ipo.maxPrice) - (ipo.issuePrice || ipo.maxPrice)) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
                             </div>
                           </div>
                           <Award size={22} color={(ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444'} />
                         </div>
                       ) : (
-                        <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.08)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div>
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Live GMP &amp; Est. Lot Profit</div>
-                            <div style={{ fontSize: '15px', fontWeight: '800', color: '#22c55e' }}>
+                            <div style={{ fontSize: '11px', color: t.textMuted }}>Live GMP &amp; Est. Lot Profit</div>
+                            <div style={{ fontSize: '15px', fontWeight: '800', color: isLight ? '#15803d' : '#22c55e' }}>
                               +₹{ipo.gmp} ({ipo.gmpPct}%) • ₹{lotProfit.toLocaleString('en-IN')}/Lot
                             </div>
                           </div>
@@ -2396,47 +2573,47 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
                         <div>
-                          <div style={{ color: '#64748b' }}>Price Band &amp; Lot</div>
-                          <div style={{ fontWeight: '700', color: '#fff', marginTop: '2px' }}>{ipo.priceBand} ({ipo.lotSize} sh)</div>
+                          <div style={{ color: t.textMuted }}>Price Band &amp; Lot</div>
+                          <div style={{ fontWeight: '700', color: t.text, marginTop: '2px' }}>{ipo.priceBand} ({ipo.lotSize} sh)</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b' }}>Min Investment</div>
-                          <div style={{ fontWeight: '700', color: '#fff', marginTop: '2px' }}>₹{minInv.toLocaleString('en-IN')}</div>
+                          <div style={{ color: t.textMuted }}>Min Investment</div>
+                          <div style={{ fontWeight: '700', color: t.text, marginTop: '2px' }}>₹{minInv.toLocaleString('en-IN')}</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b' }}>Issue Size</div>
-                          <div style={{ fontWeight: '700', color: '#fff', marginTop: '2px' }}>₹{ipo.issueSizeCr} Cr</div>
+                          <div style={{ color: t.textMuted }}>Issue Size</div>
+                          <div style={{ fontWeight: '700', color: t.text, marginTop: '2px' }}>₹{ipo.issueSizeCr} Cr</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b' }}>Total Subscription</div>
-                          <div style={{ fontWeight: '800', color: '#60a5fa', marginTop: '2px' }}>
+                          <div style={{ color: t.textMuted }}>Total Subscription</div>
+                          <div style={{ fontWeight: '800', color: isLight ? '#1d4ed8' : '#60a5fa', marginTop: '2px' }}>
                             {sub.total > 0 ? `${sub.total}x (${(ipo.applications || 0).toLocaleString('en-IN')} Apps)` : ((ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `${sub.total || 1}x` : 'Opens Soon')}
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', textAlign: 'center', fontSize: '11px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: t.cardBgSubtle, border: `1px solid ${t.borderSubtle}`, padding: '8px', borderRadius: '8px', textAlign: 'center', fontSize: '11px' }}>
                         <div>
-                          <div style={{ color: '#64748b', fontSize: '10px' }}>QIB</div>
-                          <div style={{ fontWeight: '700', color: '#e2e8f0' }}>{formatSubVal(sub.qib)}x</div>
+                          <div style={{ color: t.textMuted, fontSize: '10px' }}>QIB</div>
+                          <div style={{ fontWeight: '700', color: t.text }}>{formatSubVal(sub.qib)}x</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b', fontSize: '10px' }}>sNII</div>
-                          <div style={{ fontWeight: '700', color: '#e2e8f0' }}>{formatSubVal(sub.snii)}x</div>
+                          <div style={{ color: t.textMuted, fontSize: '10px' }}>sNII</div>
+                          <div style={{ fontWeight: '700', color: t.text }}>{formatSubVal(sub.snii)}x</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b', fontSize: '10px' }}>bNII</div>
-                          <div style={{ fontWeight: '700', color: '#e2e8f0' }}>{formatSubVal(sub.bnii)}x</div>
+                          <div style={{ color: t.textMuted, fontSize: '10px' }}>bNII</div>
+                          <div style={{ fontWeight: '700', color: t.text }}>{formatSubVal(sub.bnii)}x</div>
                         </div>
                         <div>
-                          <div style={{ color: '#64748b', fontSize: '10px' }}>Retail</div>
-                          <div style={{ fontWeight: '700', color: '#4ade80' }}>{formatSubVal(sub.retail)}x</div>
+                          <div style={{ color: t.textMuted, fontSize: '10px' }}>Retail</div>
+                          <div style={{ fontWeight: '700', color: isLight ? '#15803d' : '#4ade80' }}>{formatSubVal(sub.retail)}x</div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: t.textMuted, borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
                         <span>{(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `🎉 Listed: ${ipo.listingDate}` : `📅 ${ipo.openDate} → ${ipo.closeDate}`}</span>
-                        <span style={{ color: (ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? '#c084fc' : '#facc15', fontWeight: '700' }}>
+                        <span style={{ color: (ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (isLight ? '#7e22ce' : '#c084fc') : (isLight ? '#ca8a04' : '#facc15'), fontWeight: '700' }}>
                           {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? `Total Sub: ${sub.total || 1}x` : `🎯 Retail Odds: ${retailOdds}%`}
                         </span>
                       </div>
@@ -2444,7 +2621,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       <button
                         type="button"
                         onClick={() => setSelectedIpoForCheck(ipo)}
-                        style={{ width: '100%', padding: '9px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.35)', color: '#60a5fa', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        style={{ width: '100%', padding: '9px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.35)', color: isLight ? '#1d4ed8' : '#60a5fa', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
                         <CheckCircle2 size={14} /> 1-Click Allotment Status Check
                       </button>
@@ -2459,25 +2636,25 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
       {/* 1-CLICK ALLOTMENT STATUS MODAL */}
       {selectedIpoForCheck && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#111827', border: `1px solid ${t.cardBorder}`, borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px', color: t.text }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '20px' }}>🔍</span>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Live IPO Allotment Status</h3>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: t.text }}>Live IPO Allotment Status</h3>
               </div>
-              <button type="button" onClick={() => setSelectedIpoForCheck(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+              <button type="button" onClick={() => setSelectedIpoForCheck(null)} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: '20px', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '12.5px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div>Company: <strong style={{ color: '#fff' }}>{selectedIpoForCheck.name}</strong></div>
-              <div>Official Registrar: <strong style={{ color: '#60a5fa' }}>{selectedIpoForCheck.registrar}</strong></div>
-              <div>Total Subscription: <strong style={{ color: '#facc15' }}>{selectedIpoForCheck.subscription?.total || 0}x ({(selectedIpoForCheck.applications || 0).toLocaleString('en-IN')} Applications)</strong></div>
-              <div>Listing Date: <strong style={{ color: '#22c55e' }}>{selectedIpoForCheck.listingDate}</strong></div>
+            <div style={{ background: t.cardBgSubtle, border: `1px solid ${t.borderSubtle}`, borderRadius: '10px', padding: '12px', fontSize: '12.5px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div>Company: <strong style={{ color: t.text }}>{selectedIpoForCheck.name}</strong></div>
+              <div>Official Registrar: <strong style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>{selectedIpoForCheck.registrar}</strong></div>
+              <div>Total Subscription: <strong style={{ color: isLight ? '#ca8a04' : '#facc15' }}>{selectedIpoForCheck.subscription?.total || 0}x ({(selectedIpoForCheck.applications || 0).toLocaleString('en-IN')} Applications)</strong></div>
+              <div>Listing Date: <strong style={{ color: isLight ? '#15803d' : '#22c55e' }}>{selectedIpoForCheck.listingDate}</strong></div>
             </div>
 
             <div>
-              <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Enter Your PAN Number (For 1-Click Copy)
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -2487,13 +2664,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   maxLength="10"
                   value={panNumber}
                   onChange={e => setPanNumber(e.target.value.toUpperCase())}
-                  style={{ flex: 1, padding: '10px 14px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#fff', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}
+                  style={{ flex: 1, padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '8px', color: t.text, fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}
                 />
                 <button
                   type="button"
                   onClick={handleCopyPan}
                   disabled={!panNumber}
-                  style={{ padding: '0 14px', background: copiedPan ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)', border: copiedPan ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.15)', color: copiedPan ? '#22c55e' : '#fff', borderRadius: '8px', cursor: panNumber ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '0 14px', background: copiedPan ? (isLight ? '#dcfce7' : 'rgba(34,197,94,0.2)') : t.pillInactiveBg, border: copiedPan ? '1px solid #22c55e' : `1px solid ${t.cardBorder}`, color: copiedPan ? '#22c55e' : t.text, borderRadius: '8px', cursor: panNumber ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   {copiedPan ? <Check size={14} /> : <Copy size={14} />}
                   {copiedPan ? 'Copied' : 'Copy'}
@@ -2516,7 +2693,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   href="https://www.bseindia.com/investors/appli_check.aspx"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ flex: 1, padding: '9px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', textAlign: 'center', borderRadius: '8px', fontSize: '11.5px', fontWeight: '600', textDecoration: 'none' }}
+                  style={{ flex: 1, padding: '9px', background: t.cardBgSubtle, border: `1px solid ${t.cardBorder}`, color: t.textSecondary, textAlign: 'center', borderRadius: '8px', fontSize: '11.5px', fontWeight: '600', textDecoration: 'none' }}
                 >
                   Check on BSE India ↗
                 </a>
@@ -2524,7 +2701,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   href="https://www.nseindia.com/invest/check-trades-and-allotment-details"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ flex: 1, padding: '9px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', textAlign: 'center', borderRadius: '8px', fontSize: '11.5px', fontWeight: '600', textDecoration: 'none' }}
+                  style={{ flex: 1, padding: '9px', background: t.cardBgSubtle, border: `1px solid ${t.cardBorder}`, color: t.textSecondary, textAlign: 'center', borderRadius: '8px', fontSize: '11.5px', fontWeight: '600', textDecoration: 'none' }}
                 >
                   Check on NSE India ↗
                 </a>
