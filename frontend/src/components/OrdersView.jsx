@@ -30,14 +30,16 @@ export default function OrdersView() {
     useStore.getState().fetchUserData?.();
   }, []);
 
-  const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast } = useStore(useShallow(state => ({
+  const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen, isInitialUserDataLoaded, showToast, theme } = useStore(useShallow(state => ({
     orders: state.orders,
     pendingTriggers: state.pendingTriggers,
     removePendingTrigger: state.removePendingTrigger,
     setBasketModalOpen: state.setBasketModalOpen,
     isInitialUserDataLoaded: state.isInitialUserDataLoaded,
-    showToast: state.showToast
+    showToast: state.showToast,
+    theme: state.theme
   })));
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -871,8 +873,8 @@ export default function OrdersView() {
                       padding: '8px 12px',
                       borderRadius: '6px',
                       border: activeTag === item.tag ? `1px solid ${item.color}` : '1px solid var(--border-color)',
-                      background: activeTag === item.tag ? `${item.color}25` : 'var(--bg-hover)',
-                      color: activeTag === item.tag ? '#fff' : 'var(--text-primary)',
+                      background: activeTag === item.tag ? (isLight ? `${item.color}18` : `${item.color}25`) : 'var(--bg-hover)',
+                      color: activeTag === item.tag ? (isLight ? item.color : '#fff') : 'var(--text-primary)',
                       fontSize: '12px',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -935,13 +937,13 @@ export default function OrdersView() {
       {selectedOrder && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', zIndex: 1000,
+          background: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.85)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setSelectedOrder(null)}>
           <div style={{
-            background: '#0d1527', padding: '24px', borderRadius: '8px',
+            background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px',
             width: '90%', maxWidth: '400px', border: '1px solid var(--border-color)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+            boxShadow: isLight ? '0 20px 40px rgba(0,0,0,0.15)' : '0 20px 40px rgba(0,0,0,0.6)'
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Order Details</h3>

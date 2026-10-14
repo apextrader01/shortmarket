@@ -151,6 +151,10 @@ export default function PortfolioView() {
     }))
   );
   const isLight = theme === 'light';
+  const profitColor = isLight ? '#16a34a' : '#00E676';
+  const lossColor = isLight ? '#dc2626' : '#FF3B30';
+  const profitBg = isLight ? 'rgba(22, 163, 74, 0.12)' : 'rgba(0, 230, 118, 0.15)';
+  const lossBg = isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(255, 59, 48, 0.15)';
 
   // Proactively sync user portfolio data whenever PortfolioView is opened
   useEffect(() => {
@@ -706,7 +710,7 @@ export default function PortfolioView() {
             <span style={{ color: 'var(--text-secondary)' }}>Overall Return:</span>
             <span style={{ 
               fontWeight: '700', 
-              color: isGain ? '#00E676' : '#FF3B30',
+              color: isGain ? profitColor : lossColor,
               display: 'flex',
               alignItems: 'center',
               gap: '2px'
@@ -790,8 +794,8 @@ export default function PortfolioView() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: isGain ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Sparkles size={13} style={{ color: isGain ? '#00E676' : '#FF3B30' }} />
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: isGain ? profitBg : lossBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sparkles size={13} style={{ color: isGain ? profitColor : lossColor }} />
                   </div>
                   <span>Total Return</span>
                 </div>
@@ -800,8 +804,8 @@ export default function PortfolioView() {
                   fontWeight: '700', 
                   padding: '1px 5px', 
                   borderRadius: '3px', 
-                  background: isGain ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)', 
-                  color: isGain ? '#00E676' : '#FF3B30' 
+                  background: isGain ? profitBg : lossBg, 
+                  color: isGain ? profitColor : lossColor 
                 }}>
                   {isGain ? 'GAIN' : 'LOSS'}
                 </span>
@@ -810,14 +814,14 @@ export default function PortfolioView() {
                 fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
                 letterSpacing: '-0.3px', 
-                color: isGain ? '#00E676' : '#FF3B30',
+                color: isGain ? profitColor : lossColor,
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {isGain ? '+' : ''}{formatCurrency(overallGain)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Return ROI:</span>
-                <span style={{ color: isGain ? '#00E676' : '#FF3B30', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ color: isGain ? profitColor : lossColor, fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
                   {isGain ? '+' : ''}{overallPct.toFixed(2)}%
                 </span>
               </div>
@@ -836,13 +840,13 @@ export default function PortfolioView() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: unrealizedPnl >= 0 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {unrealizedPnl >= 0 ? <TrendingUp size={13} style={{ color: '#00E676' }} /> : <TrendingDown size={13} style={{ color: '#FF3B30' }} />}
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: unrealizedPnl >= 0 ? profitBg : lossBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {unrealizedPnl >= 0 ? <TrendingUp size={13} style={{ color: profitColor }} /> : <TrendingDown size={13} style={{ color: lossColor }} />}
                   </div>
                   <span>Unrealized P&L</span>
                 </div>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9.5px', fontWeight: '700', padding: '1px 5px', borderRadius: '3px', background: 'rgba(234, 179, 8, 0.12)', color: '#EAB308' }}>
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#00E676', display: 'inline-block' }} />
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: profitColor, display: 'inline-block' }} />
                   LIVE
                 </span>
               </div>
@@ -850,7 +854,7 @@ export default function PortfolioView() {
                 fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
                 letterSpacing: '-0.3px', 
-                color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30',
+                color: unrealizedPnl >= 0 ? profitColor : lossColor,
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
@@ -886,7 +890,7 @@ export default function PortfolioView() {
                 fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
                 letterSpacing: '-0.3px', 
-                color: todayRealizedPnl >= 0 ? '#00E676' : '#FF3B30',
+                color: todayRealizedPnl >= 0 ? profitColor : lossColor,
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {todayRealizedPnl >= 0 ? '+' : ''}{formatCurrency(todayRealizedPnl)}
@@ -1410,7 +1414,7 @@ export default function PortfolioView() {
                             <div style={{ 
                               fontSize: '13px', 
                               fontWeight: '700', 
-                              color: pos.isProfit ? '#00E676' : '#FF3B30' 
+                              color: pos.isProfit ? profitColor : lossColor 
                             }}>
                               {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)} ({pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%)
                             </div>
@@ -1432,15 +1436,15 @@ export default function PortfolioView() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span>{pos.isMf ? 'NAV' : 'LTP'}: <strong style={{ color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</strong></span>
                               {!pos.isMf && (
-                                <span style={{ fontSize: '10px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                <span style={{ fontSize: '10px', color: (pos.chgp || 0) >= 0 ? profitColor : lossColor, fontWeight: '600' }}>
                                   {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
                                 </span>
                               )}
                               <span style={{ 
                                 fontSize: '10px', 
-                                color: pos.isMf ? '#a855f7' : '#FF3B30', 
-                                border: `1px solid ${pos.isMf ? 'rgba(168,85,247,0.3)' : 'rgba(255,59,48,0.3)'}`, 
-                                background: pos.isMf ? 'rgba(168,85,247,0.08)' : 'rgba(255,59,48,0.08)',
+                                color: pos.isMf ? '#a855f7' : lossColor, 
+                                border: `1px solid ${pos.isMf ? 'rgba(168,85,247,0.3)' : (isLight ? 'rgba(220,38,38,0.3)' : 'rgba(255,59,48,0.3)')}`, 
+                                background: pos.isMf ? 'rgba(168,85,247,0.08)' : (isLight ? 'rgba(220,38,38,0.08)' : 'rgba(255,59,48,0.08)'),
                                 padding: '2px 6px', 
                                 borderRadius: '4px', 
                                 fontWeight: '700' 
@@ -1572,10 +1576,10 @@ export default function PortfolioView() {
                             <td style={{ padding: '9px 6px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', width: '85px' }}>{formatCurrency(pos.invested)}</td>
                             <td style={{ padding: '9px 6px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', width: '85px' }}>{formatCurrency(pos.current)}</td>
                             <td style={{ padding: '9px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: '92px' }}>
-                              <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700', fontSize: '12px' }}>
+                              <div style={{ color: pos.isProfit ? profitColor : lossColor, fontWeight: '700', fontSize: '12px' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}
                               </div>
-                              <div style={{ fontSize: '10px', color: pos.isProfit ? '#00E676' : '#FF3B30', opacity: 0.9, fontWeight: '600' }}>
+                              <div style={{ fontSize: '10px', color: pos.isProfit ? profitColor : lossColor, opacity: 0.9, fontWeight: '600' }}>
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
@@ -1605,9 +1609,9 @@ export default function PortfolioView() {
                                       onClick={() => handleMfAction(pos, 'REDEEM')}
                                       title="Redeem Units"
                                       style={{
-                                        background: 'rgba(255, 59, 48, 0.12)',
-                                        color: '#FF3B30',
-                                        border: '1px solid rgba(255, 59, 48, 0.3)',
+                                        background: lossBg,
+                                        color: lossColor,
+                                        border: `1px solid ${lossBorder}`,
                                         padding: '3px 6px',
                                         borderRadius: '4px',
                                         fontSize: '10px',
@@ -1652,9 +1656,9 @@ export default function PortfolioView() {
                                       }}
                                       title={pos.isShort ? 'Exit Short Position' : 'Exit / Sell'}
                                       style={{
-                                        background: 'rgba(255, 59, 48, 0.12)',
-                                        color: '#FF3B30',
-                                        border: '1px solid rgba(255, 59, 48, 0.3)',
+                                        background: lossBg,
+                                        color: lossColor,
+                                        border: `1px solid ${lossBorder}`,
                                         padding: '3px 6px',
                                         borderRadius: '4px',
                                         fontSize: '10px',

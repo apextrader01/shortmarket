@@ -27,6 +27,8 @@ const STRATEGY_TEMPLATES = [
 export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem = null, editingAlgo = null }) {
   const activeEditing = editingItem || editingAlgo;
   const marketStocks = useStore(s => s.stocks);
+  const theme = useStore(s => s.theme);
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme'));
   const [symbol, setSymbol] = useState('NSE:RELIANCE');
   const [customSymbol, setCustomSymbol] = useState('');
   const [strategy, setStrategy] = useState('EMA 9/21 Trend Scalper');
@@ -140,20 +142,20 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
       fontFamily: "'Inter', system-ui, sans-serif"
     }}>
       <div style={{
-        background: '#0d1322',
-        border: '1px solid rgba(56, 189, 248, 0.25)',
+        background: isLight ? 'var(--bg-panel, #ffffff)' : '#0d1322',
+        border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(56, 189, 248, 0.25)',
         borderRadius: '16px',
         width: '100%',
         maxWidth: '520px',
-        color: '#f8fafc',
-        boxShadow: '0 25px 60px -15px rgba(0,0,0,0.8)',
+        color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
+        boxShadow: isLight ? '0 25px 60px -15px rgba(0,0,0,0.15)' : '0 25px 60px -15px rgba(0,0,0,0.8)',
         overflow: 'hidden'
       }}>
         {/* Header */}
         <div style={{
           padding: '16px 20px',
-          background: '#111827',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? 'var(--bg-card, #f8fafc)' : '#111827',
+          borderBottom: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -171,15 +173,15 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
               <Zap size={18} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff' }}>
                 {activeEditing ? 'Configure Algo Parameters' : 'Deploy New Algo Strategy'}
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+              <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94a3b8' }}>
                 Angel One SmartAPI Execution Engine • Sub-15ms Route
               </div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: isLight ? '#64748b' : '#94a3b8', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>
@@ -188,7 +190,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
         <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Select Instrument */}
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12px', color: isLight ? '#475569' : '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
               SELECT INSTRUMENT OR ENTER CUSTOM NSE SYMBOL
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '8px' }}>
@@ -201,16 +203,16 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  background: '#121826',
-                  border: '1px solid #1e293b',
+                  background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b',
                   borderRadius: '8px',
-                  color: '#fff',
+                  color: isLight ? 'var(--text-primary, #0f172a)' : '#fff',
                   fontSize: '13px',
                   fontWeight: '600'
                 }}
               >
                 {instrumentList.map(i => (
-                  <option key={i.symbol} value={i.symbol} style={{ background: '#0f172a', color: '#fff' }}>
+                  <option key={i.symbol} value={i.symbol} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
                     {i.symbol} (₹{Number(i.ltp).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                   </option>
                 ))}
@@ -223,10 +225,10 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  background: '#121826',
-                  border: '1px solid #1e293b',
+                  background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b',
                   borderRadius: '8px',
-                  color: '#38bdf8',
+                  color: isLight ? '#0284c7' : '#38bdf8',
                   fontSize: '12.5px',
                   fontWeight: '700'
                 }}
@@ -236,7 +238,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
 
           {/* Strategy Template */}
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12px', color: isLight ? '#475569' : '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
               ALGORITHM STRATEGY
             </label>
             <select
@@ -245,28 +247,28 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                background: '#121826',
-                border: '1px solid #1e293b',
+                background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826',
+                border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b',
                 borderRadius: '8px',
-                color: '#38bdf8',
+                color: isLight ? '#0284c7' : '#38bdf8',
                 fontSize: '13px',
                 fontWeight: '700'
               }}
             >
               {STRATEGY_TEMPLATES.map(t => (
-                <option key={t.id} value={t.id} style={{ background: '#0f172a', color: '#fff' }}>
+                <option key={t.id} value={t.id} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
                   {t.name}
                 </option>
               ))}
             </select>
-            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', marginTop: '4px' }}>
               {STRATEGY_TEMPLATES.find(t => t.id === strategy)?.desc}
             </div>
           </div>
 
           {/* Execution Mode (Paper vs Live) */}
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12px', color: isLight ? '#475569' : '#94a3b8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
               EXECUTION ENGINE MODE
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -275,10 +277,10 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 onClick={() => setMode('LIVE')}
                 style={{
                   padding: '10px',
-                  background: mode === 'LIVE' ? 'rgba(34, 197, 94, 0.15)' : '#121826',
-                  border: `1px solid ${mode === 'LIVE' ? '#22c55e' : '#1e293b'}`,
+                  background: mode === 'LIVE' ? (isLight ? 'rgba(34, 197, 94, 0.12)' : 'rgba(34, 197, 94, 0.15)') : (isLight ? '#f1f5f9' : '#121826'),
+                  border: `1px solid ${mode === 'LIVE' ? '#22c55e' : (isLight ? 'var(--border-color, #cbd5e1)' : '#1e293b')}`,
                   borderRadius: '8px',
-                  color: mode === 'LIVE' ? '#22c55e' : '#94a3b8',
+                  color: mode === 'LIVE' ? (isLight ? '#16a34a' : '#22c55e') : (isLight ? '#64748b' : '#94a3b8'),
                   fontSize: '12px',
                   fontWeight: '800',
                   cursor: 'pointer'
@@ -292,10 +294,10 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
                 onClick={() => setMode('SANDBOX')}
                 style={{
                   padding: '10px',
-                  background: mode === 'SANDBOX' ? 'rgba(56, 189, 248, 0.15)' : '#121826',
-                  border: `1px solid ${mode === 'SANDBOX' ? '#38bdf8' : '#1e293b'}`,
+                  background: mode === 'SANDBOX' ? (isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.15)') : (isLight ? '#f1f5f9' : '#121826'),
+                  border: `1px solid ${mode === 'SANDBOX' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? 'var(--border-color, #cbd5e1)' : '#1e293b')}`,
                   borderRadius: '8px',
-                  color: mode === 'SANDBOX' ? '#38bdf8' : '#94a3b8',
+                  color: mode === 'SANDBOX' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                   fontSize: '12px',
                   fontWeight: '800',
                   cursor: 'pointer'
@@ -309,39 +311,39 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
           {/* Risk Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>LOTS / QTY</label>
+              <label style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', fontWeight: '700' }}>LOTS / QTY</label>
               <input
                 type="number"
                 min="1"
                 max="50"
                 value={lots}
                 onChange={e => setLots(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', background: '#121826', border: '1px solid #1e293b', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                style={{ width: '100%', padding: '8px 10px', background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b', borderRadius: '6px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '13px', marginTop: '4px' }}
               />
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>TARGET (PTS)</label>
+              <label style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', fontWeight: '700' }}>TARGET (PTS)</label>
               <input
                 type="number"
                 value={targetPts}
                 onChange={e => setTargetPts(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', background: '#121826', border: '1px solid #1e293b', borderRadius: '6px', color: '#22c55e', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
+                style={{ width: '100%', padding: '8px 10px', background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b', borderRadius: '6px', color: isLight ? '#16a34a' : '#22c55e', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
               />
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>STOP LOSS (PTS)</label>
+              <label style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', fontWeight: '700' }}>STOP LOSS (PTS)</label>
               <input
                 type="number"
                 value={slPts}
                 onChange={e => setSlPts(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', background: '#121826', border: '1px solid #1e293b', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
+                style={{ width: '100%', padding: '8px 10px', background: isLight ? 'var(--bg-input, #f8fafc)' : '#121826', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b', borderRadius: '6px', color: isLight ? '#dc2626' : '#ef4444', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
               />
             </div>
           </div>
 
           {/* Trailing SL & Auto Square Off */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#121826', borderRadius: '8px', border: '1px solid #1e293b' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: isLight ? 'var(--bg-card, #f8fafc)' : '#121826', borderRadius: '8px', border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid #1e293b' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: isLight ? 'var(--text-primary, #0f172a)' : '#cbd5e1', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={trailingSl}
@@ -350,13 +352,13 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
               />
               Enable Trailing Stop Loss
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: isLight ? '#64748b' : '#94a3b8' }}>
               Auto Exit:
               <input
                 type="text"
                 value={autoSquareOff}
                 onChange={e => setAutoSquareOff(e.target.value)}
-                style={{ width: '56px', padding: '3px 6px', background: '#090d16', border: '1px solid #1e293b', borderRadius: '4px', color: '#38bdf8', fontSize: '11px', textAlign: 'center', fontWeight: '700' }}
+                style={{ width: '56px', padding: '3px 6px', background: isLight ? '#ffffff' : '#090d16', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #1e293b', borderRadius: '4px', color: isLight ? '#0284c7' : '#38bdf8', fontSize: '11px', textAlign: 'center', fontWeight: '700' }}
               />
             </div>
           </div>
@@ -366,7 +368,7 @@ export default function DeployAlgoModal({ isOpen, onClose, onDeploy, editingItem
             <button
               type="button"
               onClick={onClose}
-              style={{ flex: 1, padding: '12px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '12px', background: isLight ? 'rgba(0, 0, 0, 0.05)' : '#1e293b', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : 'none', color: isLight ? '#475569' : '#cbd5e1', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
             >
               Cancel
             </button>

@@ -31,15 +31,19 @@ export default function MobileStockOverviewModal() {
     openOrderModal,
     setChartModalSymbol,
     setAlertModalSymbol,
-    stocks
+    stocks,
+    theme
   } = useStore(useShallow(state => ({
     mobileStockOverviewSymbol: state.mobileStockOverviewSymbol,
     setMobileStockOverviewSymbol: state.setMobileStockOverviewSymbol,
     openOrderModal: state.openOrderModal,
     setChartModalSymbol: state.setChartModalSymbol,
     setAlertModalSymbol: state.setAlertModalSymbol,
-    stocks: state.stocks || EMPTY_ARRAY
+    stocks: state.stocks || EMPTY_ARRAY,
+    theme: state.theme
   })));
+
+  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
 
   const symbol = mobileStockOverviewSymbol;
   const [activeTab, setActiveTab] = useState('Overview'); // 'Overview' | 'Technicals' | 'Depth'
@@ -285,7 +289,7 @@ export default function MobileStockOverviewModal() {
       >
         {/* Top Drag Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px', cursor: 'grab' }}>
-          <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.2)' }} />
+          <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)' }} />
         </div>
 
         {/* Sheet Header */}
@@ -300,7 +304,7 @@ export default function MobileStockOverviewModal() {
             <button
               onClick={handleClose}
               style={{
-                background: 'rgba(255,255,255,0.06)',
+                background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
                 border: 'none',
                 borderRadius: '50%',
                 width: '32px',
@@ -347,7 +351,7 @@ export default function MobileStockOverviewModal() {
           borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.08))',
           padding: '0 16px',
           gap: '20px',
-          background: 'rgba(255,255,255,0.02)'
+          background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.02)'
         }}>
           {['Overview', 'Technicals', 'Market Depth'].map(tab => (
             <div
@@ -463,7 +467,7 @@ export default function MobileStockOverviewModal() {
                         padding: '6px 0',
                         fontSize: '11px',
                         fontWeight: selectedTimeframe === tf.label ? '700' : '500',
-                        background: selectedTimeframe === tf.label ? 'var(--color-blue, #3b82f6)' : 'rgba(255,255,255,0.05)',
+                        background: selectedTimeframe === tf.label ? 'var(--color-blue, #3b82f6)' : (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)'),
                         color: selectedTimeframe === tf.label ? '#fff' : 'var(--text-secondary, #94a3b8)',
                         border: 'none',
                         borderRadius: '6px',
@@ -555,7 +559,7 @@ export default function MobileStockOverviewModal() {
                   style={{
                     flex: 1,
                     padding: '10px 8px',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
                     color: 'var(--text-primary)',
@@ -575,7 +579,7 @@ export default function MobileStockOverviewModal() {
                   style={{
                     flex: 1,
                     padding: '10px 8px',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
                     color: 'var(--text-primary)',
@@ -595,7 +599,7 @@ export default function MobileStockOverviewModal() {
                   style={{
                     flex: 1,
                     padding: '10px 8px',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
                     color: 'var(--text-primary)',
@@ -624,17 +628,17 @@ export default function MobileStockOverviewModal() {
                 border: '1px solid var(--border-color, rgba(255,255,255,0.06))'
               }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Technical Summary</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Overall Sentiment</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: analysisColor }}>{priceAnalysis}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>RSI (14)</span>
                   <span style={{ fontSize: '13px', fontWeight: '600' }}>
                     {pct > 1 ? '68.4 (Bullish)' : pct < -1 ? '34.2 (Bearish)' : '52.1 (Neutral)'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>MACD (12, 26, 9)</span>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                     {isUp ? '+1.42 (Bullish Crossover)' : '-0.88 (Bearish Crossover)'}
@@ -696,7 +700,7 @@ export default function MobileStockOverviewModal() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
                 {/* Bids Column */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: '600' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>
                     <span>Bid Qty</span>
                     <span>Bid Price</span>
                   </div>
@@ -706,7 +710,7 @@ export default function MobileStockOverviewModal() {
                       <span style={{ zIndex: 1 }}>₹{Number(b.price).toFixed(2)}</span>
                     </div>
                   ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', fontWeight: '700', color: 'var(--color-green-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid var(--border-color)', fontWeight: '700', color: 'var(--color-green-light)' }}>
                     <span>Total</span>
                     <span>{totalBidQty}</span>
                   </div>
@@ -714,7 +718,7 @@ export default function MobileStockOverviewModal() {
 
                 {/* Asks Column */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: '600' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>
                     <span>Ask Price</span>
                     <span>Ask Qty</span>
                   </div>
@@ -724,7 +728,7 @@ export default function MobileStockOverviewModal() {
                       <span style={{ zIndex: 1 }}>{a.qty || a.quantity}</span>
                     </div>
                   ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', fontWeight: '700', color: 'var(--color-red-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid var(--border-color)', fontWeight: '700', color: 'var(--color-red-light)' }}>
                     <span>Total</span>
                     <span>{totalAskQty}</span>
                   </div>
@@ -806,7 +810,7 @@ function RangeBar({ min, max, current }) {
   const percent = Math.max(0, Math.min(100, ((numCur - numMin) / range) * 100));
 
   return (
-    <div style={{ position: 'relative', height: '6px', width: '100%', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', margin: '8px 0' }}>
+    <div style={{ position: 'relative', height: '6px', width: '100%', background: 'var(--bg-hover, rgba(255,255,255,0.08))', borderRadius: '3px', margin: '8px 0' }}>
       <div 
         style={{
           position: 'absolute',
@@ -828,7 +832,7 @@ function RangeBar({ min, max, current }) {
 
 function StatItem({ label, value }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '6px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'var(--bg-hover, rgba(255,255,255,0.02))', padding: '8px 10px', borderRadius: '6px' }}>
       <span style={{ fontSize: '10px', color: 'var(--text-secondary, #94a3b8)' }}>{label}</span>
       <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{value}</span>
     </div>

@@ -2,6 +2,7 @@
 // 🌟 Hub 06: Mutual Funds & SIP Alpha Explorer (Direct vs Regular Fee Savings, 44 AMCs & 1-Click SIP Projection)
 
 import React, { useState, useMemo } from 'react';
+import { useStore } from '../store';
 import { 
   X, BarChart2, TrendingUp, Sparkles, Award, ShieldCheck, 
   ArrowUpRight, Calculator, Search, Filter, Layers, DollarSign,
@@ -233,6 +234,8 @@ export default function MutualFundsExplorerModal({
   onOpenSipCalculator,
   onOpenPaperTradingMf
 }) {
+  const { theme } = useStore();
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme'));
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -291,7 +294,7 @@ export default function MutualFundsExplorerModal({
     <div style={{
       position: 'fixed',
       inset: 0,
-      backgroundColor: 'rgba(5, 10, 20, 0.88)',
+      backgroundColor: isLight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(5, 10, 20, 0.88)',
       backdropFilter: 'blur(10px)',
       display: 'flex',
       alignItems: 'center',
@@ -300,25 +303,25 @@ export default function MutualFundsExplorerModal({
       padding: '16px'
     }}>
       <div style={{
-        background: 'var(--bg-panel, #0f172a)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: isLight ? '#ffffff' : 'var(--bg-panel, #0f172a)',
+        border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '18px',
         width: '100%',
         maxWidth: '980px',
         height: '92vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.85)',
+        boxShadow: isLight ? '0 25px 50px -12px rgba(0, 0, 0, 0.2)' : '0 30px 60px -15px rgba(0, 0, 0, 0.85)',
         overflow: 'hidden'
       }}>
         {/* Top Header */}
         <div style={{
           padding: '18px 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
           flexWrap: 'wrap',
           gap: '12px'
         }}>
@@ -327,28 +330,28 @@ export default function MutualFundsExplorerModal({
               width: '40px',
               height: '40px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(96, 165, 250, 0.1))',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
+              background: isLight ? 'rgba(59, 130, 246, 0.12)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(96, 165, 250, 0.1))',
+              border: isLight ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid rgba(59, 130, 246, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#60a5fa'
+              color: isLight ? '#2563eb' : '#60a5fa'
             }}>
               <BarChart2 size={22} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.2px' }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', letterSpacing: '-0.2px' }}>
                   Mutual Funds & Direct SIP Alpha Explorer
                 </h2>
-                <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                <span style={{ fontSize: '11px', background: isLight ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.15)', color: isLight ? '#2563eb' : '#60a5fa', border: isLight ? '1px solid rgba(59,130,246,0.25)' : '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
                   44 Indian AMCs
                 </span>
-                <span style={{ fontSize: '11px', background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                <span style={{ fontSize: '11px', background: isLight ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.15)', color: isLight ? '#16a34a' : '#4ade80', border: isLight ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(34,197,94,0.3)', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
                   ₹0 Distributor Fee
                 </span>
               </div>
-              <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: isLight ? '#64748b' : '#94a3b8' }}>
                 Discover top direct plans with lowest Expense Ratios, 5-Year CAGR track records and commission savings comparison.
               </p>
             </div>
@@ -358,12 +361,12 @@ export default function MutualFundsExplorerModal({
             type="button"
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+              border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '8px',
               padding: '7px',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: isLight ? '#475569' : '#94a3b8',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -380,8 +383,8 @@ export default function MutualFundsExplorerModal({
           {/* DIRECT VS REGULAR COMMISSION SAVINGS CALCULATOR                           */}
           {/* ───────────────────────────────────────────────────────────────────────── */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.25), rgba(15, 23, 42, 0.45))',
-            border: '1px solid rgba(59, 130, 246, 0.35)',
+            background: isLight ? 'linear-gradient(135deg, rgba(239, 246, 255, 0.85), rgba(248, 250, 252, 0.95))' : 'linear-gradient(135deg, rgba(30, 58, 138, 0.25), rgba(15, 23, 42, 0.45))',
+            border: isLight ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid rgba(59, 130, 246, 0.35)',
             borderRadius: '14px',
             padding: '18px 20px',
             display: 'flex',
@@ -390,12 +393,12 @@ export default function MutualFundsExplorerModal({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Percent size={18} color="#60a5fa" />
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                <Percent size={18} color={isLight ? '#2563eb' : '#60a5fa'} />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: isLight ? '#1e3a8a' : '#fff' }}>
                   Direct Plan vs Regular Plan Wealth Multiplier
                 </h3>
               </div>
-              <span style={{ fontSize: '11px', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+              <span style={{ fontSize: '11px', color: isLight ? '#1d4ed8' : '#93c5fd', background: isLight ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
                 Regular plans secretly deduct 1.0% - 1.5% in distributor commissions every year
               </span>
             </div>
@@ -404,8 +407,8 @@ export default function MutualFundsExplorerModal({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '11.5px', color: '#cbd5e1', fontWeight: '600' }}>Monthly SIP Amount</label>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#60a5fa' }}>₹{sipMonthly.toLocaleString('en-IN')}</span>
+                  <label style={{ fontSize: '11.5px', color: isLight ? '#475569' : '#cbd5e1', fontWeight: '600' }}>Monthly SIP Amount</label>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: isLight ? '#2563eb' : '#60a5fa' }}>₹{sipMonthly.toLocaleString('en-IN')}</span>
                 </div>
                 <input 
                   type="range"
@@ -420,8 +423,8 @@ export default function MutualFundsExplorerModal({
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '11.5px', color: '#cbd5e1', fontWeight: '600' }}>SIP Duration</label>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#60a5fa' }}>{sipYears} Years</span>
+                  <label style={{ fontSize: '11.5px', color: isLight ? '#475569' : '#cbd5e1', fontWeight: '600' }}>SIP Duration</label>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: isLight ? '#2563eb' : '#60a5fa' }}>{sipYears} Years</span>
                 </div>
                 <input 
                   type="range"
@@ -436,8 +439,8 @@ export default function MutualFundsExplorerModal({
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '11.5px', color: '#cbd5e1', fontWeight: '600' }}>Expected CAGR Return</label>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#22c55e' }}>{expectedReturn}% p.a.</span>
+                  <label style={{ fontSize: '11.5px', color: isLight ? '#475569' : '#cbd5e1', fontWeight: '600' }}>Expected CAGR Return</label>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: isLight ? '#16a34a' : '#22c55e' }}>{expectedReturn}% p.a.</span>
                 </div>
                 <input 
                   type="range"
@@ -453,30 +456,30 @@ export default function MutualFundsExplorerModal({
 
             {/* Results KPI Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '4px' }}>
-              <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>Total Invested Capital</span>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+              <div style={{ background: isLight ? '#ffffff' : 'rgba(0,0,0,0.35)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94a3b8' }}>Total Invested Capital</span>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: isLight ? '#0f172a' : '#fff', marginTop: '2px' }}>
                   ₹{(savingsCalculation.totalInvested / 100000).toFixed(2)} Lakhs
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#86efac' }}>Direct Plan Corpus (₹0 Fee)</span>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#22c55e', marginTop: '2px' }}>
+              <div style={{ background: isLight ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.1)', border: isLight ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#15803d' : '#86efac' }}>Direct Plan Corpus (₹0 Fee)</span>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: isLight ? '#16a34a' : '#22c55e', marginTop: '2px' }}>
                   ₹{(savingsCalculation.directCorpus / 100000).toFixed(2)} Lakhs
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#fca5a5' }}>Regular Plan Corpus (Broker Cut)</span>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: '#f87171', marginTop: '2px' }}>
+              <div style={{ background: isLight ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.08)', border: isLight ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '12px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#b91c1c' : '#fca5a5' }}>Regular Plan Corpus (Broker Cut)</span>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: isLight ? '#dc2626' : '#f87171', marginTop: '2px' }}>
                   ₹{(savingsCalculation.regularCorpus / 100000).toFixed(2)} Lakhs
                 </div>
               </div>
 
-              <div style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(245,158,11,0.05))', border: '1px solid rgba(234,179,8,0.4)', borderRadius: '10px', padding: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#fef08a' }}>💰 Money Saved by Going Direct</span>
-                <div style={{ fontSize: '17px', fontWeight: '800', color: '#facc15', marginTop: '2px' }}>
+              <div style={{ background: isLight ? 'linear-gradient(135deg, rgba(254, 240, 138, 0.4), rgba(253, 230, 138, 0.2))' : 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(245,158,11,0.05))', border: isLight ? '1px solid rgba(202, 138, 4, 0.4)' : '1px solid rgba(234,179,8,0.4)', borderRadius: '10px', padding: '12px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#854d0e' : '#fef08a' }}>💰 Money Saved by Going Direct</span>
+                <div style={{ fontSize: '17px', fontWeight: '800', color: isLight ? '#b45309' : '#facc15', marginTop: '2px' }}>
                   +₹{(savingsCalculation.commissionLost / 100000).toFixed(2)} Lakhs
                 </div>
               </div>
@@ -490,7 +493,7 @@ export default function MutualFundsExplorerModal({
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Search Box */}
               <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
-                <Search size={15} style={{ position: 'absolute', left: '12px', top: '11px', color: '#64748b' }} />
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '11px', color: isLight ? '#94a3b8' : '#64748b' }} />
                 <input
                   type="text"
                   placeholder="Search funds, AMC or categories (e.g. Parag Parikh, Small Cap, Nifty 50, ELSS)..."
@@ -499,10 +502,10 @@ export default function MutualFundsExplorerModal({
                   style={{
                     width: '100%',
                     padding: '9px 12px 9px 36px',
-                    background: 'rgba(0,0,0,0.35)',
-                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: isLight ? '#ffffff' : 'rgba(0,0,0,0.35)',
+                    border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.12)',
                     borderRadius: '8px',
-                    color: '#fff',
+                    color: isLight ? '#0f172a' : '#fff',
                     fontSize: '13px',
                     outline: 'none'
                   }}
@@ -530,9 +533,9 @@ export default function MutualFundsExplorerModal({
                       fontWeight: '700',
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
-                      background: selectedCategory === cat.id ? 'rgba(59, 130, 246, 0.22)' : 'rgba(255, 255, 255, 0.04)',
-                      color: selectedCategory === cat.id ? '#60a5fa' : '#94a3b8',
-                      border: selectedCategory === cat.id ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)'
+                      background: selectedCategory === cat.id ? (isLight ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.22)') : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)'),
+                      color: selectedCategory === cat.id ? (isLight ? '#1d4ed8' : '#60a5fa') : (isLight ? '#64748b' : '#94a3b8'),
+                      border: selectedCategory === cat.id ? '1px solid rgba(59, 130, 246, 0.5)' : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)')
                     }}
                   >
                     {cat.label}
@@ -554,14 +557,15 @@ export default function MutualFundsExplorerModal({
                 <div
                   key={fund.id}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.02)',
+                    border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '12px',
                     padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     gap: '12px',
+                    boxShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.05)' : 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -570,61 +574,61 @@ export default function MutualFundsExplorerModal({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                          <span style={{ fontSize: '10px', background: isLight ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)', color: isLight ? '#2563eb' : '#60a5fa', border: isLight ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                             {fund.categoryLabel}
                           </span>
                           {fund.tag && (
-                            <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                            <span style={{ fontSize: '10px', background: isLight ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.15)', color: isLight ? '#16a34a' : '#4ade80', border: isLight ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                               {fund.tag}
                             </span>
                           )}
                         </div>
-                        <h4 style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '800', color: '#f8fafc', lineHeight: '1.3' }}>
+                        <h4 style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', lineHeight: '1.3' }}>
                           {fund.name}
                         </h4>
-                        <span style={{ fontSize: '11px', color: '#64748b' }}>{fund.amc}</span>
+                        <span style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b' }}>{fund.amc}</span>
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>₹{fund.nav.toFixed(2)}</div>
-                        <span style={{ fontSize: '10px', color: '#94a3b8' }}>NAV</span>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: isLight ? '#0f172a' : '#fff' }}>₹{fund.nav.toFixed(2)}</div>
+                        <span style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8' }}>NAV</span>
                       </div>
                     </div>
 
                     {/* Performance CAGR Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 10px', marginTop: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.3)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 10px', marginTop: '12px' }}>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>1Y Return</div>
-                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: fund.cagr1y >= 0 ? '#22c55e' : '#ef4444' }}>
+                        <div style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8' }}>1Y Return</div>
+                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: fund.cagr1y >= 0 ? (isLight ? '#16a34a' : '#22c55e') : (isLight ? '#dc2626' : '#ef4444') }}>
                           +{fund.cagr1y}%
                         </div>
                       </div>
-                      <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>3Y CAGR</div>
-                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#22c55e' }}>
+                      <div style={{ textAlign: 'center', borderLeft: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)', borderRight: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8' }}>3Y CAGR</div>
+                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: fund.cagr3y >= 0 ? (isLight ? '#16a34a' : '#22c55e') : (isLight ? '#dc2626' : '#ef4444') }}>
                           +{fund.cagr3y}%
                         </div>
                       </div>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>5Y CAGR</div>
-                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#38bdf8' }}>
+                        <div style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94a3b8' }}>5Y CAGR</div>
+                        <div style={{ fontSize: '12.5px', fontWeight: '800', color: isLight ? '#0284c7' : '#38bdf8' }}>
                           +{fund.cagr5y}%
                         </div>
                       </div>
                     </div>
 
                     {/* Expense Ratio Direct vs Regular Comparison */}
-                    <div style={{ marginTop: '10px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(234, 179, 8, 0.06)', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '6px 10px', borderRadius: '6px' }}>
+                    <div style={{ marginTop: '10px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isLight ? 'rgba(234, 179, 8, 0.1)' : 'rgba(234, 179, 8, 0.06)', border: isLight ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid rgba(234, 179, 8, 0.2)', padding: '6px 10px', borderRadius: '6px' }}>
                       <div>
-                        <span style={{ color: '#94a3b8' }}>TER: </span>
-                        <strong style={{ color: '#22c55e' }}>{fund.directTer}% Direct</strong>
-                        <span style={{ color: '#64748b' }}> vs {fund.regularTer}% Regular</span>
+                        <span style={{ color: isLight ? '#475569' : '#94a3b8' }}>TER: </span>
+                        <strong style={{ color: isLight ? '#16a34a' : '#22c55e' }}>{fund.directTer}% Direct</strong>
+                        <span style={{ color: isLight ? '#64748b' : '#64748b' }}> vs {fund.regularTer}% Regular</span>
                       </div>
-                      <span style={{ color: '#facc15', fontWeight: '700' }}>Save {annualSavings}%/yr</span>
+                      <span style={{ color: isLight ? '#b45309' : '#facc15', fontWeight: '700' }}>Save {annualSavings}%/yr</span>
                     </div>
 
                     {/* AUM & Min SIP */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '10.5px', color: '#64748b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '10.5px', color: isLight ? '#64748b' : '#64748b' }}>
                       <span>AUM: ₹{(fund.aumCr / 1000).toFixed(1)}k Cr</span>
                       <span>Min SIP: ₹{fund.minSip}</span>
                     </div>
@@ -646,10 +650,10 @@ export default function MutualFundsExplorerModal({
                       style={{
                         flex: 1,
                         padding: '8px',
-                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2))',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        background: isLight ? 'rgba(59, 130, 246, 0.08)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2))',
+                        border: isLight ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(59, 130, 246, 0.4)',
                         borderRadius: '6px',
-                        color: '#60a5fa',
+                        color: isLight ? '#1d4ed8' : '#60a5fa',
                         fontSize: '11.5px',
                         fontWeight: '700',
                         cursor: 'pointer',
@@ -672,16 +676,16 @@ export default function MutualFundsExplorerModal({
         {/* Footer */}
         <div style={{
           padding: '12px 24px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(255, 255, 255, 0.02)',
+          borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '10px'
         }}>
-          <div style={{ fontSize: '11.5px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ShieldCheck size={14} color="#22c55e" />
+          <div style={{ fontSize: '11.5px', color: isLight ? '#64748b' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={14} color={isLight ? '#16a34a' : '#22c55e'} />
             <span>SEBI mandated direct plans eliminate distributor commissions, delivering 100% compounding returns to the investor.</span>
           </div>
 
@@ -690,10 +694,10 @@ export default function MutualFundsExplorerModal({
             onClick={onClose}
             style={{
               padding: '6px 14px',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+              border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '6px',
-              color: '#f8fafc',
+              color: isLight ? '#1e293b' : '#f8fafc',
               fontSize: '12px',
               fontWeight: '600',
               cursor: 'pointer'

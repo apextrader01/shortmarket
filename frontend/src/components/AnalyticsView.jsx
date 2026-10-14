@@ -32,7 +32,14 @@ export default function AnalyticsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { user } = useStore(useShallow(state => ({ user: state.user })));
+  const { user, theme } = useStore(useShallow(state => ({ user: state.user, theme: state.theme })));
+  const isLight = theme === 'light';
+  const profitColor = isLight ? '#16a34a' : '#00E676';
+  const lossColor = isLight ? '#dc2626' : '#FF3B30';
+  const profitBg = isLight ? 'rgba(22, 163, 74, 0.12)' : 'rgba(0, 230, 118, 0.12)';
+  const lossBg = isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(255, 59, 48, 0.12)';
+  const profitBorder = isLight ? 'rgba(22, 163, 74, 0.3)' : 'rgba(0, 230, 118, 0.3)';
+  const lossBorder = isLight ? 'rgba(220, 38, 38, 0.3)' : 'rgba(255, 59, 48, 0.3)';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('ALL'); // '1W', '1M', '3M', 'YTD', 'ALL'
@@ -193,7 +200,7 @@ export default function AnalyticsView() {
             <div style={{ 
               fontSize: '18px', 
               fontWeight: '700', 
-              color: isPointPositive ? '#00E676' : '#FF3B30',
+              color: isPointPositive ? profitColor : lossColor,
               display: 'flex',
               alignItems: 'center',
               gap: '4px'
@@ -206,7 +213,7 @@ export default function AnalyticsView() {
             <span style={{ color: 'var(--text-secondary)' }}>Daily P&L:</span>
             <span style={{ 
               fontWeight: '600', 
-              color: isDailyPositive ? '#00E676' : '#FF3B30',
+              color: isDailyPositive ? profitColor : lossColor,
               display: 'flex',
               alignItems: 'center',
               gap: '2px'
@@ -248,9 +255,9 @@ export default function AnalyticsView() {
             {totalTrades}
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-            <span style={{ color: '#00E676', fontWeight: '600' }}>{winningTrades} W</span>
+            <span style={{ color: profitColor, fontWeight: '600' }}>{winningTrades} W</span>
             <span>•</span>
-            <span style={{ color: '#FF3B30', fontWeight: '600' }}>{losingTrades} L</span>
+            <span style={{ color: lossColor, fontWeight: '600' }}>{losingTrades} L</span>
           </div>
         </div>
 
@@ -267,11 +274,11 @@ export default function AnalyticsView() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '12px', fontWeight: '500' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Target size={15} style={{ color: parseFloat(winRate) >= 50 ? '#00E676' : '#EAB308' }} /> Win Rate
+              <Target size={15} style={{ color: parseFloat(winRate) >= 50 ? profitColor : '#EAB308' }} /> Win Rate
             </span>
             <span style={{ 
-              background: parseFloat(winRate) >= 50 ? 'rgba(0, 230, 118, 0.1)' : 'rgba(234, 179, 8, 0.1)', 
-              color: parseFloat(winRate) >= 50 ? '#00E676' : '#EAB308', 
+              background: parseFloat(winRate) >= 50 ? profitBg : 'rgba(234, 179, 8, 0.1)', 
+              color: parseFloat(winRate) >= 50 ? profitColor : '#EAB308', 
               padding: '2px 6px', 
               borderRadius: '4px', 
               fontSize: '10px', 
@@ -284,13 +291,13 @@ export default function AnalyticsView() {
             fontSize: isMobile ? '20px' : '26px', 
             fontWeight: '700', 
             letterSpacing: '-0.5px',
-            color: parseFloat(winRate) >= 50 ? '#00E676' : '#EAB308'
+            color: parseFloat(winRate) >= 50 ? profitColor : '#EAB308'
           }}>
             {winRate}%
           </div>
           {/* Mini progress bar */}
           <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(100, Math.max(0, parseFloat(winRate)))}%`, height: '100%', background: parseFloat(winRate) >= 50 ? 'linear-gradient(90deg, #00E676, #2563eb)' : '#EAB308', borderRadius: '2px' }} />
+            <div style={{ width: `${Math.min(100, Math.max(0, parseFloat(winRate)))}%`, height: '100%', background: parseFloat(winRate) >= 50 ? `linear-gradient(90deg, ${profitColor}, #2563eb)` : '#EAB308', borderRadius: '2px' }} />
           </div>
         </div>
 
@@ -332,16 +339,16 @@ export default function AnalyticsView() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '12px', fontWeight: '500' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <TrendingUp size={15} style={{ color: '#00E676' }} /> Avg Win / Loss
+              <TrendingUp size={15} style={{ color: profitColor }} /> Avg Win / Loss
             </span>
             <span style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>PER TRADE</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: isMobile ? '16px' : '19px', fontWeight: '700', color: '#00E676' }}>
+            <span style={{ fontSize: isMobile ? '16px' : '19px', fontWeight: '700', color: profitColor }}>
               +₹{parseFloat(avgWinner).toFixed(0)}
             </span>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>/</span>
-            <span style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#FF3B30' }}>
+            <span style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: lossColor }}>
               -₹{parseFloat(avgLoser).toFixed(0)}
             </span>
           </div>
@@ -384,9 +391,9 @@ export default function AnalyticsView() {
                 fontWeight: '600',
                 padding: '2px 8px',
                 borderRadius: '12px',
-                background: isNetPositive ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)',
-                color: isNetPositive ? '#00E676' : '#FF3B30',
-                border: `1px solid ${isNetPositive ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 59, 48, 0.3)'}`
+                background: isNetPositive ? profitBg : lossBg,
+                color: isNetPositive ? profitColor : lossColor,
+                border: `1px solid ${isNetPositive ? profitBorder : lossBorder}`
               }}>
                 {isNetPositive ? 'PROFITABLE' : 'DRAWDOWN'}
               </span>
@@ -394,7 +401,7 @@ export default function AnalyticsView() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '13px', flexWrap: 'wrap' }}>
               <div>
                 <span style={{ color: 'var(--text-secondary)' }}>Net P&L: </span>
-                <span style={{ fontWeight: '700', color: isNetPositive ? '#00E676' : '#FF3B30' }}>
+                <span style={{ fontWeight: '700', color: isNetPositive ? profitColor : lossColor }}>
                   {isNetPositive ? '+' : ''}{formatCurrency(stats.netEquity)}
                 </span>
               </div>
@@ -454,21 +461,21 @@ export default function AnalyticsView() {
                 <defs>
                   {/* Glowing SVG Filters */}
                   <filter id="equityGlow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={isNetPositive ? '#00E676' : '#FF3B30'} floodOpacity="0.4" />
+                    <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={isNetPositive ? profitColor : lossColor} floodOpacity="0.4" />
                   </filter>
 
                   {/* Gradient for Bullish / Profitable Equity */}
                   <linearGradient id="gradientGreen" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00E676" stopOpacity={0.45} />
+                    <stop offset="0%" stopColor={profitColor} stopOpacity={0.45} />
                     <stop offset="60%" stopColor="#2563eb" stopOpacity={0.12} />
-                    <stop offset="100%" stopColor="#00E676" stopOpacity={0.0} />
+                    <stop offset="100%" stopColor={profitColor} stopOpacity={0.0} />
                   </linearGradient>
 
                   {/* Gradient for Drawdown / Negative Equity */}
                   <linearGradient id="gradientRed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FF3B30" stopOpacity={0.45} />
+                    <stop offset="0%" stopColor={lossColor} stopOpacity={0.45} />
                     <stop offset="60%" stopColor="#E11D48" stopOpacity={0.12} />
-                    <stop offset="100%" stopColor="#FF3B30" stopOpacity={0.0} />
+                    <stop offset="100%" stopColor={lossColor} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
 
@@ -522,14 +529,14 @@ export default function AnalyticsView() {
                 <Area 
                   type="monotone" 
                   dataKey="cumulative" 
-                  stroke={isNetPositive ? '#00E676' : '#FF3B30'} 
+                  stroke={isNetPositive ? profitColor : lossColor} 
                   strokeWidth={2.5} 
                   fillOpacity={1} 
                   fill={isNetPositive ? 'url(#gradientGreen)' : 'url(#gradientRed)'}
                   isAnimationActive={false}
                   activeDot={{ 
                     r: 6, 
-                    fill: isNetPositive ? '#00E676' : '#FF3B30', 
+                    fill: isNetPositive ? profitColor : lossColor, 
                     stroke: '#FFFFFF', 
                     strokeWidth: 2,
                     filter: 'url(#equityGlow)'
@@ -595,8 +602,8 @@ export default function AnalyticsView() {
                           fontWeight: '700', 
                           padding: '2px 6px', 
                           borderRadius: '4px', 
-                          background: trade.side === 'BUY' ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)',
-                          color: trade.side === 'BUY' ? '#00E676' : '#FF3B30'
+                          background: trade.side === 'BUY' ? profitBg : lossBg,
+                          color: trade.side === 'BUY' ? profitColor : lossColor
                         }}>
                           {trade.side}
                         </span>
@@ -604,7 +611,7 @@ export default function AnalyticsView() {
                       <div style={{ 
                         fontWeight: '700', 
                         fontSize: '14px', 
-                        color: isWin ? '#00E676' : '#FF3B30' 
+                        color: isWin ? profitColor : lossColor 
                       }}>
                         {isWin ? '+' : ''}{formatCurrency(pnl)}
                       </div>
@@ -650,8 +657,8 @@ export default function AnalyticsView() {
                           borderRadius: '4px', 
                           fontSize: '11px', 
                           fontWeight: '700',
-                          background: trade.side === 'BUY' ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)',
-                          color: trade.side === 'BUY' ? '#00E676' : '#FF3B30'
+                          background: trade.side === 'BUY' ? profitBg : lossBg,
+                          color: trade.side === 'BUY' ? profitColor : lossColor
                         }}>
                           {trade.side}
                         </span>
@@ -664,7 +671,7 @@ export default function AnalyticsView() {
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: '700', color: isWin ? '#00E676' : '#FF3B30' }}>
+                      <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: '700', color: isWin ? profitColor : lossColor }}>
                         {isWin ? '+' : ''}{formatCurrency(pnl)}
                       </td>
                     </tr>

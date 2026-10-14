@@ -7,7 +7,7 @@ import {
   ArrowUpRight, Database, Lock, Key, FileText, ChevronRight, Sparkles,
   Search, Shield, Phone, KeyRound, Check, ExternalLink, Building2, UserCheck
 } from 'lucide-react';
-import { API } from '../store';
+import { API, useStore } from '../store';
 
 // 102 Curated SEBI Registered Brokers, Depositories & Mutual Fund Portals
 const ALL_BROKERS = [
@@ -121,6 +121,8 @@ const ALL_BROKERS = [
 ];
 
 export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds }) {
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light';
   const [brokerStatus, setBrokerStatus] = useState(() => {
     try {
       const saved = localStorage.getItem('shortmarket_broker_connections');
@@ -273,25 +275,25 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
       padding: '16px'
     }}>
       <div style={{
-        background: 'var(--bg-panel, #0f172a)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: isLight ? '#ffffff' : 'var(--bg-panel, #0f172a)',
+        border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '18px',
         width: '100%',
         maxWidth: '960px',
         height: '92vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.85)',
+        boxShadow: isLight ? '0 25px 50px -12px rgba(0,0,0,0.15)' : '0 30px 60px -15px rgba(0, 0, 0, 0.85)',
         overflow: 'hidden'
       }}>
         {/* Top Header */}
         <div style={{
           padding: '18px 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
           flexWrap: 'wrap',
           gap: '12px'
         }}>
@@ -311,7 +313,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.2px' }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', letterSpacing: '-0.2px' }}>
                   Multi-Broker & Depository Connect
                 </h2>
                 <span style={{ fontSize: '11px', background: 'rgba(6,182,212,0.15)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.3)', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
@@ -323,7 +325,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                   </span>
                 )}
               </div>
-              <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: isLight ? '#64748b' : '#94a3b8' }}>
                 RBI & SEBI certified Account Aggregator (AA) consent framework. OTP-verified read-only portfolio sync.
               </p>
             </div>
@@ -333,12 +335,12 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
             type="button"
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+              border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '8px',
               padding: '7px',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: isLight ? '#64748b' : '#94a3b8',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -397,7 +399,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
         )}
 
         {/* Search & Filter Bar */}
-        <div style={{ padding: '16px 24px 12px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '16px 24px 12px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Search Input */}
             <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
@@ -410,10 +412,10 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                 style={{
                   width: '100%',
                   padding: '9px 12px 9px 36px',
-                  background: 'rgba(0,0,0,0.35)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.35)',
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.12)',
                   borderRadius: '8px',
-                  color: '#fff',
+                  color: isLight ? '#0f172a' : '#fff',
                   fontSize: '13px',
                   outline: 'none'
                 }}
@@ -440,9 +442,15 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                     fontWeight: '700',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    background: categoryFilter === f.id ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: categoryFilter === f.id ? '#22d3ee' : '#94a3b8',
-                    border: categoryFilter === f.id ? '1px solid rgba(6, 182, 212, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)'
+                    background: categoryFilter === f.id 
+                      ? (isLight ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.2)') 
+                      : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)'),
+                    color: categoryFilter === f.id 
+                      ? (isLight ? '#0891b2' : '#22d3ee') 
+                      : (isLight ? '#475569' : '#94a3b8'),
+                    border: categoryFilter === f.id 
+                      ? '1px solid rgba(6, 182, 212, 0.45)' 
+                      : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)')
                   }}
                 >
                   {f.label}
@@ -456,7 +464,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
           {filteredBrokers.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-              <p style={{ fontSize: '15px', fontWeight: '600', color: '#94a3b8' }}>No brokers found matching "{searchQuery}"</p>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: isLight ? '#475569' : '#94a3b8' }}>No brokers found matching "{searchQuery}"</p>
               <p style={{ fontSize: '13px' }}>Try switching the filter to "All (102)" or clearing your search query.</p>
             </div>
           ) : (
@@ -473,8 +481,12 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                   <div
                     key={broker.id}
                     style={{
-                      background: isConnected ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-                      border: isConnected ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.07)',
+                      background: isConnected 
+                        ? (isLight ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.04)') 
+                        : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)'),
+                      border: isConnected 
+                        ? '1px solid rgba(16, 185, 129, 0.3)' 
+                        : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.07)'),
                       borderRadius: '12px',
                       padding: '16px',
                       display: 'flex',
@@ -505,7 +517,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                           </div>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <h4 style={{ margin: 0, fontSize: '14px', color: '#f8fafc', fontWeight: '700' }}>
+                              <h4 style={{ margin: 0, fontSize: '14px', color: isLight ? '#0f172a' : '#f8fafc', fontWeight: '700' }}>
                                 {broker.name}
                               </h4>
                               {broker.popular && (
@@ -538,8 +550,8 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                         ) : (
                           <span style={{
                             fontSize: '10.5px',
-                            color: '#94a3b8',
-                            background: 'rgba(255, 255, 255, 0.04)',
+                            color: isLight ? '#64748b' : '#94a3b8',
+                            background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.04)',
                             padding: '2px 7px',
                             borderRadius: '6px'
                           }}>
@@ -549,14 +561,14 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                       </div>
 
                       {/* Card Description */}
-                      <p style={{ margin: '10px 0 0', fontSize: '11.5px', color: '#94a3b8', lineHeight: '1.4' }}>
+                      <p style={{ margin: '10px 0 0', fontSize: '11.5px', color: isLight ? '#64748b' : '#94a3b8', lineHeight: '1.4' }}>
                         {broker.desc}
                       </p>
 
                       {/* Connected Details Pill */}
                       {isConnected && conn && (
-                        <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px 10px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                        <div style={{ marginTop: '10px', background: isLight ? '#ffffff' : 'rgba(0,0,0,0.25)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px 10px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: isLight ? '#334155' : '#cbd5e1' }}>
                             <span>Holdings Synced:</span>
                             <strong style={{ color: '#22c55e' }}>₹{conn.portfolioValue?.toLocaleString('en-IN')}</strong>
                           </div>
@@ -643,15 +655,15 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
         {/* Footer */}
         <div style={{
           padding: '12px 24px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(255, 255, 255, 0.02)',
+          borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '10px'
         }}>
-          <div style={{ fontSize: '11.5px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '11.5px', color: isLight ? '#64748b' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sparkles size={14} color="#06b6d4" />
             <span>Connect depositories (CDSL/NSDL) or CAMS/KFintech for zero-brokerage direct Mutual Funds tracking.</span>
           </div>
@@ -664,10 +676,10 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
             }}
             style={{
               padding: '6px 12px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
+              border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.15)',
               borderRadius: '6px',
-              color: '#f8fafc',
+              color: isLight ? '#0f172a' : '#f8fafc',
               fontSize: '11.5px',
               fontWeight: '600',
               cursor: 'pointer',
@@ -688,7 +700,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.85)',
+          background: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.85)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
@@ -697,13 +709,13 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
           padding: '20px'
         }}>
           <div style={{
-            background: '#111827',
-            border: '1px solid rgba(255,255,255,0.15)',
+            background: isLight ? '#ffffff' : '#111827',
+            border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.15)',
             borderRadius: '16px',
             maxWidth: '500px',
             width: '100%',
             padding: '24px',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+            boxShadow: isLight ? '0 25px 50px -12px rgba(0,0,0,0.2)' : '0 25px 50px -12px rgba(0,0,0,0.7)',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px'
@@ -727,10 +739,10 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                   {activeBrokerForAuth.name[0]}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: isLight ? '#0f172a' : '#fff' }}>
                     Connect {activeBrokerForAuth.name}
                   </h3>
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
                     SEBI Reg: {activeBrokerForAuth.sebiReg}
                   </span>
                 </div>
@@ -739,7 +751,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
               <button
                 type="button"
                 onClick={() => setActiveBrokerForAuth(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: isLight ? '#64748b' : '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
               >
                 ✕
               </button>
@@ -748,31 +760,31 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
             {/* STEP 1: Enter Mobile / PAN and View Permissions */}
             {authStep === 1 && (
               <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <p style={{ margin: 0, fontSize: '12.5px', color: '#94a3b8', lineHeight: '1.4' }}>
+                <p style={{ margin: 0, fontSize: '12.5px', color: isLight ? '#475569' : '#94a3b8', lineHeight: '1.4' }}>
                   Authorize read-only Demat and holdings sync via the official SEBI & RBI Account Aggregator (AA) framework.
                 </p>
 
                 {/* Explicit Read-Only Permissions Display */}
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '11.5px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ fontWeight: '700', color: '#cbd5e1', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '11.5px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontWeight: '700', color: isLight ? '#334155' : '#cbd5e1', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Shield size={13} color="#22c55e" /> Account Aggregator Permission Scope:
                   </div>
-                  <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ color: isLight ? '#64748b' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Check size={12} color="#22c55e" /> Read-only Demat equity shares & ETF holdings
                   </div>
-                  <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ color: isLight ? '#64748b' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Check size={12} color="#22c55e" /> Mutual fund active folios and SIP values
                   </div>
-                  <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ color: isLight ? '#64748b' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Check size={12} color="#22c55e" /> Daily profit & loss and contract summaries
                   </div>
-                  <div style={{ color: '#ef4444', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
+                  <div style={{ color: '#ef4444', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', borderTop: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
                     <span>🚫</span> NO trade placement or fund withdrawal permissions.
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '11px', color: isLight ? '#475569' : '#cbd5e1', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                     Registered Mobile Number or PAN
                   </label>
                   <input
@@ -784,10 +796,10 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                     style={{
                       width: '100%',
                       padding: '10px 14px',
-                      background: 'rgba(0,0,0,0.4)',
-                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.4)',
+                      border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)',
                       borderRadius: '8px',
-                      color: '#fff',
+                      color: isLight ? '#0f172a' : '#fff',
                       fontSize: '13.5px'
                     }}
                   />
@@ -795,7 +807,7 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                     <button
                       type="button"
                       onClick={() => setMobileOrPan('9876543210')}
-                      style={{ fontSize: '10.5px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                      style={{ fontSize: '10.5px', background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', color: isLight ? '#2563eb' : '#94a3b8', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
                     >
                       Fill Demo Mobile: 9876543210
                     </button>
@@ -830,8 +842,8 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
             {authStep === 2 && (
               <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ textAlign: 'center', padding: '6px 0' }}>
-                  <span style={{ fontSize: '13px', color: '#94a3b8' }}>
-                    Enter 6-digit OTP sent to <strong style={{ color: '#fff' }}>{mobileOrPan}</strong>
+                  <span style={{ fontSize: '13px', color: isLight ? '#475569' : '#94a3b8' }}>
+                    Enter 6-digit OTP sent to <strong style={{ color: isLight ? '#0f172a' : '#fff' }}>{mobileOrPan}</strong>
                   </span>
                   <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
                     SEBI Account Aggregator SMS delivered in 1-2 seconds.
@@ -853,23 +865,23 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                       letterSpacing: '8px',
                       fontSize: '20px',
                       fontWeight: '800',
-                      background: 'rgba(0,0,0,0.4)',
-                      border: '1px solid rgba(6,182,212,0.5)',
+                      background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.4)',
+                      border: isLight ? '1px solid #0284c7' : '1px solid rgba(6,182,212,0.5)',
                       borderRadius: '8px',
-                      color: '#22d3ee'
+                      color: isLight ? '#0284c7' : '#22d3ee'
                     }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                     <button
                       type="button"
                       onClick={() => setOtpCode('123456')}
-                      style={{ fontSize: '11px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#38bdf8', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                      style={{ fontSize: '11px', background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)', color: '#2563eb', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
                     >
                       Auto-fill: 123456
                     </button>
                     <span style={{ fontSize: '11px', color: '#64748b' }}>
                       {resendTimer > 0 ? `Resend in ${resendTimer}s` : (
-                        <button type="button" onClick={() => setResendTimer(60)} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '11px' }}>
+                        <button type="button" onClick={() => setResendTimer(60)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '11px' }}>
                           Resend OTP
                         </button>
                       )}
@@ -909,26 +921,26 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                 </div>
 
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '17px', color: '#fff', fontWeight: '800' }}>
+                  <h4 style={{ margin: 0, fontSize: '17px', color: isLight ? '#0f172a' : '#fff', fontWeight: '800' }}>
                     Connected to {activeBrokerForAuth.name}!
                   </h4>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: isLight ? '#64748b' : '#94a3b8' }}>
                     Read-only Demat holdings & Mutual Fund folios are now continuously synced with SkandX.
                   </p>
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '12px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '12px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>Demat Client ID:</span>
-                    <strong style={{ color: '#fff' }}>{brokerStatus[activeBrokerForAuth.id]?.dematId}</strong>
+                    <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>Demat Client ID:</span>
+                    <strong style={{ color: isLight ? '#0f172a' : '#fff' }}>{brokerStatus[activeBrokerForAuth.id]?.dematId}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>Holdings Value Synced:</span>
+                    <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>Holdings Value Synced:</span>
                     <strong style={{ color: '#22c55e' }}>₹{brokerStatus[activeBrokerForAuth.id]?.portfolioValue?.toLocaleString('en-IN')}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>Folios Imported:</span>
-                    <strong style={{ color: '#38bdf8' }}>{brokerStatus[activeBrokerForAuth.id]?.mfCount} Active Folios</strong>
+                    <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>Folios Imported:</span>
+                    <strong style={{ color: isLight ? '#0284c7' : '#38bdf8' }}>{brokerStatus[activeBrokerForAuth.id]?.mfCount} Active Folios</strong>
                   </div>
                 </div>
 
@@ -937,10 +949,10 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                   onClick={() => setActiveBrokerForAuth(null)}
                   style={{
                     padding: '10px',
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.08)',
+                    border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)',
                     borderRadius: '8px',
-                    color: '#fff',
+                    color: isLight ? '#0f172a' : '#fff',
                     fontWeight: '700',
                     fontSize: '13px',
                     cursor: 'pointer'
@@ -950,7 +962,6 @@ export default function BrokerConnectModal({ isOpen, onClose, onOpenMutualFunds 
                 </button>
               </div>
             )}
-
           </div>
         </div>
       )}

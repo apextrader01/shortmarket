@@ -145,7 +145,7 @@ function formatMembersCount(num) {
 }
 
 export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }) {
-  const { user, positions, stocks, prices, fetchBatchPrices, setSelectedSymbol, openOrderModal, showToast } = useStore(
+  const { user, positions, stocks, prices, fetchBatchPrices, setSelectedSymbol, openOrderModal, showToast, theme } = useStore(
     useShallow(state => ({
       user: state.user,
       positions: state.positions,
@@ -154,9 +154,11 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
       fetchBatchPrices: state.fetchBatchPrices,
       setSelectedSymbol: state.setSelectedSymbol,
       openOrderModal: state.openOrderModal,
-      showToast: state.showToast
+      showToast: state.showToast,
+      theme: state.theme
     }))
   );
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme'));
 
   // Navigation Tabs: 'clubs' | 'hot' | 'new' | 'following' | 'saved'
   const [activeSubTab, setActiveSubTab] = useState('hot');
@@ -874,8 +876,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
       height: '100%',
       minHeight: 0,
       overflowY: 'auto',
-      background: '#0b101b',
-      color: '#f8fafc',
+      background: isLight ? 'var(--bg-main, #f8fafc)' : '#0b101b',
+      color: 'var(--text-primary)',
       position: 'relative',
       fontFamily: "'Inter', system-ui, sans-serif"
     }}>
@@ -949,9 +951,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
         position: 'sticky',
         top: 0,
         zIndex: 30,
-        background: 'rgba(15, 23, 42, 0.96)',
+        background: isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(15, 23, 42, 0.96)',
         backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+        borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)'
       }}>
         <div style={{
           maxWidth: '980px',
@@ -985,7 +987,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.3px', color: isLight ? 'var(--text-primary)' : '#fff', whiteSpace: 'nowrap' }}>
                     Traders Community
                   </span>
                   <span style={{
@@ -1003,7 +1005,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     {storagePolicy.label}
                   </span>
                 </div>
-                <div className="comm-header-subtext" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                <div className="comm-header-subtext" style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   Live NSE/BSE/MCX Charts, Option Strategies & Verified Setups • Ultra-Fast 40KB WebP Engine
                 </div>
               </div>
@@ -1016,7 +1018,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 flex: '1 1 200px',
                 maxWidth: '300px'
               }}>
-                <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <Search size={14} color="var(--text-secondary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   value={searchQuery}
@@ -1030,11 +1032,11 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                   placeholder="Search #NIFTY50, traders, clubs..."
                   style={{
                     width: '100%',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
+                    border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
                     padding: '6px 28px 6px 30px',
-                    color: '#f8fafc',
+                    color: isLight ? 'var(--text-primary)' : '#f8fafc',
                     fontSize: '12px',
                     outline: 'none'
                   }}
@@ -1052,7 +1054,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       transform: 'translateY(-50%)',
                       background: 'transparent',
                       border: 'none',
-                      color: '#94a3b8',
+                      color: 'var(--text-secondary)',
                       cursor: 'pointer'
                     }}
                   >
@@ -1112,7 +1114,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     background: 'transparent',
                     border: 'none',
                     borderBottom: isActive ? '2.5px solid #3b82f6' : '2.5px solid transparent',
-                    color: isActive ? '#3b82f6' : '#94a3b8',
+                    color: isActive ? '#3b82f6' : (isLight ? 'var(--text-secondary)' : '#94a3b8'),
                     padding: '8px 4px 10px 4px',
                     fontSize: '13.5px',
                     fontWeight: isActive ? '800' : '600',
@@ -1274,28 +1276,28 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             {/* Your Clubs Section */}
             <div style={{
-              background: '#131b2e',
-              border: '1px solid rgba(255, 255, 255, 0.07)',
+              background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)',
               borderRadius: '12px',
               padding: '16px'
             }}>
               <div style={{
                 fontSize: '14px',
                 fontWeight: '800',
-                color: '#f8fafc',
+                color: isLight ? 'var(--text-primary)' : '#f8fafc',
                 marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
                 <span>Your Clubs ({joinedClubs.length})</span>
-                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '500' }}>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                   Click any club to view live chart setups
                 </span>
               </div>
 
               {joinedClubs.length === 0 ? (
-                <div style={{ color: '#94a3b8', fontSize: '12.5px', padding: '12px 0' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12.5px', padding: '12px 0' }}>
                   You haven’t joined any clubs yet. Join a club below to customize your feed!
                 </div>
               ) : (
@@ -1312,8 +1314,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                         setActiveSubTab('hot');
                       }}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.03)',
+                        border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '10px',
                         padding: '12px 14px',
                         display: 'flex',
@@ -1339,15 +1341,15 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           {club.icon}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {club.name}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                             {formatMembersCount(club.members_count)} • Active {formatRelativeTime(club.last_posted_at)}
                           </div>
                         </div>
                       </div>
-                      <ChevronRight size={16} color="#64748b" />
+                      <ChevronRight size={16} color="var(--text-secondary)" />
                     </div>
                   ))}
                 </div>
@@ -1366,8 +1368,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 <div
                   key={categoryName}
                   style={{
-                    background: '#131b2e',
-                    border: '1px solid rgba(255, 255, 255, 0.07)',
+                    background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+                    border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)',
                     borderRadius: '12px',
                     padding: '16px'
                   }}
@@ -1382,7 +1384,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     gap: '8px',
                     marginBottom: '14px',
                     paddingBottom: '8px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                    borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.05)'
                   }}>
                     <span style={{ fontSize: '15px' }}>{meta.icon}</span>
                     <span>{meta.label} ({categoryClubs.length})</span>
@@ -1397,8 +1399,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           setActiveSubTab('hot');
                         }}
                         style={{
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.06)',
+                          background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)',
+                          border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.06)',
                           borderRadius: '10px',
                           padding: '12px 14px',
                           display: 'flex',
@@ -1426,13 +1428,13 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           </div>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>
+                              <span style={{ fontSize: '14px', fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
                                 {club.name}
                               </span>
                               <span style={{
                                 fontSize: '11px',
-                                color: '#94a3b8',
-                                background: 'rgba(255, 255, 255, 0.06)',
+                                color: 'var(--text-secondary)',
+                                background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.06)',
                                 padding: '2px 8px',
                                 borderRadius: '12px',
                                 fontWeight: '600'
@@ -1440,7 +1442,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                                 {formatMembersCount(club.members_count)}
                               </span>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px', lineHeight: '1.4' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: '1.4' }}>
                               {club.description}
                             </div>
                           </div>
@@ -1479,8 +1481,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
             <div
               onClick={() => setShowComposeModal(true)}
               style={{
-                background: '#131b2e',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+                border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '12px',
                 padding: '12px 16px',
                 display: 'flex',
@@ -1495,7 +1497,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                   width: '34px',
                   height: '34px',
                   borderRadius: '50%',
-                  background: '#1e293b',
+                  background: isLight ? 'var(--bg-hover)' : '#1e293b',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1512,7 +1514,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     (user?.username || 'T').charAt(0).toUpperCase()
                   )}
                 </div>
-                <span style={{ color: '#64748b', fontSize: '13px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
                   Share your #NIFTY50 view, upload a 50MB chart photo (auto-compressed to 40KB WebP), or post a Trade Setup...
                 </span>
               </div>
@@ -1556,7 +1558,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               overflowX: 'auto',
               paddingBottom: '2px'
             }}>
-              <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                 TRENDING:
               </span>
               {['NIFTY50', 'BANKNIFTY', 'FINNIFTY', 'ADANI', 'RELIANCE', 'ICICIBANK', 'TCS', 'SENSEX', 'CRUDEOIL', 'OPTIONS'].map(tag => {
@@ -1566,9 +1568,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     key={tag}
                     onClick={() => setSelectedTag(isSelected ? '' : tag)}
                     style={{
-                      background: isSelected ? '#2563eb' : 'rgba(255, 255, 255, 0.04)',
-                      color: isSelected ? '#fff' : '#94a3b8',
-                      border: `1px solid ${isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.08)'}`,
+                      background: isSelected ? '#2563eb' : (isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)'),
+                      color: isSelected ? '#fff' : (isLight ? 'var(--text-secondary)' : '#94a3b8'),
+                      border: `1px solid ${isSelected ? '#3b82f6' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
                       borderRadius: '999px',
                       padding: '4px 10px',
                       fontSize: '11.5px',
@@ -1585,23 +1587,23 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
             {/* Posts List */}
             {loadingFeed ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+              <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
                 Loading live trader feed...
               </div>
             ) : posts.length === 0 ? (
               activeSubTab === 'saved' ? (
                 <div style={{
-                  background: '#131b2e',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+                  border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)',
                   borderRadius: '12px',
                   padding: '40px 20px',
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔖</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc', marginBottom: '6px' }}>
                     No Saved Posts Yet
                   </div>
-                  <div style={{ fontSize: '12.5px', color: '#94a3b8', maxWidth: '380px', margin: '0 auto 16px', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto 16px', lineHeight: '1.5' }}>
                     Bookmark any post, chart idea, or trade setup by clicking the bookmark icon to save it here for fast reference.
                   </div>
                   <button
@@ -1622,16 +1624,16 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 </div>
               ) : (
                 <div style={{
-                  background: '#131b2e',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+                  border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)',
                   borderRadius: '12px',
                   padding: '36px 20px',
                   textAlign: 'center'
                 }}>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc', marginBottom: '6px' }}>
                     No posts match this filter yet
                   </div>
-                  <div style={{ fontSize: '12.5px', color: '#94a3b8', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
                     Be the first trader to share your chart analysis or F&O strategy setup!
                   </div>
                   <button
@@ -1656,15 +1658,16 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 <React.Fragment key={post.id}>
                   <div
                     style={{
-                      background: '#131b2e',
+                      background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
                       border: post.is_pinned
                         ? '1px solid rgba(245, 158, 11, 0.4)'
-                        : '1px solid rgba(255, 255, 255, 0.07)',
+                        : (isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)'),
                       borderRadius: '12px',
                       padding: '16px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px'
+                      gap: '12px',
+                      boxShadow: isLight ? '0 2px 8px rgba(0, 0, 0, 0.04)' : 'none'
                     }}
                   >
                     {/* Pinned Banner */}
@@ -1694,8 +1697,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           width: '38px',
                           height: '38px',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #1e293b, #334155)',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          background: isLight ? 'var(--bg-hover)' : 'linear-gradient(135deg, #1e293b, #334155)',
+                          border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.15)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1714,7 +1717,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#f8fafc' }}>
+                            <span style={{ fontSize: '13.5px', fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
                               {post.username}
                             </span>
                             {renderTierBadge(post.subscription_tier, post.is_admin)}
@@ -1731,14 +1734,14 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#94a3b8', marginTop: '2px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px', flexWrap: 'wrap' }}>
                             <span>in</span>
                             <span
                               onClick={() => {
                                 const found = clubs.find(c => c.id === post.club_id);
                                 if (found) setSelectedClub(found);
                               }}
-                              style={{ color: '#cbd5e1', fontWeight: '600', cursor: 'pointer' }}
+                              style={{ color: isLight ? 'var(--text-primary)' : '#cbd5e1', fontWeight: '600', cursor: 'pointer' }}
                             >
                               {post.club_icon} {post.club_name}
                             </span>
@@ -1754,9 +1757,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           <button
                             onClick={() => handleToggleFollow(post.user_id)}
                             style={{
-                              background: post.is_following ? 'rgba(255,255,255,0.06)' : 'rgba(59, 130, 246, 0.15)',
-                              color: post.is_following ? '#94a3b8' : '#60a5fa',
-                              border: `1px solid ${post.is_following ? 'rgba(255,255,255,0.1)' : 'rgba(59, 130, 246, 0.35)'}`,
+                              background: post.is_following ? (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)') : 'rgba(59, 130, 246, 0.15)',
+                              color: post.is_following ? 'var(--text-secondary)' : '#60a5fa',
+                              border: `1px solid ${post.is_following ? (isLight ? 'var(--border-color)' : 'rgba(255,255,255,0.1)') : 'rgba(59, 130, 246, 0.35)'}`,
                               borderRadius: '6px',
                               padding: '4px 9px',
                               fontSize: '11px',
@@ -1772,9 +1775,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             onClick={() => handlePinPost(post.id)}
                             title={post.is_pinned ? 'Unpin post' : 'Pin post'}
                             style={{
-                              background: 'rgba(255,255,255,0.04)',
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              color: post.is_pinned ? '#f59e0b' : '#94a3b8',
+                              background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.04)',
+                              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.08)',
+                              color: post.is_pinned ? '#f59e0b' : 'var(--text-secondary)',
                               borderRadius: '6px',
                               padding: '5px',
                               cursor: 'pointer'
@@ -1807,7 +1810,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       <div style={{
                         fontSize: '13.5px',
                         lineHeight: '1.55',
-                        color: '#e2e8f0',
+                        color: isLight ? 'var(--text-primary)' : '#e2e8f0',
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word'
                       }}>
@@ -1818,16 +1821,16 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     {/* ─── FrontPage-Style Zero-Storage JSON Trade Setup Card ─── */}
                     {post.trade_setup && (
                       <div style={{
-                        background: '#0f172a',
-                        border: '1px solid rgba(56, 189, 248, 0.22)',
+                        background: isLight ? 'var(--bg-card, var(--bg-hover))' : '#0f172a',
+                        border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(56, 189, 248, 0.22)',
                         borderRadius: '10px',
                         overflow: 'hidden'
                       }}>
                         {/* Setup Header */}
                         <div style={{
                           padding: '9px 14px',
-                          background: 'rgba(30, 41, 59, 0.7)',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                          background: isLight ? 'rgba(56, 189, 248, 0.08)' : 'rgba(30, 41, 59, 0.7)',
+                          borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.06)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -1835,7 +1838,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           gap: '8px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '800', color: '#f8fafc' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
                               {post.trade_setup.symbol}
                             </span>
                             {post.trade_setup.strategy && (
@@ -1944,7 +1947,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                                     borderRadius: '6px',
                                     cursor: 'pointer',
                                     transition: 'background 0.15s',
-                                    borderBottom: lIdx < post.trade_setup.legs.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : 'none'
+                                    borderBottom: lIdx < post.trade_setup.legs.length - 1 ? (isLight ? '1px dashed var(--border-color)' : '1px dashed rgba(255,255,255,0.06)') : 'none'
                                   }}
                                   className="hoverable"
                                   title={`Click to trade this leg (${leg.side} ${leg.type} ${leg.strike} @ ₹${leg.price})`}
@@ -1961,14 +1964,14 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                                     }}>
                                       {leg.side}
                                     </span>
-                                    <span style={{ color: '#cbd5e1', fontWeight: '600' }}>
+                                    <span style={{ color: isLight ? 'var(--text-secondary)' : '#cbd5e1', fontWeight: '600' }}>
                                       {leg.lots || '1 LOT'}
                                     </span>
-                                    <span style={{ color: '#f8fafc', fontWeight: '800' }}>
+                                    <span style={{ color: isLight ? 'var(--text-primary)' : '#f8fafc', fontWeight: '800' }}>
                                       {leg.type} {leg.strike}
                                     </span>
                                   </div>
-                                  <div style={{ color: '#94a3b8', fontWeight: '700' }}>
+                                  <div style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>
                                     @ ₹{leg.price}
                                   </div>
                                 </div>
@@ -1983,33 +1986,33 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(4, 1fr)',
-                            background: 'rgba(15, 23, 42, 0.9)',
-                            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                            background: isLight ? 'var(--bg-hover)' : 'rgba(15, 23, 42, 0.9)',
+                            borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.06)',
                             padding: '8px 14px',
                             gap: '8px',
                             fontSize: '11px'
                           }}
                         >
                           <div>
-                            <div style={{ color: '#64748b', fontWeight: '700' }}>MAX PROFIT</div>
+                            <div style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>MAX PROFIT</div>
                             <div style={{ color: '#34d399', fontWeight: '800', marginTop: '2px' }}>
                               {post.trade_setup.maxProfit || '—'}
                             </div>
                           </div>
                           <div>
-                            <div style={{ color: '#64748b', fontWeight: '700' }}>MAX LOSS</div>
+                            <div style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>MAX LOSS</div>
                             <div style={{ color: '#f87171', fontWeight: '800', marginTop: '2px' }}>
                               {post.trade_setup.maxLoss || '—'}
                             </div>
                           </div>
                           <div>
-                            <div style={{ color: '#64748b', fontWeight: '700' }}>LOT SIZE</div>
-                            <div style={{ color: '#f8fafc', fontWeight: '800', marginTop: '2px' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>LOT SIZE</div>
+                            <div style={{ color: isLight ? 'var(--text-primary)' : '#f8fafc', fontWeight: '800', marginTop: '2px' }}>
                               {post.trade_setup.lotSize || '—'}
                             </div>
                           </div>
                           <div>
-                            <div style={{ color: '#64748b', fontWeight: '700' }}>EST. MARGIN</div>
+                            <div style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>EST. MARGIN</div>
                             <div style={{ color: '#38bdf8', fontWeight: '800', marginTop: '2px' }}>
                               {post.trade_setup.margin || '—'}
                             </div>
@@ -2026,8 +2029,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           position: 'relative',
                           borderRadius: '10px',
                           overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          background: '#090d16',
+                          border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
+                          background: isLight ? 'var(--bg-card, #ffffff)' : '#090d16',
                           maxHeight: '420px',
                           cursor: 'zoom-in',
                           display: 'flex',
@@ -2074,7 +2077,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       paddingTop: '8px',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.06)',
                       flexWrap: 'wrap',
                       gap: '8px'
                     }}>
@@ -2082,9 +2085,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                         <button
                           onClick={() => handleToggleVote(post.id)}
                           style={{
-                            background: post.has_voted ? 'rgba(59, 130, 246, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                            color: post.has_voted ? '#60a5fa' : '#cbd5e1',
-                            border: `1px solid ${post.has_voted ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                            background: post.has_voted ? 'rgba(59, 130, 246, 0.18)' : (isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)'),
+                            color: post.has_voted ? '#60a5fa' : (isLight ? 'var(--text-secondary)' : '#cbd5e1'),
+                            border: `1px solid ${post.has_voted ? 'rgba(59, 130, 246, 0.4)' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
                             borderRadius: '999px',
                             padding: '5px 12px',
                             fontSize: '12px',
@@ -2103,9 +2106,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                         <button
                           onClick={() => handleToggleComments(post.id)}
                           style={{
-                            background: openCommentsPostId === post.id ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                            color: openCommentsPostId === post.id ? '#38bdf8' : '#cbd5e1',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            background: openCommentsPostId === post.id ? 'rgba(56, 189, 248, 0.15)' : (isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)'),
+                            color: openCommentsPostId === post.id ? '#38bdf8' : (isLight ? 'var(--text-secondary)' : '#cbd5e1'),
+                            border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '999px',
                             padding: '5px 12px',
                             fontSize: '12px',
@@ -2126,9 +2129,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           onClick={() => toggleSavePost(post.id)}
                           title={savedPostIds.includes(post.id) ? 'Remove from Saved' : 'Save Setup to Bookmarks'}
                           style={{
-                            background: savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                            color: savedPostIds.includes(post.id) ? '#fbbf24' : '#94a3b8',
-                            border: `1px solid ${savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                            background: savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.18)' : (isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)'),
+                            color: savedPostIds.includes(post.id) ? '#fbbf24' : 'var(--text-secondary)',
+                            border: `1px solid ${savedPostIds.includes(post.id) ? 'rgba(245, 158, 11, 0.4)' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
                             borderRadius: '999px',
                             padding: '5px 10px',
                             fontSize: '12px',
@@ -2170,13 +2173,13 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       <div style={{
                         marginTop: '6px',
                         paddingTop: '10px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.06)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '8px'
                       }}>
                         {(commentsByPost[post.id] || []).length === 0 ? (
-                          <div style={{ fontSize: '12px', color: '#64748b', padding: '4px 0' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '4px 0' }}>
                             No comments yet. Start the discussion!
                           </div>
                         ) : (
@@ -2184,20 +2187,20 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             <div
                               key={c.id}
                               style={{
-                                background: 'rgba(255, 255, 255, 0.025)',
+                                background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.025)',
                                 borderRadius: '8px',
                                 padding: '8px 10px',
                                 fontSize: '12.5px'
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                                <span style={{ fontWeight: '700', color: '#f8fafc' }}>{c.username}</span>
+                                <span style={{ fontWeight: '700', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>{c.username}</span>
                                 {renderTierBadge(c.subscription_tier, c.is_admin)}
-                                <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                                <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                                   • {formatRelativeTime(c.created_at)}
                                 </span>
                               </div>
-                              <div style={{ color: '#cbd5e1', lineHeight: '1.45' }}>{c.content}</div>
+                              <div style={{ color: isLight ? 'var(--text-primary)' : '#cbd5e1', lineHeight: '1.45' }}>{c.content}</div>
                             </div>
                           ))
                         )}
@@ -2213,11 +2216,11 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             placeholder="Write a comment or reply..."
                             style={{
                               flex: 1,
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
+                              background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
+                              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.12)',
                               borderRadius: '8px',
                               padding: '7px 11px',
-                              color: '#f8fafc',
+                              color: isLight ? 'var(--text-primary)' : '#f8fafc',
                               fontSize: '12.5px',
                               outline: 'none'
                             }}
@@ -2368,8 +2371,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
         >
           <div
             style={{
-              background: '#131b2e',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? 'var(--bg-panel, #ffffff)' : '#131b2e',
+              border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '14px',
               width: '100%',
               maxWidth: '620px',
@@ -2379,22 +2382,22 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               display: 'flex',
               flexDirection: 'column',
               gap: '14px',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.65)'
+              boxShadow: isLight ? '0 20px 50px rgba(0,0,0,0.12)' : '0 20px 50px rgba(0,0,0,0.65)'
             }}
           >
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc' }}>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc' }}>
                   Create Trader Community Post
                 </div>
-                <div style={{ fontSize: '11.5px', color: storagePolicy.is_permanent ? '#34d399' : '#38bdf8', fontWeight: '600', marginTop: '2px' }}>
+                <div style={{ fontSize: '11.5px', color: storagePolicy.is_permanent ? (isLight ? '#059669' : '#34d399') : (isLight ? '#0284c7' : '#38bdf8'), fontWeight: '600', marginTop: '2px' }}>
                   {storagePolicy.label}
                 </div>
               </div>
               <button
                 onClick={() => setShowComposeModal(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: 'none', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
@@ -2402,24 +2405,24 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
             {/* Select Club */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={{ fontSize: '11.5px', fontWeight: '700', color: '#94a3b8' }}>
+              <label style={{ fontSize: '11.5px', fontWeight: '700', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8' }}>
                 SELECT CLUB
               </label>
               <select
                 value={composeClubId}
                 onChange={(e) => setComposeClubId(e.target.value)}
                 style={{
-                  background: '#0f172a',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: isLight ? 'var(--bg-input, #f8fafc)' : '#0f172a',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
                   borderRadius: '8px',
                   padding: '8px 12px',
-                  color: '#f8fafc',
+                  color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
                   fontSize: '13px',
                   outline: 'none'
                 }}
               >
                 {clubs.map(c => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#f8fafc' }}>
                     {c.icon} {c.name} ({c.category})
                   </option>
                 ))}
@@ -2446,11 +2449,11 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 placeholder="Share your market view, levels, or option strategy... Use #NIFTY50, #BANKNIFTY, #RELIANCE (or press Ctrl+V to paste any chart screenshot!)"
                 style={{
                   width: '100%',
-                  background: '#0f172a',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: isLight ? 'var(--bg-input, #f8fafc)' : '#0f172a',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
                   borderRadius: '10px',
                   padding: '12px',
-                  color: '#f8fafc',
+                  color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
                   fontSize: '13.5px',
                   lineHeight: '1.5',
                   resize: 'vertical',
@@ -2460,7 +2463,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
               {/* Quick #SYMBOL Tag Insertion Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>Quick Tags:</span>
+                <span style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', fontWeight: '700' }}>Quick Tags:</span>
                 {['#NIFTY50', '#BANKNIFTY', '#FINNIFTY', '#ADANI', '#ADANIENT', '#RELIANCE', '#ICICIBANK', '#SENSEX', '#CRUDEOIL'].map(tag => (
                   <button
                     key={tag}
@@ -2483,9 +2486,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       }
                     }}
                     style={{
-                      background: 'rgba(56, 189, 248, 0.1)',
-                      border: '1px solid rgba(56, 189, 248, 0.25)',
-                      color: '#38bdf8',
+                      background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56, 189, 248, 0.1)',
+                      border: isLight ? '1px solid rgba(2, 132, 199, 0.25)' : '1px solid rgba(56, 189, 248, 0.25)',
+                      color: isLight ? '#0284c7' : '#38bdf8',
                       borderRadius: '6px',
                       padding: '2px 8px',
                       fontSize: '11px',
@@ -2501,8 +2504,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
             {/* ─── 50MB -> ~40KB WebP Photo Uploader Box ─── */}
             <div style={{
-              background: '#0f172a',
-              border: '1px dashed rgba(56, 189, 248, 0.35)',
+              background: isLight ? 'var(--bg-card, #f8fafc)' : '#0f172a',
+              border: isLight ? '1px dashed rgba(2, 132, 199, 0.4)' : '1px dashed rgba(56, 189, 248, 0.35)',
               borderRadius: '10px',
               padding: '12px'
             }}>
@@ -2547,7 +2550,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                   <img
                     src={uploadedImageInfo.preview_url || uploadedImageInfo.image_url}
                     alt="Compressed Preview"
-                    style={{ maxHeight: '220px', width: '100%', objectFit: 'contain', borderRadius: '8px', background: '#090d16' }}
+                    style={{ maxHeight: '220px', width: '100%', objectFit: 'contain', borderRadius: '8px', background: isLight ? '#f1f5f9' : '#090d16' }}
                   />
                 </div>
               ) : (
@@ -2562,19 +2565,19 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <ImageIcon size={20} color="#38bdf8" />
+                    <ImageIcon size={20} color={isLight ? '#0284c7' : '#38bdf8'} />
                     <div>
-                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc' }}>
+                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc' }}>
                         Upload Chart Screenshot or Photo (Up to 50 MB)
                       </div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '11px', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8' }}>
                         Auto-compresses 50 MB photos to ~40 KB crisp WebP before upload
                       </div>
                     </div>
                   </div>
                   <span style={{
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    color: '#38bdf8',
+                    background: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.15)',
+                    color: isLight ? '#0284c7' : '#38bdf8',
                     padding: '5px 10px',
                     borderRadius: '6px',
                     fontSize: '11.5px',
@@ -2588,8 +2591,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
 
             {/* ─── Zero-Storage JSON Trade Setup Attachment ─── */}
             <div style={{
-              background: '#0f172a',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: isLight ? 'var(--bg-card, #f8fafc)' : '#0f172a',
+              border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '10px',
               padding: '12px',
               display: 'flex',
@@ -2597,7 +2600,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               gap: '10px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', color: '#f8fafc' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc' }}>
                   <input
                     type="checkbox"
                     checked={attachTradeSetup}
@@ -2614,9 +2617,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     }}
                     defaultValue=""
                     style={{
-                      background: 'rgba(16, 185, 129, 0.12)',
-                      border: '1px solid rgba(16, 185, 129, 0.35)',
-                      color: '#34d399',
+                      background: isLight ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.12)',
+                      border: isLight ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(16, 185, 129, 0.35)',
+                      color: isLight ? '#059669' : '#34d399',
                       borderRadius: '6px',
                       padding: '4px 8px',
                       fontSize: '11px',
@@ -2624,9 +2627,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       outline: 'none'
                     }}
                   >
-                    <option value="" disabled>⚡ 1-Click Import Open Position ({activePositions.length})</option>
+                    <option value="" disabled style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>⚡ 1-Click Import Open Position ({activePositions.length})</option>
                     {activePositions.map((p, i) => (
-                      <option key={i} value={i} style={{ background: '#0f172a', color: '#fff' }}>
+                      <option key={i} value={i} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
                         {p.symbol} ({p.quantity > 0 ? 'LONG' : 'SHORT'} {Math.abs(p.quantity)} @ ₹{p.average_price})
                       </option>
                     ))}
@@ -2638,7 +2641,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
                   {/* Quick Popular Share Chips */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>⚡ Quick Shares:</span>
+                    <span style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94a3b8', fontWeight: '700' }}>⚡ Quick Shares:</span>
                     {[
                       { label: 'ADANIENT', symbol: 'ADANIENT', unique_symbol: 'NSE:ADANIENT-EQ', lotsize: 1, name: 'ADANI ENTERPRISES' },
                       { label: 'ADANIPORTS', symbol: 'ADANIPORTS', unique_symbol: 'NSE:ADANIPORTS-EQ', lotsize: 1, name: 'ADANI PORTS' },
@@ -2655,9 +2658,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           type="button"
                           onClick={() => handleSelectStock(chip)}
                           style={{
-                            background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                            border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
-                            color: isSelected ? '#38bdf8' : '#cbd5e1',
+                            background: isSelected ? (isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.25)') : (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'),
+                            border: isSelected ? (isLight ? '1px solid #0284c7' : '1px solid #38bdf8') : (isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.1)'),
+                            color: isSelected ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#475569' : '#cbd5e1'),
                             borderRadius: '6px',
                             padding: '3px 8px',
                             fontSize: '11px',
@@ -2694,17 +2697,17 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           placeholder="Search stock / share (e.g. ADANI)..."
                           style={{
                             width: '100%',
-                            background: '#131b2e',
-                            border: showStockDropdown && stockSearchResults.length > 0 ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                            background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e',
+                            border: showStockDropdown && stockSearchResults.length > 0 ? (isLight ? '1px solid #0284c7' : '1px solid #38bdf8') : (isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)'),
                             borderRadius: '6px',
                             padding: '7px 28px 7px 30px',
-                            color: '#fff',
+                            color: isLight ? 'var(--text-primary, #0f172a)' : '#fff',
                             fontSize: '12px',
                             outline: 'none'
                           }}
                         />
                         {isSearchingStocks ? (
-                          <span style={{ position: 'absolute', right: '10px', fontSize: '11px', color: '#38bdf8' }}>⌛</span>
+                          <span style={{ position: 'absolute', right: '10px', fontSize: '11px', color: isLight ? '#0284c7' : '#38bdf8' }}>⌛</span>
                         ) : (stockSearchQuery || tradeSetupForm.symbol) ? (
                           <button
                             type="button"
@@ -2739,10 +2742,10 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                           right: 0,
                           zIndex: 70,
                           marginTop: '4px',
-                          background: '#0b1120',
-                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          background: isLight ? 'var(--bg-panel, #ffffff)' : '#0b1120',
+                          border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(56, 189, 248, 0.3)',
                           borderRadius: '8px',
-                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+                          boxShadow: isLight ? '0 10px 25px -5px rgba(0, 0, 0, 0.15)' : '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
                           maxHeight: '220px',
                           overflowY: 'auto'
                         }}>
@@ -2763,31 +2766,31 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                                   justifyContent: 'space-between',
                                   padding: '8px 10px',
                                   cursor: 'pointer',
-                                  borderBottom: idx < stockSearchResults.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                                  borderBottom: idx < stockSearchResults.length - 1 ? (isLight ? '1px solid var(--border-color, rgba(0,0,0,0.06))' : '1px solid rgba(255,255,255,0.05)') : 'none',
                                   transition: 'background 0.15s ease'
                                 }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)'}
+                                onMouseEnter={(e) => e.currentTarget.style.background = isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56, 189, 248, 0.1)'}
                                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                               >
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#f8fafc' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: '800', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc' }}>
                                     {item.name || item.symbol}
-                                    <span style={{ fontSize: '10px', fontWeight: '600', color: '#94a3b8', marginLeft: '6px' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '600', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8', marginLeft: '6px' }}>
                                       {item.exchange || 'NSE'}
                                     </span>
                                   </span>
-                                  <span style={{ fontSize: '10.5px', color: '#64748b', maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span style={{ fontSize: '10.5px', color: isLight ? '#64748b' : '#64748b', maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {item.description || item.name || itemSym}
                                   </span>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                   {ltp > 0 && (
-                                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#38bdf8' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: '700', color: isLight ? '#0284c7' : '#38bdf8' }}>
                                       ₹{Number(ltp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                   )}
                                   {chg !== 0 && (
-                                    <span style={{ fontSize: '10px', fontWeight: '700', color: chg >= 0 ? '#34d399' : '#f87171' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: chg >= 0 ? (isLight ? '#059669' : '#34d399') : (isLight ? '#dc2626' : '#f87171') }}>
                                       {chg >= 0 ? '+' : ''}{Number(chg).toFixed(2)}%
                                     </span>
                                   )}
@@ -2804,7 +2807,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       value={tradeSetupForm.strategy}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, strategy: e.target.value }))}
                       placeholder="Strategy (e.g. BULL PUT SPREAD)"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                      style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '12px', outline: 'none' }}
                     />
                   </div>
 
@@ -2813,8 +2816,8 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                     <div
                       key={idx}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '8px',
                         padding: '8px',
                         display: 'flex',
@@ -2830,10 +2833,10 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             next[idx] = { ...next[idx], side: e.target.value };
                             setTradeSetupForm(prev => ({ ...prev, legs: next }));
                           }}
-                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: '#fff', fontSize: '11.5px', fontWeight: '700' }}
+                          style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px', fontWeight: '700' }}
                         >
-                          <option value="BUY">BUY</option>
-                          <option value="SELL">SELL</option>
+                          <option value="BUY" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>BUY</option>
+                          <option value="SELL" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>SELL</option>
                         </select>
                         <select
                           value={leg.type}
@@ -2842,12 +2845,12 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             next[idx] = { ...next[idx], type: e.target.value };
                             setTradeSetupForm(prev => ({ ...prev, legs: next }));
                           }}
-                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: '#fff', fontSize: '11.5px', fontWeight: '700' }}
+                          style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px', fontWeight: '700' }}
                         >
-                          <option value="CE">CE</option>
-                          <option value="PE">PE</option>
-                          <option value="FUT">FUT</option>
-                          <option value="EQ">EQ</option>
+                          <option value="CE" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>CE</option>
+                          <option value="PE" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>PE</option>
+                          <option value="FUT" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>FUT</option>
+                          <option value="EQ" style={{ background: isLight ? '#fff' : '#131b2e', color: isLight ? '#0f172a' : '#fff' }}>EQ</option>
                         </select>
                         <input
                           type="text"
@@ -2858,13 +2861,13 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             setTradeSetupForm(prev => ({ ...prev, legs: next }));
                           }}
                           placeholder="Strike (e.g. 25000)"
-                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                          style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px' }}
                         />
                         {tradeSetupForm.legs.length > 1 ? (
                           <button
                             type="button"
                             onClick={() => setTradeSetupForm(prev => ({ ...prev, legs: prev.legs.filter((_, i) => i !== idx) }))}
-                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#f87171', padding: '4px', cursor: 'pointer' }}
+                            style={{ background: isLight ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: isLight ? '#dc2626' : '#f87171', padding: '4px', cursor: 'pointer' }}
                             title="Remove leg"
                           >
                             ✕
@@ -2882,7 +2885,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             setTradeSetupForm(prev => ({ ...prev, legs: next }));
                           }}
                           placeholder="Lots (e.g. 1 LOT)"
-                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                          style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px' }}
                         />
                         <input
                           type="text"
@@ -2893,7 +2896,7 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                             setTradeSetupForm(prev => ({ ...prev, legs: next }));
                           }}
                           placeholder="Price @ ₹"
-                          style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '11.5px' }}
+                          style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px' }}
                         />
                       </div>
                     </div>
@@ -2910,9 +2913,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       }
                       style={{
                         alignSelf: 'flex-start',
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.25)',
-                        color: '#38bdf8',
+                        background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56, 189, 248, 0.12)',
+                        border: isLight ? '1px solid rgba(2, 132, 199, 0.25)' : '1px solid rgba(56, 189, 248, 0.25)',
+                        color: isLight ? '#0284c7' : '#38bdf8',
                         borderRadius: '6px',
                         padding: '4px 10px',
                         fontSize: '11px',
@@ -2930,28 +2933,28 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
                       value={tradeSetupForm.maxProfit}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, maxProfit: e.target.value }))}
                       placeholder="Max Profit"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#34d399', fontSize: '11.5px', fontWeight: '700' }}
+                      style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: isLight ? '#059669' : '#34d399', fontSize: '11.5px', fontWeight: '700' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.maxLoss}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, maxLoss: e.target.value }))}
                       placeholder="Max Loss"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#f87171', fontSize: '11.5px', fontWeight: '700' }}
+                      style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: isLight ? '#dc2626' : '#f87171', fontSize: '11.5px', fontWeight: '700' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.lotSize}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, lotSize: e.target.value }))}
                       placeholder="Lot Size"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#fff', fontSize: '11.5px' }}
+                      style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '11.5px' }}
                     />
                     <input
                       type="text"
                       value={tradeSetupForm.margin}
                       onChange={(e) => setTradeSetupForm(prev => ({ ...prev, margin: e.target.value }))}
                       placeholder="Est. Margin"
-                      style={{ background: '#131b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: '#38bdf8', fontSize: '11.5px' }}
+                      style={{ background: isLight ? 'var(--bg-input, #ffffff)' : '#131b2e', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: isLight ? '#0284c7' : '#38bdf8', fontSize: '11.5px' }}
                     />
                   </div>
                 </div>
@@ -2963,9 +2966,9 @@ export default function CommunityFeedView({ onOpenPaperTrading, onUpgradeClick }
               <button
                 onClick={() => setShowComposeModal(false)}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  color: '#cbd5e1',
-                  border: 'none',
+                  background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
+                  color: isLight ? '#475569' : '#cbd5e1',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : 'none',
                   borderRadius: '8px',
                   padding: '8px 16px',
                   fontSize: '12.5px',

@@ -20,6 +20,8 @@ export default function AlertModal() {
   const activeWatchlistId = useStore(state => state.activeWatchlistId);
   const stocks = useStore(state => state.stocks);
   const showToast = useStore(state => state.showToast);
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light';
   const { setAlertModalSymbol, addAlert, subscribeToSymbol, fetchBatchPrices, pingSubscriptions } = useStore.getState();
 
   const [selectedSymbol, setSelectedSymbol] = useState(modalSymbol || 'NSE:NIFTY50-INDEX');
@@ -187,37 +189,37 @@ export default function AlertModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      backgroundColor: isLight ? 'rgba(15, 23, 42, 0.6)' : 'rgba(15, 23, 42, 0.85)',
       zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center',
       padding: '16px', backdropFilter: 'blur(4px)'
     }}>
       <div style={{
-        background: '#1E293B', borderRadius: '14px', width: '100%', maxWidth: '440px',
+        background: isLight ? '#ffffff' : '#1E293B', borderRadius: '14px', width: '100%', maxWidth: '440px',
         maxHeight: '90vh', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', border: '1px solid #334155',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)'
+        display: 'flex', flexDirection: 'column', border: isLight ? '1px solid #e2e8f0' : '1px solid #334155',
+        boxShadow: isLight ? '0 25px 50px -12px rgba(0, 0, 0, 0.2)' : '0 25px 50px -12px rgba(0, 0, 0, 0.6)'
       }}>
         {/* Header */}
         <div style={{ 
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-          padding: '16px 20px', borderBottom: '1px solid #334155',
-          background: 'rgba(30, 41, 59, 0.8)'
+          padding: '16px 20px', borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid #334155',
+          background: isLight ? '#f8fafc' : 'rgba(30, 41, 59, 0.8)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ background: 'rgba(96, 165, 250, 0.15)', padding: '6px', borderRadius: '8px', display: 'flex' }}>
-              <Bell size={18} color="#60A5FA" />
+            <div style={{ background: isLight ? 'rgba(59, 130, 246, 0.12)' : 'rgba(96, 165, 250, 0.15)', padding: '6px', borderRadius: '8px', display: 'flex' }}>
+              <Bell size={18} color={isLight ? '#2563eb' : '#60A5FA'} />
             </div>
             <div>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: '#F8FAFC' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: isLight ? '#0f172a' : '#F8FAFC' }}>
                 Create Price Alert
               </h2>
-              <div style={{ fontSize: '11px', color: '#94A3B8' }}>Instant notifications when target is reached</div>
+              <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94A3B8' }}>Instant notifications when target is reached</div>
             </div>
           </div>
           <button 
             type="button"
             onClick={() => setAlertModalSymbol(null)}
-            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+            style={{ background: 'transparent', border: 'none', color: isLight ? '#64748b' : '#94A3B8', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
           >
             <X size={20} />
           </button>
@@ -228,20 +230,20 @@ export default function AlertModal() {
           
           {/* Selected Instrument Display Card */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.6)',
+            background: isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.6)',
             borderRadius: '10px',
-            border: '1px solid #334155',
+            border: isLight ? '1px solid #e2e8f0' : '1px solid #334155',
             padding: '14px 16px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
               <div>
                 <span style={{ 
                   fontSize: '10px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px', 
-                  background: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', marginRight: '6px'
+                  background: isLight ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.2)', color: isLight ? '#2563eb' : '#60A5FA', marginRight: '6px'
                 }}>
                   {exchangeName}
                 </span>
-                <span style={{ fontSize: '16px', fontWeight: '800', color: '#F8FAFC' }}>
+                <span style={{ fontSize: '16px', fontWeight: '800', color: isLight ? '#0f172a' : '#F8FAFC' }}>
                   {cleanSymbolName}
                 </span>
               </div>
@@ -253,9 +255,9 @@ export default function AlertModal() {
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }}
                 style={{
-                  background: isSearchOpen ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                  color: isSearchOpen ? '#60A5FA' : '#94A3B8',
-                  border: '1px solid #334155',
+                  background: isSearchOpen ? (isLight ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.2)') : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'),
+                  color: isSearchOpen ? '#2563eb' : (isLight ? '#475569' : '#94A3B8'),
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid #334155',
                   padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                 }}
@@ -266,12 +268,12 @@ export default function AlertModal() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>LTP:</span>
-              <span style={{ fontSize: '18px', fontWeight: '800', color: ltp > 0 ? (isUp ? '#10B981' : '#EF4444') : '#94A3B8' }}>
+              <span style={{ fontSize: '12px', color: isLight ? '#64748b' : '#94A3B8' }}>LTP:</span>
+              <span style={{ fontSize: '18px', fontWeight: '800', color: ltp > 0 ? (isUp ? (isLight ? '#16a34a' : '#10B981') : (isLight ? '#dc2626' : '#EF4444')) : (isLight ? '#64748b' : '#94A3B8') }}>
                 ₹{ltp > 0 ? ltp.toFixed(2) : 'Loading...'}
               </span>
               {priceObj && priceObj.change !== undefined && (
-                <span style={{ fontSize: '12px', fontWeight: '600', color: isUp ? '#10B981' : '#EF4444', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: isUp ? (isLight ? '#16a34a' : '#10B981') : (isLight ? '#dc2626' : '#EF4444'), display: 'flex', alignItems: 'center', gap: '2px' }}>
                   {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                   {isUp ? '+' : ''}{Number(priceObj.change).toFixed(2)} ({isUp ? '+' : ''}{Number(priceObj.pct || 0).toFixed(2)}%)
                 </span>
@@ -282,14 +284,14 @@ export default function AlertModal() {
           {/* Instrument Search & Quick Pills Drawer */}
           {isSearchOpen && (
             <div style={{
-              background: 'rgba(15, 23, 42, 0.8)',
+              background: isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.8)',
               borderRadius: '10px',
-              border: '1px solid #3b82f6',
+              border: isLight ? '1px solid #93c5fd' : '1px solid #3b82f6',
               padding: '12px',
               display: 'flex', flexDirection: 'column', gap: '10px'
             }}>
               <div style={{ position: 'relative' }}>
-                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '11px' }} />
+                <Search size={14} color={isLight ? '#94a3b8' : '#94A3B8'} style={{ position: 'absolute', left: '10px', top: '11px' }} />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -297,15 +299,15 @@ export default function AlertModal() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
-                    width: '100%', padding: '8px 12px 8px 32px', background: '#0F172A',
-                    border: '1px solid #334155', borderRadius: '6px', color: '#fff', fontSize: '13px', outline: 'none'
+                    width: '100%', padding: '8px 12px 8px 32px', background: isLight ? '#ffffff' : '#0F172A',
+                    border: isLight ? '1px solid #cbd5e1' : '1px solid #334155', borderRadius: '6px', color: isLight ? '#0f172a' : '#fff', fontSize: '13px', outline: 'none'
                   }}
                 />
               </div>
 
               {/* Live search results */}
               {isSearching && (
-                <div style={{ fontSize: '12px', color: '#94A3B8', textAlign: 'center', padding: '6px' }}>
+                <div style={{ fontSize: '12px', color: isLight ? '#64748b' : '#94A3B8', textAlign: 'center', padding: '6px' }}>
                   Searching instruments...
                 </div>
               )}
@@ -322,24 +324,24 @@ export default function AlertModal() {
                         style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           padding: '7px 10px', borderRadius: '6px', cursor: 'pointer',
-                          background: isCurrent ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                          border: `1px solid ${isCurrent ? '#3b82f6' : '#334155'}`
+                          background: isCurrent ? (isLight ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.2)') : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
+                          border: `1px solid ${isCurrent ? '#3b82f6' : (isLight ? '#e2e8f0' : '#334155')}`
                         }}
                       >
                         <div>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#F8FAFC', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: isLight ? '#0f172a' : '#F8FAFC', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {item.symbol}
-                            <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)', color: '#94A3B8' }}>
+                            <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.1)', color: isLight ? '#64748b' : '#94A3B8' }}>
                               {item.exchange || 'NSE'}
                             </span>
                           </div>
                           {item.name && (
-                            <div style={{ fontSize: '10px', color: '#94A3B8', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '10px', color: isLight ? '#64748b' : '#94A3B8', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {item.name}
                             </div>
                           )}
                         </div>
-                        {isCurrent && <Check size={14} color="#60A5FA" />}
+                        {isCurrent && <Check size={14} color="#2563eb" />}
                       </div>
                     );
                   })}
@@ -348,7 +350,7 @@ export default function AlertModal() {
 
               {/* Quick Popular Instruments Chips */}
               <div>
-                <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
+                <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
                   Quick Instruments:
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -358,9 +360,9 @@ export default function AlertModal() {
                       type="button"
                       onClick={() => handleSelectInstrument(p.symbol)}
                       style={{
-                        background: selectedSymbol === p.symbol ? 'var(--color-blue)' : 'rgba(255, 255, 255, 0.05)',
-                        color: selectedSymbol === p.symbol ? '#fff' : '#CBD5E1',
-                        border: '1px solid #334155', borderRadius: '14px', padding: '3px 9px',
+                        background: selectedSymbol === p.symbol ? 'var(--color-blue)' : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)'),
+                        color: selectedSymbol === p.symbol ? '#fff' : (isLight ? '#475569' : '#CBD5E1'),
+                        border: isLight ? '1px solid #cbd5e1' : '1px solid #334155', borderRadius: '14px', padding: '3px 9px',
                         fontSize: '11px', fontWeight: '600', cursor: 'pointer'
                       }}
                     >
@@ -373,7 +375,7 @@ export default function AlertModal() {
               {/* Watchlist Chips (if any) */}
               {watchlistPills.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
+                  <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
                     From Your Watchlist:
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -383,9 +385,9 @@ export default function AlertModal() {
                         type="button"
                         onClick={() => handleSelectInstrument(wp.symbol)}
                         style={{
-                          background: selectedSymbol === wp.symbol ? 'var(--color-blue)' : 'rgba(255, 255, 255, 0.05)',
-                          color: selectedSymbol === wp.symbol ? '#fff' : '#CBD5E1',
-                          border: '1px solid #334155', borderRadius: '14px', padding: '3px 9px',
+                          background: selectedSymbol === wp.symbol ? 'var(--color-blue)' : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)'),
+                          color: selectedSymbol === wp.symbol ? '#fff' : (isLight ? '#475569' : '#CBD5E1'),
+                          border: isLight ? '1px solid #cbd5e1' : '1px solid #334155', borderRadius: '14px', padding: '3px 9px',
                           fontSize: '11px', fontWeight: '600', cursor: 'pointer'
                         }}
                       >
@@ -401,15 +403,15 @@ export default function AlertModal() {
           {/* Condition and Target Price Inputs */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: isLight ? '#475569' : '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
                 Condition
               </label>
               <select 
                 value={condition} 
                 onChange={(e) => setCondition(e.target.value)}
                 style={{
-                  width: '100%', padding: '10px', background: '#0F172A', border: '1px solid #334155',
-                  borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none'
+                  width: '100%', padding: '10px', background: isLight ? '#ffffff' : '#0F172A', border: isLight ? '1px solid #cbd5e1' : '1px solid #334155',
+                  borderRadius: '8px', color: isLight ? '#0f172a' : '#fff', fontSize: '13px', outline: 'none'
                 }}
               >
                 <option value="ABOVE">Crosses Above (≥)</option>
@@ -418,7 +420,7 @@ export default function AlertModal() {
             </div>
             
             <div style={{ flex: 1.2 }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: isLight ? '#475569' : '#94A3B8', marginBottom: '6px', fontWeight: '600' }}>
                 Target Price (₹)
               </label>
               <input 
@@ -428,8 +430,8 @@ export default function AlertModal() {
                 value={targetPrice}
                 onChange={(e) => setTargetPrice(e.target.value)}
                 style={{
-                  width: '100%', padding: '10px', background: '#0F172A', border: '1px solid #334155',
-                  borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none'
+                  width: '100%', padding: '10px', background: isLight ? '#ffffff' : '#0F172A', border: isLight ? '1px solid #cbd5e1' : '1px solid #334155',
+                  borderRadius: '8px', color: isLight ? '#0f172a' : '#fff', fontSize: '13px', outline: 'none'
                 }}
               />
             </div>
@@ -438,7 +440,7 @@ export default function AlertModal() {
           {/* Quick Target Percentage Pills (Based on live LTP) */}
           {ltp > 0 && (
             <div>
-              <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#94A3B8', marginBottom: '6px' }}>
                 Quick Target Levels:
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -449,9 +451,9 @@ export default function AlertModal() {
                       type="button"
                       onClick={() => handlePercentTarget(pct)}
                       style={{
-                        flex: 1, padding: '5px 0', background: 'rgba(16, 185, 129, 0.1)',
-                        border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px',
-                        color: '#10B981', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
+                        flex: 1, padding: '5px 0', background: isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.1)',
+                        border: isLight ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px',
+                        color: isLight ? '#15803d' : '#10B981', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
                       }}
                     >
                       +{pct}%
@@ -464,9 +466,9 @@ export default function AlertModal() {
                       type="button"
                       onClick={() => handlePercentTarget(pct)}
                       style={{
-                        flex: 1, padding: '5px 0', background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '6px',
-                        color: '#EF4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
+                        flex: 1, padding: '5px 0', background: isLight ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.1)',
+                        border: isLight ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '6px',
+                        color: isLight ? '#b91c1c' : '#EF4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
                       }}
                     >
                       {pct}%

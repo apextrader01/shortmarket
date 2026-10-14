@@ -14,6 +14,8 @@ const POPULAR_AMOUNTS = [
 export default function ResetPortfolioModal({ isOpen, onClose }) {
   const resetAccount = useStore(state => state.resetAccount);
   const fetchUserData = useStore(state => state.fetchUserData);
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
   
   const [selectedAmount, setSelectedAmount] = useState(1000000);
   const [customAmount, setCustomAmount] = useState('1000000');
@@ -101,7 +103,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(5, 8, 16, 0.92)',
+      background: isLight ? 'rgba(15, 23, 42, 0.45)' : 'rgba(5, 8, 16, 0.92)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -109,15 +111,15 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
       padding: '16px'
     }}>
       <div style={{
-        background: '#131824',
-        border: '1px solid #1e293b',
+        background: isLight ? '#ffffff' : '#131824',
+        border: isLight ? '1px solid #e2e8f0' : '1px solid #1e293b',
         borderRadius: '16px',
         width: '100%',
         maxWidth: '440px',
         maxHeight: '92vh',
         overflowY: 'auto',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-        color: '#f8fafc',
+        boxShadow: isLight ? '0 20px 40px rgba(0,0,0,0.12)' : '0 20px 40px rgba(0,0,0,0.6)',
+        color: isLight ? '#0f172a' : '#f8fafc',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column'
@@ -129,14 +131,14 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '16px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)'
+          borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.06)'
         }}>
           <button
             onClick={onClose}
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: isLight ? '#64748b' : '#94a3b8',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -145,7 +147,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
           >
             <ArrowLeft size={20} />
           </button>
-          <span style={{ fontSize: '13px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: isLight ? '#475569' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             Paper Trading
           </span>
           <button
@@ -153,7 +155,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: isLight ? '#64748b' : '#94a3b8',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -178,27 +180,27 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#38bdf8',
+              color: isLight ? '#0284c7' : '#38bdf8',
               marginBottom: '12px'
             }}>
               <RotateCcw size={26} />
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 6px 0', color: '#f8fafc' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 6px 0', color: isLight ? '#0f172a' : '#f8fafc' }}>
               Reset Portfolio
             </h2>
-            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '0 0 4px 0', lineHeight: '1.45' }}>
+            <p style={{ fontSize: '12.5px', color: isLight ? '#475569' : '#94a3b8', margin: '0 0 4px 0', lineHeight: '1.45' }}>
               This will reset your current portfolio performance and set the capital to the entered portfolio amount.
             </p>
             <div style={{
               display: 'inline-block',
               fontSize: '11.5px',
               fontWeight: '700',
-              color: '#38bdf8',
-              background: 'rgba(56,189,248,0.1)',
+              color: isLight ? '#0284c7' : '#38bdf8',
+              background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56,189,248,0.1)',
               padding: '3px 12px',
               borderRadius: '12px',
               marginTop: '4px',
-              border: '1px solid rgba(56,189,248,0.25)'
+              border: isLight ? '1px solid rgba(2, 132, 199, 0.25)' : '1px solid rgba(56,189,248,0.25)'
             }}>
               Max amount limit is ₹10 Crore
             </div>
@@ -206,7 +208,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
 
           {/* Popular Amounts */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#94a3b8', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '700', color: isLight ? '#475569' : '#94a3b8', marginBottom: '10px' }}>
               Choose from popular amounts
             </div>
             <div style={{
@@ -224,9 +226,9 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
                     style={{
                       padding: '12px 14px',
                       borderRadius: '10px',
-                      background: isSelected ? 'rgba(37,99,235,0.16)' : '#1a2234',
-                      border: isSelected ? '1.5px solid #3b82f6' : '1px solid #232d42',
-                      color: isSelected ? '#ffffff' : '#cbd5e1',
+                      background: isSelected ? 'rgba(37,99,235,0.16)' : (isLight ? '#f8fafc' : '#1a2234'),
+                      border: isSelected ? '1.5px solid #3b82f6' : (isLight ? '1px solid #e2e8f0' : '1px solid #232d42'),
+                      color: isSelected ? (isLight ? '#2563eb' : '#ffffff') : (isLight ? '#0f172a' : '#cbd5e1'),
                       fontSize: '13.5px',
                       fontWeight: isSelected ? '800' : '600',
                       cursor: 'pointer',
@@ -238,7 +240,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
                     }}
                   >
                     <span>{item.label}</span>
-                    <span style={{ fontSize: '10.5px', color: isSelected ? '#60a5fa' : '#64748b', marginTop: '2px' }}>
+                    <span style={{ fontSize: '10.5px', color: isSelected ? '#3b82f6' : (isLight ? '#64748b' : '#64748b'), marginTop: '2px' }}>
                       {item.desc}
                     </span>
                   </button>
@@ -250,11 +252,11 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
           {/* Customised Amount */}
           <div style={{ marginBottom: '18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#94a3b8' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: '700', color: isLight ? '#475569' : '#94a3b8' }}>
                 Or enter a customised amount
               </span>
               {activeAmountNum > 0 && (
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#38bdf8' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: isLight ? '#0284c7' : '#38bdf8' }}>
                   {formatIndianWords(activeAmountNum)}
                 </span>
               )}
@@ -262,13 +264,13 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              background: '#1a2234',
-              border: '1px solid #232d42',
+              background: isLight ? '#f8fafc' : '#1a2234',
+              border: isLight ? '1px solid #cbd5e1' : '1px solid #232d42',
               borderRadius: '10px',
               padding: '12px 14px',
               transition: 'border-color 0.15s'
             }}>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: '#64748b', marginRight: '6px' }}>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: isLight ? '#475569' : '#64748b', marginRight: '6px' }}>
                 ₹
               </span>
               <input
@@ -280,7 +282,7 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  color: '#ffffff',
+                  color: isLight ? '#0f172a' : '#ffffff',
                   fontSize: '16px',
                   fontWeight: '700',
                   width: '100%',
@@ -292,8 +294,8 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
 
           {/* Warning Banner */}
           <div style={{
-            background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
+            background: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+            border: isLight ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
             borderRadius: '8px',
             padding: '10px 12px',
             display: 'flex',
@@ -301,8 +303,8 @@ export default function ResetPortfolioModal({ isOpen, onClose }) {
             gap: '8px',
             marginBottom: '20px'
           }}>
-            <AlertTriangle size={15} color="#f87171" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', color: '#fca5a5', lineHeight: '1.4' }}>
+            <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', color: isLight ? '#b91c1c' : '#fca5a5', lineHeight: '1.4' }}>
               All open positions, pending orders, and trading ledger will be permanently reset to this starting capital.
             </span>
           </div>

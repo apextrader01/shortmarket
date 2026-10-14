@@ -2,6 +2,7 @@
 // 🧮 Comprehensive Financial & Trading Calculators Suite
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useStore } from '../store';
 import { 
   X, Calculator, TrendingUp, ShieldAlert, Receipt, LineChart, 
   ArrowRight, Info, CheckCircle2, RefreshCw, DollarSign, Percent,
@@ -10,6 +11,8 @@ import {
 
 export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab = 'SIP', onOpenMutualFunds }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -68,10 +71,10 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
               <Calculator size={20} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#f8fafc' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc' }}>
                 Financial & Trading Calculators
               </h2>
-              <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
                 Institutional mathematical models for compounding, risk management & post-tax returns
               </p>
             </div>
@@ -79,12 +82,12 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
           <button 
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.05)',
+              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '8px',
               padding: '6px',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -98,7 +101,7 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
         <div style={{
           display: 'flex',
           borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-          background: 'rgba(0, 0, 0, 0.2)',
+          background: isLight ? 'var(--bg-hover)' : 'rgba(0, 0, 0, 0.2)',
           overflowX: 'auto'
         }}>
           {[
@@ -139,18 +142,19 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
 
         {/* Calculator Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {activeTab === 'SIP' && <SipCalculatorView />}
+          {activeTab === 'SIP' && <SipCalculatorView isLight={isLight} />}
           {activeTab === 'MUTUAL_FUNDS' && (
             <MutualFundsDirectSipView 
+              isLight={isLight}
               onSwitchToSip={(cagr) => {
                 setActiveTab('SIP');
               }} 
               onOpenMutualFunds={onOpenMutualFunds} 
             />
           )}
-          {activeTab === 'POSITION' && <PositionSizerView />}
-          {activeTab === 'BROKERAGE' && <BrokerageTaxView />}
-          {activeTab === 'GREEKS' && <OptionGreeksView />}
+          {activeTab === 'POSITION' && <PositionSizerView isLight={isLight} />}
+          {activeTab === 'BROKERAGE' && <BrokerageTaxView isLight={isLight} />}
+          {activeTab === 'GREEKS' && <OptionGreeksView isLight={isLight} />}
         </div>
       </div>
     </div>
@@ -160,7 +164,7 @@ export default function FinancialCalculatorsModal({ isOpen, onClose, initialTab 
 // --------------------------------------------------------------------------
 // 1. SIP & Lumpsum Wealth Compounder
 // --------------------------------------------------------------------------
-function SipCalculatorView() {
+function SipCalculatorView({ isLight }) {
   const [mode, setMode] = useState('SIP'); // 'SIP' | 'LUMPSUM'
   const [monthlyInvestment, setMonthlyInvestment] = useState(15000);
   const [lumpsumAmount, setLumpsumAmount] = useState(200000);
@@ -207,7 +211,7 @@ function SipCalculatorView() {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
       {/* Controls */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '8px' }}>
           <button
             onClick={() => setMode('SIP')}
             style={{
@@ -216,7 +220,7 @@ function SipCalculatorView() {
               borderRadius: '6px',
               border: 'none',
               background: mode === 'SIP' ? '#0284c7' : 'transparent',
-              color: '#fff',
+              color: mode === 'SIP' ? '#fff' : (isLight ? 'var(--text-secondary)' : '#94a3b8'),
               fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer'
@@ -232,7 +236,7 @@ function SipCalculatorView() {
               borderRadius: '6px',
               border: 'none',
               background: mode === 'LUMPSUM' ? '#0284c7' : 'transparent',
-              color: '#fff',
+              color: mode === 'LUMPSUM' ? '#fff' : (isLight ? 'var(--text-secondary)' : '#94a3b8'),
               fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer'
@@ -245,7 +249,7 @@ function SipCalculatorView() {
         {mode === 'SIP' ? (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', color: '#cbd5e1' }}>Monthly Investment</label>
+              <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Monthly Investment</label>
               <span style={{ fontSize: '14px', fontWeight: '700', color: '#38bdf8' }}>₹{monthlyInvestment.toLocaleString('en-IN')}</span>
             </div>
             <input 
@@ -258,7 +262,7 @@ function SipCalculatorView() {
         ) : (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', color: '#cbd5e1' }}>Lumpsum Amount</label>
+              <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Lumpsum Amount</label>
               <span style={{ fontSize: '14px', fontWeight: '700', color: '#38bdf8' }}>₹{lumpsumAmount.toLocaleString('en-IN')}</span>
             </div>
             <input 
@@ -272,7 +276,7 @@ function SipCalculatorView() {
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <label style={{ fontSize: '13px', color: '#cbd5e1' }}>Expected Return Rate (p.a.)</label>
+            <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Expected Return Rate (p.a.)</label>
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>{expectedReturn}%</span>
           </div>
           <input 
@@ -285,7 +289,7 @@ function SipCalculatorView() {
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <label style={{ fontSize: '13px', color: '#cbd5e1' }}>Time Horizon</label>
+            <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Time Horizon</label>
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#f59e0b' }}>{years} Years</span>
           </div>
           <input 
@@ -299,7 +303,7 @@ function SipCalculatorView() {
         {mode === 'SIP' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', color: '#cbd5e1' }}>Annual Step-Up (% increase every year)</label>
+              <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Annual Step-Up (% increase every year)</label>
               <span style={{ fontSize: '14px', fontWeight: '700', color: '#a855f7' }}>{stepUpPct}%</span>
             </div>
             <input 
@@ -314,8 +318,8 @@ function SipCalculatorView() {
 
       {/* Output Summary */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
         borderRadius: '12px',
         padding: '20px',
         display: 'flex',
@@ -324,7 +328,7 @@ function SipCalculatorView() {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Maturity Wealth</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Maturity Wealth</span>
             <h3 style={{ fontSize: '28px', fontWeight: '800', color: '#38bdf8', margin: '4px 0 0' }}>
               ₹{Math.round(results.total).toLocaleString('en-IN')}
             </h3>
@@ -333,15 +337,15 @@ function SipCalculatorView() {
             </span>
           </div>
 
-          <div style={{ height: '10px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
+          <div style={{ height: '10px', width: '100%', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.1)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
             <div style={{ width: `${(results.invested / results.total) * 100}%`, background: '#64748b' }} title="Invested Amount" />
             <div style={{ width: `${(results.returns / results.total) * 100}%`, background: '#10b981' }} title="Compounded Gains" />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', paddingTop: '8px' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>Invested Amount</div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#e2e8f0', marginTop: '2px' }}>
+            <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Invested Amount</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '2px' }}>
                 ₹{Math.round(results.invested).toLocaleString('en-IN')}
               </div>
             </div>
@@ -355,7 +359,7 @@ function SipCalculatorView() {
         </div>
 
         <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(56, 189, 248, 0.05)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.15)' }}>
-          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
             💡 <strong>Pro Tip:</strong> An annual {stepUpPct}% step-up increases your maturity corpus by over <strong>40%</strong> compared to a flat SIP by capturing natural salary increments.
           </div>
         </div>
@@ -367,7 +371,7 @@ function SipCalculatorView() {
 // --------------------------------------------------------------------------
 // 2. Position Sizing & Risk/Reward Calculator
 // --------------------------------------------------------------------------
-function PositionSizerView() {
+function PositionSizerView({ isLight }) {
   const [capital, setCapital] = useState(500000);
   const [riskPct, setRiskPct] = useState(1.5);
   const [entryPrice, setEntryPrice] = useState(1250);
@@ -401,18 +405,18 @@ function PositionSizerView() {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
-          <label style={{ fontSize: '12px', color: '#94a3b8' }}>Account Trading Capital (₹)</label>
+          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Account Trading Capital (₹)</label>
           <input 
             type="number" 
             value={capital} 
             onChange={e => setCapital(Number(e.target.value))}
-            style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px', marginTop: '4px' }}
+            style={{ width: '100%', padding: '10px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', marginTop: '4px' }}
           />
         </div>
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Max Risk per Trade (%)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Risk per Trade (%)</label>
             <span style={{ fontSize: '13px', fontWeight: '700', color: '#ef4444' }}>{riskPct}% (₹{Math.round((capital * riskPct) / 100).toLocaleString('en-IN')})</span>
           </div>
           <input 
@@ -425,12 +429,12 @@ function PositionSizerView() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
           <div>
-            <label style={{ fontSize: '11px', color: '#94a3b8' }}>Entry Price (₹)</label>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Entry Price (₹)</label>
             <input 
               type="number" 
               value={entryPrice} 
               onChange={e => setEntryPrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', marginTop: '4px' }}
             />
           </div>
           <div>
@@ -439,7 +443,7 @@ function PositionSizerView() {
               type="number" 
               value={stopLoss} 
               onChange={e => setStopLoss(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fca5a5', fontSize: '13px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#f87171', fontSize: '13px', marginTop: '4px' }}
             />
           </div>
           <div>
@@ -448,7 +452,7 @@ function PositionSizerView() {
               type="number" 
               value={targetPrice} 
               onChange={e => setTargetPrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', color: '#6ee7b7', fontSize: '13px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', color: '#10b981', fontSize: '13px', marginTop: '4px' }}
             />
           </div>
         </div>
@@ -456,8 +460,8 @@ function PositionSizerView() {
 
       {/* Execution Advice Card */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
         borderRadius: '12px',
         padding: '20px',
         display: 'flex',
@@ -465,15 +469,15 @@ function PositionSizerView() {
         justifyContent: 'space-between'
       }}>
         <div>
-          <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase' }}>Recommended Position Sizing</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Recommended Position Sizing</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
             <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#38bdf8', margin: 0 }}>
               {calc.qty.toLocaleString()}
             </h3>
-            <span style={{ fontSize: '14px', color: '#94a3b8' }}>Shares</span>
+            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Shares</span>
           </div>
-          <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '2px' }}>
-            Total Capital Required: <strong>₹{Math.round(calc.totalExposure).toLocaleString('en-IN')}</strong>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            Total Capital Required: <strong style={{ color: 'var(--text-primary)' }}>₹{Math.round(calc.totalExposure).toLocaleString('en-IN')}</strong>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
@@ -503,7 +507,7 @@ function PositionSizerView() {
           justifyContent: 'space-between'
         }}>
           <div>
-            <div style={{ fontSize: '12px', color: '#94a3b8' }}>Risk : Reward Ratio</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Risk : Reward Ratio</div>
             <div style={{ fontSize: '16px', fontWeight: '800', color: Number(calc.rrRatio) >= 2 ? '#10b981' : '#f59e0b' }}>
               1 : {calc.rrRatio}
             </div>
@@ -520,7 +524,7 @@ function PositionSizerView() {
 // --------------------------------------------------------------------------
 // 3. Brokerage & Tax Calculator (STT revised Oct 2024 rates)
 // --------------------------------------------------------------------------
-function BrokerageTaxView() {
+function BrokerageTaxView({ isLight }) {
   const [segment, setSegment] = useState('EQUITY_INTRADAY'); // 'EQUITY_INTRADAY' | 'EQUITY_DELIVERY' | 'FUTURES' | 'OPTIONS'
   const [buyPrice, setBuyPrice] = useState(1500);
   const [sellPrice, setSellPrice] = useState(1525);
@@ -602,8 +606,8 @@ function BrokerageTaxView() {
                 padding: '8px',
                 borderRadius: '6px',
                 border: 'none',
-                background: segment === s.id ? '#0284c7' : 'rgba(255,255,255,0.05)',
-                color: '#fff',
+                background: segment === s.id ? '#0284c7' : (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)'),
+                color: segment === s.id ? '#fff' : 'var(--text-primary)',
                 fontSize: '12px',
                 fontWeight: '600',
                 cursor: 'pointer'
@@ -616,42 +620,42 @@ function BrokerageTaxView() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Buy Price (₹)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Buy Price (₹)</label>
             <input 
               type="number" 
               value={buyPrice} 
               onChange={e => setBuyPrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '14px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '14px', marginTop: '4px' }}
             />
           </div>
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Sell Price (₹)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Sell Price (₹)</label>
             <input 
               type="number" 
               value={sellPrice} 
               onChange={e => setSellPrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '14px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '14px', marginTop: '4px' }}
             />
           </div>
         </div>
 
         <div>
-          <label style={{ fontSize: '12px', color: '#94a3b8' }}>Quantity / Lots</label>
+          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Quantity / Lots</label>
           <input 
             type="number" 
             value={quantity} 
             onChange={e => setQuantity(Number(e.target.value))}
-            style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '14px', marginTop: '4px' }}
+            style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '14px', marginTop: '4px' }}
           />
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>Turnover Summary</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#cbd5e1' }}>
+        <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Turnover Summary</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-primary)' }}>
             <span>Total Turnover:</span>
             <strong>₹{Math.round(breakdown.turnover).toLocaleString('en-IN')}</strong>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#cbd5e1', marginTop: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-primary)', marginTop: '4px' }}>
             <span>Breakeven Pts:</span>
             <strong style={{ color: '#f59e0b' }}>+₹{breakdown.breakevenPoints.toFixed(2)} / share</strong>
           </div>
@@ -660,8 +664,8 @@ function BrokerageTaxView() {
 
       {/* Tax & Charges Table */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
         borderRadius: '12px',
         padding: '16px',
         display: 'flex',
@@ -670,32 +674,32 @@ function BrokerageTaxView() {
       }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#e2e8f0' }}>Government & Exchange Charges</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Government & Exchange Charges</span>
             <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px' }}>Budget 2024 Rates</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
               <span>Brokerage:</span>
-              <span style={{ color: '#f8fafc' }}>₹{breakdown.brokerage.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-primary)' }}>₹{breakdown.brokerage.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
               <span>STT / CTT:</span>
-              <span style={{ color: '#f8fafc' }}>₹{breakdown.stt.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-primary)' }}>₹{breakdown.stt.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
               <span>Exchange Txn Charges:</span>
-              <span style={{ color: '#f8fafc' }}>₹{breakdown.exchTxn.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-primary)' }}>₹{breakdown.exchTxn.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
               <span>GST (18% on Brokerage & Txn):</span>
-              <span style={{ color: '#f8fafc' }}>₹{breakdown.gst.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-primary)' }}>₹{breakdown.gst.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
               <span>SEBI Charges & Stamp Duty:</span>
-              <span style={{ color: '#f8fafc' }}>₹{(breakdown.sebiTurnover + breakdown.stampDuty).toFixed(2)}</span>
+              <span style={{ color: 'var(--text-primary)' }}>₹{(breakdown.sebiTurnover + breakdown.stampDuty).toFixed(2)}</span>
             </div>
-            <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+            <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: '#ef4444' }}>
               <span>Total Statutory Charges:</span>
               <span>-₹{breakdown.totalCharges.toFixed(2)}</span>
@@ -716,7 +720,7 @@ function BrokerageTaxView() {
           <div style={{ fontSize: '24px', fontWeight: '800', color: breakdown.netPnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px' }}>
             {breakdown.netPnl >= 0 ? '+' : ''}₹{breakdown.netPnl.toFixed(2)}
           </div>
-          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Gross P&L: ₹{breakdown.grossPnl.toFixed(2)}
           </div>
         </div>
@@ -728,7 +732,7 @@ function BrokerageTaxView() {
 // --------------------------------------------------------------------------
 // 4. Options Greeks & Black-Scholes Calculator
 // --------------------------------------------------------------------------
-function OptionGreeksView() {
+function OptionGreeksView({ isLight }) {
   const [spotPrice, setSpotPrice] = useState(24500);
   const [strikePrice, setStrikePrice] = useState(24500);
   const [daysToExpiry, setDaysToExpiry] = useState(7);
@@ -794,8 +798,8 @@ function OptionGreeksView() {
               padding: '8px',
               borderRadius: '6px',
               border: 'none',
-              background: optionType === 'CE' ? '#10b981' : 'rgba(255,255,255,0.05)',
-              color: '#fff',
+              background: optionType === 'CE' ? '#10b981' : (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)'),
+              color: optionType === 'CE' ? '#fff' : 'var(--text-primary)',
               fontSize: '13px',
               fontWeight: '700',
               cursor: 'pointer'
@@ -810,8 +814,8 @@ function OptionGreeksView() {
               padding: '8px',
               borderRadius: '6px',
               border: 'none',
-              background: optionType === 'PE' ? '#ef4444' : 'rgba(255,255,255,0.05)',
-              color: '#fff',
+              background: optionType === 'PE' ? '#ef4444' : (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)'),
+              color: optionType === 'PE' ? '#fff' : 'var(--text-primary)',
               fontSize: '13px',
               fontWeight: '700',
               cursor: 'pointer'
@@ -823,28 +827,28 @@ function OptionGreeksView() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Underlying Spot (₹)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Underlying Spot (₹)</label>
             <input 
               type="number" 
               value={spotPrice} 
               onChange={e => setSpotPrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', marginTop: '4px' }}
             />
           </div>
           <div>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Strike Price (₹)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Strike Price (₹)</label>
             <input 
               type="number" 
               value={strikePrice} 
               onChange={e => setStrikePrice(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+              style={{ width: '100%', padding: '8px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', marginTop: '4px' }}
             />
           </div>
         </div>
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Days to Expiry (DTE)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Days to Expiry (DTE)</label>
             <span style={{ fontSize: '13px', fontWeight: '700', color: '#f59e0b' }}>{daysToExpiry} Days</span>
           </div>
           <input 
@@ -857,7 +861,7 @@ function OptionGreeksView() {
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Implied Volatility (IV %)</label>
+            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Implied Volatility (IV %)</label>
             <span style={{ fontSize: '13px', fontWeight: '700', color: '#a855f7' }}>{ivPct}%</span>
           </div>
           <input 
@@ -871,8 +875,8 @@ function OptionGreeksView() {
 
       {/* Greek Output Metrics */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
         borderRadius: '12px',
         padding: '20px',
         display: 'flex',
@@ -881,7 +885,7 @@ function OptionGreeksView() {
       }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Fair Option Premium</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Fair Option Premium</span>
             <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px' }}>{greeks.moneyness}</span>
           </div>
           <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#38bdf8', margin: '4px 0 0' }}>
@@ -889,34 +893,34 @@ function OptionGreeksView() {
           </h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>Δ Delta (Spot Sensitivity)</div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', marginTop: '2px' }}>
+            <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Δ Delta (Spot Sensitivity)</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '2px' }}>
                 {greeks.delta.toFixed(3)}
               </div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>Γ Gamma (Delta Acceleration)</div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', marginTop: '2px' }}>
+            <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Γ Gamma (Delta Acceleration)</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '2px' }}>
                 {greeks.gamma.toFixed(5)}
               </div>
             </div>
             <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
               <div style={{ fontSize: '11px', color: '#ef4444' }}>Θ Theta (Daily Time Decay)</div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#fca5a5', marginTop: '2px' }}>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: '#f87171', marginTop: '2px' }}>
                 {greeks.theta.toFixed(2)} / day
               </div>
             </div>
             <div style={{ background: 'rgba(168, 85, 247, 0.08)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-              <div style={{ fontSize: '11px', color: '#c084fc' }}>V Vega (1% IV Change)</div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#d8b4fe', marginTop: '2px' }}>
+              <div style={{ fontSize: '11px', color: '#a855f7' }}>V Vega (1% IV Change)</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: '#c084fc', marginTop: '2px' }}>
                 ₹{greeks.vega.toFixed(2)}
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: '16px', fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
+        <div style={{ marginTop: '16px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
           * Calculated via standard Black-Scholes-Merton continuous compounding model with risk-free rate r = 7.0%.
         </div>
       </div>
@@ -927,7 +931,7 @@ function OptionGreeksView() {
 // --------------------------------------------------------------------------
 // 5. Direct Mutual Funds & Fee Savings Simulator
 // --------------------------------------------------------------------------
-function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
+function MutualFundsDirectSipView({ isLight, onSwitchToSip, onOpenMutualFunds }) {
   const [monthlySip, setMonthlySip] = useState(10000);
   const [tenureYears, setTenureYears] = useState(15);
   const [expectedCagr, setExpectedCagr] = useState(14);
@@ -1037,10 +1041,10 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
             <Sparkles size={20} />
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc' }}>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
               Direct Plans vs Regular Plans Wealth Multiplier
             </div>
-            <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
               Cut out 1.0% - 1.5% annual distributor trail commissions across 44 Indian AMCs & keep 100% of the alpha.
             </div>
           </div>
@@ -1072,8 +1076,8 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
         {/* Controls */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
           borderRadius: '12px',
           padding: '20px',
           display: 'flex',
@@ -1082,7 +1086,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
         }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Monthly SIP Amount (₹)</label>
+              <label style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Monthly SIP Amount (₹)</label>
               <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#38bdf8' }}>₹{monthlySip.toLocaleString('en-IN')}</span>
             </div>
             <input 
@@ -1095,7 +1099,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Investment Horizon</label>
+              <label style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Investment Horizon</label>
               <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#10b981' }}>{tenureYears} Years</span>
             </div>
             <input 
@@ -1108,7 +1112,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <label style={{ fontSize: '12.5px', color: '#94a3b8', fontWeight: '600' }}>Expected Market Return (CAGR)</label>
+              <label style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Expected Market Return (CAGR)</label>
               <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#f59e0b' }}>{expectedCagr}%</span>
             </div>
             <input 
@@ -1126,7 +1130,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
                 type="number" step="0.05"
                 value={regularTer} 
                 onChange={e => setRegularTer(Number(e.target.value))}
-                style={{ width: '100%', padding: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', color: '#fca5a5', fontSize: '13px', marginTop: '4px' }}
+                style={{ width: '100%', padding: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', color: '#f87171', fontSize: '13px', marginTop: '4px' }}
               />
             </div>
             <div>
@@ -1135,7 +1139,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
                 type="number" step="0.05"
                 value={directTer} 
                 onChange={e => setDirectTer(Number(e.target.value))}
-                style={{ width: '100%', padding: '8px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', color: '#86efac', fontSize: '13px', marginTop: '4px' }}
+                style={{ width: '100%', padding: '8px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', color: '#10b981', fontSize: '13px', marginTop: '4px' }}
               />
             </div>
           </div>
@@ -1143,8 +1147,8 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
 
         {/* Results Card */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
           borderRadius: '12px',
           padding: '20px',
           display: 'flex',
@@ -1152,7 +1156,7 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
           justifyContent: 'space-between'
         }}>
           <div>
-            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Extra Wealth Saved by Going Direct
             </span>
             <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#10b981', margin: '4px 0 0' }}>
@@ -1164,18 +1168,18 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
               <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#86efac', fontWeight: '600' }}>Direct Plan Value</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>Direct Plan Value</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', marginTop: '2px' }}>
                   ₹{Math.round(feeSavings.directCorpus).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>Net CAGR: {(expectedCagr - directTer).toFixed(2)}%</div>
+                <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Net CAGR: {(expectedCagr - directTer).toFixed(2)}%</div>
               </div>
               <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '12px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: '600' }}>Regular Plan Value</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#cbd5e1', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>Regular Plan Value</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', marginTop: '2px' }}>
                   ₹{Math.round(feeSavings.regularCorpus).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>Net CAGR: {(expectedCagr - regularTer).toFixed(2)}%</div>
+                <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Net CAGR: {(expectedCagr - regularTer).toFixed(2)}%</div>
               </div>
             </div>
           </div>
@@ -1208,10 +1212,10 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
-            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#f8fafc' }}>
+            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
               Top Direct Mutual Funds (Zero Commission Flagships)
             </h4>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
               Benchmark 5Y CAGR & Direct Expense Ratios (TER)
             </span>
           </div>
@@ -1241,8 +1245,8 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
             <div 
               key={idx}
               style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
                 borderRadius: '10px',
                 padding: '14px',
                 display: 'flex',
@@ -1260,19 +1264,19 @@ function MutualFundsDirectSipView({ onSwitchToSip, onOpenMutualFunds }) {
                     {fund.highlight}
                   </span>
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: '#f8fafc', marginTop: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '8px' }}>
                   {fund.name}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '8px', borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.05)' }}>
                 <div>
-                  <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>5Y CAGR</div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>5Y CAGR</div>
                   <div style={{ fontSize: '15px', fontWeight: '800', color: '#10b981' }}>{fund.cagr5y}%</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>Direct vs Reg TER</div>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#f8fafc' }}>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Direct vs Reg TER</div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
                     <span style={{ color: '#10b981' }}>{fund.directTer}%</span> / <span style={{ color: '#ef4444', textDecoration: 'line-through' }}>{fund.regularTer}%</span>
                   </div>
                 </div>

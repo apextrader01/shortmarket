@@ -105,7 +105,7 @@ export default function DepositModal({ onClose }) {
             )}
 
             {/* Amount Input */}
-            <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px 20px', textAlign: 'center', transition: 'border-color 0.2s', ...(amount ? { borderColor: 'var(--color-blue)' } : {}) }}>
+            <div style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px 20px', textAlign: 'center', transition: 'border-color 0.2s', ...(amount ? { borderColor: 'var(--color-blue)' } : {}) }}>
               <label style={{ fontSize: '14px', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px', fontWeight: '500' }}>Enter Amount</label>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '32px', fontWeight: '500', color: amount ? 'var(--text-primary)' : 'var(--text-secondary)' }}>&#8377;</span>
@@ -149,7 +149,7 @@ export default function DepositModal({ onClose }) {
           </div>
           
           {/* Footer Area */}
-          <div style={{ background: 'var(--bg-elevated)', padding: '24px', borderTop: '1px solid var(--border-color)', marginTop: '8px' }}>
+          <div style={{ background: 'var(--bg-hover)', padding: '24px', borderTop: '1px solid var(--border-color)', marginTop: '8px' }}>
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={loading}>
               {loading ? 'Processing...' : (
                 <>Request Deposit {amount ? '(Rs. ' + Number(amount).toLocaleString('en-IN') + ')' : ''} <ArrowRight size={18} /></>

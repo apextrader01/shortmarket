@@ -8,6 +8,8 @@ export default function ChartModal() {
   const setChartModalSymbol = useStore(state => state.setChartModalSymbol);
   const prices = useStore(state => state.prices);
   const fetchBatchPrices = useStore(state => state.fetchBatchPrices);
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light';
 
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
   const [isLandscape, setIsLandscape] = useState(false);
@@ -54,6 +56,8 @@ export default function ChartModal() {
   const isUp = (rawPriceObj?.pct ?? 0) >= 0;
   const pct = rawPriceObj?.pct != null ? Number(rawPriceObj.pct).toFixed(2) : null;
   const change = rawPriceObj?.change != null ? Number(rawPriceObj.change).toFixed(2) : null;
+  const profitColor = isLight ? '#16a34a' : '#34d399';
+  const lossColor = isLight ? '#dc2626' : '#f87171';
 
   return (
     <div 
@@ -65,7 +69,7 @@ export default function ChartModal() {
         height: isLandscape ? '100vw' : '100dvh',
         transform: isLandscape ? 'rotate(90deg) translateY(-100%)' : 'none',
         transformOrigin: 'top left',
-        backgroundColor: '#0b1120',
+        backgroundColor: isLight ? '#ffffff' : '#0b1120',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
@@ -78,7 +82,7 @@ export default function ChartModal() {
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(11, 17, 32, 0.92)',
+        backgroundColor: isLight ? 'rgba(15, 23, 42, 0.6)' : 'rgba(11, 17, 32, 0.92)',
         backdropFilter: 'blur(8px)',
         zIndex: 9999,
         display: 'flex',
@@ -92,10 +96,10 @@ export default function ChartModal() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: '#0b1120',
+        background: isLight ? '#ffffff' : '#0b1120',
         overflow: 'hidden'
       } : {
-        background: '#111827',
+        background: isLight ? '#ffffff' : '#111827',
         borderRadius: '14px',
         width: '95%',
         maxWidth: '1280px',
@@ -103,8 +107,8 @@ export default function ChartModal() {
         maxHeight: '92vh',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+        border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: isLight ? '0 25px 50px -12px rgba(0, 0, 0, 0.2)' : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
         overflow: 'hidden'
       }}>
         {/* Unified Top Header Bar */}
@@ -113,8 +117,8 @@ export default function ChartModal() {
           justifyContent: 'space-between',
           alignItems: 'center', 
           padding: isMobile ? '8px 12px' : '12px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: '#0f172a',
+          borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? '#ffffff' : '#0f172a',
           flexShrink: 0,
           gap: '10px'
         }}>
@@ -123,9 +127,9 @@ export default function ChartModal() {
             <button 
               onClick={() => setChartModalSymbol(null)}
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
                 border: 'none',
-                color: '#94a3b8',
+                color: isLight ? '#475569' : '#94a3b8',
                 borderRadius: '8px',
                 padding: '6px',
                 display: 'flex',
@@ -141,7 +145,7 @@ export default function ChartModal() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: isMobile ? '15px' : '17px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: isMobile ? '15px' : '17px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', whiteSpace: 'nowrap' }}>
                   {cleanSym}
                 </span>
                 <span style={{
@@ -159,15 +163,15 @@ export default function ChartModal() {
 
               {ltp != null && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '800', color: isUp ? '#34d399' : '#f87171' }}>
+                  <span style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '800', color: isUp ? profitColor : lossColor }}>
                     ₹{Number(ltp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   {pct !== null && (
                     <span style={{
                       fontSize: '11px',
                       fontWeight: '700',
-                      color: isUp ? '#34d399' : '#f87171',
-                      background: isUp ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)',
+                      color: isUp ? profitColor : lossColor,
+                      background: isUp ? (isLight ? 'rgba(22, 163, 74, 0.12)' : 'rgba(52, 211, 153, 0.12)') : (isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(248, 113, 113, 0.12)'),
                       padding: '1px 5px',
                       borderRadius: '4px'
                     }}>
@@ -186,9 +190,9 @@ export default function ChartModal() {
               <button
                 onClick={toggleLandscape}
                 style={{
-                  background: isLandscape ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                  border: isLandscape ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
-                  color: isLandscape ? '#38bdf8' : '#cbd5e1',
+                  background: isLandscape ? (isLight ? 'rgba(14, 165, 233, 0.15)' : 'rgba(56, 189, 248, 0.2)') : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'),
+                  border: isLandscape ? (isLight ? '1px solid #0284c7' : '1px solid #38bdf8') : (isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.1)'),
+                  color: isLandscape ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#475569' : '#cbd5e1'),
                   borderRadius: '6px',
                   padding: '5px 8px',
                   fontSize: '11px',
@@ -206,12 +210,12 @@ export default function ChartModal() {
             )}
 
             {/* View Switcher: Chart vs Details */}
-            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px', border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)' }}>
               <button
                 onClick={() => setActiveView('chart')}
                 style={{
                   background: activeView === 'chart' ? '#2563eb' : 'transparent',
-                  color: activeView === 'chart' ? '#fff' : '#94a3b8',
+                  color: activeView === 'chart' ? '#fff' : (isLight ? '#64748b' : '#94a3b8'),
                   border: 'none',
                   borderRadius: '4px',
                   padding: '4px 8px',
@@ -230,7 +234,7 @@ export default function ChartModal() {
                 onClick={() => setActiveView('details')}
                 style={{
                   background: activeView === 'details' ? '#2563eb' : 'transparent',
-                  color: activeView === 'details' ? '#fff' : '#94a3b8',
+                  color: activeView === 'details' ? '#fff' : (isLight ? '#64748b' : '#94a3b8'),
                   border: 'none',
                   borderRadius: '4px',
                   padding: '4px 8px',
@@ -251,7 +255,7 @@ export default function ChartModal() {
             {!isMobile && (
               <button 
                 onClick={() => setChartModalSymbol(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', marginLeft: '4px' }}
+                style={{ background: 'none', border: 'none', color: isLight ? '#64748b' : '#94a3b8', cursor: 'pointer', padding: '4px', marginLeft: '4px' }}
                 title="Close"
               >
                 <X size={20} />

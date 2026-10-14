@@ -65,7 +65,7 @@ export default function MutualFundModal({ fund, onClose }) {
     }}>
       <div style={{
         width: '800px', maxWidth: '95vw', height: '600px', maxHeight: '85vh',
-        background: 'var(--bg-dark)', borderRadius: '12px',
+        background: 'var(--bg-panel)', borderRadius: '12px',
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column'
       }}>
@@ -121,7 +121,7 @@ export default function MutualFundModal({ fund, onClose }) {
                 type="number" 
                 value={amount} 
                 onChange={e => setAmount(e.target.value)} 
-                style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', color: '#fff', fontSize: '16px', outline: 'none', fontWeight: '600' }} 
+                style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '16px', outline: 'none', fontWeight: '600' }} 
               />
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   {['1000', '5000', '10000'].map(val => (
@@ -137,10 +137,10 @@ export default function MutualFundModal({ fund, onClose }) {
                         <Calendar size={16} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
                         <select 
                             value={sipDate} 
-                            onChange={e => setSipDate(e.target.value)}
-                            style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', outline: 'none', width: '100%', cursor: 'pointer' }}
+                            onChange={e => setSipDate(e.target.value)} 
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', width: '100%', cursor: 'pointer' }}
                         >
-                            {[1, 5, 10, 15, 20, 25].map(d => <option key={d} value={d}>{d}th of every month</option>)}
+                            {[1, 5, 10, 15, 20, 25].map(d => <option key={d} value={d} style={{ background: 'var(--bg-panel)', color: 'var(--text-primary)' }}>{d}th of every month</option>)}
                         </select>
                     </div>
                 </div>

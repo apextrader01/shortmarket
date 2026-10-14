@@ -22,6 +22,8 @@ export default function WealthPersonalFinanceModal({
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'NET_WORTH');
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -68,12 +70,12 @@ export default function WealthPersonalFinanceModal({
 
   const renderActiveView = () => {
     switch (activeTab) {
-      case 'AI_COPILOT': return <AiWealthCopilotView isMobile={isMobile} />;
-      case 'BUDGET': return <BudgetLeakDetectorView isMobile={isMobile} />;
-      case 'INSURANCE': return <InsuranceGapView isMobile={isMobile} />;
-      case 'TAX_LOSS': return <TaxLossHarvestingView isMobile={isMobile} />;
+      case 'AI_COPILOT': return <AiWealthCopilotView isMobile={isMobile} isLight={isLight} />;
+      case 'BUDGET': return <BudgetLeakDetectorView isMobile={isMobile} isLight={isLight} />;
+      case 'INSURANCE': return <InsuranceGapView isMobile={isMobile} isLight={isLight} />;
+      case 'TAX_LOSS': return <TaxLossHarvestingView isMobile={isMobile} isLight={isLight} />;
       case 'NET_WORTH':
-      default: return <NetWorthView isMobile={isMobile} />;
+      default: return <NetWorthView isMobile={isMobile} isLight={isLight} />;
     }
   };
 
@@ -82,8 +84,8 @@ export default function WealthPersonalFinanceModal({
       <div style={{
         width: '100%',
         minHeight: '100vh',
-        backgroundColor: '#070b12',
-        color: '#f8fafc',
+        backgroundColor: isLight ? 'var(--bg-main, #f8fafc)' : '#070b12',
+        color: 'var(--text-primary)',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'Inter, system-ui, sans-serif',
@@ -92,8 +94,8 @@ export default function WealthPersonalFinanceModal({
         {/* Top Institutional Navigation Bar */}
         <header style={{
           padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 12px 10px' : '14px 24px',
-          background: 'rgba(11, 17, 30, 0.94)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(11, 17, 30, 0.94)',
+          borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
           backdropFilter: 'blur(12px)',
           position: 'sticky',
           top: 0,
@@ -113,9 +115,9 @@ export default function WealthPersonalFinanceModal({
                 gap: '5px',
                 padding: isMobile ? '6px 10px' : '8px 14px',
                 borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#e2e8f0',
+                background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.05)',
+                border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: 'var(--text-primary)',
                 fontSize: isMobile ? '11.5px' : '12.5px',
                 fontWeight: '600',
                 cursor: 'pointer',
@@ -145,7 +147,7 @@ export default function WealthPersonalFinanceModal({
                   <span style={{ fontSize: '9.5px', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                     HUB 04 • WEALTH OS
                   </span>
-                  <h1 style={{ margin: 0, fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <h1 style={{ margin: 0, fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     Wealth OS & Tax Hub
                   </h1>
                 </div>
@@ -290,10 +292,10 @@ export default function WealthPersonalFinanceModal({
                       padding: '10px 14px',
                       borderRadius: '12px',
                       background: isActive
-                        ? `linear-gradient(135deg, ${tab.color}30, rgba(15, 23, 42, 0.95))`
-                        : 'rgba(15, 23, 42, 0.8)',
-                      border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
-                      color: '#f8fafc',
+                        ? `linear-gradient(135deg, ${tab.color}30, ${isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.95)'})`
+                        : (isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.8)'),
+                      border: isActive ? `1.5px solid ${tab.color}` : `1px solid ${isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)'}`,
+                      color: 'var(--text-primary)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -340,10 +342,10 @@ export default function WealthPersonalFinanceModal({
                       padding: '16px',
                       borderRadius: '14px',
                       background: isActive
-                        ? `linear-gradient(135deg, ${tab.color}26, rgba(15, 23, 42, 0.9))`
-                        : 'rgba(15, 23, 42, 0.7)',
-                      border: isActive ? `1.5px solid ${tab.color}` : '1px solid rgba(255, 255, 255, 0.08)',
-                      color: '#f8fafc',
+                        ? `linear-gradient(135deg, ${tab.color}26, ${isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.9)'})`
+                        : (isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.7)'),
+                      border: isActive ? `1.5px solid ${tab.color}` : `1px solid ${isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)'}`,
+                      color: 'var(--text-primary)',
                       cursor: 'pointer',
                       textAlign: 'left',
                       display: 'flex',
@@ -370,15 +372,15 @@ export default function WealthPersonalFinanceModal({
                       <span style={{
                         fontSize: '10px',
                         fontWeight: '700',
-                        color: isActive ? tab.color : '#94a3b8',
-                        background: 'rgba(255, 255, 255, 0.04)',
+                        color: isActive ? tab.color : 'var(--text-secondary)',
+                        background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)',
                         padding: '2px 7px',
                         borderRadius: '5px'
                       }}>
                         {tab.badge}
                       </span>
                     </div>
-                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: isActive ? '#fff' : '#cbd5e1' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: isActive ? tab.color : 'var(--text-primary)' }}>
                       {tab.label}
                     </div>
                   </button>
@@ -389,11 +391,11 @@ export default function WealthPersonalFinanceModal({
 
           {/* Active Workspace Panel */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(15, 23, 42, 0.85)',
+            border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: isMobile ? '14px' : '18px',
             padding: isMobile ? '16px 12px' : '26px',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
+            boxShadow: isLight ? '0 10px 30px rgba(0, 0, 0, 0.06)' : '0 20px 50px rgba(0, 0, 0, 0.45)',
             boxSizing: 'border-box',
             width: '100%',
             overflowX: 'hidden'
@@ -422,25 +424,25 @@ export default function WealthPersonalFinanceModal({
       padding: '16px'
     }}>
       <div style={{
-        background: '#0f172a',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: isLight ? 'var(--bg-panel, #ffffff)' : '#0f172a',
+        border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '16px',
         width: '100%',
         maxWidth: '1040px',
         maxHeight: '92vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+        boxShadow: isLight ? '0 20px 50px rgba(0, 0, 0, 0.15)' : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
         overflow: 'hidden'
       }}>
         {/* Header */}
         <div style={{
           padding: '16px 22px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(255, 255, 255, 0.02)'
+          background: isLight ? 'transparent' : 'rgba(255, 255, 255, 0.02)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
@@ -457,10 +459,10 @@ export default function WealthPersonalFinanceModal({
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#f8fafc' }}>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc' }}>
                 Wealth OS & Tax Hub
               </h2>
-              <p style={{ margin: 0, fontSize: '11.5px', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--text-secondary)' }}>
                 Net worth, 50/30/20 budget, actuarial HLV gap, latest tax slabs & 24/7 AI wealth copilot
               </p>
             </div>
@@ -468,12 +470,12 @@ export default function WealthPersonalFinanceModal({
           <button 
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.05)',
+              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '8px',
               padding: '6px',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -486,8 +488,8 @@ export default function WealthPersonalFinanceModal({
         {/* Tab Navigation */}
         <div style={{
           display: 'flex',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(0, 0, 0, 0.25)',
+          borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
+          background: isLight ? 'var(--bg-hover)' : 'rgba(0, 0, 0, 0.25)',
           overflowX: 'auto'
         }}>
           {TABS.map(tab => {
@@ -504,7 +506,7 @@ export default function WealthPersonalFinanceModal({
                   gap: '8px',
                   fontSize: '12.5px',
                   fontWeight: isActive ? '700' : '500',
-                  color: isActive ? tab.color : '#94a3b8',
+                  color: isActive ? tab.color : (isLight ? 'var(--text-secondary)' : '#94a3b8'),
                   background: isActive ? `${tab.color}15` : 'transparent',
                   border: 'none',
                   borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
@@ -537,7 +539,7 @@ function renderFormattedAiMessage(rawText) {
     const parts = String(str).split(/(\*\*[^*]+\*\*)/g);
     return parts.map((part, idx) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={idx} style={{ color: '#fff', fontWeight: '700' }}>{part.slice(2, -2)}</strong>;
+        return <strong key={idx} style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{part.slice(2, -2)}</strong>;
       }
       return part;
     });
@@ -548,7 +550,7 @@ function renderFormattedAiMessage(rawText) {
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed || trimmed === '---') {
-          return <div key={i} style={{ height: trimmed === '---' ? '1px' : '4px', background: trimmed === '---' ? 'rgba(255,255,255,0.1)' : 'transparent', margin: trimmed === '---' ? '4px 0' : 0 }} />;
+          return <div key={i} style={{ height: trimmed === '---' ? '1px' : '4px', background: trimmed === '---' ? 'var(--border-color)' : 'transparent', margin: trimmed === '---' ? '4px 0' : 0 }} />;
         }
         if (trimmed.startsWith('### ')) {
           return (
@@ -581,7 +583,7 @@ function renderFormattedAiMessage(rawText) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. CONSOLIDATED NET WORTH (MULTI-ASSET INSTITUTIONAL DASHBOARD)
 // ══════════════════════════════════════════════════════════════════════════════
-function NetWorthView({ isMobile }) {
+function NetWorthView({ isMobile, isLight }) {
   const holdings = useStore(state => state.holdings || []);
   const [stocks, setStocks] = useState(1250000);
   const [mutualFunds, setMutualFunds] = useState(850000);
@@ -633,6 +635,30 @@ function NetWorthView({ isMobile }) {
   const prevCrore = nextCrore - 10000000;
   const croreProgress = Math.min(100, Math.max(0, ((netWorth - prevCrore) / 10000000) * 100));
 
+  const inputStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '7px 10px',
+    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.35)',
+    border: `1px solid ${isLight ? 'var(--border-color)' : 'rgba(255,255,255,0.12)'}`,
+    borderRadius: '6px',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    marginTop: '2px'
+  };
+
+  const debtInputStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '7px 10px',
+    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.4)',
+    border: '1px solid rgba(239,68,68,0.3)',
+    borderRadius: '6px',
+    color: isLight ? '#b91c1c' : '#fff',
+    fontSize: '13px',
+    marginTop: '2px'
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* KPI Overview Bar */}
@@ -642,15 +668,15 @@ function NetWorthView({ isMobile }) {
         gap: '12px'
       }}>
         <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Consolidated Net Worth</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Consolidated Net Worth</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#38bdf8', marginTop: '2px' }}>
             ₹{(netWorth / 10000000).toFixed(2)} Cr
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>₹{Math.round(netWorth).toLocaleString('en-IN')}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>₹{Math.round(netWorth).toLocaleString('en-IN')}</div>
         </div>
 
         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Gross Total Assets</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Gross Total Assets</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
             ₹{(totalAssets / 10000000).toFixed(2)} Cr
           </div>
@@ -658,7 +684,7 @@ function NetWorthView({ isMobile }) {
         </div>
 
         <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Total Debt Liabilities</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Total Debt Liabilities</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#f87171', marginTop: '2px' }}>
             ₹{(totalLiabilities / 10000000).toFixed(2)} Cr
           </div>
@@ -666,11 +692,11 @@ function NetWorthView({ isMobile }) {
         </div>
 
         <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Solvency & Health</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Solvency & Health</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: solvencyRatio >= 70 ? '#a855f7' : '#f59e0b', marginTop: '2px' }}>
             {solvencyRatio.toFixed(1)}%
           </div>
-          <div style={{ fontSize: '11px', color: solvencyRatio >= 70 ? '#d8b4fe' : '#fbbf24' }}>
+          <div style={{ fontSize: '11px', color: solvencyRatio >= 70 ? '#a855f7' : '#fbbf24' }}>
             {solvencyRatio >= 70 ? 'Institutional Safety ✓' : 'Moderate Cushion'}
           </div>
         </div>
@@ -681,11 +707,11 @@ function NetWorthView({ isMobile }) {
         {/* Left: Interactive Asset & Liability Inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Assets Section */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.07)', borderRadius: '14px', padding: '16px' }}>
+          <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)', borderRadius: '14px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <PieChart size={16} color="#38bdf8" />
-                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc' }}>
                   Multi-Asset Breakdown (₹)
                 </h4>
               </div>
@@ -724,7 +750,7 @@ function NetWorthView({ isMobile }) {
                   type="number" 
                   value={stocks} 
                   onChange={e => setStocks(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
 
@@ -734,7 +760,7 @@ function NetWorthView({ isMobile }) {
                   type="number" 
                   value={mutualFunds} 
                   onChange={e => setMutualFunds(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
 
@@ -744,17 +770,17 @@ function NetWorthView({ isMobile }) {
                   type="number" 
                   value={epfPpf} 
                   onChange={e => setEpfPpf(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>Bank Savings, Liquid & FDs</label>
+                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Bank Savings, Liquid & FDs</label>
                 <input 
                   type="number" 
                   value={bankFd} 
                   onChange={e => setBankFd(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
 
@@ -764,7 +790,7 @@ function NetWorthView({ isMobile }) {
                   type="number" 
                   value={gold} 
                   onChange={e => setGold(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
 
@@ -774,7 +800,7 @@ function NetWorthView({ isMobile }) {
                   type="number" 
                   value={realEstate} 
                   onChange={e => setRealEstate(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={inputStyle} 
                 />
               </div>
             </div>
@@ -784,39 +810,39 @@ function NetWorthView({ isMobile }) {
           <div style={{ background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '14px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
               <Shield size={16} color="#ef4444" />
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#fca5a5' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: isLight ? '#dc2626' : '#fca5a5' }}>
                 Debt Liabilities & Active EMIs (₹)
               </h4>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '11px', color: '#fca5a5' }}>Home Loan Principal</label>
+                <label style={{ fontSize: '11px', color: isLight ? '#dc2626' : '#fca5a5' }}>Home Loan Principal</label>
                 <input 
                   type="number" 
                   value={homeLoan} 
                   onChange={e => setHomeLoan(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={debtInputStyle} 
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', color: '#fca5a5' }}>Vehicle / Personal Loans</label>
+                <label style={{ fontSize: '11px', color: isLight ? '#dc2626' : '#fca5a5' }}>Vehicle / Personal Loans</label>
                 <input 
                   type="number" 
                   value={personalLoan} 
                   onChange={e => setPersonalLoan(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={debtInputStyle} 
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', color: '#fca5a5' }}>Credit Cards & BNPL</label>
+                <label style={{ fontSize: '11px', color: isLight ? '#dc2626' : '#fca5a5' }}>Credit Cards & BNPL</label>
                 <input 
                   type="number" 
                   value={creditCardDebt} 
                   onChange={e => setCreditCardDebt(Number(e.target.value) || 0)} 
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }} 
+                  style={debtInputStyle} 
                 />
               </div>
             </div>
@@ -826,13 +852,13 @@ function NetWorthView({ isMobile }) {
         {/* Right: Institutional Asset Allocation & Health Analysis */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Visual Stacked Asset Allocation Bar */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#cbd5e1' }}>Multi-Asset Allocation Mix</span>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Total ₹{(totalAssets / 100000).toFixed(1)}L</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Multi-Asset Allocation Mix</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Total ₹{(totalAssets / 100000).toFixed(1)}L</span>
             </div>
 
-            <div style={{ height: '14px', borderRadius: '7px', overflow: 'hidden', display: 'flex', background: 'rgba(255,255,255,0.06)' }}>
+            <div style={{ height: '14px', borderRadius: '7px', overflow: 'hidden', display: 'flex', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)' }}>
               <div style={{ width: `${(stocks / totalAssets) * 100}%`, background: '#38bdf8' }} title="Direct Stocks" />
               <div style={{ width: `${(mutualFunds / totalAssets) * 100}%`, background: '#10b981' }} title="Mutual Funds" />
               <div style={{ width: `${(epfPpf / totalAssets) * 100}%`, background: '#f59e0b' }} title="EPF/PPF" />
@@ -845,15 +871,15 @@ function NetWorthView({ isMobile }) {
               <div style={{ color: '#38bdf8' }}>● Stocks: {((stocks / totalAssets) * 100).toFixed(0)}%</div>
               <div style={{ color: '#10b981' }}>● MF/ETF: {((mutualFunds / totalAssets) * 100).toFixed(0)}%</div>
               <div style={{ color: '#f59e0b' }}>● EPF/PPF: {((epfPpf / totalAssets) * 100).toFixed(0)}%</div>
-              <div style={{ color: '#cbd5e1' }}>● Cash/FD: {((bankFd / totalAssets) * 100).toFixed(0)}%</div>
+              <div style={{ color: 'var(--text-secondary)' }}>● Cash/FD: {((bankFd / totalAssets) * 100).toFixed(0)}%</div>
               <div style={{ color: '#fbbf24' }}>● Gold: {((gold / totalAssets) * 100).toFixed(0)}%</div>
               <div style={{ color: '#a855f7' }}>● Realty: {((realEstate / totalAssets) * 100).toFixed(0)}%</div>
             </div>
           </div>
 
           {/* Liquidity Tiers */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#cbd5e1', marginBottom: '10px' }}>
+          <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>
               Asset Liquidity Structure
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -862,14 +888,14 @@ function NetWorthView({ isMobile }) {
                 <div style={{ fontSize: '15px', fontWeight: '800', color: '#34d399', marginTop: '2px' }}>
                   ₹{(liquidAssets / 100000).toFixed(1)} Lakhs
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8' }}>Stocks, MFs, Bank, Gold</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Stocks, MFs, Bank, Gold</div>
               </div>
               <div style={{ background: 'rgba(168, 85, 247, 0.07)', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '10px', borderRadius: '8px' }}>
                 <div style={{ fontSize: '10.5px', color: '#a855f7' }}>Tier 2: Illiquid / Long-Term</div>
                 <div style={{ fontSize: '15px', fontWeight: '800', color: '#c084fc', marginTop: '2px' }}>
                   ₹{(illiquidAssets / 100000).toFixed(1)} Lakhs
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8' }}>Real Estate &amp; EPF Lock-in</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Real Estate &amp; EPF Lock-in</div>
               </div>
             </div>
           </div>
@@ -878,12 +904,12 @@ function NetWorthView({ isMobile }) {
           <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: '700', color: '#38bdf8' }}>Next Milestone: ₹{(nextCrore / 10000000).toFixed(1)} Crores</span>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>{croreProgress.toFixed(1)}% Completed</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{croreProgress.toFixed(1)}% Completed</span>
             </div>
-            <div style={{ height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: '8px' }}>
+            <div style={{ height: '8px', borderRadius: '4px', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: '8px' }}>
               <div style={{ width: `${croreProgress}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8, #10b981)' }} />
             </div>
-            <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
               Need ₹{((nextCrore - netWorth) / 100000).toFixed(1)} Lakhs more to reach the next landmark!
             </div>
           </div>
@@ -896,7 +922,7 @@ function NetWorthView({ isMobile }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 2. 50/30/20 SMART BUDGET & CASHFLOW AUDIT
 // ══════════════════════════════════════════════════════════════════════════════
-function BudgetLeakDetectorView({ isMobile }) {
+function BudgetLeakDetectorView({ isMobile, isLight }) {
   const [monthlyIncome, setMonthlyIncome] = useState(120000);
   const [needsExpense, setNeedsExpense] = useState(55000);
   const [wantsExpense, setWantsExpense] = useState(45000);
@@ -955,15 +981,15 @@ function BudgetLeakDetectorView({ isMobile }) {
         gap: '12px'
       }}>
         <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Monthly Take-Home</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Monthly Take-Home</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#38bdf8', marginTop: '2px' }}>
             ₹{monthlyIncome.toLocaleString('en-IN')}
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>₹{(monthlyIncome * 12 / 100000).toFixed(1)}L Annualized</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>₹{(monthlyIncome * 12 / 100000).toFixed(1)}L Annualized</div>
         </div>
 
         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Active Savings Rate</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Active Savings Rate</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: savingsRate >= 20 ? '#34d399' : '#f59e0b', marginTop: '2px' }}>
             {savingsRate.toFixed(1)}%
           </div>
@@ -973,31 +999,31 @@ function BudgetLeakDetectorView({ isMobile }) {
         </div>
 
         <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Cashflow Balance</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Cashflow Balance</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: cashSurplus >= 0 ? '#fbbf24' : '#ef4444', marginTop: '2px' }}>
             {cashSurplus >= 0 ? `+₹${cashSurplus.toLocaleString('en-IN')}` : `-₹${Math.abs(cashSurplus).toLocaleString('en-IN')}`}
           </div>
-          <div style={{ fontSize: '11px', color: cashSurplus >= 0 ? '#cbd5e1' : '#f87171' }}>
+          <div style={{ fontSize: '11px', color: cashSurplus >= 0 ? 'var(--text-secondary)' : '#f87171' }}>
             {cashSurplus >= 0 ? 'Monthly Surplus Cushion' : 'Overspending Deficit!'}
           </div>
         </div>
 
         <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Detected Leaks</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Detected Leaks</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#f87171', marginTop: '2px' }}>
             -₹{Math.round(totalPluggedLeaks).toLocaleString('en-IN')}/mo
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>{detectedLeaks.length} Active Leak Categories</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{detectedLeaks.length} Active Leak Categories</div>
         </div>
       </div>
 
       {/* Main Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr', gap: '20px' }}>
         {/* Left: 50/30/20 Sliders & Income Presets */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700' }}>Net Monthly Take-Home Income (₹)</label>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700' }}>Net Monthly Take-Home Income (₹)</label>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {[50000, 100000, 150000, 250000].map(amt => (
                   <button
@@ -1009,7 +1035,7 @@ function BudgetLeakDetectorView({ isMobile }) {
                       setWantsExpense(Math.round(amt * 0.30));
                       setSavingsExpense(Math.round(amt * 0.20));
                     }}
-                    style={{ padding: '3px 7px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}
+                    style={{ padding: '3px 7px', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}
                   >
                     ₹{(amt / 1000).toFixed(0)}k
                   </button>
@@ -1020,7 +1046,7 @@ function BudgetLeakDetectorView({ isMobile }) {
               type="number"
               value={monthlyIncome}
               onChange={e => setMonthlyIncome(Number(e.target.value) || 0)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: '#fff', fontSize: '15px', fontWeight: '800', marginTop: '6px' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.35)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '15px', fontWeight: '800', marginTop: '6px' }}
             />
           </div>
 
@@ -1028,7 +1054,7 @@ function BudgetLeakDetectorView({ isMobile }) {
           <div style={{ background: 'rgba(56, 189, 248, 0.05)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700' }}>Needs: Rent, EMIs, Groceries, Utilities</span>
-              <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>₹{needsExpense.toLocaleString('en-IN')}</span>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#fff' }}>₹{needsExpense.toLocaleString('en-IN')}</span>
             </div>
             <input 
               type="range" min="0" max={monthlyIncome} step="1000"
@@ -1036,7 +1062,7 @@ function BudgetLeakDetectorView({ isMobile }) {
               onChange={e => setNeedsExpense(Number(e.target.value))}
               style={{ width: '100%', accentColor: '#38bdf8', marginTop: '6px' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               <span>50% Target: ₹{Math.round(targetNeeds).toLocaleString('en-IN')}</span>
               <span style={{ color: needsExpense <= targetNeeds ? '#34d399' : '#f87171' }}>
                 {needsExpense <= targetNeeds ? 'Within Budget ✓' : `+₹${Math.round(needsExpense - targetNeeds).toLocaleString('en-IN')} Over`}
@@ -1058,7 +1084,7 @@ function BudgetLeakDetectorView({ isMobile }) {
               onChange={e => setWantsExpense(Number(e.target.value))}
               style={{ width: '100%', accentColor: wantsExpense > targetWants ? '#ef4444' : '#10b981', marginTop: '6px' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               <span>30% Target: ₹{Math.round(targetWants).toLocaleString('en-IN')}</span>
               <span style={{ color: wantsExpense <= targetWants ? '#34d399' : '#f87171' }}>
                 {wantsExpense <= targetWants ? 'Under Control ✓' : `Leak Alert: +₹${Math.round(wantsExpense - targetWants).toLocaleString('en-IN')}`}
@@ -1078,7 +1104,7 @@ function BudgetLeakDetectorView({ isMobile }) {
               onChange={e => setSavingsExpense(Number(e.target.value))}
               style={{ width: '100%', accentColor: '#10b981', marginTop: '6px' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               <span>20% Target: ₹{Math.round(targetSavings).toLocaleString('en-IN')}</span>
               <span style={{ color: savingsExpense >= targetSavings ? '#34d399' : '#fbbf24' }}>
                 {savingsExpense >= targetSavings ? 'Healthy Savings Rate ✓' : `Shortfall: -₹${Math.round(targetSavings - savingsExpense).toLocaleString('en-IN')}`}
@@ -1089,10 +1115,10 @@ function BudgetLeakDetectorView({ isMobile }) {
 
         {/* Right: Leaks & Wealth Boost Engine */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <AlertTriangle size={18} color="#f59e0b" />
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: isLight ? '#0f172a' : '#f8fafc' }}>
                 AI Expense Leak Detector
               </h4>
             </div>
@@ -1102,19 +1128,19 @@ function BudgetLeakDetectorView({ isMobile }) {
                 <div 
                   key={idx}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: `1px solid ${leak.severity === 'HIGH' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1px solid ${leak.severity === 'HIGH' ? 'rgba(239, 68, 68, 0.3)' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
                     borderRadius: '8px',
                     padding: '10px 12px'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#f8fafc' }}>{leak.title}</span>
+                    <span style={{ fontSize: '12.5px', fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc' }}>{leak.title}</span>
                     <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#ef4444' }}>
                       -₹{Math.round(leak.amount).toLocaleString('en-IN')} / mo
                     </span>
                   </div>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                     {leak.desc}
                   </p>
                 </div>
@@ -1127,18 +1153,18 @@ function BudgetLeakDetectorView({ isMobile }) {
               <Sparkles size={16} />
               <span>Compounding Wealth Boost</span>
             </div>
-            <div style={{ fontSize: '12.5px', color: '#cbd5e1', marginTop: '6px', lineHeight: '1.5' }}>
-              Redirecting <strong style={{ color: '#fff' }}>₹{Math.round(totalPluggedLeaks).toLocaleString('en-IN')}/month</strong> of plugged leaks into a 12% compounding Nifty 50 Index SIP yields:
+            <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', marginTop: '6px', lineHeight: '1.5' }}>
+              Redirecting <strong style={{ color: 'var(--text-primary)' }}>₹{Math.round(totalPluggedLeaks).toLocaleString('en-IN')}/month</strong> of plugged leaks into a 12% compounding Nifty 50 Index SIP yields:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>10-Year Corpus</div>
+              <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>10-Year Corpus</div>
                 <div style={{ fontSize: '16px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
                   ₹{(leakBoostCorpus / 100000).toFixed(2)} Lakhs
                 </div>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>20-Year Corpus</div>
+              <div style={{ background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>20-Year Corpus</div>
                 <div style={{ fontSize: '16px', fontWeight: '900', color: '#60a5fa', marginTop: '2px' }}>
                   ₹{(leakBoostCorpus * 3.7 / 10000000).toFixed(2)} Crores
                 </div>
@@ -1154,7 +1180,7 @@ function BudgetLeakDetectorView({ isMobile }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 3. ACTUARIAL LIFE & HEALTH SHIELD (HUMAN LIFE VALUE - HLV)
 // ══════════════════════════════════════════════════════════════════════════════
-function InsuranceGapView({ isMobile }) {
+function InsuranceGapView({ isMobile, isLight }) {
   const [annualIncome, setAnnualIncome] = useState(1500000);
   const [currentAge, setCurrentAge] = useState(28);
   const [retireAge, setRetireAge] = useState(60);
@@ -1162,6 +1188,18 @@ function InsuranceGapView({ isMobile }) {
   const [existingTermCover, setExistingTermCover] = useState(5000000);
   const [dependents, setDependents] = useState(2);
   const [childEduGoal, setChildEduGoal] = useState(2500000);
+
+  const inputStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '8px 10px',
+    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.35)',
+    border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.12)',
+    borderRadius: '6px',
+    color: isLight ? 'var(--text-primary)' : '#fff',
+    fontSize: '13px',
+    marginTop: '2px'
+  };
 
   const analysis = useMemo(() => {
     const workingYears = Math.max(1, retireAge - currentAge);
@@ -1188,140 +1226,140 @@ function InsuranceGapView({ isMobile }) {
         gap: '12px'
       }}>
         <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Actuarial HLV Target</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Actuarial HLV Target</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#fbbf24', marginTop: '2px' }}>
             ₹{(analysis.idealCoverage / 10000000).toFixed(2)} Cr
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>15x Income + Debts + Education</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>15x Income + Debts + Education</div>
         </div>
 
         <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Existing Cover</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Existing Cover</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#38bdf8', marginTop: '2px' }}>
             ₹{(existingTermCover / 10000000).toFixed(2)} Cr
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>Active Life Policies</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Active Life Policies</div>
         </div>
 
         <div style={{ background: analysis.gap > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', border: `1px solid ${analysis.gap > 0 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`, borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Protection Gap</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Protection Gap</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: analysis.gap > 0 ? '#f87171' : '#34d399', marginTop: '2px' }}>
             {analysis.gap > 0 ? `₹${(analysis.gap / 10000000).toFixed(2)} Cr Shortfall` : '100% Protected ✓'}
           </div>
-          <div style={{ fontSize: '11px', color: analysis.gap > 0 ? '#fca5a5' : '#10b981' }}>
+          <div style={{ fontSize: '11px', color: analysis.gap > 0 ? '#f87171' : '#10b981' }}>
             {analysis.gap > 0 ? 'Family Under-Insured!' : 'Complete Family Shield'}
           </div>
         </div>
 
         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Term Policy Premium</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Term Policy Premium</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
             ~₹{analysis.approxMonthlyPremium}/mo
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>Pure Term (Zero ULIP Drag)</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Pure Term (Zero ULIP Drag)</div>
         </div>
       </div>
 
       {/* Main Form & Solutions */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr', gap: '20px' }}>
         {/* Form */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <HeartPulse size={16} color="#fbbf24" />
-            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#f8fafc' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
               Family Protection &amp; Actuarial Assumptions
             </h4>
           </div>
 
           <div>
-            <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Annual Gross Income (₹)</label>
+            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Annual Gross Income (₹)</label>
             <input 
               type="number"
               value={annualIncome}
               onChange={e => setAnnualIncome(Number(e.target.value) || 0)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+              style={inputStyle}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Current Age</label>
+              <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Current Age</label>
               <input 
                 type="number"
                 value={currentAge}
                 onChange={e => setCurrentAge(Number(e.target.value) || 0)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Target Retirement Age</label>
+              <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Target Retirement Age</label>
               <input 
                 type="number"
                 value={retireAge}
                 onChange={e => setRetireAge(Number(e.target.value) || 0)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+                style={inputStyle}
               />
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Total Outstanding Loans &amp; Liabilities (₹)</label>
+            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Total Outstanding Loans &amp; Liabilities (₹)</label>
             <input 
               type="number"
               value={totalDebts}
               onChange={e => setTotalDebts(Number(e.target.value) || 0)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Children Higher Education / Marriage Goal (₹)</label>
+            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Children Higher Education / Marriage Goal (₹)</label>
             <input 
               type="number"
               value={childEduGoal}
               onChange={e => setChildEduGoal(Number(e.target.value) || 0)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Existing Life Insurance Cover (₹)</label>
+            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Existing Life Insurance Cover (₹)</label>
             <input 
               type="number"
               value={existingTermCover}
               onChange={e => setExistingTermCover(Number(e.target.value) || 0)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '2px' }}
+              style={inputStyle}
             />
           </div>
         </div>
 
         {/* Protection Blueprints */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ background: 'rgba(56, 189, 248, 0.06)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: isLight ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.06)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <ShieldCheck size={16} color="#38bdf8" />
-              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#38bdf8' }}>
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#0284c7' }}>
                 Pillar 1: Pure Term Life Insurance
               </h4>
             </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5' }}>
+            <p style={{ margin: '8px 0 0', fontSize: '12px', color: isLight ? 'var(--text-primary)' : '#cbd5e1', lineHeight: '1.5' }}>
               Get a pure Term Insurance policy for ₹{(analysis.gap / 10000000).toFixed(1)} Cr for only ~<strong>₹{analysis.approxMonthlyPremium}/month</strong>. Avoid expensive ULIPs or endowment plans where 5-10% of premiums are eroded in agent commissions.
             </p>
           </div>
 
-          <div style={{ background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: isLight ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Award size={16} color="#34d399" />
-              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#34d399' }}>
+              <Award size={16} color="#10b981" />
+              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#059669' }}>
                 Pillar 2: ₹1 Crore Health Shield (Base + Super Top-up)
               </h4>
             </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5' }}>
+            <p style={{ margin: '8px 0 0', fontSize: '12px', color: isLight ? 'var(--text-primary)' : '#cbd5e1', lineHeight: '1.5' }}>
               Instead of an expensive ₹1 Cr base policy, buy a <strong>₹10 Lakh Base Health Cover</strong> combined with a <strong>₹90 Lakh Super Top-up</strong> (₹10L deductible). This slashes your annual health insurance premium by over <strong>60%</strong>!
             </p>
           </div>
 
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.07)', borderRadius: '14px', padding: '14px', fontSize: '11.5px', color: '#94a3b8' }}>
+          <div style={{ background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.07)', borderRadius: '14px', padding: '14px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
             * Actuarial Standard: 15 years family income replacement plus total debt redemption & children higher education buffer.
           </div>
         </div>
@@ -1333,7 +1371,7 @@ function InsuranceGapView({ isMobile }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 4. INCOME TAX SLABS (UNION BUDGET LATEST) & CAPITAL GAINS HARVESTING
 // ══════════════════════════════════════════════════════════════════════════════
-function TaxLossHarvestingView({ isMobile }) {
+function TaxLossHarvestingView({ isMobile, isLight }) {
   const [grossSalary, setGrossSalary] = useState(1500000); // 15 Lakhs
   const [sec80c, setSec80c] = useState(150000); // Max 1.5L
   const [sec80d, setSec80d] = useState(50000); // Health insurance (self + parents)
@@ -1345,6 +1383,17 @@ function TaxLossHarvestingView({ isMobile }) {
   const [stcgGains, setStcgGains] = useState(180000); // 20%
   const [ltcgGains, setLtcgGains] = useState(250000); // 12.5% beyond 1.25L
   const [unrealizedLosses, setUnrealizedLosses] = useState(120000);
+
+  const inputStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '6px 8px',
+    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.35)',
+    border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.12)',
+    borderRadius: '6px',
+    color: isLight ? 'var(--text-primary)' : '#fff',
+    fontSize: '12px'
+  };
 
   const taxComp = useMemo(() => {
     // 1. NEW TAX REGIME (Union Budget Latest)
@@ -1432,11 +1481,11 @@ function TaxLossHarvestingView({ isMobile }) {
         gap: '12px'
       }}>
         <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Gross Annual Income</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Gross Annual Income</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#38bdf8', marginTop: '2px' }}>
             ₹{(grossSalary / 100000).toFixed(2)} Lakhs
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>₹{Math.round(grossSalary / 12).toLocaleString('en-IN')}/month</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>₹{Math.round(grossSalary / 12).toLocaleString('en-IN')}/month</div>
         </div>
 
         <div style={{
@@ -1445,36 +1494,36 @@ function TaxLossHarvestingView({ isMobile }) {
           borderRadius: '12px',
           padding: '14px'
         }}>
-          <div style={{ fontSize: '11px', color: '#cbd5e1', textTransform: 'uppercase', fontWeight: '700' }}>Recommended Regime</div>
-          <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: taxComp.recommendedRegime === 'NEW' ? '#34d399' : '#38bdf8', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Recommended Regime</div>
+          <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: taxComp.recommendedRegime === 'NEW' ? '#10b981' : '#38bdf8', marginTop: '2px' }}>
             {taxComp.recommendedRegime === 'NEW' ? '⚡ New Tax Regime' : '⚡ Old Tax Regime'}
           </div>
-          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>Saves ₹{taxComp.regimeSavings.toLocaleString('en-IN')} extra!</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Saves ₹{taxComp.regimeSavings.toLocaleString('en-IN')} extra!</div>
         </div>
 
         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>New Regime Tax</div>
-          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>New Regime Tax</div>
+          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#10b981', marginTop: '2px' }}>
             ₹{taxComp.newTotalTax.toLocaleString('en-IN')}
           </div>
           <div style={{ fontSize: '11px', color: '#10b981' }}>Std Ded ₹75,000 applied</div>
         </div>
 
         <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700' }}>Harvesting Tax Savings</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Harvesting Tax Savings</div>
           <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#f87171', marginTop: '2px' }}>
             ₹{taxComp.cgTaxSaved.toLocaleString('en-IN')} Saved
           </div>
-          <div style={{ fontSize: '11px', color: '#fca5a5' }}>STCG 20% &amp; LTCG 12.5% Offset</div>
+          <div style={{ fontSize: '11px', color: '#f87171' }}>STCG 20% &amp; LTCG 12.5% Offset</div>
         </div>
       </div>
 
       {/* Side-by-Side Slabs Comparison Table */}
-      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
+      <div style={{ background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Scale size={18} color="#ec4899" />
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#f8fafc' }}>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
               Union Budget Tax Slabs: New Regime vs Old Regime (AY 2025-26 &amp; AY 2026-27)
             </h3>
           </div>
@@ -1486,16 +1535,16 @@ function TaxLossHarvestingView({ isMobile }) {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
           {/* New Regime Slabs Card */}
           <div style={{
-            background: 'rgba(16, 185, 129, 0.04)',
-            border: `1px solid ${taxComp.recommendedRegime === 'NEW' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+            background: isLight ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.04)',
+            border: `1px solid ${taxComp.recommendedRegime === 'NEW' ? 'rgba(16, 185, 129, 0.5)' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
             borderRadius: '10px',
             padding: '14px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>NEW TAX REGIME (Default)</span>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Tax: ₹{taxComp.newTotalTax.toLocaleString('en-IN')}</span>
+              <span style={{ fontWeight: '800', color: '#059669', fontSize: '13px' }}>NEW TAX REGIME (Default)</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Tax: ₹{taxComp.newTotalTax.toLocaleString('en-IN')}</span>
             </div>
-            <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: '1.6' }}>
+            <div style={{ fontSize: '11px', color: isLight ? 'var(--text-primary)' : '#cbd5e1', lineHeight: '1.6' }}>
               • <strong>Up to ₹3,00,000:</strong> 0% (NIL)<br />
               • <strong>₹3,00,001 to ₹7,00,000:</strong> 5% (Rebate u/s 87A makes tax ₹0)<br />
               • <strong>₹7,00,001 to ₹10,00,000:</strong> 10%<br />
@@ -1508,16 +1557,16 @@ function TaxLossHarvestingView({ isMobile }) {
 
           {/* Old Regime Slabs Card */}
           <div style={{
-            background: 'rgba(56, 189, 248, 0.04)',
-            border: `1px solid ${taxComp.recommendedRegime === 'OLD' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+            background: isLight ? 'rgba(56, 189, 248, 0.06)' : 'rgba(56, 189, 248, 0.04)',
+            border: `1px solid ${taxComp.recommendedRegime === 'OLD' ? 'rgba(56, 189, 248, 0.5)' : (isLight ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.08)')}`,
             borderRadius: '10px',
             padding: '14px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: '800', color: '#38bdf8', fontSize: '13px' }}>OLD TAX REGIME (Itemized)</span>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Tax: ₹{taxComp.oldTotalTax.toLocaleString('en-IN')}</span>
+              <span style={{ fontWeight: '800', color: '#0284c7', fontSize: '13px' }}>OLD TAX REGIME (Itemized)</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Tax: ₹{taxComp.oldTotalTax.toLocaleString('en-IN')}</span>
             </div>
-            <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: '1.6' }}>
+            <div style={{ fontSize: '11px', color: isLight ? 'var(--text-primary)' : '#cbd5e1', lineHeight: '1.6' }}>
               • <strong>Up to ₹2,50,000:</strong> 0% (NIL)<br />
               • <strong>₹2,50,001 to ₹5,00,000:</strong> 5% (Rebate u/s 87A up to ₹5L)<br />
               • <strong>₹5,00,001 to ₹10,00,000:</strong> 20%<br />
@@ -1532,16 +1581,16 @@ function TaxLossHarvestingView({ isMobile }) {
       {/* Inputs Deck: Salary & Deductions */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr', gap: '20px' }}>
         {/* Left: Salary & Deductions */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>Salary &amp; Tax Deductions</span>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#fff' }}>Salary &amp; Tax Deductions</span>
             <div style={{ display: 'flex', gap: '4px' }}>
               {[1000000, 1500000, 2000000, 3000000].map(s => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setGrossSalary(s)}
-                  style={{ padding: '3px 7px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}
+                  style={{ padding: '3px 7px', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.1)', color: isLight ? 'var(--text-primary)' : '#cbd5e1', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}
                 >
                   ₹{(s / 100000).toFixed(0)}L
                 </button>
@@ -1550,65 +1599,65 @@ function TaxLossHarvestingView({ isMobile }) {
           </div>
 
           <div>
-            <label style={{ fontSize: '11px', color: '#94a3b8' }}>Gross Annual Salary / Income (₹)</label>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Gross Annual Salary / Income (₹)</label>
             <input 
               type="number" 
               value={grossSalary} 
               onChange={e => setGrossSalary(Number(e.target.value) || 0)} 
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '14px', fontWeight: '800', marginTop: '2px' }} 
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0,0,0,0.35)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: isLight ? 'var(--text-primary)' : '#fff', fontSize: '14px', fontWeight: '800', marginTop: '2px' }} 
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', color: '#94a3b8' }}>Section 80C (EPF/PPF/ELSS, max ₹1.5L)</label>
-              <input type="number" value={sec80c} onChange={e => setSec80c(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Section 80C (EPF/PPF/ELSS, max ₹1.5L)</label>
+              <input type="number" value={sec80c} onChange={e => setSec80c(Number(e.target.value) || 0)} style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: '#94a3b8' }}>Section 80D (Mediclaim, max ₹75k)</label>
-              <input type="number" value={sec80d} onChange={e => setSec80d(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Section 80D (Mediclaim, max ₹75k)</label>
+              <input type="number" value={sec80d} onChange={e => setSec80d(Number(e.target.value) || 0)} style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: '#94a3b8' }}>Section 80CCD(1B) NPS (max ₹50k)</label>
-              <input type="number" value={sec80ccd} onChange={e => setSec80ccd(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Section 80CCD(1B) NPS (max ₹50k)</label>
+              <input type="number" value={sec80ccd} onChange={e => setSec80ccd(Number(e.target.value) || 0)} style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: '#94a3b8' }}>Section 24(b) Home Loan Interest</label>
-              <input type="number" value={sec24b} onChange={e => setSec24b(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Section 24(b) Home Loan Interest</label>
+              <input type="number" value={sec24b} onChange={e => setSec24b(Number(e.target.value) || 0)} style={inputStyle} />
             </div>
           </div>
         </div>
 
         {/* Right: Capital Gains & Tax-Loss Harvesting Engine */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ background: isLight ? 'var(--bg-card, var(--bg-hover))' : 'rgba(255, 255, 255, 0.02)', border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Scissors size={16} color="#ec4899" />
-            <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: '#f8fafc' }}>
+            <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#f8fafc' }}>
               Capital Gains &amp; Tax-Loss Harvester (Budget 2024 Rates)
             </h4>
           </div>
 
           <div>
-            <label style={{ fontSize: '11px', color: '#94a3b8' }}>Realized STCG on Equity (@ 20% Tax)</label>
-            <input type="number" value={stcgGains} onChange={e => setStcgGains(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Realized STCG on Equity (@ 20% Tax)</label>
+            <input type="number" value={stcgGains} onChange={e => setStcgGains(Number(e.target.value) || 0)} style={inputStyle} />
           </div>
 
           <div>
-            <label style={{ fontSize: '11px', color: '#94a3b8' }}>Realized LTCG on Equity (@ 12.5% beyond ₹1.25L)</label>
-            <input type="number" value={ltcgGains} onChange={e => setLtcgGains(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', fontSize: '12px' }} />
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Realized LTCG on Equity (@ 12.5% beyond ₹1.25L)</label>
+            <input type="number" value={ltcgGains} onChange={e => setLtcgGains(Number(e.target.value) || 0)} style={inputStyle} />
           </div>
 
           <div>
-            <label style={{ fontSize: '11px', color: '#f87171' }}>Unrealized Losses in Holding Portfolio (₹)</label>
-            <input type="number" value={unrealizedLosses} onChange={e => setUnrealizedLosses(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', color: '#fca5a5', fontSize: '12px' }} />
+            <label style={{ fontSize: '11px', color: '#ef4444' }}>Unrealized Losses in Holding Portfolio (₹)</label>
+            <input type="number" value={unrealizedLosses} onChange={e => setUnrealizedLosses(Number(e.target.value) || 0)} style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', background: isLight ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', color: isLight ? '#dc2626' : '#fca5a5', fontSize: '12px' }} />
           </div>
 
-          <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ background: isLight ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: '#34d399', fontWeight: '800' }}>Harvesting Tax Savings</span>
-              <span style={{ fontSize: '14px', fontWeight: '900', color: '#34d399' }}>₹{taxComp.cgTaxSaved.toLocaleString('en-IN')} Saved</span>
+              <span style={{ fontSize: '12px', color: '#059669', fontWeight: '800' }}>Harvesting Tax Savings</span>
+              <span style={{ fontSize: '14px', fontWeight: '900', color: '#059669' }}>₹{taxComp.cgTaxSaved.toLocaleString('en-IN')} Saved</span>
             </div>
-            <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: isLight ? 'var(--text-secondary)' : '#cbd5e1', marginTop: '4px' }}>
               Sell ₹{Math.round(unrealizedLosses).toLocaleString('en-IN')} of loss-making holdings before March 31 to legally offset gains and keep cash in your bank!
             </div>
           </div>
@@ -1621,7 +1670,7 @@ function TaxLossHarvestingView({ isMobile }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 5. 24/7 AI WEALTH & TAX COPILOT (POWERED BY GOOGLE GEMINI 3.5 FLASH)
 // ══════════════════════════════════════════════════════════════════════════════
-function AiWealthCopilotView({ isMobile }) {
+function AiWealthCopilotView({ isMobile, isLight }) {
   const INITIAL_GREETING = {
     sender: 'ai',
     source: 'gemini-3.5-flash',
@@ -1710,7 +1759,7 @@ function AiWealthCopilotView({ isMobile }) {
         justifyContent: 'space-between',
         paddingBottom: '12px',
         marginBottom: '10px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)',
         flexWrap: 'wrap',
         gap: '8px'
       }}>
@@ -1722,7 +1771,7 @@ function AiWealthCopilotView({ isMobile }) {
             background: '#10b981',
             boxShadow: '0 0 10px #10b981'
           }} />
-          <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#e2e8f0' }}>
+          <span style={{ fontSize: '12.5px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#e2e8f0' }}>
             Google Gemini 3.5 Flash • Quantitative Indian Wealth &amp; Tax Engine
           </span>
         </div>
@@ -1767,14 +1816,19 @@ function AiWealthCopilotView({ isMobile }) {
             style={{
               alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: isMobile ? '94%' : '88%',
-              background: m.sender === 'user' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.04)',
-              border: m.sender === 'user' ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
+              background: m.sender === 'user'
+                ? 'linear-gradient(135deg, #0284c7, #2563eb)'
+                : (isLight ? 'var(--bg-card, #ffffff)' : 'rgba(255, 255, 255, 0.04)'),
+              border: m.sender === 'user'
+                ? 'none'
+                : (isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)'),
               borderRadius: m.sender === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
               padding: '12px 16px',
-              color: '#f8fafc',
+              color: m.sender === 'user' ? '#fff' : (isLight ? 'var(--text-primary)' : '#f8fafc'),
               fontSize: '13px',
               lineHeight: '1.55',
-              position: 'relative'
+              position: 'relative',
+              boxShadow: isLight && m.sender !== 'user' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none'
             }}
           >
             {m.sender === 'user' ? m.text : (
@@ -1784,7 +1838,7 @@ function AiWealthCopilotView({ isMobile }) {
                   <button
                     type="button"
                     onClick={() => handleCopy(m.text, idx)}
-                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
+                    style={{ background: 'none', border: 'none', color: isLight ? 'var(--text-secondary)' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
                   >
                     {copiedIdx === idx ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                     <span>{copiedIdx === idx ? 'Copied' : 'Copy'}</span>
@@ -1798,11 +1852,11 @@ function AiWealthCopilotView({ isMobile }) {
         {isTyping && (
           <div style={{
             alignSelf: 'flex-start',
-            background: 'rgba(168, 85, 247, 0.08)',
-            border: '1px solid rgba(168, 85, 247, 0.25)',
+            background: isLight ? 'rgba(168, 85, 247, 0.12)' : 'rgba(168, 85, 247, 0.08)',
+            border: isLight ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid rgba(168, 85, 247, 0.25)',
             borderRadius: '12px 12px 12px 2px',
             padding: '10px 16px',
-            color: '#d8b4fe',
+            color: isLight ? '#7e22ce' : '#d8b4fe',
             fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
@@ -1823,10 +1877,10 @@ function AiWealthCopilotView({ isMobile }) {
             onClick={() => handleSend(p)}
             style={{
               padding: '6px 12px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: isLight ? 'var(--bg-hover)' : 'rgba(255, 255, 255, 0.04)',
+              border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '20px',
-              color: '#cbd5e1',
+              color: isLight ? 'var(--text-primary)' : '#cbd5e1',
               fontSize: '11px',
               whiteSpace: 'nowrap',
               cursor: 'pointer',
@@ -1839,7 +1893,7 @@ function AiWealthCopilotView({ isMobile }) {
       </div>
 
       {/* Input Box */}
-      <div style={{ display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <div style={{ display: 'flex', gap: '8px', paddingTop: '10px', borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.08)' }}>
         <input 
           type="text"
           placeholder="Ask any question (e.g. Age 25, 20k salary, need 15L in 10 years)..."
@@ -1849,10 +1903,10 @@ function AiWealthCopilotView({ isMobile }) {
           style={{
             flex: 1,
             padding: '12px 16px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
+            border: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '10px',
-            color: '#fff',
+            color: isLight ? 'var(--text-primary)' : '#fff',
             fontSize: '13px'
           }}
         />

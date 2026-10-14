@@ -149,20 +149,21 @@ export default function EditOrderModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: 'rgba(0,0,0,0.85)',
+      background: 'rgba(0,0,0,0.65)',
+      backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
-        width: '520px', background: 'var(--bg-dark)', borderRadius: '8px', 
+        width: '520px', background: 'var(--bg-panel)', borderRadius: '8px', 
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column'
       }}>
         
         {/* Header */}
-        <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', fontWeight: '800', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>
                 {exchange}
               </span>
               <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
@@ -174,7 +175,7 @@ export default function EditOrderModal() {
                 padding: '2px 7px', 
                 borderRadius: '4px', 
                 background: isBuy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', 
-                color: isBuy ? '#00E676' : '#FF3B30' 
+                color: isBuy ? 'var(--color-green-light)' : 'var(--color-red-light)' 
               }}>
                 {isBuy ? 'BUY' : 'SELL'}
               </span>
@@ -182,7 +183,7 @@ export default function EditOrderModal() {
               {isCO && <span style={{ fontSize: '10px', background: '#8b5cf6', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>CO</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isUp ? '#00E676' : '#FF3B30', display: 'inline-block' }} />
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'inline-block' }} />
               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Market Price (LTP):</span>
               <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '700', fontSize: '13.5px' }}>
                 ₹{livePrice.toFixed(2)}
@@ -193,7 +194,7 @@ export default function EditOrderModal() {
             </div>
           </div>
 
-          <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
+          <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
         </div>
 
         {/* Form Body */}
@@ -234,7 +235,7 @@ export default function EditOrderModal() {
                         type="text" 
                         value={price} 
                         onChange={e => setPrice(e.target.value)} 
-                        style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                        style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
                       />
                     </div>
                   )}
@@ -261,7 +262,7 @@ export default function EditOrderModal() {
                         setTriggerPrice(e.target.value); 
                         if (order.type !== 'SL') setPrice(e.target.value); 
                       }} 
-                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
                     />
                   </div>
                 </div>
@@ -343,7 +344,7 @@ export default function EditOrderModal() {
                       const n = parseInt(e.target.value, 10);
                       setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
                     }} 
-                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                   />
                 </div>
 
@@ -391,7 +392,7 @@ export default function EditOrderModal() {
                       value={price} 
                       onChange={e => setPrice(e.target.value)} 
                       placeholder={livePrice > 0 ? livePrice.toFixed(2) : '0.00'}
-                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                     />
                   )}
                 </div>
@@ -426,7 +427,7 @@ export default function EditOrderModal() {
                     type="text" 
                     value={triggerPrice} 
                     onChange={e => setTriggerPrice(e.target.value)} 
-                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '8px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                   />
                 </div>
               )}
@@ -439,7 +440,7 @@ export default function EditOrderModal() {
                   gap: '16px', 
                   marginBottom: '16px',
                   padding: '16px',
-                  background: 'rgba(255,255,255,0.02)',
+                  background: 'var(--bg-hover)',
                   borderRadius: '8px',
                   border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
                 }}>
@@ -456,7 +457,7 @@ export default function EditOrderModal() {
                         width: '100%', background: 'var(--bg-panel)', 
                         border: '1px solid rgba(239, 68, 68, 0.3)', 
                         padding: '8px 12px', borderRadius: '4px', 
-                        color: '#fff', fontSize: '14px', outline: 'none' 
+                        color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
                       }} 
                     />
                   </div>
@@ -475,7 +476,7 @@ export default function EditOrderModal() {
                           width: '100%', background: 'var(--bg-panel)', 
                           border: '1px solid rgba(34, 197, 94, 0.3)', 
                           padding: '8px 12px', borderRadius: '4px', 
-                          color: '#fff', fontSize: '14px', outline: 'none' 
+                          color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
                         }} 
                       />
                     </div>
@@ -506,7 +507,7 @@ export default function EditOrderModal() {
                       ? `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
                       : `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`}
                   </div>
-                  <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                  <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
                     {orderLotSize > 1
                       ? `Entered ${numQty.toLocaleString('en-IN')} Qty (${Math.round(numQty / orderLotSize).toLocaleString('en-IN')} Lots) exceeds maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
                       : `Entered ${numQty.toLocaleString('en-IN')} Shares exceeds maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Shares.`}
@@ -539,7 +540,7 @@ export default function EditOrderModal() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ background: 'var(--color-yellow)', color: '#000', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>!</div>
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#fef08a' }}>Insufficient margin!</div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--color-yellow)' }}>Insufficient margin!</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To update, please add ₹{(marginDifference - balanceNum).toFixed(2)}</div>
                 </div>
               </div>
@@ -558,7 +559,7 @@ export default function EditOrderModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: 'var(--bg-hover)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {!isPendingTrigger && (
             <div style={{ display: 'flex', gap: '24px' }}>
               <div>

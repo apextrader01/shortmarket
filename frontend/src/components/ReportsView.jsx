@@ -805,7 +805,7 @@ const TradesAndCharges = () => {
                  (viewMode === 'Date-Wise View' ? dateWiseData : scripWiseData).map((row, idx) => (
                    <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                       <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Date-Wise View' ? row.date : row.symbol}</span>
+                       <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Date-Wise View' ? row.date : row.symbol}</span>
                        <span style={{ flexShrink: 0, fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
                          {row.totalTrades} Trades
                        </span>
@@ -814,8 +814,8 @@ const TradesAndCharges = () => {
                        <span>Buy Qty: <strong style={{ color: 'var(--color-green-light)' }}>{Number(row.buyQty)}</strong></span>
                        <span>Sell Qty: <strong style={{ color: 'var(--color-red-light)' }}>{Number(row.sellQty)}</strong></span>
                      </div>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                       <span>Brokerage: <strong style={{ color: '#fff' }}>₹{row.brokerage.toFixed(2)}</strong></span>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', paddingTop: '6px', borderTop: '1px solid var(--border-color)' }}>
+                       <span>Brokerage: <strong style={{ color: 'var(--text-primary)' }}>₹{row.brokerage.toFixed(2)}</strong></span>
                        <span>Charges: <strong style={{ color: '#f87171' }}>₹{row.charges.toFixed(2)}</strong></span>
                      </div>
                    </div>
@@ -1152,14 +1152,14 @@ const ProfitAndLoss = () => {
                    return (
                      <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                         <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Month-Wise View' ? row.name : row.symbol}</span>
+                         <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Month-Wise View' ? row.name : row.symbol}</span>
                          <span style={{ flexShrink: 0, fontWeight: '800', fontSize: '14px', color: net >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                            {net >= 0 ? '+' : ''}₹{net.toFixed(2)}
                          </span>
                        </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', paddingTop: '6px', borderTop: '1px solid var(--border-color)' }}>
                          <span>Gross P&L: <strong style={{ color: row.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{row.pnl >= 0 ? '+' : ''}₹{row.pnl.toFixed(2)}</strong></span>
-                         <span>Charges: <strong style={{ color: '#fff' }}>₹{row.charges.toFixed(2)}</strong></span>
+                         <span>Charges: <strong style={{ color: 'var(--text-primary)' }}>₹{row.charges.toFixed(2)}</strong></span>
                        </div>
                      </div>
                    );
@@ -1440,17 +1440,17 @@ const TradingInsights = () => {
                   <div key={idx} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                        <span style={{ flexShrink: 0, color: side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
+                        <span style={{ flexShrink: 0, color: side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'var(--bg-panel)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
                           {side}
                         </span>
-                        <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.symbol}</span>
+                        <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.symbol}</span>
                       </div>
                       <div style={{ flexShrink: 0, fontWeight: '700', fontSize: '13px', color: pnlVal > 0 ? 'var(--color-green-light)' : (pnlVal < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
                         {pnlVal !== null ? `${pnlVal > 0 ? '+' : ''}₹${pnlVal.toFixed(2)}` : '--'}
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      <span>Qty: <strong style={{ color: '#fff' }}>{Number(o.quantity || 0)}</strong> @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</span>
+                      <span>Qty: <strong style={{ color: 'var(--text-primary)' }}>{Number(o.quantity || 0)}</strong> @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</span>
                       <span>{new Date(o.created_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
                     </div>
                   </div>
@@ -1509,13 +1509,15 @@ const TradingInsights = () => {
 // 5. DOWNLOAD REPORTS WITH REPORT CONFIGURATION MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const DownloadReports = () => {
-  const { positions, orders, holdings, token, user } = useStore(useShallow(state => ({ 
+  const { positions, orders, holdings, token, user, theme } = useStore(useShallow(state => ({ 
     positions: state.positions, 
     orders: state.orders, 
     holdings: state.holdings,
     token: state.token,
-    user: state.user
+    user: state.user,
+    theme: state.theme
   })));
+  const isLight = theme === 'light';
 
   const [activeCard, setActiveCard] = useState('tax_pnl');
   const [selectedPeriods, setSelectedPeriods] = useState({
@@ -1674,7 +1676,7 @@ const DownloadReports = () => {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>Official Trading Statements & Tax Reports</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>Official Trading Statements & Tax Reports</div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
             Instant client-side generation in Excel (.csv), HTML, or printable PDF format
           </div>
@@ -1697,9 +1699,9 @@ const DownloadReports = () => {
               key={item.id}
               style={{
                 borderRadius: '12px',
-                border: isOpen ? `1px solid ${item.color}66` : '1px solid rgba(255,255,255,0.08)',
-                background: isOpen ? 'rgba(30, 41, 59, 0.45)' : 'rgba(15, 23, 42, 0.35)',
-                boxShadow: isOpen ? `0 8px 24px rgba(0,0,0,0.3)` : 'none',
+                border: isOpen ? `1px solid ${item.color}66` : (isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.08)'),
+                background: isOpen ? (isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.45)') : (isLight ? 'var(--bg-panel)' : 'rgba(15, 23, 42, 0.35)'),
+                boxShadow: isOpen ? (isLight ? '0 8px 24px rgba(0,0,0,0.06)' : '0 8px 24px rgba(0,0,0,0.3)') : 'none',
                 transition: 'all 0.2s ease-in-out',
                 overflow: 'hidden'
               }}
@@ -1732,7 +1734,7 @@ const DownloadReports = () => {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>{item.title}</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.title}</span>
                     <span style={{
                       fontSize: '10px',
                       fontWeight: '700',
@@ -1753,15 +1755,15 @@ const DownloadReports = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                   {!item.isHolding && !item.isContractNote && (
-                    <span style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '6px', fontWeight: '600' }} className="hide-on-mobile">
+                    <span style={{ fontSize: '11px', color: isLight ? 'var(--text-secondary)' : '#94a3b8', background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '6px', fontWeight: '600' }} className="hide-on-mobile">
                       {currentPeriod}
                     </span>
                   )}
                   <button
                     type="button"
                     style={{
-                      background: isOpen ? `${item.color}25` : 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${isOpen ? item.color : 'rgba(255,255,255,0.1)'}`,
+                      background: isOpen ? `${item.color}25` : (isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)'),
+                      border: `1px solid ${isOpen ? item.color : (isLight ? 'var(--border-color)' : 'rgba(255,255,255,0.1)')}`,
                       color: isOpen ? item.color : 'var(--text-primary)',
                       padding: '6px 14px',
                       borderRadius: '6px',
@@ -1779,8 +1781,8 @@ const DownloadReports = () => {
               {isOpen && (
                 <div style={{
                   padding: '16px 20px 20px 20px',
-                  borderTop: '1px solid rgba(255,255,255,0.06)',
-                  background: 'rgba(10, 15, 29, 0.4)',
+                  borderTop: isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.06)',
+                  background: isLight ? '#f8fafc' : 'rgba(10, 15, 29, 0.4)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '16px'
@@ -1788,7 +1790,7 @@ const DownloadReports = () => {
                   {/* Period Selection Controls */}
                   {!item.isHolding && !item.isContractNote && (
                     <div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: isLight ? 'var(--text-primary)' : '#cbd5e1', marginBottom: '8px' }}>
                         Select Statement Time Range:
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -1807,8 +1809,8 @@ const DownloadReports = () => {
                                 borderRadius: '6px',
                                 fontSize: '11.5px',
                                 fontWeight: '600',
-                                border: isSel ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.1)',
-                                background: isSel ? `${item.color}25` : 'rgba(255,255,255,0.04)',
+                                border: isSel ? `1px solid ${item.color}` : (isLight ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.1)'),
+                                background: isSel ? `${item.color}25` : (isLight ? 'var(--bg-panel)' : 'rgba(255,255,255,0.04)'),
                                 color: isSel ? item.color : 'var(--text-secondary)',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s'
@@ -1829,7 +1831,7 @@ const DownloadReports = () => {
                               const val = e.target.value;
                               setCustomDates(prev => ({ ...prev, [item.id]: { ...prev[item.id], start: val } }));
                             }}
-                            style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }}
+                            style={{ flex: 1, background: isLight ? '#ffffff' : '#1e293b', border: isLight ? '1px solid var(--border-color)' : '1px solid #334155', color: isLight ? 'var(--text-primary)' : '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: isLight ? 'light' : 'dark' }}
                           />
                           <span style={{ fontSize: '12px', color: '#94a3b8' }}>to</span>
                           <input
@@ -1839,7 +1841,7 @@ const DownloadReports = () => {
                               const val = e.target.value;
                               setCustomDates(prev => ({ ...prev, [item.id]: { ...prev[item.id], end: val } }));
                             }}
-                            style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }}
+                            style={{ flex: 1, background: isLight ? '#ffffff' : '#1e293b', border: isLight ? '1px solid var(--border-color)' : '1px solid #334155', color: isLight ? 'var(--text-primary)' : '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: isLight ? 'light' : 'dark' }}
                           />
                         </div>
                       )}
@@ -1849,14 +1851,14 @@ const DownloadReports = () => {
                   {/* Contract Note Trade Date */}
                   {item.isContractNote && (
                     <div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: isLight ? 'var(--text-primary)' : '#cbd5e1', marginBottom: '8px' }}>
                         Select Trade Execution Date:
                       </div>
                       <input
                         type="date"
                         value={contractDate}
                         onChange={(e) => setContractDate(e.target.value)}
-                        style={{ background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '8px 12px', borderRadius: '8px', fontSize: '12.5px', colorScheme: 'dark', width: '220px' }}
+                        style={{ background: isLight ? '#ffffff' : '#1e293b', border: isLight ? '1px solid var(--border-color)' : '1px solid #334155', color: isLight ? 'var(--text-primary)' : '#fff', padding: '8px 12px', borderRadius: '8px', fontSize: '12.5px', colorScheme: isLight ? 'light' : 'dark', width: '220px' }}
                       />
                     </div>
                   )}

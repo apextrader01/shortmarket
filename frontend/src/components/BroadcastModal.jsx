@@ -22,14 +22,17 @@ const POPULAR_INSTRUMENTS = [
 ];
 
 export default function BroadcastModal({ isOpen, onClose }) {
-  const { sendBroadcastNotification, broadcastNotifications, deleteBroadcastNotification, prices } = useStore(
+  const { sendBroadcastNotification, broadcastNotifications, deleteBroadcastNotification, prices, theme } = useStore(
     useShallow(state => ({
       sendBroadcastNotification: state.sendBroadcastNotification,
       broadcastNotifications: state.broadcastNotifications || [],
       deleteBroadcastNotification: state.deleteBroadcastNotification,
-      prices: state.prices || {}
+      prices: state.prices || {},
+      theme: state.theme
     }))
   );
+
+  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
 
   const [activeTab, setActiveTab] = useState('SIGNAL'); // 'SIGNAL', 'NEWS', 'ANNOUNCEMENT', 'HISTORY'
   const [submitting, setSubmitting] = useState(false);
@@ -409,10 +412,10 @@ export default function BroadcastModal({ isOpen, onClose }) {
           width: '100%',
           maxWidth: '680px',
           maxHeight: '90vh',
-          background: 'var(--bg-card, #131722)',
+          background: 'var(--bg-panel, #ffffff)',
           border: '1px solid var(--border-color)',
           borderRadius: '16px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
+          boxShadow: isLight ? '0 24px 60px rgba(0, 0, 0, 0.15)' : '0 24px 60px rgba(0, 0, 0, 0.7)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -427,7 +430,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(0,0,0,0.2)'
+          background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', padding: '8px', borderRadius: '10px', color: '#fff' }}>
@@ -455,7 +458,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
         <div style={{
           display: 'flex',
           borderBottom: '1px solid var(--border-color)',
-          background: 'rgba(0,0,0,0.1)'
+          background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.1)'
         }}>
           {[
             { id: 'SIGNAL', label: '🎯 Trade Signal (Buy / Sell)', icon: TrendingUp },
@@ -472,7 +475,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                 background: activeTab === tab.id ? 'var(--bg-panel)' : 'transparent',
                 border: 'none',
                 borderBottom: activeTab === tab.id ? '2px solid var(--color-blue)' : '2px solid transparent',
-                color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)',
+                color: activeTab === tab.id ? (isLight ? 'var(--color-blue)' : '#fff') : 'var(--text-secondary)',
                 fontWeight: activeTab === tab.id ? '700' : '500',
                 fontSize: '12.5px',
                 cursor: 'pointer',
@@ -555,7 +558,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     <div 
                       key={n.id} 
                       style={{ 
-                        background: 'rgba(0,0,0,0.2)', 
+                        background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)', 
                         border: '1px solid var(--border-color)', 
                         borderRadius: '10px', 
                         padding: '12px 16px',
@@ -654,7 +657,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             padding: '11px 8px',
                             borderRadius: '8px',
                             border: signalSide === 'BUY' ? '2px solid #10B981' : '1px solid var(--border-color)',
-                            background: signalSide === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)',
+                            background: signalSide === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : (isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'),
                             color: signalSide === 'BUY' ? '#10B981' : 'var(--text-secondary)',
                             fontWeight: '800',
                             fontSize: '13px',
@@ -675,7 +678,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             padding: '11px 8px',
                             borderRadius: '8px',
                             border: signalSide === 'SELL' ? '2px solid #EF4444' : '1px solid var(--border-color)',
-                            background: signalSide === 'SELL' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0,0,0,0.2)',
+                            background: signalSide === 'SELL' ? 'rgba(239, 68, 68, 0.15)' : (isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'),
                             color: signalSide === 'SELL' ? '#EF4444' : 'var(--text-secondary)',
                             fontWeight: '800',
                             fontSize: '13px',
@@ -705,8 +708,8 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             padding: '11px 8px',
                             borderRadius: '8px',
                             border: productType === 'INT' ? '2px solid #3B82F6' : '1px solid var(--border-color)',
-                            background: productType === 'INT' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(0,0,0,0.2)',
-                            color: productType === 'INT' ? '#60A5FA' : 'var(--text-secondary)',
+                            background: productType === 'INT' ? 'rgba(59, 130, 246, 0.18)' : (isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'),
+                            color: productType === 'INT' ? (isLight ? '#2563eb' : '#60A5FA') : 'var(--text-secondary)',
                             fontWeight: '800',
                             fontSize: '13px',
                             cursor: 'pointer',
@@ -731,8 +734,8 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             padding: '11px 8px',
                             borderRadius: '8px',
                             border: productType === 'DEL' ? '2px solid #8B5CF6' : '1px solid var(--border-color)',
-                            background: productType === 'DEL' ? 'rgba(139, 92, 246, 0.18)' : 'rgba(0,0,0,0.2)',
-                            color: productType === 'DEL' ? '#A78BFA' : 'var(--text-secondary)',
+                            background: productType === 'DEL' ? 'rgba(139, 92, 246, 0.18)' : (isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'),
+                            color: productType === 'DEL' ? (isLight ? '#7c3aed' : '#A78BFA') : 'var(--text-secondary)',
                             fontWeight: '800',
                             fontSize: '13px',
                             cursor: isDeliveryDisabled ? 'not-allowed' : 'pointer',
@@ -847,7 +850,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             {isMcx(selectedStockData) ? '🪙 MCX COMMODITY' : (isFno(selectedStockData) ? '⚡ F&O DERIVATIVE' : '📈 CASH EQUITY')}
                           </span>
                           <div>
-                            <div style={{ fontWeight: '800', fontSize: '13px', color: '#fff' }}>
+                            <div style={{ fontWeight: '800', fontSize: '13px', color: 'var(--text-primary)' }}>
                               {selectedStockData.uniqueSymbol || selectedStockData.symbol}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -857,7 +860,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            Lot Size: <strong style={{ color: '#fff' }}>{getInstantLotsize(selectedStockData.uniqueSymbol || selectedStockData.symbol)}</strong>
+                            Lot Size: <strong style={{ color: 'var(--text-primary)' }}>{getInstantLotsize(selectedStockData.uniqueSymbol || selectedStockData.symbol)}</strong>
                           </div>
                           {prices[selectedStockData.uniqueSymbol]?.ltp !== undefined && (
                             <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--color-green-light)' }}>
@@ -876,10 +879,10 @@ export default function BroadcastModal({ isOpen, onClose }) {
                         left: 0,
                         right: 0,
                         marginTop: '4px',
-                        background: 'var(--bg-dark, #0f172a)',
+                        background: 'var(--bg-panel, #ffffff)',
                         border: '1px solid var(--border-color)',
                         borderRadius: '10px',
-                        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7)',
+                        boxShadow: isLight ? '0 12px 36px rgba(0, 0, 0, 0.15)' : '0 12px 36px rgba(0, 0, 0, 0.7)',
                         zIndex: 1000,
                         overflow: 'hidden',
                         maxHeight: '340px',
@@ -894,7 +897,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                           gap: '6px',
                           padding: '8px 12px',
                           borderBottom: '1px solid var(--border-color)',
-                          background: 'rgba(0,0,0,0.3)',
+                          background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.3)',
                           overflowX: 'auto'
                         }} className="scrollbar-hide">
                           {[
@@ -913,8 +916,8 @@ export default function BroadcastModal({ isOpen, onClose }) {
                                 fontWeight: '700',
                                 borderRadius: '6px',
                                 border: searchSegment === seg.id ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                                background: searchSegment === seg.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.04)',
-                                color: searchSegment === seg.id ? '#60A5FA' : 'var(--text-secondary)',
+                                background: searchSegment === seg.id ? 'rgba(59, 130, 246, 0.2)' : (isLight ? 'transparent' : 'rgba(255,255,255,0.04)'),
+                                color: searchSegment === seg.id ? 'var(--color-blue)' : 'var(--text-secondary)',
                                 cursor: 'pointer',
                                 whiteSpace: 'nowrap'
                               }}
@@ -971,7 +974,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                                     </span>
                                     <div>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: '800', fontSize: '12.5px', color: '#fff' }}>
+                                        <span style={{ fontWeight: '800', fontSize: '12.5px', color: 'var(--text-primary)' }}>
                                           {item.symbol || itemSym}
                                         </span>
                                         {lot > 1 && (
@@ -1286,7 +1289,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                             padding: '10px 8px',
                             borderRadius: '8px',
                             border: newsImpact === item.id ? `2px solid ${item.color}` : '1px solid var(--border-color)',
-                            background: newsImpact === item.id ? item.bg : 'rgba(0,0,0,0.2)',
+                            background: newsImpact === item.id ? item.bg : (isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.2)'),
                             color: newsImpact === item.id ? item.color : 'var(--text-secondary)',
                             fontWeight: '700',
                             fontSize: '12px',
@@ -1352,7 +1355,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
 
               {/* Targeting & Delivery Controls */}
               <div style={{
-                background: 'rgba(0,0,0,0.25)',
+                background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.25)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '10px',
                 padding: '14px',

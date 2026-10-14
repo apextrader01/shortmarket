@@ -2,6 +2,7 @@
 // 🧮 SkandX Institutional Calculators & Financial Tools Suite (Fyers-Style Full-Page Platform)
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useStore } from '../store';
 import { 
   Calculator, TrendingUp, DollarSign, Percent, ArrowLeft, ArrowRight,
   Download, FileText, PieChart, Table, RefreshCw, Plus, Trash2, CheckCircle2,
@@ -143,6 +144,9 @@ const normalizeCalcId = (type) => {
 };
 
 export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOpenPaperTrading }) {
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme'));
+
   // Current active view: 'CATALOG' or specific calculator id (e.g. 'sip', 'reducing-loan')
   const [selectedCalcId, setSelectedCalcId] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -633,21 +637,24 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
   }, [activeCalcMeta, selectedCalcId]);
 
   return (
-    <div style={{
-      width: '100%',
-      minHeight: '100vh',
-      background: 'var(--bg-main, #090d16)',
-      color: '#f8fafc',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      display: 'flex',
-      flexDirection: 'column',
-      overflowX: 'hidden'
-    }}>
+    <div 
+      className="skx-calculators-suite"
+      style={{
+        width: '100%',
+        minHeight: '100vh',
+        background: isLight ? 'var(--bg-main, #f8fafc)' : 'var(--bg-main, #090d16)',
+        color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        display: 'flex',
+        flexDirection: 'column',
+        overflowX: 'hidden'
+      }}
+    >
       {/* ── Topbar (Edge-to-Edge Institutional Header) ── */}
       <header style={{
         height: isMobile ? 'auto' : '62px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(15, 23, 42, 0.95)',
+        borderBottom: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)',
+        background: isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(15, 23, 42, 0.95)',
         backdropFilter: 'blur(12px)',
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
@@ -670,11 +677,11 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                 }
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '8px',
                 padding: isMobile ? '6px 10px' : '6px 12px',
-                color: '#94a3b8',
+                color: isLight ? 'var(--text-secondary, #475569)' : '#94a3b8',
                 fontSize: isMobile ? '11.5px' : '12.5px',
                 fontWeight: '600',
                 display: 'flex',
@@ -703,11 +710,11 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                 }}
               />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: isMobile ? '13.5px' : '15px', fontWeight: '800', letterSpacing: '-0.3px', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: isMobile ? '13.5px' : '15px', fontWeight: '800', letterSpacing: '-0.3px', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   SkandX Calculators
                 </div>
                 {!isMobile && (
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  <span style={{ fontSize: '11px', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8' }}>
                     {selectedCalcId === 'CATALOG' ? 'Directory & Tools' : activeCalcMeta.title}
                   </span>
                 )}
@@ -751,10 +758,10 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                   value={selectedCalcId}
                   onChange={e => setSelectedCalcId(e.target.value)}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
+                    border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.15)',
                     borderRadius: '8px',
-                    color: '#f8fafc',
+                    color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
                     fontSize: isMobile ? '12px' : '12.5px',
                     fontWeight: '600',
                     padding: isMobile ? '6px 8px' : '7px 12px',
@@ -765,7 +772,7 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                   }}
                 >
                   {CALCULATORS_CATALOG.map(calc => (
-                    <option key={calc.id} value={calc.id} style={{ background: '#0f172a', color: '#fff' }}>
+                    <option key={calc.id} value={calc.id} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
                       {calc.title}
                     </option>
                   ))}
@@ -774,11 +781,11 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                 <button
                   onClick={handleCopyShareLink}
                   style={{
-                    background: copiedLink ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                    border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    background: copiedLink ? (isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.15)') : (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'),
+                    border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : (isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)'),
                     borderRadius: '8px',
                     padding: isMobile ? '6px 10px' : '7px 12px',
-                    color: copiedLink ? '#34d399' : '#cbd5e1',
+                    color: copiedLink ? (isLight ? '#059669' : '#34d399') : (isLight ? 'var(--text-secondary, #475569)' : '#cbd5e1'),
                     fontSize: '11.5px',
                     fontWeight: '600',
                     display: 'flex',
@@ -797,11 +804,11 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
                 <button
                   onClick={handlePrintPDF}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(37, 99, 235, 0.25))',
-                    border: '1px solid rgba(56, 189, 248, 0.45)',
+                    background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(37, 99, 235, 0.25))',
+                    border: isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.45)',
                     borderRadius: '8px',
                     padding: isMobile ? '6px 10px' : '7px 12px',
-                    color: '#38bdf8',
+                    color: isLight ? '#0284c7' : '#38bdf8',
                     fontSize: '11.5px',
                     fontWeight: '700',
                     display: 'flex',
@@ -856,6 +863,7 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
             onSearchChange={setCatalogSearch}
             onSelectCalculator={setSelectedCalcId}
             isMobile={isMobile}
+            isLight={isLight}
           />
         ) : (
           <DedicatedCalculatorView 
@@ -869,6 +877,7 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
             onRegisterReport={handleRegisterReport}
             onOpenPaperTrading={onOpenPaperTrading}
             isMobile={isMobile}
+            isLight={isLight}
           />
         )}
       </main>
@@ -880,20 +889,20 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
 // COMPONENT 1: CATALOG DIRECTORY VIEW (Matching Fyers Screen 1)
 // ============================================================================
 function CatalogDirectoryView({
-  catalog, selectedCategory, onSelectCategory, searchQuery, onSearchChange, onSelectCalculator, isMobile
+  catalog, selectedCategory, onSelectCategory, searchQuery, onSearchChange, onSelectCalculator, isMobile, isLight
 }) {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: isMobile ? '16px 12px 60px' : '32px 24px', boxSizing: 'border-box' }}>
       {/* Hero Banner */}
       <div style={{ marginBottom: isMobile ? '18px' : '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontSize: '11.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isLight ? '#0284c7' : '#38bdf8', fontSize: '11.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
           <Sparkles size={14} />
           <span>Institutional Computational Math</span>
         </div>
-        <h1 style={{ fontSize: isMobile ? '22px' : 'clamp(24px, 3vw, 32px)', fontWeight: '900', margin: 0, letterSpacing: '-0.5px', color: '#f8fafc' }}>
+        <h1 style={{ fontSize: isMobile ? '22px' : 'clamp(24px, 3vw, 32px)', fontWeight: '900', margin: 0, letterSpacing: '-0.5px', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc' }}>
           Financial & Trading Calculators
         </h1>
-        <p style={{ fontSize: isMobile ? '12.5px' : '14px', color: '#94a3b8', margin: '6px 0 0', maxWidth: '720px', lineHeight: '1.5' }}>
+        <p style={{ fontSize: isMobile ? '12.5px' : '14px', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8', margin: '6px 0 0', maxWidth: '720px', lineHeight: '1.5' }}>
           Explore our suite of compounding models, multi-tranche stock averaging, MTF leverage costs, SEBI tax calculations, and loan amortization engines.
         </p>
       </div>
@@ -917,9 +926,9 @@ function CatalogDirectoryView({
                 style={{
                   padding: isMobile ? '7px 12px' : '8px 16px',
                   borderRadius: '20px',
-                  border: 'none',
-                  background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
-                  color: isActive ? '#fff' : '#94a3b8',
+                  border: isActive ? 'none' : (isLight ? '1px solid var(--border-color, #cbd5e1)' : 'none'),
+                  background: isActive ? 'linear-gradient(135deg, #0284c7, #2563eb)' : (isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(255, 255, 255, 0.05)'),
+                  color: isActive ? '#fff' : (isLight ? 'var(--text-secondary, #475569)' : '#94a3b8'),
                   fontSize: isMobile ? '12px' : '13px',
                   fontWeight: isActive ? '700' : '500',
                   cursor: 'pointer',
@@ -939,21 +948,21 @@ function CatalogDirectoryView({
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: 'rgba(0, 0, 0, 0.35)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(0, 0, 0, 0.35)',
+          border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           padding: '8px 14px',
           minWidth: isMobile ? '100%' : '280px',
           width: isMobile ? '100%' : 'auto',
           boxSizing: 'border-box'
         }}>
-          <Search size={16} color="#94a3b8" />
+          <Search size={16} color={isLight ? '#64748b' : '#94a3b8'} />
           <input 
             type="text"
             placeholder="Search calculators (e.g. Loan, SIP, MTF)..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
-            style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', width: '100%', outline: 'none' }}
+            style={{ background: 'transparent', border: 'none', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontSize: '13px', width: '100%', outline: 'none' }}
           />
         </div>
       </div>
@@ -967,8 +976,8 @@ function CatalogDirectoryView({
               key={calc.id}
               onClick={() => onSelectCalculator(calc.id)}
               style={{
-                background: 'rgba(15, 23, 42, 0.65)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: isLight ? 'var(--bg-panel, #ffffff)' : 'rgba(15, 23, 42, 0.65)',
+                border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '16px',
                 padding: isMobile ? '16px' : '22px',
                 display: 'flex',
@@ -977,17 +986,18 @@ function CatalogDirectoryView({
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: isLight ? '0 4px 14px rgba(0, 0, 0, 0.04)' : 'none'
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+                e.currentTarget.style.borderColor = isLight ? '#0284c7' : 'rgba(56, 189, 248, 0.4)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.5)';
+                e.currentTarget.style.boxShadow = isLight ? '0 12px 30px rgba(0, 0, 0, 0.08)' : '0 12px 30px rgba(0, 0, 0, 0.5)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.borderColor = isLight ? 'var(--border-color, #e2e8f0)' : 'rgba(255, 255, 255, 0.08)';
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.boxShadow = isLight ? '0 4px 14px rgba(0, 0, 0, 0.04)' : 'none';
               }}
             >
               <div>
@@ -1021,10 +1031,10 @@ function CatalogDirectoryView({
                 <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '2px' }}>
                   {calc.categoryLabel}
                 </div>
-                <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#f8fafc', margin: '0 0 6px', lineHeight: '1.3' }}>
+                <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc', margin: '0 0 6px', lineHeight: '1.3' }}>
                   {calc.title}
                 </h3>
-                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '0 0 14px', lineHeight: '1.5' }}>
+                <p style={{ fontSize: '12.5px', color: isLight ? 'var(--text-secondary, #64748b)' : '#94a3b8', margin: '0 0 14px', lineHeight: '1.5' }}>
                   {calc.shortDesc}
                 </p>
               </div>
@@ -1034,20 +1044,20 @@ function CatalogDirectoryView({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 paddingTop: '12px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                borderTop: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.06)'
               }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#38bdf8' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: isLight ? '#0284c7' : '#38bdf8' }}>
                   Launch Calculator
                 </span>
                 <div style={{
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  background: 'rgba(56, 189, 248, 0.1)',
+                  background: isLight ? 'rgba(2, 132, 199, 0.1)' : 'rgba(56, 189, 248, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#38bdf8'
+                  color: isLight ? '#0284c7' : '#38bdf8'
                 }}>
                   <ArrowRight size={14} />
                 </div>
@@ -1064,7 +1074,7 @@ function CatalogDirectoryView({
 // COMPONENT 2: DEDICATED FULL-PAGE CALCULATOR VIEW (Matching Fyers Screen 2)
 // ============================================================================
 function DedicatedCalculatorView({
-  calcId, calcMeta, viewMode, onToggleViewMode, onBackToCatalog, onDownloadCSV, onPrintPDF, onRegisterReport, onOpenPaperTrading, isMobile
+  calcId, calcMeta, viewMode, onToggleViewMode, onBackToCatalog, onDownloadCSV, onPrintPDF, onRegisterReport, onOpenPaperTrading, isMobile, isLight
 }) {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: isMobile ? '14px 12px 60px' : '24px', boxSizing: 'border-box' }}>
@@ -1075,12 +1085,12 @@ function DedicatedCalculatorView({
             <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
               {calcMeta.categoryLabel}
             </span>
-            <span style={{ color: '#475569' }}>•</span>
+            <span style={{ color: isLight ? '#94a3b8' : '#475569' }}>•</span>
             <span style={{ fontSize: '11px', color: calcMeta.badgeColor, fontWeight: '700' }}>
               {calcMeta.badge}
             </span>
           </div>
-          <h1 style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', color: '#f8fafc', margin: '4px 0 0' }}>
+          <h1 style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc', margin: '4px 0 0' }}>
             {calcMeta.title}
           </h1>
         </div>
@@ -1089,8 +1099,8 @@ function DedicatedCalculatorView({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex',
-            background: 'rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: isLight ? 'var(--bg-hover, #f1f5f9)' : 'rgba(0, 0, 0, 0.4)',
+            border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '8px',
             padding: '3px'
           }}>
@@ -1101,7 +1111,7 @@ function DedicatedCalculatorView({
                 borderRadius: '6px',
                 border: 'none',
                 background: viewMode === 'CHART' ? '#0284c7' : 'transparent',
-                color: viewMode === 'CHART' ? '#fff' : '#94a3b8',
+                color: viewMode === 'CHART' ? '#fff' : (isLight ? 'var(--text-secondary, #475569)' : '#94a3b8'),
                 fontSize: '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -1120,7 +1130,7 @@ function DedicatedCalculatorView({
                 borderRadius: '6px',
                 border: 'none',
                 background: viewMode === 'TABLE' ? '#0284c7' : 'transparent',
-                color: viewMode === 'TABLE' ? '#fff' : '#94a3b8',
+                color: viewMode === 'TABLE' ? '#fff' : (isLight ? 'var(--text-secondary, #475569)' : '#94a3b8'),
                 fontSize: '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -1139,9 +1149,9 @@ function DedicatedCalculatorView({
             style={{
               padding: '7px 14px',
               borderRadius: '8px',
-              border: '1px solid rgba(56, 189, 248, 0.35)',
-              background: 'rgba(2, 132, 199, 0.14)',
-              color: '#38bdf8',
+              border: isLight ? '1px solid rgba(2, 132, 199, 0.35)' : '1px solid rgba(56, 189, 248, 0.35)',
+              background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(2, 132, 199, 0.14)',
+              color: isLight ? '#0284c7' : '#38bdf8',
               fontSize: '12px',
               fontWeight: '700',
               cursor: 'pointer',
