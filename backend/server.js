@@ -5592,6 +5592,15 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     generalClient.sRem('telemetry:users', String(userId)).catch(() => {});
                 }
 
+                let wsMin = parseInt(data.ws_minutes || 0, 10);
+                if (wsMin === 0 && data.api_calls) {
+                    const calls = parseInt(data.api_calls, 10);
+                    if (calls > 0) {
+                        wsMin = Math.max(1, Math.round(calls / 15));
+                        generalClient.hSetNX(`telemetry:user:${userId}`, 'ws_minutes', String(wsMin)).catch(() => {});
+                    }
+                }
+
                 userStats.push({
                     userId,
                     clientId: dbUser ? dbUser.client_id : null,
@@ -5600,7 +5609,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     existsInDb: Boolean(dbUser),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
-                    wsMinutes: parseInt(data.ws_minutes || 0)
+                    wsMinutes: wsMin
                 });
             }
             return res.json({ api: apiStats, users: userStats, system, timeframe: 'all' });
@@ -5676,6 +5685,8 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     userMap[vk.identifier].apiCalls += parseInt(data.api_calls || 0, 10);
                     userMap[vk.identifier].apiTimeMs += parseInt(data.api_time_ms || 0, 10);
                     userMap[vk.identifier].apiBytes += parseInt(data.api_bytes || 0, 10);
+                    const bWs = parseInt(data.ws_minutes || 0, 10);
+                    userMap[vk.identifier].wsMinutes += (bWs > 0 ? bWs : 1);
                 }
             });
 
@@ -12960,6 +12971,52 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
 });
 
 // ─── Socket.IO ────────────────────────────────────────────────────────────
+const activeSocketUsers = new Map(); // userId -> Set<socket.id>
+
+function getTelemetryMinuteBucket(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
+}
+
+// Track Active Market Time (ws_minutes) every 60 seconds
+setInterval(async () => {
+  if (activeSocketUsers.size === 0) return;
+  try {
+    const { generalClient } = require('./services/redisClient');
+    if (!generalClient || !generalClient.isReady) return;
+
+    const currentBucket = getTelemetryMinuteBucket();
+    const p = generalClient.multi();
+    let ops = 0;
+
+    for (const uid of activeSocketUsers.keys()) {
+      if (!uid || uid === 'anonymous' || uid === 'undefined' || uid === 'null') continue;
+
+      // Cluster-safe deduplication: only 1 increment per user per minute across all PM2 workers
+      const lockKey = `telemetry:active_user_min:${currentBucket}:${uid}`;
+      const acquired = await generalClient.set(lockKey, '1', { NX: true, EX: 120 }).catch(() => null);
+      if (!acquired) continue;
+
+      p.hIncrBy(`telemetry:user:${uid}`, 'ws_minutes', 1);
+      p.sAdd('telemetry:users', String(uid));
+
+      // Also record into minute bucket for timeframe queries (15m, 1h, 24h, etc.)
+      const mbKey = `telemetry:mb:${currentBucket}:user:${uid}`;
+      p.hIncrBy(mbKey, 'ws_minutes', 1);
+      p.expire(mbKey, 86400);
+      p.sAdd(`telemetry:mb_keys:${currentBucket}`, mbKey);
+      p.expire(`telemetry:mb_keys:${currentBucket}`, 86400);
+      ops++;
+    }
+
+    if (ops > 0) {
+      await p.exec().catch(() => {});
+    }
+  } catch (err) {
+    // Silent catch so it never interrupts the server loop
+  }
+}, 60000).unref();
+
 io.on('connection', (socket) => {
   // NOTE: Do NOT log every connect/disconnect — at 50k users this would spam logs
 
@@ -12976,7 +13033,13 @@ io.on('connection', (socket) => {
 
   socket.on('register_user', (userId) => {
     if (userId) {
-      socket.join(userId.toString());
+      const uid = userId.toString();
+      socket.join(uid);
+      socket.userId = uid;
+      if (!activeSocketUsers.has(uid)) {
+        activeSocketUsers.set(uid, new Set());
+      }
+      activeSocketUsers.get(uid).add(socket.id);
     }
   });
 
@@ -13083,7 +13146,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    // NOTE: No log here intentionally — at scale this would spam the logger
+    if (socket.userId && activeSocketUsers.has(socket.userId)) {
+      const set = activeSocketUsers.get(socket.userId);
+      set.delete(socket.id);
+      if (set.size === 0) {
+        activeSocketUsers.delete(socket.userId);
+      }
+    }
   });
 });
 

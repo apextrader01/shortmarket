@@ -7601,7 +7601,7 @@ export default function AdminDashboard() {
                       csv += `API,"${r.route}",${r.count},${avgLat},${r.totalBytes}\n`;
                     });
                     (adminTelemetry.users || []).forEach(u => {
-                      csv += `USER,"${u.username} (${u.userId})",${u.apiCalls},0,${u.apiBytes}\n`;
+                      csv += `USER,"${u.username} (${u.userId})",${u.apiCalls},${u.wsMinutes || 0},${u.apiBytes}\n`;
                     });
                     const blob = new Blob([csv], { type: 'text/csv' });
                     const url = window.URL.createObjectURL(blob);
@@ -8139,7 +8139,11 @@ export default function AdminDashboard() {
                                   )}
                                 </div>
                               </td>
-                              <td style={{ padding: '5px 8px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '500' }}>
+                                {(u.wsMinutes || 0) >= 60
+                                  ? `${Math.floor((u.wsMinutes || 0) / 60)}h ${(u.wsMinutes || 0) % 60}m`
+                                  : `${u.wsMinutes || 0} mins`}
+                              </td>
                               <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
                               <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--color-blue)', fontWeight: '600' }}>{sizeMb} MB</td>
                             </tr>
