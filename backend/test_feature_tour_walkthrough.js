@@ -70,6 +70,32 @@ const serverCode = fs.readFileSync(serverPath, 'utf8');
 assert(serverCode.includes('is_new_user: isNewUser'), 'server.js must return is_new_user in google-login');
 console.log('✔ [PASS] Module 6: Backend google-login returns is_new_user indicator');
 
+// 7. Verify Mobile Touch Swipe Support
+assert(tourModalCode.includes('handleTouchStart') && tourModalCode.includes('handleTouchEnd'), 'FeatureTourModal must implement touch start/end listeners');
+assert(tourModalCode.includes('diffX') && tourModalCode.includes('touchStartXRef'), 'FeatureTourModal must track horizontal touch delta');
+console.log('✔ [PASS] Module 7: Native mobile touch swipe gestures (left/right swipe)');
+
+// 8. Verify Backdrop Dismissal
+assert(tourModalCode.includes('if (e.target === e.currentTarget) handleDismiss(\'backdrop_click\')'), 'FeatureTourModal must dismiss when clicking backdrop overlay');
+console.log('✔ [PASS] Module 8: Backdrop click dismissal');
+
+// 9. Verify Direct Hub Navigation & Clickable Preview
+assert(tourModalCode.includes('handleJumpToHub'), 'FeatureTourModal must implement handleJumpToHub handler');
+assert(tourModalCode.includes('Open Hub'), 'FeatureTourModal must render Open Hub button in header deck');
+assert(tourModalCode.includes('skx-tour-preview-strip') && tourModalCode.includes('onClick={() => handleJumpToHub(currentStep.hubKey)}'), 'Preview strip must be clickable to jump into hub');
+console.log('✔ [PASS] Module 9: Direct hub navigation via header button and interactive preview strip');
+
+// 10. Verify Smooth Step Transitions & CSS animations
+assert(tourModalCode.includes('@keyframes skxSlideStep'), 'FeatureTourModal must define step transition keyframes');
+assert(tourModalCode.includes('skx-step-content'), 'FeatureTourModal must wrap step content in animated container');
+console.log('✔ [PASS] Module 10: Smooth slide transition animations');
+
+// 11. Verify Dot Hit Box & Accessibility
+assert(tourModalCode.includes('skx-tour-step-dot-wrap'), 'Progress dots must be wrapped in padding container for comfortable touch targets');
+assert(tourModalCode.includes('role="dialog"') && tourModalCode.includes('aria-modal="true"'), 'Modal must declare accessible dialog attributes');
+console.log('✔ [PASS] Module 11: Touch hit-target padding & accessible ARIA dialog roles');
+
 console.log('\n======================================================================');
-console.log('🏁 ALL FEATURE TOUR VERIFICATION CHECKS PASSED (6/6)');
+console.log('🏁 ALL FEATURE TOUR VERIFICATION CHECKS PASSED (11/11)');
 console.log('======================================================================\n');
+

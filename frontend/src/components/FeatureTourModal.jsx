@@ -2,7 +2,7 @@
 // 🌟 Interactive Guided Feature Tour & Product Introduction Walkthrough
 // Introduces all key platform hubs step-by-step with Next, Back, and Skip controls.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   TrendingUp, BookOpen, Cpu, Calculator,
   PieChart, Building2, Sparkles, ShieldCheck,
@@ -269,6 +269,44 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
     }
   };
 
+  // Touch swipe support for native-app mobile gesture experience
+  const touchStartXRef = useRef(null);
+  const touchStartYRef = useRef(null);
+
+  const handleTouchStart = (e) => {
+    if (e.touches && e.touches[0]) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartXRef.current === null) return;
+    const endX = e.changedTouches?.[0]?.clientX;
+    const endY = e.changedTouches?.[0]?.clientY;
+    if (endX !== undefined && endY !== undefined) {
+      const diffX = touchStartXRef.current - endX;
+      const diffY = touchStartYRef.current - endY;
+      // Dominant horizontal swipe (> 45px distance and 1.3x more horizontal than vertical)
+      if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+        if (diffX > 0) {
+          // Swiped left -> Next
+          if (isLastStep) {
+            handleDismiss('finished');
+            if (onNavigateToHub) onNavigateToHub('Markets');
+          } else {
+            setCurrentStepIndex(prev => Math.min(prev + 1, totalSteps - 1));
+          }
+        } else {
+          // Swiped right -> Back
+          setCurrentStepIndex(prev => Math.max(prev - 1, 0));
+        }
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   // Keyboard navigation listener
   useEffect(() => {
     if (!isOpen) return;
@@ -301,6 +339,9 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
   return (
     <div
       className="feature-tour-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleDismiss('backdrop_click');
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -323,6 +364,13 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
         @keyframes skxPulseGlow {
           0%, 100% { opacity: 0.6; transform: scale(1); }
           50% { opacity: 0.9; transform: scale(1.08); }
+        }
+        @keyframes skxSlideStep {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .skx-step-content {
+          animation: skxSlideStep 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .skx-tour-card {
           width: 100%;
@@ -350,6 +398,20 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
         }
         .skx-tour-footer {
           flex-shrink: 0;
+        }
+        .skx-tour-jump-btn:hover {
+          background: rgba(255, 255, 255, 0.12) !important;
+          transform: translateY(-1px);
+        }
+        .skx-tour-preview-strip:hover {
+          border-color: rgba(255, 255, 255, 0.3) !important;
+          transform: translateY(-1px);
+        }
+        .skx-tour-step-dot-wrap {
+          padding: 6px 3px;
+          display: flex;
+          align-items: center;
+          cursor: pointer;
         }
         @media (max-width: 640px) {
           .skx-tour-card {
@@ -388,6 +450,11 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
 
       <div
         className="skx-tour-card"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Interactive Guided Feature Tour"
         style={{
           backgroundImage: currentStep.bgGradient,
         }}
@@ -431,32 +498,61 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => handleDismiss('closed_x')}
-            title="Skip Tour"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              transition: 'all 0.18s ease'
-            }}
-          >
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onNavigateToHub && currentStep.hubKey && (
+              <button
+                type="button"
+                className="skx-tour-jump-btn"
+                onClick={() => handleJumpToHub(currentStep.hubKey)}
+                title={`Open ${currentStep.title} directly`}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${currentStep.accentColor}44`,
+                  borderRadius: '8px',
+                  padding: '5px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: currentStep.accentColor,
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.16s ease'
+                }}
+              >
+                <span>Open Hub</span>
+                <ArrowRight size={12} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => handleDismiss('closed_x')}
+              title="Skip Tour"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                transition: 'all 0.18s ease'
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Main Content Area */}
         <div className="skx-tour-body" style={{ padding: '22px 24px 20px 24px' }}>
-          {/* Feature Header with Halo Icon */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
+          <div key={currentStep.id} className="skx-step-content">
+            {/* Feature Header with Halo Icon */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
             <div
               style={{
                 width: '52px',
@@ -570,6 +666,9 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
 
           {/* Interactive Live Snapshot Strip */}
           <div
+            className="skx-tour-preview-strip"
+            onClick={() => handleJumpToHub(currentStep.hubKey)}
+            title={`Open ${currentStep.title} directly`}
             style={{
               padding: '12px 14px',
               borderRadius: '12px',
@@ -579,7 +678,9 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              flexWrap: 'wrap'
+              flexWrap: 'wrap',
+              cursor: 'pointer',
+              transition: 'all 0.18s ease'
             }}
           >
             {currentStep.preview.type === 'terminal' && (
@@ -680,6 +781,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
             )}
           </div>
         </div>
+      </div>
 
         {/* Bottom Navigation & Progress Footer */}
         <div
@@ -744,7 +846,7 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '4px'
             }}
           >
             {TOUR_STEPS.map((step, idx) => {
@@ -752,15 +854,19 @@ export default function FeatureTourModal({ isOpen = true, onClose, onNavigateToH
               return (
                 <div
                   key={step.id}
-                  className="skx-tour-step-dot"
+                  className="skx-tour-step-dot-wrap"
                   onClick={() => setCurrentStepIndex(idx)}
                   title={`Jump to ${step.title}`}
-                  style={{
-                    width: isActive ? '24px' : '8px',
-                    background: isActive ? currentStep.accentColor : 'rgba(255, 255, 255, 0.15)',
-                    boxShadow: isActive ? `0 0 10px ${currentStep.accentColor}60` : 'none'
-                  }}
-                />
+                >
+                  <div
+                    className="skx-tour-step-dot"
+                    style={{
+                      width: isActive ? '24px' : '8px',
+                      background: isActive ? currentStep.accentColor : 'rgba(255, 255, 255, 0.15)',
+                      boxShadow: isActive ? `0 0 10px ${currentStep.accentColor}60` : 'none'
+                    }}
+                  />
+                </div>
               );
             })}
           </div>

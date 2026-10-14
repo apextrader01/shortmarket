@@ -1029,6 +1029,9 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 try {
                   localStorage.setItem('skandx_show_feature_tour', 'true');
                   localStorage.removeItem('skandx_feature_tour_completed');
+                  if (user?.id) {
+                    localStorage.removeItem(`skandx_feature_tour_completed_${user.id}`);
+                  }
                 } catch (_) {}
                 setActiveTab('Home');
               }}
