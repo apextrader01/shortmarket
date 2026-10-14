@@ -1274,6 +1274,8 @@ function MarketCalendarTab({ isMobile }) {
 
 export default function AdminDashboard() {
   const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, adminUpdateUserDetails, adminImpersonateUser, toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, deleteContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, adminUpdateUserDetails: state.adminUpdateUserDetails, adminImpersonateUser: state.adminImpersonateUser, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, deleteContest: state.deleteContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
+  const theme = useStore(state => state.theme);
+  const isLight = theme === 'light';
 
   const [tgConfigForm, setTgConfigForm] = useState({
     global_enabled: true,
@@ -8409,7 +8411,7 @@ export default function AdminDashboard() {
 
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
               {/* Client Details Editor */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Edit size={14} style={{ color: 'var(--color-blue)' }} /> Client Details
                 </h4>
@@ -8444,7 +8446,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Balance Editor */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CreditCard size={14} style={{ color: 'var(--color-blue)' }} /> Margin Balance
                 </h4>
@@ -8467,7 +8469,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Subscription Editor */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Activity size={14} style={{ color: 'var(--color-blue)' }} /> Subscription Tier
                 </h4>
@@ -8496,15 +8498,15 @@ export default function AdminDashboard() {
               </div>
 
               {/* Device & Security Fingerprint Card */}
-              <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ background: isLight ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.05)', padding: '16px', borderRadius: '8px', border: isLight ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(59, 130, 246, 0.2)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: isLight ? '#2563eb' : '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   🛡️ Device & Security Fingerprint
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Device Model:</span> <strong style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.device_model || 'Desktop PC'}</strong></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>OS & Browser:</span> <span style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.os_name || 'Windows'} ({selectedUser.browser_name || 'Chrome'})</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px', fontFamily: 'monospace' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Detected IP Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Device Model:</span> <strong style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', marginLeft: '4px' }}>{selectedUser.device_model || 'Desktop PC'}</strong></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>OS & Browser:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', marginLeft: '4px' }}>{selectedUser.os_name || 'Windows'} ({selectedUser.browser_name || 'Chrome'})</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: isLight ? '#0284c7' : '#93c5fd', marginLeft: '4px', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Detected IP Location:</span> <span style={{ color: isLight ? '#16a34a' : '#4ade80', marginLeft: '4px', fontWeight: '600' }}>
                     {(() => {
                       const city = (selectedUser.ip_city && selectedUser.ip_city !== 'Local Network' && selectedUser.ip_city !== 'Local') ? selectedUser.ip_city : '';
                       const state = (selectedUser.ip_state && selectedUser.ip_state !== 'Local') ? selectedUser.ip_state : '';
@@ -8552,7 +8554,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* User Profile Details */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h4 style={{ fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
                     <Users size={14} style={{ color: 'var(--color-blue)' }} /> Client Profile (Onboarding Data)
@@ -8784,7 +8786,7 @@ export default function AdminDashboard() {
                         type="button"
                         onClick={() => setIsEditingClientProfile(false)}
                         className="btn"
-                        style={{ background: 'rgba(255,255,255,0.08)', color: 'white', padding: '6px 14px', fontSize: '12px' }}
+                        style={{ background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: isLight ? 'var(--text-primary, #0f172a)' : 'white', border: isLight ? '1px solid var(--border-color, #cbd5e1)' : 'none', padding: '6px 14px', fontSize: '12px' }}
                       >
                         Cancel
                       </button>
@@ -8801,18 +8803,18 @@ export default function AdminDashboard() {
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
                     <div><span style={{ color: 'var(--text-secondary)' }}>Client ID:</span> <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : 'N/A')}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_state || selectedUser.state || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_city || selectedUser.city || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: 'white' }}>{selectedUser.occupation || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: 'white' }}>{selectedUser.annual_income || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: 'white' }}>{selectedUser.financial_goal || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: 'white' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: 'white' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
-                    <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: 'white' }}>{selectedUser.trading_style || 'N/A'}</span></div>
-                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Address:</span> <span style={{ color: 'white', fontWeight: '500' }}>{selectedUser.address || 'Not provided'}</span></div>
-                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Bank / UPI:</span> <span style={{ color: '#34d399', fontWeight: '600' }}>{selectedUser.upi_id || selectedUser.bank_account_no ? `${selectedUser.upi_id ? `UPI: ${selectedUser.upi_id}` : ''}${selectedUser.upi_id && selectedUser.bank_account_no ? ' | ' : ''}${selectedUser.bank_account_no ? `Bank A/C: ${selectedUser.bank_account_no} (${selectedUser.bank_ifsc || 'N/A'})` : ''}` : 'Not provided'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.dob || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.gender || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.onboarding_state || selectedUser.state || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.onboarding_city || selectedUser.city || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.occupation || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.annual_income || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.financial_goal || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
+                    <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '600' }}>{selectedUser.trading_style || 'N/A'}</span></div>
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Address:</span> <span style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', fontWeight: '500' }}>{selectedUser.address || 'Not provided'}</span></div>
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Bank / UPI:</span> <span style={{ color: isLight ? '#059669' : '#34d399', fontWeight: '700' }}>{selectedUser.upi_id || selectedUser.bank_account_no ? `${selectedUser.upi_id ? `UPI: ${selectedUser.upi_id}` : ''}${selectedUser.upi_id && selectedUser.bank_account_no ? ' | ' : ''}${selectedUser.bank_account_no ? `Bank A/C: ${selectedUser.bank_account_no} (${selectedUser.bank_ifsc || 'N/A'})` : ''}` : 'Not provided'}</span></div>
                   </div>
                 )}
               </div>
@@ -8823,8 +8825,8 @@ export default function AdminDashboard() {
                   <Users size={14} style={{ color: 'var(--color-blue)' }} /> Identity Documents
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>PAN Card (ID: {selectedUser.pan_card || 'Not set'})</div>
+                  <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: isLight ? '1px dashed var(--border-color, #cbd5e1)' : '1px dashed var(--border-color)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>PAN Card (ID: <strong style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff' }}>{selectedUser.pan_card || 'Not set'}</strong>)</div>
                     {selectedUser.kyc_pan_url ? (
                       <a href={selectedUser.kyc_pan_url} target="_blank" rel="noreferrer">
                         <img src={selectedUser.kyc_pan_url} alt="PAN" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -8833,8 +8835,8 @@ export default function AdminDashboard() {
                       <div style={{ height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>No Document</div>
                     )}
                   </div>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Aadhar (ID: {selectedUser.aadhar_number || 'Not set'})</div>
+                  <div style={{ background: isLight ? 'var(--bg-card, #f8fafc)' : 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: isLight ? '1px dashed var(--border-color, #cbd5e1)' : '1px dashed var(--border-color)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Aadhar (ID: <strong style={{ color: isLight ? 'var(--text-primary, #0f172a)' : '#fff' }}>{selectedUser.aadhar_number || 'Not set'}</strong>)</div>
                     {selectedUser.kyc_aadhar_url ? (
                       <a href={selectedUser.kyc_aadhar_url} target="_blank" rel="noreferrer">
                         <img src={selectedUser.kyc_aadhar_url} alt="Aadhar" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px' }} />
