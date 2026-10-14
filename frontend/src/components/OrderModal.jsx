@@ -1668,6 +1668,10 @@ export default function OrderModal() {
                   orderModal.lotsize > 1 ? `EXCEEDS FREEZE LIMIT (${maxAllowedLots} LOTS MAX)` : `EXCEEDS FREEZE LIMIT (${freezeLimit.toLocaleString('en-IN')} MAX)`
                 ) : isTrueExit ? (
                   `EXIT ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isAmo ? '(AMO)' : ''}`
+                ) : isBO ? (
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} (BO • SL ₹${parseFloat(slPrice || 0).toFixed(1)}) ${isAmo ? '(AMO)' : ''}`
+                ) : isCO ? (
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} (CO • SL ₹${parseFloat(slPrice || 0).toFixed(1)}) ${isAmo ? '(AMO)' : ''}`
                 ) : (
                   `${side} ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isAmo ? '(AMO)' : ''}`
                 )

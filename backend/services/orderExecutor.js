@@ -220,24 +220,33 @@ async function spawnBracketOrders(trx, order, childQty) {
   if (slOrder) spawned.push(slOrder);
   if (tgtOrder) spawned.push(tgtOrder);
 
-  // Hook into transaction completion to add orders to in-memory trigger engine
-  // This guarantees that if the transaction rolls back, ghost orders are NOT added to memory
-  if (trx && typeof trx.on === 'function') {
-    trx.on('commit', async () => {
-      for (const ord of spawned) {
-        await triggerEngine.addOrderToMemory(ord).catch(() => {});
-      }
-    });
-  } else if (trx && typeof trx.executionPromise?.then === 'function') {
-    trx.executionPromise.then(async () => {
-      for (const ord of spawned) {
-        await triggerEngine.addOrderToMemory(ord).catch(() => {});
-      }
-    }).catch(() => {});
-  } else {
+  // Synchronize spawned bracket child orders with in-memory trigger engine and cluster Master node
+  const syncSpawnedOrders = async () => {
     for (const ord of spawned) {
       await triggerEngine.addOrderToMemory(ord).catch(() => {});
     }
+    const spawnedSymbols = Array.from(new Set(spawned.map(s => s.symbol).filter(Boolean)));
+    if (spawnedSymbols.length > 0) {
+      try {
+        const { pubClient } = require('./redisClient');
+        if (pubClient && pubClient.isReady) {
+          // O(1) in-memory symbol notification to Master node (zero DB queries)
+          pubClient.publish('trigger_symbol_active', JSON.stringify(spawnedSymbols)).catch(() => {});
+          // Ensure Fyers WebSocket actively subscribes to ticks for these symbols
+          pubClient.publish('fyers_subscribe', JSON.stringify(spawnedSymbols)).catch(() => {});
+          // Debounced trigger reload fallback across cluster
+          pubClient.publish('reload_triggers', '1').catch(() => {});
+        }
+      } catch (e) {}
+    }
+  };
+
+  if (trx && typeof trx.on === 'function') {
+    trx.on('commit', syncSpawnedOrders);
+  } else if (trx && typeof trx.executionPromise?.then === 'function') {
+    trx.executionPromise.then(syncSpawnedOrders).catch(() => {});
+  } else {
+    syncSpawnedOrders().catch(() => {});
   }
 
   return spawned;

@@ -685,9 +685,31 @@ if (isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
   const triggerEngine = require('./services/triggerEngine');
   const setupMasterSync = () => {
+    let masterReloadDebounceTimer = null;
     cacheSubClient.subscribe('reload_triggers', (message) => {
-        console.log('[Master] Reloading triggers from DB');
-        triggerEngine.loadPendingOrders();
+        if (masterReloadDebounceTimer) clearTimeout(masterReloadDebounceTimer);
+        masterReloadDebounceTimer = setTimeout(() => {
+            console.log('[Master] Reloading triggers from DB (debounced)');
+            triggerEngine.loadPendingOrders();
+            masterReloadDebounceTimer = null;
+        }, 500);
+    }).catch(err => console.error(err));
+
+    // High-performance O(1) in-memory trigger symbol activation (zero DB query, zero Redis scan)
+    cacheSubClient.subscribe('trigger_symbol_active', (message) => {
+        try {
+            const syms = typeof message === 'string' ? JSON.parse(message) : message;
+            const symList = Array.isArray(syms) ? syms : [syms];
+            symList.forEach(sym => {
+                if (sym && typeof sym === 'string') {
+                    triggerEngine.activeTriggerSymbols.add(sym);
+                    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+                    if (clean && clean !== sym) {
+                        triggerEngine.activeTriggerSymbols.add(clean);
+                    }
+                }
+            });
+        } catch (e) {}
     }).catch(err => console.error(err));
 
     cacheSubClient.subscribe('reload_volume_orders', async (message) => {
@@ -758,9 +780,31 @@ if (!isFyersMaster) {
     }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
     
     if (!isMaster) {
-      // Production Workers also subscribe to trigger reloads
+      let workerReloadDebounceTimer = null;
+      // Production Workers also subscribe to trigger reloads (debounced)
       cacheSubClient.subscribe('reload_triggers', () => {
-          triggerEngine.loadPendingOrders();
+          if (workerReloadDebounceTimer) clearTimeout(workerReloadDebounceTimer);
+          workerReloadDebounceTimer = setTimeout(() => {
+              triggerEngine.loadPendingOrders();
+              workerReloadDebounceTimer = null;
+          }, 500);
+      }).catch(err => console.error(err));
+
+      // Worker O(1) in-memory symbol activation
+      cacheSubClient.subscribe('trigger_symbol_active', (message) => {
+          try {
+              const syms = typeof message === 'string' ? JSON.parse(message) : message;
+              const symList = Array.isArray(syms) ? syms : [syms];
+              symList.forEach(sym => {
+                  if (sym && typeof sym === 'string') {
+                      triggerEngine.activeTriggerSymbols.add(sym);
+                      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+                      if (clean && clean !== sym) {
+                          triggerEngine.activeTriggerSymbols.add(clean);
+                      }
+                  }
+              });
+          } catch (e) {}
       }).catch(err => console.error(err));
 
       cacheSubClient.subscribe('reload_volume_orders', async () => {
