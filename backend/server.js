@@ -947,13 +947,26 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
-// 🛡️ Security Hardening Headers (Permissions-Policy & Cross-Origin-Opener-Policy)
-// Note: Cross-Origin-Opener-Policy must NOT be 'same-origin-allow-popups' because Chrome severs
-// window.opener when popups navigate cross-origin to accounts.google.com/firebaseapp.com,
-// breaking Google Auth / Firebase signInWithPopup. We use 'unsafe-none' to preserve window.opener.
 app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), usb=(), bluetooth=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  next();
+});
+
+// ⚡ Strip Content-Security-Policy on all /api/ REST endpoints
+// CSP only applies to HTML documents parsed by web browsers. Stripping it on JSON APIs
+// saves >2,700 bytes per HTTP response, preventing Nginx 4KB proxy_buffer_size overflow (HTTP 502 Bad Gateway).
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('X-Content-Security-Policy');
+    const origWriteHead = res.writeHead;
+    res.writeHead = function(...args) {
+      res.removeHeader('Content-Security-Policy');
+      res.removeHeader('X-Content-Security-Policy');
+      return origWriteHead.apply(this, args);
+    };
+  }
   next();
 });
 

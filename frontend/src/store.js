@@ -361,7 +361,9 @@ export const useStore = create(persist((set, get) => ({
         };
       }
       const cleanErr = formatAuthErrorMessage(data.error);
-      set({ authError: cleanErr });
+      if (!data.needs_email_verification) {
+        set({ authError: cleanErr });
+      }
       return { success: false, error: cleanErr, needs_email_verification: data.needs_email_verification, email: data.email };
     } catch (err) {
       const cleanErr = formatAuthErrorMessage(err);
@@ -457,7 +459,9 @@ export const useStore = create(persist((set, get) => ({
         return { success: true };
       } else {
         const cleanErr = formatAuthErrorMessage(data.error);
-        set({ authError: cleanErr });
+        if (!data.needs_email_verification) {
+          set({ authError: cleanErr });
+        }
         return {
           success: false,
           error: cleanErr,

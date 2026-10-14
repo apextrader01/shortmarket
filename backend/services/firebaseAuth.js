@@ -102,9 +102,12 @@ async function ensureFirebaseUser(email, phone = null, password = null, options 
     const updatePayload = {};
     if (password) updatePayload.password = password;
     if (resetEmailVerified) updatePayload.emailVerified = false;
-    else if (markEmailVerified && !existing.emailVerified) updatePayload.emailVerified = true;
+    else if (markEmailVerified) updatePayload.emailVerified = true;
     if (Object.keys(updatePayload).length > 0) {
-      const updated = await auth.updateUser(existing.uid, updatePayload).catch(() => null);
+      const updated = await auth.updateUser(existing.uid, updatePayload).catch((e) => {
+        console.warn(`[FIREBASE AUTH] updateUser note for ${cleanEmail}:`, e.message);
+        return null;
+      });
       if (updated) return updated;
     }
     return existing;

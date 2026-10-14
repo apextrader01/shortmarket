@@ -83,6 +83,11 @@ server {
         # WebSocket Long-Lived Connection Timeout (Keeps live ticks alive 24/7)
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
+
+        # Upstream Header Buffer Sizes to prevent 502 Bad Gateway
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
     }
 }
 EOF

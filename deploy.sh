@@ -50,5 +50,16 @@ pm2 delete shortmarket-backend 2>/dev/null || true
 pm2 reload "$APP_NAME" --update-env 2>/dev/null || pm2 restart "$APP_NAME" --update-env 2>/dev/null || pm2 start ecosystem.config.js
 pm2 save 2>/dev/null || true
 
+# 6. Ensure Nginx proxy buffers are configured (Prevents 502 Bad Gateway from upstream header overflow)
+if [ -d "/etc/nginx/sites-available" ]; then
+  for conf in /etc/nginx/sites-available/*; do
+    if [ -f "$conf" ] && grep -q "proxy_pass" "$conf" && ! grep -q "proxy_buffer_size" "$conf"; then
+      echo "🔧 Updating Nginx proxy buffer sizes in $conf..."
+      sudo sed -i '/location \/ {/a \        proxy_buffer_size 128k;\n        proxy_buffers 4 256k;\n        proxy_busy_buffers_size 256k;' "$conf" 2>/dev/null || true
+      sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
+    fi
+  done
+fi
+
 echo "✅ Deployment Successful! [$APP_NAME] is running cleanly."
 cd ..
