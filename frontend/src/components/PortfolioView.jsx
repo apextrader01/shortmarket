@@ -155,6 +155,8 @@ export default function PortfolioView() {
   const lossColor = isLight ? '#dc2626' : '#FF3B30';
   const profitBg = isLight ? 'rgba(22, 163, 74, 0.12)' : 'rgba(0, 230, 118, 0.15)';
   const lossBg = isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(255, 59, 48, 0.15)';
+  const profitBorder = isLight ? 'rgba(22, 163, 74, 0.3)' : 'rgba(0, 230, 118, 0.3)';
+  const lossBorder = isLight ? 'rgba(220, 38, 38, 0.3)' : 'rgba(255, 59, 48, 0.3)';
 
   // Proactively sync user portfolio data whenever PortfolioView is opened
   useEffect(() => {
