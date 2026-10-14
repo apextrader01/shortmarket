@@ -39,6 +39,7 @@ export default function LoginView() {
   });
 
   useEffect(() => {
+    useStore.setState({ authError: null });
     const urlParams = new URLSearchParams(window.location.search);
     let ref = urlParams.get('ref');
     if (!ref) {
@@ -1182,12 +1183,15 @@ export default function LoginView() {
       }
     } catch (err) {
       console.warn('Google sign-in error:', err);
-      // Ignore when user deliberately closes or cancels the popup
+      // Ignore and clear error when user deliberately closes or cancels the popup
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        useStore.setState({ authError: null });
         return;
       }
       let userFriendlyMsg = 'Google sign-in failed. Please try again.';
-      if (err.code === 'auth/popup-blocked') {
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        userFriendlyMsg = 'An account with this email was created with a password. Please enter your email and password above to log in.';
+      } else if (err.code === 'auth/popup-blocked') {
         userFriendlyMsg = 'Pop-up was blocked by your browser. Please allow pop-ups for skandx.in (look for the pop-up icon in your address bar), or log in with Email & Password.';
       } else if (err.code === 'auth/network-request-failed') {
         userFriendlyMsg = 'Network connection issue. Please check your internet connection and try again.';

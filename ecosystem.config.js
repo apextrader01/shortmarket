@@ -12,8 +12,8 @@ module.exports = {
       instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 'max', // Auto-cluster across all CPU cores for 100k - 1M concurrency
       exec_mode: 'cluster',
       watch: false,
-      max_memory_restart: '1200M',
-      node_args: '--optimize_for_size --max-old-space-size=768',
+      max_memory_restart: '1500M',
+      node_args: '--optimize_for_size --max-old-space-size=1024',
       env: {
         NODE_ENV: process.env.NODE_ENV || 'production',
         PORT: process.env.PORT ? parseInt(process.env.PORT, 10) : 5000,

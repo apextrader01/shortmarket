@@ -15,8 +15,8 @@ module.exports = {
       instances: instances,
       exec_mode: execMode,
       watch: false,
-      max_memory_restart: isStaging ? '600M' : '800M',
-      node_args: '--optimize_for_size --max-old-space-size=384 --expose-gc',
+      max_memory_restart: isStaging ? '800M' : '1500M',
+      node_args: '--optimize_for_size --max-old-space-size=1024 --expose-gc',
       env: {
         NODE_ENV: process.env.NODE_ENV || (isStaging ? 'staging' : 'production'),
         PORT: port,
