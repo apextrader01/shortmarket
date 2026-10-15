@@ -38,12 +38,10 @@ export default function UserActivityInspectorModal({
   const [activeTab, setActiveTab] = useState('CLICKS'); // 'CLICKS' | 'APIS'
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (!isOpen || !data) return null;
-
-  const user = data.user || {};
-  const stats = data.stats || {};
-  const apiLogs = data.apiLogs || [];
-  const activityLogs = data.activityLogs || [];
+  const user = data?.user || {};
+  const stats = data?.stats || {};
+  const apiLogs = data?.apiLogs || [];
+  const activityLogs = data?.activityLogs || [];
 
   const filteredActivities = useMemo(() => {
     if (!searchQuery.trim()) return activityLogs;
@@ -66,6 +64,8 @@ export default function UserActivityInspectorModal({
       (api.ip || '').toLowerCase().includes(q)
     );
   }, [apiLogs, searchQuery]);
+
+  if (!isOpen || !data) return null;
 
   const totalBytesFormatted = ((stats.apiBytes || 0) / (1024 * 1024)).toFixed(3);
   const marketTimeFormatted = (stats.wsMinutes || 0) >= 60

@@ -9185,14 +9185,16 @@ export default function AdminDashboard() {
       )}
 
       {/* User Activity & API Telemetry Inspector Modal */}
-      <UserActivityInspectorModal
-        isOpen={Boolean(inspectedUserTelemetry)}
-        data={inspectedUserTelemetry}
-        loading={telemetryInspectorLoading}
-        onRefresh={() => handleInspectUserTelemetry(inspectedUserTelemetry?.user?.id || inspectedUserTelemetry?.user?.client_id)}
-        onClose={() => setInspectedUserTelemetry(null)}
-        isLight={isLight}
-      />
+      {inspectedUserTelemetry && (
+        <UserActivityInspectorModal
+          isOpen={true}
+          data={inspectedUserTelemetry}
+          loading={telemetryInspectorLoading}
+          onRefresh={() => handleInspectUserTelemetry(inspectedUserTelemetry?.user?.id || inspectedUserTelemetry?.user?.client_id)}
+          onClose={() => setInspectedUserTelemetry(null)}
+          isLight={isLight}
+        />
+      )}
     </div>
   );
 }
