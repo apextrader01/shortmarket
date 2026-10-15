@@ -866,7 +866,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   const [simWinRate, setSimWinRate] = useState(60);
   const [simRiskReward, setSimRiskReward] = useState(2.0);
   const [monteCarloResult, setMonteCarloResult] = useState(null);
-const [riskCalc, setRiskCalc] = useState({
+  const [riskProfilePreset, setRiskProfilePreset] = useState('STANDARD');
+  const [riskCalc, setRiskCalc] = useState({
     capital: 200000,
     riskPct: 1,
     entry: 450,
@@ -7626,28 +7627,33 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       { id: 'CONSERVATIVE', label: '🛡️ Conservative (0.5%)', pct: 0.5 },
                       { id: 'STANDARD', label: '🎯 Standard (1.0%)', pct: 1.0 },
                       { id: 'AGGRESSIVE', label: '⚡ Aggressive (2.0%)', pct: 2.0 }
-                    ].map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          setRiskProfilePreset(p.id);
-                          setRiskCalc(r => ({ ...r, riskPct: p.pct }));
-                        }}
-                        style={{
-                          backgroundColor: riskCalc.riskPct === p.pct ? '#2563eb' : colors.bgCard,
-                          color: riskCalc.riskPct === p.pct ? '#ffffff' : colors.textPrimary,
-                          border: `1px solid ${colors.borderColor}`,
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          boxShadow: colors.cardShadow
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
+                    ].map(p => {
+                      const isActive = riskProfilePreset === p.id || parseFloat(riskCalc.riskPct) === p.pct;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setRiskProfilePreset(p.id);
+                            setRiskCalc(r => ({ ...r, riskPct: p.pct }));
+                          }}
+                          style={{
+                            backgroundColor: isActive ? '#2563eb' : colors.bgCard,
+                            color: isActive ? '#ffffff' : colors.textPrimary,
+                            border: `1px solid ${isActive ? '#2563eb' : colors.borderColor}`,
+                            padding: '5px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            boxShadow: isActive ? '0 2px 6px rgba(37, 99, 235, 0.35)' : colors.cardShadow,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Circuit Breaker Status Pill */}
@@ -7719,7 +7725,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         type="number"
                         step="0.1"
                         value={riskCalc.riskPct}
-                        onChange={(e) => setRiskCalc({ ...riskCalc, riskPct: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRiskCalc(prev => ({ ...prev, riskPct: val }));
+                          const num = parseFloat(val);
+                          if (num === 0.5) setRiskProfilePreset('CONSERVATIVE');
+                          else if (num === 1.0) setRiskProfilePreset('STANDARD');
+                          else if (num === 2.0) setRiskProfilePreset('AGGRESSIVE');
+                          else setRiskProfilePreset('CUSTOM');
+                        }}
                         style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
                       />
                     </div>
