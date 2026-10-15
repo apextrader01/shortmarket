@@ -2966,24 +2966,31 @@ export const useStore = create(persist((set, get) => ({
       body.classList.remove('font-small', 'font-medium', 'font-large');
       body.classList.add('font-' + size);
       
-      // Clear legacy body inline styles that caused the bottom black gap
-      body.style.zoom = '';
+      // Clear legacy body transform styles
+      root.style.zoom = '';
       body.style.MozTransform = '';
       body.style.MozTransformOrigin = '';
-      body.style.width = '';
-      body.style.height = '';
 
-      // Direct root zoom for full viewport scaling with zero black gap
+      let scale = 1;
+      let widthComp = '100vw';
+      let heightComp = '100vh';
+
       if (size === 'small') {
-        root.style.zoom = '0.9';
-        root.style.setProperty('--app-scale', '0.9');
+        scale = 0.9;
+        widthComp = '111.112vw';
+        heightComp = '111.112vh';
       } else if (size === 'large') {
-        root.style.zoom = '1.08';
-        root.style.setProperty('--app-scale', '1.08');
-      } else {
-        root.style.zoom = '1';
-        root.style.setProperty('--app-scale', '1');
+        scale = 1.08;
+        widthComp = '92.593vw';
+        heightComp = '92.593vh';
       }
+
+      root.style.setProperty('--app-scale', String(scale));
+      body.style.setProperty('--app-scale', String(scale));
+      body.style.zoom = String(scale);
+      body.style.width = widthComp;
+      body.style.height = heightComp;
+      body.style.minHeight = heightComp;
     }
     
     return { fontSize: size };

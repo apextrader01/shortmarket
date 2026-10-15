@@ -1478,7 +1478,7 @@ function App() {
         color: 'var(--text-primary)', 
         backgroundColor: 'var(--bg-primary)',
         height: '100%',
-        minHeight: '100vh',
+        minHeight: '100%',
         overflowY: isScrollableTab ? 'auto' : 'hidden',
         overflowX: 'hidden'
       }}
