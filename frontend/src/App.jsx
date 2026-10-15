@@ -1671,7 +1671,7 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.06)',
+                      background: theme === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
                       border: '1px solid var(--border-color)',
                       color: 'var(--text-primary)',
                       cursor: 'pointer',
@@ -1691,10 +1691,28 @@ function App() {
                     <img 
                       src={logoImg} 
                       alt="SkandX Logo" 
-                      style={{ width: '24px', height: '24px', borderRadius: '6px', boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)' }} 
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        boxShadow: theme === 'light' ? '0 2px 6px rgba(2, 132, 199, 0.2)' : '0 0 10px rgba(56, 189, 248, 0.35)',
+                        border: theme === 'light' ? '1px solid rgba(2, 132, 199, 0.25)' : 'none'
+                      }} 
                     />
-                    <span style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
-                      Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
+                    <span style={{
+                      fontSize: '16px',
+                      fontWeight: '800',
+                      letterSpacing: '-0.5px',
+                      color: theme === 'light' ? '#0f172a' : 'var(--text-primary, #ffffff)',
+                      fontFamily: "'Outfit', sans-serif"
+                    }}>
+                      Skand<span style={{
+                        background: theme === 'light'
+                          ? 'linear-gradient(135deg, #0284c7 0%, #10b981 100%)'
+                          : 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent'
+                      }}>X</span>
                     </span>
                     {isStagingEnv && (
                       <span style={{

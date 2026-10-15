@@ -1372,8 +1372,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 flexShrink: 0
               }}
             />
-            <span style={{ color: '#fff', letterSpacing: '-0.3px', whiteSpace: 'nowrap', fontFamily: "'Outfit', Inter, sans-serif", fontWeight: '800' }}>
-              Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> <span style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '900', color: '#e2e8f0', letterSpacing: '0.5px' }}>ALGO</span>
+            <span style={{ color: 'var(--text-primary, #fff)', letterSpacing: '-0.3px', whiteSpace: 'nowrap', fontFamily: "'Outfit', Inter, sans-serif", fontWeight: '800' }}>
+              Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> <span style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '900', color: 'var(--text-secondary, #e2e8f0)', letterSpacing: '0.5px' }}>ALGO</span>
             </span>
             <span style={{
               fontSize: '10px',

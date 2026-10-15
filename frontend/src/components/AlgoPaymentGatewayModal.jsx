@@ -359,7 +359,7 @@ export default function AlgoPaymentGatewayModal({
             />
             <div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: isLight ? 'var(--text-primary, #0f172a)' : '#fff', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> × Cashfree Checkout</span>
+                <span>Skand<span style={{ background: isLight ? 'linear-gradient(135deg, #0284c7 0%, #10b981 100%)' : 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span> × Cashfree Checkout</span>
                 <span style={{ fontSize: '10px', background: isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.15)', color: isLight ? '#059669' : '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
                   LIVE GATEWAY
                 </span>
