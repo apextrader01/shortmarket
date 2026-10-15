@@ -674,7 +674,7 @@ export default function LandingHomeView({
   return (
     <div className="skx-landing-root" style={{
       width: '100%',
-      maxWidth: '100vw',
+      maxWidth: '100%',
       minHeight: '100%',
       backgroundColor: t.bg,
       backgroundImage: t.bgGradient,

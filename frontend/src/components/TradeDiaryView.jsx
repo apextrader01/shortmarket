@@ -2441,8 +2441,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   return (
     <div style={{
       display: 'flex',
-      width: '100vw',
-      height: '100vh',
+      width: '100%',
+      height: '100%',
+      minHeight: '100%',
       backgroundColor: colors.bgMain,
       color: colors.textPrimary,
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

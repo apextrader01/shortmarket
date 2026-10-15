@@ -1296,7 +1296,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   return (
     <div style={{
       width: '100%',
-      minHeight: '100vh',
+      minHeight: '100%',
       background: '#070a12',
       color: '#f8fafc',
       fontFamily: 'Inter, system-ui, -apple-system, sans-serif',

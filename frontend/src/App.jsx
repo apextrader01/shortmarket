@@ -1404,7 +1404,7 @@ function App() {
   if (!user && (['home', 'paper-trading', 'papertrading', 'markets'].includes(cleanFirstSegment) || (isSearchOrAdCrawler && cleanFirstSegment === ''))) {
     return (
       <Suspense fallback={<TabLoader />}>
-        <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
+        <div style={{ minHeight: '100%', width: '100%', background: 'var(--bg-primary, #0a0b0d)' }}>
           <LandingHomeView
             onOpenPaperTrading={() => { window.location.href = '/login'; }}
             onOpenCommunity={() => { window.location.href = '/community'; }}
