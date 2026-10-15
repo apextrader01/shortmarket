@@ -1141,6 +1141,7 @@ async function ensureCriticalColumns() {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         date VARCHAR(20) NOT NULL,
         pre_market_data JSONB DEFAULT '{}',
+        in_market_data JSONB DEFAULT '{}',
         post_market_data JSONB DEFAULT '{}',
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1148,6 +1149,7 @@ async function ensureCriticalColumns() {
         CONSTRAINT uq_user_checklist_date UNIQUE (user_id, date)
       )
     `);
+    await db.raw(`ALTER TABLE trading_checklists ADD COLUMN IF NOT EXISTS in_market_data JSONB DEFAULT '{}'`).catch(() => {});
 
     await db.raw(`
       CREATE TABLE IF NOT EXISTS trading_mistakes (

@@ -713,15 +713,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [isLightboxZoomed, setIsLightboxZoomed] = useState(false);
   const [newTradeForm, setNewTradeForm] = useState({
-    symbol: 'NIFTY 24500 CE',
+    symbol: '',
     trade_type: 'BUY',
     product_type: 'INT',
     market_segment: 'Indian',
     entry_price: '',
     exit_price: '',
-    quantity: '50',
+    quantity: '',
     realized_pnl: '',
-    charges: '45',
+    charges: '0',
     strategy: '🔥 Breakout',
     emotion: '🎯 Disciplined Execution',
     mistake: '',
@@ -736,7 +736,7 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     category: 'Momentum',
     target_rr: '1:2.5',
     timeframe: '5-Min',
-    win_rate: '65',
+    win_rate: '',
     description: '',
     rulesText: '1. Wait for candle close confirmation\n2. Align with major 200 EMA trend\n3. Predefined stop-loss in order book',
     color: '#3b82f6'
@@ -753,20 +753,20 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     name: '',
     category: 'PSYCHOLOGY',
     severity: 'CRITICAL',
-    loss: '5000',
+    loss: '',
     count: '1',
     trigger: '',
     antidote: ''
   });
 
   const [newSetupForm, setNewSetupForm] = useState({
-    symbol: 'BANKNIFTY 52000 CE',
+    symbol: '',
     direction: 'LONG',
-    entry: '380',
-    sl: '340',
-    target: '480',
+    entry: '',
+    sl: '',
+    target: '',
     strategy: '🔥 Breakout',
-    rationale: 'Daily consolidation breakout retest with high buying volume.'
+    rationale: ''
   });
 
   // Simple Mode state for Trade Diary (defaults to true for clean, streamlined UX)
@@ -1103,7 +1103,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         const c = dataChk.checklists[0];
         setTodayChecklist({
           preMarket: typeof c.pre_market_data === 'string' ? JSON.parse(c.pre_market_data) : (c.pre_market_data || {}),
-          inMarket: { stopLossPlacedImmediately: true, positionSizedProperly: true, candleCloseWaited: true, noRevengeTrading: true },
+          inMarket: typeof c.in_market_data === 'string' ? JSON.parse(c.in_market_data) : (c.in_market_data || {}),
           postMarket: typeof c.post_market_data === 'string' ? JSON.parse(c.post_market_data) : (c.post_market_data || {}),
           notes: c.notes || ''
         });
@@ -1302,8 +1302,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
-            date: selectedChecklistDate,
+            date: selectedChecklistDate || todayStr,
             pre_market_data: section === 'preMarket' ? currentSectionItems : todayChecklist.preMarket,
+            in_market_data: section === 'inMarket' ? currentSectionItems : todayChecklist.inMarket,
             post_market_data: section === 'postMarket' ? currentSectionItems : todayChecklist.postMarket,
             notes: todayChecklist.notes
           })
@@ -1337,8 +1338,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
-            date: selectedChecklistDate,
+            date: selectedChecklistDate || todayStr,
             pre_market_data: { ...todayChecklist.preMarket, custom: customChecklistItems.preMarket },
+            in_market_data: { ...todayChecklist.inMarket, custom: customChecklistItems.inMarket },
             post_market_data: { ...todayChecklist.postMarket, custom: customChecklistItems.postMarket },
             notes: todayChecklist.notes,
             sentiment: dailySentiment
@@ -1371,8 +1373,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
-          date: todayStr,
+          date: selectedChecklistDate || todayStr,
           pre_market_data: updated.preMarket,
+          in_market_data: updated.inMarket,
           post_market_data: updated.postMarket,
           notes: updated.notes
         })
@@ -1886,7 +1889,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       category: 'Momentum',
       target_rr: '1:2.5',
       timeframe: '5-Min',
-      win_rate: '65',
+      win_rate: '',
       description: '',
       rulesText: '1. Wait for candle close confirmation\n2. Align with major 200 EMA trend\n3. Predefined stop-loss in order book',
       color: '#3b82f6'
@@ -1957,7 +1960,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const handleAddMistake = (e) => {
     e.preventDefault();
     if (!newMistakeForm.name.trim()) return;
-    const lossVal = parseFloat(newMistakeForm.loss) || 5000;
+    const lossVal = parseFloat(newMistakeForm.loss) || 0;
     const countVal = parseInt(newMistakeForm.count, 10) || 1;
 
     const newM = {
@@ -1978,7 +1981,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       name: '',
       category: 'PSYCHOLOGY',
       severity: 'CRITICAL',
-      loss: '5000',
+      loss: '',
       count: '1',
       trigger: '',
       antidote: ''
@@ -2022,7 +2025,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (m.id === mistakeId) {
         const avgPerEvent = (parseFloat(m.loss) || 0) / (m.count || 1);
         const newCount = (m.count || 1) + 1;
-        const newLoss = Math.round((parseFloat(m.loss) || 0) + (avgPerEvent || 3000));
+        const newLoss = Math.round((parseFloat(m.loss) || 0) + (avgPerEvent || 0));
         return {
           ...m,
           count: newCount,
@@ -2058,6 +2061,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     };
     setCommunityPosts(prev => [post, ...prev]);
     setShowShareSetupModal(false);
+    setNewSetupForm({
+      symbol: '',
+      direction: 'LONG',
+      entry: '',
+      sl: '',
+      target: '',
+      strategy: '🔥 Breakout',
+      rationale: ''
+    });
   };
 
   // Like Community Post
@@ -2080,7 +2092,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const [aiChatMessages, setAiChatMessages] = useState([
     {
       sender: 'coach',
-      text: 'Hello trader! I have analyzed your journal logs. Your core edge is strong in morning breakout sessions, but late-day overtrading and moving stop-losses represent your main profit leaks. How can I help you sharpen your execution today?'
+      text: 'Hello trader! I am your Trade Diary AI Coach. I am here to help you audit trade execution, manage drawdown risk, and eliminate behavioral leaks. How can I help you sharpen your edge today?'
     }
   ]);
   const [aiToast, setAiToast] = useState(null);
@@ -2219,16 +2231,23 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       }
     } catch (_) {}
 
-    let replyText = "Based on your trade logs, your highest win rate (68%) occurs during the first 90 minutes of market open. To optimize your edge, focus exclusively on setups aligning with the 200 EMA trend and strictly cap your daily risk at 1%.";
+    const hasLoggedTrades = dbTrades && dbTrades.length > 0;
+    const currentWinRate = metrics.winRate || 0;
+    const tradeCount = dbTrades.length;
+
+    let replyText = hasLoggedTrades
+      ? `Based on your ${tradeCount} logged trade${tradeCount > 1 ? 's' : ''} (Current win rate: ${currentWinRate}%), your core focus should be on executing high-conviction setups with strict 1:2+ RR and respecting your predefined risk limits.`
+      : "To maximize your trading edge, log your setups consistently with entry, stop-loss, and emotional tags. Focus on executing your predefined plan and capping risk per trade at 1-2% of total capital.";
+
     const qLower = userQ.toLowerCase();
     if (qLower.includes('afternoon') || qLower.includes('2 pm') || qLower.includes('late')) {
-      replyText = "Your logs show that 72% of your red trades happen after 02:00 PM due to decay and chop. My prescription: Shut down your terminal at 01:30 PM after locking morning gains.";
+      replyText = "Late-session and afternoon trades often experience choppy liquidity and accelerated option premium decay. If you find your discipline slipping later in the day, enforce a strict cutoff time or cap your daily trade count.";
     } else if (qLower.includes('fomo') || qLower.includes('revenge') || qLower.includes('emotion')) {
-      replyText = "Revenge trading accounts for ₹16,500 in leaks. When a stop-loss is hit, force a mandatory 15-minute physical screen detachment before evaluating any new setup.";
+      replyText = "Revenge trading and emotional FOMO are the biggest leaks in trading. When a stop-loss is triggered, take a mandatory 15-minute physical screen detachment before evaluating any new setup.";
     } else if (qLower.includes('risk') || qLower.includes('stop') || qLower.includes('loss')) {
-      replyText = "Moving stop-losses has cost you ₹22,800. Remember: your predefined stop is your insurance policy. Accept the small 1R loss without hesitation so you can catch the next 2.5R winner.";
+      replyText = "Never widen or eliminate a stop-loss mid-trade. Your predefined stop is your insurance policy. Accept planned losses without hesitation to preserve dry powder for high-probability setups.";
     } else if (qLower.includes('target') || qLower.includes('exit') || qLower.includes('early')) {
-      replyText = "You have exited winners early 5 times, leaving over ₹11,200 on the table. Switch from manual discretionary exits to a rule-based 9-EMA trailing stop.";
+      replyText = "Premature exits often stem from anxiety about giving back open gains. Consider booking partial profits at 1:1.5 RR and trailing the remainder behind key structure or the 9 EMA.";
     }
 
     setAiChatMessages(prev => [...prev, { sender: 'coach', text: replyText }]);
@@ -3256,9 +3275,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           strategy: '🔥 Multi-Strategy Discipline Portfolio',
                           net_pnl: metrics.totalPnL,
                           realized_pnl: metrics.totalGross,
-                          entry_price: 24500,
-                          exit_price: 24950,
-                          qty: 50,
+                          pnlPercent: metrics.returnOnCapital || 0,
+                          isSummary: true,
+                          tradesCount: metrics.totalTrades,
+                          winRate: metrics.winRate,
+                          entry_price: 0,
+                          exit_price: 0,
+                          qty: metrics.totalTrades,
                           market_segment: marketSegment
                         });
                       }}
@@ -6285,7 +6308,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       {topLossMistake ? (topLossMistake.name || topLossMistake.mistake_name) : 'None'}
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: '700', color: topLossMistake ? colors.accentRed : colors.accentGreen, marginTop: '2px' }}>
-                      {topLossMistake ? `-${formatMoneyPlain(topLossMistake.loss, marketSegment)} (${topLossMistake.count || 0}x)` : '₹0 (Zero Leaks)'}
+                      {topLossMistake ? `-${formatMoneyPlain(topLossMistake.loss, marketSegment)} (${topLossMistake.count || 0}x)` : `${formatMoneyPlain(0, marketSegment)} (Zero Leaks)`}
                     </div>
                   </div>
 
@@ -6803,10 +6826,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>⏱️ PEAK ALPHA WINDOW</div>
                     <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>
-                      {hasTrades ? 'Morning Session (09:15 – 11:30 AM)' : 'Awaiting Data'}
+                      {hasTrades ? (marketSegment === 'Indian' ? 'Morning Session (09:15 – 11:30 AM)' : (marketSegment === 'US' ? 'US Opening Hour (09:30 – 11:30 AM EST)' : (marketSegment === 'Forex' ? 'London/NY Overlap' : 'Peak Volume Liquidity Window'))) : 'Awaiting Data'}
                     </div>
                     <div style={{ fontSize: '10px', color: hasTrades ? colors.accentGreen : colors.textMuted, fontWeight: '700' }}>
-                      {hasTrades ? `${winRate}% Win Rate in Morning Session` : 'No Trades Logged'}
+                      {hasTrades ? `${winRate}% Overall Win Rate` : 'No Trades Logged'}
                     </div>
                   </div>
 
@@ -7796,6 +7819,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       onClick={() => {
                         setRiskCalc(r => ({
                           ...r,
+                          symbol: a.symbol,
                           entry: a.entry,
                           stopLoss: a.sl,
                           target: a.target
@@ -7936,16 +7960,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => {
-                        setNewTradeForm({
-                          symbol: `${marketSegment === 'Indian' ? 'NIFTY 24600 CE' : (marketSegment === 'Crypto' ? 'BTC/USDT' : 'EUR/USD')}`,
-                          direction: 'LONG',
-                          entry: riskCalc.entry.toString(),
-                          exit: '',
-                          qty: calculatedRisk.suggestedQty.toString(),
+                        setNewTradeForm(prev => ({
+                          ...prev,
+                          symbol: riskCalc.symbol || (MARKET_CONFIGS[marketSegment]?.suggestions?.[0] || 'NIFTY 24500 CE'),
+                          trade_type: 'BUY',
+                          market_segment: marketSegment,
+                          entry_price: riskCalc.entry ? riskCalc.entry.toString() : '',
+                          exit_price: '',
+                          quantity: calculatedRisk.suggestedQty ? calculatedRisk.suggestedQty.toString() : '1',
                           strategy: '🔥 Breakout',
                           emotion: '🎯 Disciplined Execution',
+                          trade_date: todayStr,
                           notes: `Pre-calculated risk: Max loss ${formatMoneyPlain(calculatedRisk.maxLossRupees, marketSegment)}, Target 1:${calculatedRisk.rr} RR.`
-                        });
+                        }));
                         setShowNewTradeModal(true);
                       }}
                       style={{
@@ -8523,16 +8550,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <button
                               onClick={() => {
-                                setNewTradeForm({
+                                setNewTradeForm(prev => ({
+                                  ...prev,
                                   symbol: post.symbol,
-                                  direction: post.direction,
-                                  entry: post.entry.toString(),
-                                  exit: '',
-                                  qty: '50',
+                                  trade_type: post.direction === 'SHORT' ? 'SELL' : 'BUY',
+                                  entry_price: (post.entry || '').toString(),
+                                  exit_price: '',
+                                  quantity: '50',
                                   strategy: post.strategy || '🔥 Breakout',
                                   emotion: '🎯 Disciplined Execution',
+                                  market_segment: post.market || marketSegment,
+                                  trade_date: todayStr,
                                   notes: `Copied from community setup by ${post.author}: ${post.rationale}`
-                                });
+                                }));
                                 setShowNewTradeModal(true);
                               }}
                               style={{
@@ -9039,9 +9069,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           strategy: '🔥 Multi-Strategy Portfolio',
                           net_pnl: monthStatement.netPnl,
                           realized_pnl: monthStatement.grossPnl,
-                          entry_price: 24500,
-                          exit_price: 25150,
-                          qty: 50,
+                          pnlPercent: monthStatement.roi || 0,
+                          isSummary: true,
+                          tradesCount: monthStatement.totalTrades,
+                          winRate: monthStatement.winRate,
+                          entry_price: 0,
+                          exit_price: 0,
+                          qty: monthStatement.totalTrades,
                           market_segment: marketSegment
                         });
                       }}
@@ -11504,15 +11538,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
               <button
                 onClick={() => {
+                  const sTrades = selectedCalendarSession.trades || [];
+                  const firstTr = sTrades[0];
                   setSelectedTradeForShare({
-                    symbol: `${selectedCalendarSession.date} Session (${selectedCalendarSession.market || marketSegment})`,
-                    strategy: selectedCalendarSession.strategy || '🔥 Multi-Setup Execution',
+                    symbol: firstTr ? firstTr.symbol : `${selectedCalendarSession.date} Session (${selectedCalendarSession.market || marketSegment})`,
+                    strategy: firstTr?.strategy || selectedCalendarSession.strategy || '🔥 Multi-Setup Execution',
                     net_pnl: selectedCalendarSession.pnl,
                     realized_pnl: selectedCalendarSession.pnl,
-                    entry_price: 24500,
-                    exit_price: 24850,
-                    qty: 50,
-                    market_segment: selectedCalendarSession.market || marketSegment
+                    entry_price: firstTr ? Number(firstTr.entry_price || firstTr.avg || 0) : 0,
+                    exit_price: firstTr ? Number(firstTr.exit_price || 0) : 0,
+                    qty: firstTr ? Number(firstTr.quantity || 1) : (sTrades.length || 1),
+                    market_segment: selectedCalendarSession.market || marketSegment,
+                    isSummary: !firstTr,
+                    tradesCount: sTrades.length
                   });
                 }}
                 style={{ backgroundColor: colors.bgInner, color: colors.accentBlueLight, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}

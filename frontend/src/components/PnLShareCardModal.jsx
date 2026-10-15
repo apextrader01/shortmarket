@@ -73,14 +73,14 @@ export default function PnLShareCardModal({ trade, onClose }) {
   const displaySymbol = symbol.includes(':') ? symbol.split(':')[1] : symbol;
   const pnl = Number(trade?.realized_pnl !== undefined ? trade?.realized_pnl : (trade?.pnl || trade?.displayPnl || 0));
   const isProfit = pnl >= 0;
+  const entryPrice = Number(trade?.avg || trade?.average_price || trade?.buyPrice || trade?.entry_price || 0);
   const rawPnlPercent = trade?.pnlPercent !== undefined
     ? Number(trade.pnlPercent)
-    : (trade?.avg && Number(trade.avg) > 0 && trade?.exit_price !== null && trade?.exit_price !== undefined
-      ? ((Number(trade.exit_price) - Number(trade.avg)) / Number(trade.avg)) * 100 * (trade.side === 'SELL' ? -1 : 1)
+    : (entryPrice > 0 && trade?.exit_price !== null && trade?.exit_price !== undefined
+      ? ((Number(trade.exit_price) - entryPrice) / entryPrice) * 100 * (trade.side === 'SELL' ? -1 : 1)
       : 0);
   const pnlPercent = isNaN(rawPnlPercent) ? 0 : rawPnlPercent;
 
-  const entryPrice = Number(trade?.avg || trade?.average_price || trade?.buyPrice || 0);
   const exitPrice = (trade?.exit_price !== null && trade?.exit_price !== undefined && !isNaN(Number(trade.exit_price)))
     ? Number(trade.exit_price)
     : Number(trade?.ltp || trade?.sellPrice || entryPrice);
@@ -254,11 +254,18 @@ export default function PnLShareCardModal({ trade, onClose }) {
     // Metrics Grid
     const gridY = 625;
     const colWidth = (width - 160 - 36) / 3;
-    const metrics = [
-      { label: 'ENTRY PRICE', val: currency + entryPrice.toFixed(2) },
-      { label: 'EXIT / LTP', val: currency + exitPrice.toFixed(2) },
-      { label: 'QUANTITY', val: quantity + ' Qty' }
-    ];
+    const isSummaryCard = trade?.isSummary || (!entryPrice && !exitPrice && trade?.tradesCount !== undefined);
+    const metrics = isSummaryCard
+      ? [
+          { label: 'TOTAL TRADES', val: `${trade?.tradesCount || trade?.qty || 1} Trades` },
+          { label: 'WIN RATE', val: trade?.winRate !== undefined ? `${trade.winRate}%` : 'N/A' },
+          { label: 'MARKET', val: marketSeg }
+        ]
+      : [
+          { label: 'ENTRY PRICE', val: currency + entryPrice.toFixed(2) },
+          { label: 'EXIT / LTP', val: currency + exitPrice.toFixed(2) },
+          { label: 'QUANTITY', val: quantity + ' Qty' }
+        ];
 
     metrics.forEach((m, idx) => {
       const colX = 80 + idx * (colWidth + 18);

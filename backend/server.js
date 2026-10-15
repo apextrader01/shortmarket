@@ -15141,7 +15141,7 @@ app.get('/api/journal/checklists', authenticateToken, async (req, res) => {
 
 app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
   try {
-    const { date, pre_market_data, post_market_data, notes } = req.body;
+    const { date, pre_market_data, in_market_data, post_market_data, notes } = req.body;
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const existing = await db('trading_checklists').where({ user_id: req.user.id, date: targetDate }).first();
@@ -15152,6 +15152,7 @@ app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
         .where({ id: existing.id })
         .update({
           pre_market_data: pre_market_data ? JSON.stringify(pre_market_data) : existing.pre_market_data,
+          in_market_data: in_market_data ? JSON.stringify(in_market_data) : existing.in_market_data,
           post_market_data: post_market_data ? JSON.stringify(post_market_data) : existing.post_market_data,
           notes: notes !== undefined ? notes : existing.notes,
           updated_at: new Date()
@@ -15162,6 +15163,7 @@ app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
         user_id: req.user.id,
         date: targetDate,
         pre_market_data: JSON.stringify(pre_market_data || {}),
+        in_market_data: JSON.stringify(in_market_data || {}),
         post_market_data: JSON.stringify(post_market_data || {}),
         notes: notes || ''
       }).returning('*');
