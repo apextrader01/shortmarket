@@ -63,10 +63,10 @@ export default function DepositModal({ onClose }) {
         <div style={{ padding: '24px 24px 20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)' }}>
-              <Wallet size={22} color="var(--color-blue)" /> Add Funds
+              <Wallet size={22} color="var(--color-blue)" /> Add Virtual Capital
             </h2>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Available Margin: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>&#8377;{Number(user?.balance || 0).toLocaleString('en-IN')}</span>
+              Available Virtual Margin: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>&#8377;{Number(user?.balance || 0).toLocaleString('en-IN')}</span>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'var(--bg-hover)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
@@ -152,11 +152,12 @@ export default function DepositModal({ onClose }) {
           <div style={{ background: 'var(--bg-hover)', padding: '24px', borderTop: '1px solid var(--border-color)', marginTop: '8px' }}>
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={loading}>
               {loading ? 'Processing...' : (
-                <>Request Deposit {amount ? '(Rs. ' + Number(amount).toLocaleString('en-IN') + ')' : ''} <ArrowRight size={18} /></>
+                <>Request Virtual Margin {amount ? '(₹' + Number(amount).toLocaleString('en-IN') + ')' : ''} <ArrowRight size={18} /></>
               )}
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              <ShieldCheck size={14} /> Funds will be credited once approved by an administrator.
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '16px', fontSize: '11.5px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: '1.4' }}>
+              <ShieldCheck size={14} color="#10b981" style={{ flexShrink: 0 }} />
+              <span>Simulated demo currency for educational practice. Holds zero monetary value.</span>
             </div>
           </div>
         </form>

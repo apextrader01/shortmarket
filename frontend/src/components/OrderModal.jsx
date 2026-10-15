@@ -832,6 +832,9 @@ export default function OrderModal() {
               <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
                 {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}
               </span>
+              <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.3)', border: '1px solid rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                Simulated Paper Order
+              </span>
             </div>
             <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginTop: '3px', fontWeight: '500' }}>
               {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice > 0 ? livePrice.toFixed(2) : (orderModal.initialPrice && Number(orderModal.initialPrice) > 0 ? Number(orderModal.initialPrice).toFixed(2) : (price && parseFloat(price) > 0 ? Number(price).toFixed(2) : '0.00'))}

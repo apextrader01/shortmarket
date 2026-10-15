@@ -256,7 +256,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Withdrawal request failed');
-      setWithdrawMsg({ type: 'success', text: '✅ Real money withdrawal request submitted! Admin will credit your UPI/Bank.' });
+      setWithdrawMsg({ type: 'success', text: '✅ Referral reward payout request submitted! Admin will credit your registered UPI/Bank.' });
       setWithdrawAmount('');
       fetchRewardStats();
       setTimeout(() => {
@@ -1268,16 +1268,16 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
-                  Real Money Cashout
+                  Referral Rewards Payout
                 </h3>
                 <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
-                  Direct Payout to UPI / Bank Account
+                  Direct Affiliate Commission Payout to UPI / Bank Account
                 </div>
               </div>
             </div>
 
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
-              Withdraw your real cash referral commissions & rewards directly to your bank.
+              Withdraw your earned referral commissions &amp; affiliate rewards directly to your registered bank account or UPI ID.
             </p>
 
             {/* Available Balance Box */}
