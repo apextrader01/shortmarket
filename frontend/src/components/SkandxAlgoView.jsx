@@ -884,17 +884,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     showToast(`Order Executed: ${orderSide} ${payload.qty} ${payload.symbol} @ ${payload.price}!`);
   };
 
-  // ── Copy Group Handlers ──────────────────────────────────────────────────
+  // ── Multi-Account Sync Handlers ──────────────────────────────────────────────────
   const handleUpdateCopyGroup = async (patch) => {
     if (patch.status === 'ACTIVE') {
       const hasMaster = (patch.masterAccount || copyGroup.masterAccount) && (patch.masterAccount || copyGroup.masterAccount) !== 'UNASSIGNED';
       const hasFollowers = Array.isArray(copyGroup.followers) && copyGroup.followers.length > 0;
       if (!hasMaster && demats.length === 0) {
-        showToast('Connect a Master Demat account first before starting the Copy Trading Engine.');
+        showToast('Connect a Primary Demat account first before starting the Multi-Account Sync Router.');
         return;
       }
       if (!hasFollowers) {
-        showToast('Add at least 1 Follower Account before starting the Copy Trading Engine.');
+        showToast('Add at least 1 Linked Account before starting the Multi-Account Sync Router.');
         return;
       }
     }
@@ -908,7 +908,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       if (data.success && data.copyGroups) {
         setCopyGroup(data.copyGroups);
       }
-      showToast('Updated Group Copy configuration!');
+      showToast('Updated Multi-Account Sync configuration!');
     } catch (_) {}
   };
 
@@ -917,17 +917,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
       const data = await apiFetch('/api/v1/bridge/copy-group/sync-linked', { method: 'POST' });
       if (data.success) {
         if (data.copyGroups) setCopyGroup(data.copyGroups);
-        showToast(data.message || 'Synced Linked Clients into Copy Group!');
+        showToast(data.message || 'Synced Linked Demats into Sync Router!');
       }
     } catch (_) {
-      showToast('Could not sync Linked Clients.');
+      showToast('Could not sync Linked Demats.');
     }
   };
 
   const handleSimulateCopyOrder = async () => {
     const activeFollowers = (copyGroup.followers || []).filter(f => f.status === 'ACTIVE');
     if (activeFollowers.length === 0) {
-      showToast('Add at least 1 ACTIVE follower account to test trade replication.');
+      showToast('Add at least 1 ACTIVE linked account to test trade synchronization.');
       return;
     }
     const testSym = watchlist[0]?.symbol || 'NSE:RELIANCE';
@@ -941,16 +941,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           side: 'BUY',
           qty: 50,
           price: `₹${Number(ltp).toFixed(2)}`,
-          account: copyGroup.masterAccount !== 'UNASSIGNED' ? copyGroup.masterAccount : (demats[0]?.clientCode || 'MASTER-A/C'),
+          account: copyGroup.masterAccount !== 'UNASSIGNED' ? copyGroup.masterAccount : (demats[0]?.clientCode || 'PRIMARY-A/C'),
           broker: 'Angel One SmartAPI',
           forceCopy: true,
-          source: 'Master Copy Trade Broadcast'
+          source: 'Primary Demat Order Sync'
         })
       });
       if (data.success) {
         if (Array.isArray(data.orders)) setOrders(data.orders);
         if (Array.isArray(data.watchlist)) setWatchlist(data.watchlist);
-        showToast(`Master Trade Broadcasted! Replicated across ${activeFollowers.length} Follower Demat(s).`);
+        showToast(`Primary Order Broadcasted! Synchronized across ${activeFollowers.length} Linked Demat(s).`);
       }
     } catch (_) {}
   };
@@ -1018,14 +1018,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   }, null, 2);
 
   const handleTestWebhookFire = async () => {
-    showToast(`Firing webhook signal to /api/v1/bridge/webhook...`);
+    showToast(`Firing webhook alert to /api/v1/bridge/webhook...`);
     try {
       const data = await apiFetch('/api/v1/bridge/webhook', {
         method: 'POST',
         body: jsonWebhookSample
       });
       if (data.success) {
-        const copyNote = data.copiedCount > 0 ? ` (+${data.copiedCount} follower copies)` : '';
+        const copyNote = data.copiedCount > 0 ? ` (+${data.copiedCount} linked accounts)` : '';
         showToast(`Webhook Executed! Order ${data.orderId} routed (${whAction} ${whQty} ${whSymbol})${copyNote}.`);
         if (Array.isArray(data.orders)) {
           setOrders(data.orders);
@@ -1037,7 +1037,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         }
       }
     } catch (_) {
-      showToast('Webhook test signal processed.');
+      showToast('Webhook test alert processed.');
     }
   };
 
@@ -1121,7 +1121,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   };
 
   const handleKillSwitch = async () => {
-    if (!window.confirm('EMERGENCY KILL SWITCH: This will exit all copy trading positions and pause auto execution across all connected Demats. Proceed?')) return;
+    if (!window.confirm('EMERGENCY KILL SWITCH: This will exit all open positions and pause execution across all connected Demats. Proceed?')) return;
     try {
       const data = await apiFetch('/api/v1/bridge/kill-switch', { method: 'POST' });
       if (data.success) {
@@ -1286,7 +1286,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
     { id: 'StaticIp', label: 'Static IPs (₹350)', icon: Wifi, count: staticIps.length },
     { id: 'LinkUser', label: 'Link Users (₹250)', icon: Users, count: linkedUsers.length },
     { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
-    { id: 'GroupCopy', label: 'Group Copy', icon: Layers, count: copyGroup.followers?.length || 0 },
+    { id: 'GroupCopy', label: 'Multi-Account Sync', icon: Layers, count: copyGroup.followers?.length || 0 },
     { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
     { id: 'TelegramBot', label: 'Telegram Bot', icon: Send },
     { id: 'Plans', label: 'Plans & Pricing', icon: ShoppingBag },
@@ -1457,7 +1457,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               letterSpacing: '0.3px',
               whiteSpace: 'nowrap'
             }}
-            title="Emergency Kill Switch - Exits all copy trading positions immediately"
+            title="Emergency Kill Switch - Exits all open positions across connected Demats immediately"
           >
             <Power size={13} /> {isMobile ? 'KILL' : 'KILL SWITCH'}
           </button>
@@ -1661,7 +1661,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               { id: 'StaticIp', label: 'Static IPs (₹350/mo)', icon: Wifi, count: staticIps.length },
               { id: 'LinkUser', label: 'Link Users (₹250/mo)', icon: Users, count: linkedUsers.length },
               { id: 'WatchList', label: 'Algo Watchlist', icon: Bookmark, count: watchlist.length },
-              { id: 'GroupCopy', label: 'Group / Copy', icon: Layers, count: copyGroup.followers?.length || 0 },
+              { id: 'GroupCopy', label: 'Multi-Account Sync', icon: Layers, count: copyGroup.followers?.length || 0 },
               { id: 'Bridge', label: 'Webhook Bridge', icon: Cpu },
               { id: 'TelegramBot', label: 'Telegram Bot', icon: Send },
               { id: 'Plans', label: 'Plans & Pricing', icon: ShoppingBag }
@@ -2170,7 +2170,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
-                        <Users size={15} color="#a855f7" /> Group / Copy
+                        <Users size={15} color="#a855f7" /> Multi-Account Sync
                       </div>
                       <input
                         type="checkbox"
@@ -2965,7 +2965,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <th style={{ padding: '14px 18px' }}>Client</th>
                       <th style={{ padding: '14px 18px' }}>Broker & UCC</th>
                       <th style={{ padding: '14px 18px' }}>Connected At</th>
-                      <th style={{ padding: '14px 18px' }}>Copy Ratio</th>
+                      <th style={{ padding: '14px 18px' }}>Allocation Ratio</th>
                       <th style={{ padding: '14px 18px' }}>Status</th>
                       <th style={{ padding: '14px 18px' }}>Algo Trading</th>
                       <th style={{ padding: '14px 18px' }}>Actions</th>
@@ -3533,17 +3533,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* TAB 6: GROUP / COPY TRADING                                   */}
+          {/* TAB 6: MULTI-ACCOUNT DEMAT SYNCHRONIZATION                   */}
           {/* ───────────────────────────────────────────────────────────── */}
           {activeMenu === 'GroupCopy' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
-                    Group & Multi-Account Copy Trading
+                    Group & Multi-Account Demat Synchronization
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Replicate orders from your Master Angel One Demat account to Follower Demats with custom lot multipliers.
+                    Synchronize orders from your Primary Angel One Demat account to Linked Demats with custom lot multipliers.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
@@ -3566,7 +3566,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         cursor: 'pointer'
                       }}
                     >
-                      <RefreshCw size={14} /> Sync Linked Clients ({linkedUsers.length})
+                      <RefreshCw size={14} /> Sync Linked Demats ({linkedUsers.length})
                     </button>
                   )}
                   <button
@@ -3587,7 +3587,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    ⚡ Test Master Copy Trade
+                    ⚡ Test Multi-Account Order
                   </button>
                   <button
                     onClick={() => setShowAddFollowerModal(true)}
@@ -3607,7 +3607,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       cursor: 'pointer'
                     }}
                   >
-                    <Plus size={15} /> + Add Follower Account
+                    <Plus size={15} /> + Add Linked Account
                   </button>
                   <button
                     onClick={handleKillSwitch}
@@ -3655,17 +3655,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             color: '#fff',
                             minWidth: '220px'
                           }}
-                          title="Click to rename Copy Group"
+                          title="Click to rename Account Group"
                         />
                       </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
-                        <span>Master Demat:</span>
+                        <span>Primary Demat:</span>
                         <select
                           value={copyGroup.masterAccount || 'UNASSIGNED'}
                           onChange={e => handleUpdateCopyGroup({ masterAccount: e.target.value })}
                           style={{ background: '#090d16', border: '1px solid #334155', color: '#38bdf8', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
                         >
-                          <option value="UNASSIGNED">Select Master Demat...</option>
+                          <option value="UNASSIGNED">Select Primary Demat...</option>
                           {demats.map(d => (
                             <option key={d.id} value={d.clientCode}>{d.broker} ({d.clientCode})</option>
                           ))}
@@ -3684,7 +3684,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Global Copy Status:</span>
+                    <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Global Sync Status:</span>
                     <button
                       onClick={() => {
                         const newSt = copyGroup.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
@@ -3708,12 +3708,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 <div style={{ borderTop: '1px solid #1e293b', paddingTop: '14px' }}>
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
-                    Follower / Child Demat Accounts ({copyGroup.followers?.length || 0}):
+                    Linked / Secondary Demat Accounts ({copyGroup.followers?.length || 0}):
                   </div>
 
                   {(!copyGroup.followers || copyGroup.followers.length === 0) ? (
                     <div style={{ background: '#090d16', border: '1px dashed #334155', borderRadius: '8px', padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
-                      No follower accounts added to this Copy Group yet. Click <b>"+ Add Follower Account"</b>{linkedUsers.length > 0 ? ' or "Sync Linked Clients"' : ''} above to start mirroring trades.
+                      No linked accounts added to this Sync Group yet. Click <b>"+ Add Linked Account"</b>{linkedUsers.length > 0 ? ' or "Sync Linked Demats"' : ''} above to start routing orders.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -3785,7 +3785,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <button
                               onClick={() => handleRemoveFollower(f.id)}
                               style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                              title="Remove Follower"
+                              title="Remove Linked Account"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -3797,14 +3797,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              {/* Recent Replicated Copy Orders Table */}
+              {/* Recent Synchronized Multi-Account Orders Table */}
               <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
                 <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
-                  Recent Master & Follower Copy Trade Log ({orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).length})
+                  Recent Multi-Account Execution Log ({orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy') || String(o.source || '').includes('Sync')).length})
                 </div>
-                {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).length === 0 ? (
+                {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy') || String(o.source || '').includes('Sync')).length === 0 ? (
                   <div style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    No replicated copy trades recorded yet. Add a follower account and click <b>"⚡ Test Master Copy Trade"</b> above to verify multi-account execution.
+                    No multi-account synchronized trades recorded yet. Add a linked account and click <b>"⚡ Test Multi-Account Order"</b> above to verify multi-account execution.
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -3850,7 +3850,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   TradingView, Chartink & Python Webhook Bridge
                 </h2>
                 <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                  Zero-latency JSON alert webhook listener routing strategy signals directly into your connected Angel One SmartAPI Demats.
+                  Zero-latency JSON alert webhook listener routing strategy alerts directly into your connected Angel One SmartAPI Demats.
                 </p>
               </div>
 
@@ -4058,7 +4058,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
                 {orders.length === 0 ? (
                   <div style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    No webhook signals fired yet. Click <b>"⚡ Test Webhook Fire"</b> above to simulate a live TradingView signal.
+                    No webhook triggers fired yet. Click <b>"⚡ Test Webhook Fire"</b> above to simulate a live TradingView alert.
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -4173,7 +4173,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {[
                       { key: 'notifyFills', label: 'Order Fills' },
                       { key: 'notifyRejections', label: 'Broker Rejections' },
-                      { key: 'notifyCopyTrades', label: 'Follower Copy Trades' },
+                      { key: 'notifyCopyTrades', label: 'Multi-Account Sync Orders' },
                       { key: 'notifyDailyPnl', label: '15:30 Daily P&L Summary' }
                     ].map(item => (
                       <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#cbd5e1', cursor: 'pointer' }}>
@@ -4311,7 +4311,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     ₹0 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
-                    Perfect for testing automated strategies, backtesting signals, and routing single-demat signals.
+                    Perfect for testing automated strategies, backtesting rules, and routing single-demat alerts.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
@@ -4610,7 +4610,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               if (code === 'ALGO_STATIC_IP' || code === 'STATIC_IP') return 'Dedicated BKC Static IP (₹350/mo)';
               if (code === 'ALGO_LINK_USER' || code === 'ALGO_LINK_SLOT' || code === 'LINK_USER') return 'Client Demat Link Slot (₹250/mo)';
               if (code === 'ALGO_PRO' || code === 'PLAN_PRO') return 'Pro Algo Trader Plan (₹999/mo)';
-              if (code === 'ALGO_INSTITUTIONAL' || code === 'PLAN_INSTITUTIONAL') return 'Institutional Copy Master (₹2,499/mo)';
+              if (code === 'ALGO_INSTITUTIONAL' || code === 'PLAN_INSTITUTIONAL') return 'Institutional Multi-Account OMS (₹2,499/mo)';
               if (code === 'ALGO_ADDON') return 'SkandX Algo Add-On Service';
               return rawPlan || 'SkandX Algo Service';
             };
@@ -4813,7 +4813,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div style={{ fontSize: '22px', fontWeight: '900', color: '#a855f7', marginTop: '5px' }}>
                       {adminStats?.summary?.totalLinkedClients ?? linkedUsers.length} / {adminStats?.summary?.totalLinkCapacity ?? (config.totalLinkSlots || 1)}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '3px' }}>Follower Copy Capacity</div>
+                    <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '3px' }}>Linked Account Capacity</div>
                   </div>
                 </div>
 
@@ -4863,7 +4863,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           All SkandX Algo User Accounts — Current Algo Wallet Money & Quotas ({filteredAccounts.length})
                         </div>
                         <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                          View each user's live Algo Wallet balance, total Algo spend, active Algo Plan, connected Demats, Static IPs, Link Slots & Copy status.
+                          View each user's live Algo Wallet balance, total Algo spend, active Algo Plan, connected Demats, Static IPs, Link Slots & Sync status.
                         </div>
                       </div>
 
@@ -4919,7 +4919,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             <th style={{ padding: '10px 12px' }}>Connected Demats</th>
                             <th style={{ padding: '10px 12px' }}>Static IPs</th>
                             <th style={{ padding: '10px 12px' }}>Link Slots</th>
-                            <th style={{ padding: '10px 12px' }}>Active Algos & Copy</th>
+                            <th style={{ padding: '10px 12px' }}>Active Algos & Sync</th>
                             <th style={{ padding: '10px 12px' }}>Algo Admin Actions</th>
                           </tr>
                         </thead>
@@ -5000,7 +5000,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     {acc.activeAlgosCount} / {acc.watchlistCount} Algos
                                   </span>
                                   <div style={{ fontSize: '10px', color: '#64748b' }}>
-                                    {acc.ordersCount} Orders • Copy {acc.copyGroupStatus || 'PAUSED'}
+                                    {acc.ordersCount} Orders • Sync {acc.copyGroupStatus || 'PAUSED'}
                                   </div>
                                 </td>
 
@@ -5899,7 +5899,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Default Copy Multiplier</label>
+                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Default Allocation Multiplier</label>
                 <select
                   value={newLinkCopyRatio}
                   onChange={e => setNewLinkCopyRatio(e.target.value)}
@@ -5956,7 +5956,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             color: '#fff'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Add Follower to Copy Group</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Add Linked Account to Sync Group</h3>
               <button onClick={() => setShowAddFollowerModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -6039,7 +6039,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   type="submit"
                   style={{ flex: 1, padding: '11px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontWeight: '800' }}
                 >
-                  Add Follower
+                  Link Account
                 </button>
               </div>
             </form>

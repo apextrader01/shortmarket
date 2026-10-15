@@ -93,9 +93,9 @@ export const SEO_ROUTES = {
     category: 'FinanceApplication'
   },
   '/algo': {
-    title: 'SkandX Algo — Multi-Broker Demat Bridge, TradingView Webhooks & Copy Trading | SkandX',
+    title: 'SkandX Algo — Multi-Broker Demat Bridge, TradingView Webhooks & Multi-Account Sync | SkandX',
     description: 'Automate NSE/BSE/MCX trading with TradingView JSON Webhooks, Dedicated Static IPs, Pre-Built Options Strategy Templates, and Multi-Broker Demat API execution.',
-    keywords: 'algo trading india, tradingview webhook bridge india, multi broker copy trading, nifty straddle algo, skandx algo',
+    keywords: 'algo trading india, tradingview webhook bridge india, multi broker demat sync, nifty straddle algo, skandx algo',
     category: 'FinanceApplication'
   },
   '/algo-trading': {

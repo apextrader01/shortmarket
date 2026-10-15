@@ -149,12 +149,12 @@ const SEED_IPO_DATA = [
     issueSizeCr: 9950.00,
     openDate: 'Opening Soon',
     closeDate: 'Announced Soon',
-    listingDate: 'SEBI Approved',
+    listingDate: 'DRHP Cleared',
     gmp: 125,
     gmpPct: 15.63,
     subscription: { qib: 0, snii: 0, bnii: 0, nii: 0, retail: 0, employee: null, shareholder: null, others: null, total: 0 },
     applications: 0,
-    asOn: 'SEBI DRHP Approved',
+    asOn: 'DRHP Cleared',
     registrar: 'KFintech',
     registrarUrl: 'https://kosmic.kfintech.com/ipostatus/',
     sector: 'IT Services & Digital Solutions'
@@ -172,7 +172,7 @@ const SEED_IPO_DATA = [
     issueSizeCr: 12500.00,
     openDate: 'Opening Soon',
     closeDate: 'Announced Soon',
-    listingDate: 'SEBI Approved',
+    listingDate: 'DRHP Cleared',
     gmp: 160,
     gmpPct: 21.62,
     subscription: { qib: 0, snii: 0, bnii: 0, nii: 0, retail: 0, employee: null, shareholder: null, others: null, total: 0 },
@@ -1371,11 +1371,11 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     Turnover (Cr) ⇅
                   </th>
                   <th onClick={() => handleSortBhavCol('surgeMult')} style={{ padding: '11px 12px', textAlign: 'center', cursor: 'pointer' }}>
-                    Signals ⇅
+                    Technical Triggers ⇅
                   </th>
                 </tr>
 
-                {/* Row 2: Per-Column Filter Inputs (LTP, Day Change, Traded Vol, Delivery Vol, Delivery %, Turnover, Signals) */}
+                {/* Row 2: Per-Column Filter Inputs (LTP, Day Change, Traded Vol, Delivery Vol, Delivery %, Turnover, Technical Triggers) */}
                 <tr style={{ background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.9)', borderBottom: `1px solid ${t.cardBorder}` }}>
                   <th style={{ padding: '6px 10px', borderRight: `1px solid ${t.borderSubtle}` }}>
                     <input
@@ -1458,7 +1458,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       onChange={e => setBhavColFilter(p => ({ ...p, colSignal: e.target.value }))}
                       style={{ width: '100%', padding: '5px 6px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: '5px', color: t.text, fontSize: '11px' }}
                     >
-                      <option value="ALL">All Signals</option>
+                      <option value="ALL">All Triggers</option>
                       <option value="52W_HIGH">🔥 52W High</option>
                       <option value="52W_LOW">❄️ 52W Low</option>
                       <option value="SURGE_2X">⚡ Surge 2x+</option>
