@@ -321,6 +321,7 @@ export default function AlgoPaymentGatewayModal({
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px',
+      paddingBottom: 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))',
       fontFamily: "'Inter', system-ui, sans-serif"
     }}>
       <div style={{

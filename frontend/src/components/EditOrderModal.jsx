@@ -559,7 +559,18 @@ export default function EditOrderModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ background: 'var(--bg-hover)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div 
+          className="order-modal-footer"
+          style={{ 
+            background: 'var(--bg-hover)', 
+            padding: '16px 20px', 
+            paddingBottom: 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))',
+            borderTop: '1px solid var(--border-color)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between' 
+          }}
+        >
           {!isPendingTrigger && (
             <div style={{ display: 'flex', gap: '24px' }}>
               <div>

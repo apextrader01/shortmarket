@@ -1525,16 +1525,20 @@ export default function OrderModal() {
         )}
 
         {/* Footer Bar */}
-        <div style={{
-          background: 'var(--bg-card)',
-          padding: isMobile ? '12px 14px 16px 14px' : '12px 18px',
-          borderTop: '1px solid var(--border-color)',
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          alignItems: isMobile ? 'stretch' : 'center',
-          justifyContent: 'space-between',
-          gap: isMobile ? '10px' : '12px'
-        }}>
+        <div 
+          className="order-modal-footer"
+          style={{
+            background: 'var(--bg-card)',
+            padding: isMobile ? '12px 14px' : '12px 18px',
+            paddingBottom: isMobile ? 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))' : '12px',
+            borderTop: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
+            gap: isMobile ? '10px' : '12px'
+          }}
+        >
           {/* Left Info Column */}
           <div style={{ 
             display: 'flex', 

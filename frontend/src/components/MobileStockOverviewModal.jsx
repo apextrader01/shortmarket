@@ -740,18 +740,22 @@ export default function MobileStockOverviewModal() {
         </div>
 
         {/* FIXED STICKY FOOTER (BUY & SELL BUTTONS) */}
-        <div style={{
-          position: 'sticky',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: 'var(--bg-secondary, #0f172a)',
-          borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-          padding: '12px 16px',
-          display: 'flex',
-          gap: '12px',
-          zIndex: 10
-        }}>
+        <div 
+          className="mobile-stock-footer"
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: 'var(--bg-secondary, #0f172a)',
+            borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+            padding: '12px 16px',
+            paddingBottom: 'max(14px, calc(14px + env(safe-area-inset-bottom, 0px)))',
+            display: 'flex',
+            gap: '12px',
+            zIndex: 10
+          }}
+        >
           <button
             onClick={handleBuy}
             style={{
