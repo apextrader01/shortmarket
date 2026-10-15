@@ -190,7 +190,9 @@ const TopIndexTicker = React.memo(() => {
     <div className="hide-on-tablet" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
       <IndexChip label="NIFTY50" price={nifty} />
       <IndexChip label="BANKNIFTY" price={banknifty} />
-      <IndexChip label="SENSEX" price={sensex} />
+      <div className="hide-on-compact-laptop" style={{ display: 'flex' }}>
+        <IndexChip label="SENSEX" price={sensex} />
+      </div>
       <DataStatusBadge />
     </div>
   );
@@ -1736,8 +1738,45 @@ function App() {
                 <TopIndexTicker />
               </div>
 
-              {/* Right: nav tabs + user info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0, minWidth: 0 }}>
+              {/* Center: nav tabs */}
+              <nav aria-label="Main Navigation" className="hide-on-mobile nav-scrollable" style={{
+                display: 'flex', alignItems: 'center', gap: '2px',
+                fontSize: '9.5px', fontWeight: '700', margin: '0 8px', whiteSpace: 'nowrap',
+                flex: '1 1 auto', minWidth: 0
+              }}>
+                {[
+                  { key: 'Home', label: 'Home' },
+                  { key: 'Algo', label: 'SkandX Algo' },
+                  { key: 'TradeDiary', label: 'Trade Diary' },
+                  { key: 'Markets', label: 'Paper Trading' },
+                  { key: 'Positions', label: 'Positions' },
+                  { key: 'Orders', label: 'Orders' },
+                  { key: 'Portfolio', label: 'Portfolio' },
+                  { key: 'MutualFunds', label: 'Mutual Funds' },
+                  { key: 'Journal', label: 'Trading Journal' },
+                  { key: 'Leaderboard', label: 'Leaderboard' },
+                  { key: 'Community', label: 'Community' },
+                  ...(Boolean(user?.is_admin) ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
+                ].map((tabItem) => (
+                  <div
+                    key={tabItem.key}
+                    onClick={() => setActiveTab(tabItem.key)}
+                    className={`nav-pill ${(activeTab === tabItem.key || (tabItem.key === 'Markets' && activeTab === 'Watchlist')) ? "active" : ""}`}
+                    style={{
+                      padding:        '16px 5px',
+                      cursor:         'pointer',
+                      textTransform:  'uppercase',
+                      letterSpacing:  '0.2px',
+                      whiteSpace:     'nowrap'
+                    }}
+                  >
+                    {tabItem.label}
+                  </div>
+                ))}
+              </nav>
+
+              {/* Right: notification bell + user info + hamburger menu */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
                 {/* Hotkey Toast Notification */}
                 {hotkeyToast && (
                   <div style={{
@@ -1750,42 +1789,6 @@ function App() {
                     {hotkeyToast}
                   </div>
                 )}
-                
-                {/* Tab Navigation */}
-                <nav aria-label="Main Navigation" className="hide-on-mobile" style={{
-                  display: 'flex', alignItems: 'center', gap: '2px',
-                  fontSize: '9.5px', fontWeight: '700', marginRight: '2px', whiteSpace: 'nowrap'
-                }}>
-                  {[
-                    { key: 'Home', label: 'Home' },
-                    { key: 'Algo', label: 'SkandX Algo' },
-                    { key: 'TradeDiary', label: 'Trade Diary' },
-                    { key: 'Markets', label: 'Paper Trading' },
-                    { key: 'Positions', label: 'Positions' },
-                    { key: 'Orders', label: 'Orders' },
-                    { key: 'Portfolio', label: 'Portfolio' },
-                    { key: 'MutualFunds', label: 'Mutual Funds' },
-                    { key: 'Journal', label: 'Trading Journal' },
-                    { key: 'Leaderboard', label: 'Leaderboard' },
-                    { key: 'Community', label: 'Community' },
-                    ...(Boolean(user?.is_admin) ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
-                  ].map((tabItem) => (
-                    <div
-                      key={tabItem.key}
-                      onClick={() => setActiveTab(tabItem.key)}
-                      className={`nav-pill ${(activeTab === tabItem.key || (tabItem.key === 'Markets' && activeTab === 'Watchlist')) ? "active" : ""}`}
-                      style={{
-                        padding:        '16px 4px',
-                        cursor:         'pointer',
-                        textTransform:  'uppercase',
-                        letterSpacing:  '0.2px',
-                        whiteSpace:     'nowrap'
-                      }}
-                    >
-                      {tabItem.label}
-                    </div>
-                  ))}
-                </nav>
 
                 {/* Real-time Notification Bell (Desktop & Mobile) */}
                 <button
@@ -1838,34 +1841,54 @@ function App() {
                   )}
                 </button>
 
-                {/* Hamburger Menu (Mobile Only) */}
-                <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
-                  <Menu size={22} color="var(--text-primary)" />
+                {/* User Profile Avatar & Name (Pinned to right, never clipped or hidden) */}
+                <div 
+                  onClick={() => setActiveTab('ClientData')}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    cursor: 'pointer', 
+                    padding: '3px 8px', 
+                    borderRadius: '8px',
+                    background: (activeTab === 'ClientData' || activeTab === 'Settings') ? 'rgba(56, 189, 248, 0.14)' : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${(activeTab === 'ClientData' || activeTab === 'Settings') ? 'rgba(56, 189, 248, 0.35)' : 'var(--border-color)'}`,
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:bg-white/5 transition-colors"
+                  title={`${user?.username || 'My Profile'} (${user?.client_id || user?.id || ''})`}
+                >
+                  <div style={{
+                    width: '26px', height: '26px', borderRadius: '50%',
+                    background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid var(--border-color)', overflow: 'hidden', flexShrink: 0
+                  }}>
+                    {user?.profile_picture_url ? (
+                      <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <User size={14} color="var(--text-secondary)" />
+                    )}
+                  </div>
+                  <div 
+                    className="hide-on-mobile"
+                    style={{ 
+                      fontWeight: '700', 
+                      fontSize: '11.5px', 
+                      maxWidth: '130px', 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      color: (activeTab === 'ClientData' || activeTab === 'Settings') ? '#38bdf8' : 'var(--text-primary)'
+                    }}
+                  >
+                    {user?.username || 'My Profile'}
+                  </div>
                 </div>
 
-                {/* User avatar + logout */}
-                <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                  <div 
-                    onClick={() => setActiveTab('ClientData')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '3px 6px', borderRadius: '8px' }}
-                    className="hover:bg-white/5 transition-colors"
-                    title={user.username}
-                  >
-                    <div style={{
-                      width: '24px', height: '24px', borderRadius: '50%',
-                      background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '1px solid var(--border-color)', overflow: 'hidden', flexShrink: 0
-                    }}>
-                      {user?.profile_picture_url ? (
-                        <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <User size={13} color="var(--text-secondary)" />
-                      )}
-                    </div>
-                    <div style={{ fontWeight: '700', fontSize: '11.5px', maxWidth: '85px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {user.username}
-                    </div>
-                  </div>
+                {/* Hamburger Menu (Mobile Only) */}
+                <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                  <Menu size={22} color="var(--text-primary)" />
                 </div>
               </div>
             </header>
@@ -1954,7 +1977,7 @@ function App() {
                 </div>
               )}
               {(activeTab === 'ClientData' || activeTab === 'Settings') && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflow: 'hidden' }}>
                   <Suspense fallback={<TabLoader />}>
                     <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
                   </Suspense>

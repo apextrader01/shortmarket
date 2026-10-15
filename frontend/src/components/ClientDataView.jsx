@@ -3,7 +3,7 @@ import { Bell, ShieldAlert } from 'lucide-react';
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send, Sparkles, User, CreditCard, Laptop } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send, Sparkles, User, CreditCard, Laptop, Copy, Check } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
@@ -71,6 +71,17 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const openSettingsTab = (tab = 'all') => {
     setSettingsTab(tab);
     setShowProfile(true);
+  };
+
+  const [copiedId, setCopiedId] = useState(false);
+  const handleCopyClientId = (e) => {
+    e?.stopPropagation?.();
+    const idToCopy = user?.client_id || user?.id || '';
+    if (idToCopy && navigator.clipboard) {
+      navigator.clipboard.writeText(String(idToCopy));
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
   };
 
   useEffect(() => {
@@ -387,317 +398,458 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   }
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
-        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
-          <LogOut size={14} /> LOGOUT
-        </div>
-      </div>
-
-      {/* Profile Section */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          
-          <div 
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            style={{ 
-              width: '48px', height: '48px', borderRadius: '50%', 
-              background: user?.profile_picture_url ? `url(${user.profile_picture_url}) center/cover` : 'linear-gradient(135deg, var(--color-navy-light), var(--color-blue))', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              fontSize: '18px', fontWeight: '700', cursor: 'pointer',
-              position: 'relative', overflow: 'hidden'
-            }}
-            title="Upload Profile Picture"
-          >
-            {isUploading ? (
-              <Loader2 size={24} className="animate-spin" color="var(--text-primary)" />
-            ) : !user?.profile_picture_url ? (
-              user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
-            ) : null}
-            
-            {!isUploading && (
-              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '30%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <Upload size={12} color="var(--text-primary)" />
-              </div>
-            )}
+    <div style={{ flex: 1, height: '100%', padding: isMobile ? '16px 12px 90px 12px' : '20px 24px 60px 24px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>My Account</h2>
+            <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--border-color)', fontWeight: '600' }}>
+              Client Portal
+            </span>
           </div>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="image/*" 
-            style={{ display: 'none' }} 
-          />
-
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
-              {user?.username || 'Hari Krishnan I Vijayan'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-              Client ID: {user?.client_id || user?.id}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
-              Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button 
-                type="button"
-                onClick={() => openSettingsTab('profile')} 
-                className="btn btn-secondary"
-                style={{ 
-                  fontSize: '11.5px', 
-                  fontWeight: '700', 
-                  padding: '6px 12px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  borderColor: 'rgba(59, 130, 246, 0.35)',
-                  color: 'var(--color-blue-light)',
-                  cursor: 'pointer'
-                }}
-              >
-                <User size={13} /> Profile & KYC
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => openSettingsTab('security')} 
-                style={{ 
-                  fontSize: '11.5px', 
-                  fontWeight: '700', 
-                  padding: '6px 12px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  background: user?.totp_enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                  border: user?.totp_enabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
-                  color: user?.totp_enabled ? '#4ade80' : '#f59e0b',
-                  cursor: 'pointer'
-                }}
-              >
-                <ShieldCheck size={13} /> {user?.totp_enabled ? '2-Step 2FA: Active 🟢' : '2-Step Authenticator 🔑'}
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => openSettingsTab('devices')} 
-                style={{ 
-                  fontSize: '11.5px', 
-                  fontWeight: '700', 
-                  padding: '6px 12px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  background: 'rgba(139, 92, 246, 0.12)',
-                  border: '1px solid rgba(139, 92, 246, 0.35)',
-                  color: '#c084fc',
-                  cursor: 'pointer'
-                }}
-              >
-                <Laptop size={13} /> Device Security
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => openSettingsTab('devices')} 
-                style={{ 
-                  fontSize: '11.5px', 
-                  fontWeight: '700', 
-                  padding: '6px 12px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  background: 'rgba(16, 185, 129, 0.12)',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  color: '#34d399',
-                  cursor: 'pointer'
-                }}
-              >
-                <Sparkles size={13} /> 60-Day Trusted Devices
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => openSettingsTab('bank')} 
-                style={{ 
-                  fontSize: '11.5px', 
-                  fontWeight: '700', 
-                  padding: '6px 12px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  background: (user?.upi_id || user?.bank_account_no) ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid var(--border-color)',
-                  color: (user?.upi_id || user?.bank_account_no) ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                  cursor: 'pointer'
-                }}
-              >
-                <CreditCard size={13} /> {(user?.upi_id || user?.bank_account_no) ? 'Bank & UPI 💳' : 'Bank & UPI ⚡'}
-              </button>
-            </div>
-            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '11px' }}>
-          <Star size={14} /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
-        </div>
-      </div>
-
-      {/* Add Funds Banner */}
-      <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px', marginBottom: '36px', borderLeft: '4px solid var(--color-blue)', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '800', color: 'var(--color-blue-light)', flexShrink: 0 }}>
-            ₹
-          </div>
-          <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Get ready to invest</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with SkandX</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '280px' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s' }}>
-            DEPOSIT
-          </button>
-          <button onClick={() => setShowResetModal(true)} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.15s' }}>
-            RESET ACCOUNT
-          </button>
-        </div>
-      </div>
-
-
-      {/* Real Money Withdrawal & Referral Rewards Card */}
-      <div className="glass-panel" style={{ 
-        padding: '20px 24px', 
-        display: 'flex', 
-        flexDirection: isMobile ? 'column' : 'row', 
-        justifyContent: 'space-between', 
-        alignItems: isMobile ? 'flex-start' : 'center', 
-        gap: '20px', 
-        marginBottom: '36px', 
-        borderLeft: '4px solid #10b981', 
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)',
-        borderColor: 'rgba(16, 185, 129, 0.3)',
-        width: '100%', 
-        boxSizing: 'border-box' 
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            background: 'rgba(16, 185, 129, 0.18)', 
-            border: '1px solid rgba(16, 185, 129, 0.4)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#34d399', 
-            flexShrink: 0 
-          }}>
-            <Wallet size={24} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                Real Cash Earnings
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                Total Earned: <strong style={{ color: 'var(--text-primary)' }}>₹{Number(rewardStats?.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-              </span>
-            </div>
-            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span>Available to Withdraw:</span>
-              <span style={{ color: '#10b981', fontSize: '20px', fontWeight: '900' }}>
-                ₹{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Cashout referral rewards, commissions & affiliate earnings directly to your UPI / Bank Account.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '300px' }}>
           <button 
-            onClick={() => { setShowWithdrawModal(true); setWithdrawMsg({ type: '', text: '' }); }}
+            type="button"
+            onClick={logout} 
             style={{ 
-              flex: 1, 
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-              color: '#ffffff', 
-              border: 'none', 
-              padding: '12px 18px', 
-              borderRadius: '8px', 
-              fontSize: '12px', 
-              fontWeight: '800', 
-              cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-              transition: 'all 0.15s' 
-            }}
-          >
-            <ArrowDownToLine size={15} /> WITHDRAW CASH 💸
-          </button>
-          <button 
-            onClick={() => setShowReferrals(true)} 
-            style={{ 
-              flex: 1, 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              color: 'var(--text-primary)', 
-              border: '1px solid var(--border-color)', 
-              padding: '12px 18px', 
-              borderRadius: '8px', 
-              fontSize: '12px', 
+              gap: '6px', 
+              color: 'var(--color-red-light, #f87171)', 
+              cursor: 'pointer', 
+              fontSize: '11px', 
               fontWeight: '700', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '6px',
-              transition: 'background 0.15s' 
+              padding: '6px 14px', 
+              border: '1px solid rgba(225,42,31,0.3)', 
+              borderRadius: '20px', 
+              background: 'rgba(225,42,31,0.08)',
+              transition: 'all 0.15s ease'
             }}
+            className="hover:bg-red-500/20"
           >
-            <Gift size={15} color="#fbbf24" /> INVITE & EARN 🎁
+            <LogOut size={13} /> LOGOUT
           </button>
         </div>
-      </div>
 
-      {/* Sections */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-        
-        {/* Reports */}
+        {/* Profile Card */}
+        <div className="glass-panel" style={{ 
+          padding: isMobile ? '16px' : '18px 22px', 
+          borderRadius: '12px', 
+          marginBottom: '18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '16px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+            <div 
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+              style={{ 
+                width: '52px', height: '52px', borderRadius: '50%', 
+                background: user?.profile_picture_url ? `url(${user.profile_picture_url}) center/cover` : 'linear-gradient(135deg, var(--color-navy-light), var(--color-blue))', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                fontSize: '18px', fontWeight: '800', cursor: 'pointer',
+                position: 'relative', overflow: 'hidden', flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                border: '1.5px solid var(--border-color)'
+              }}
+              title="Upload Profile Picture"
+            >
+              {isUploading ? (
+                <Loader2 size={24} className="animate-spin" color="var(--text-primary)" />
+              ) : !user?.profile_picture_url ? (
+                user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
+              ) : null}
+              
+              {!isUploading && (
+                <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '32%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <Upload size={11} color="#ffffff" />
+                </div>
+              )}
+            </div>
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept="image/*" 
+              style={{ display: 'none' }} 
+            />
+
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '3px', letterSpacing: '-0.3px' }}>
+                {user?.username || 'Hari Krishnan I Vijayan'}
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Client ID: <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{user?.client_id || user?.id || 'SE000002'}</strong>
+                </span>
+                <button 
+                  type="button"
+                  onClick={handleCopyClientId}
+                  style={{
+                    background: copiedId ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${copiedId ? 'rgba(34, 197, 94, 0.4)' : 'var(--border-color)'}`,
+                    borderRadius: '4px',
+                    padding: '2px 7px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    color: copiedId ? '#4ade80' : 'var(--text-secondary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Copy Client ID"
+                >
+                  {copiedId ? <Check size={11} color="#4ade80" /> : <Copy size={11} />}
+                  <span>{copiedId ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+
+              <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Available Margin:</span>
+                <span style={{ fontSize: '14.5px', fontWeight: '800' }}>
+                  &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              {/* 5 Action Shortcuts Under Margin */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button 
+                  type="button"
+                  onClick={() => openSettingsTab('profile')} 
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '700', 
+                    padding: '5px 11px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px',
+                    background: 'rgba(59, 130, 246, 0.12)',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    color: 'var(--color-blue-light)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:bg-blue-500/20"
+                >
+                  <User size={12} /> Profile & KYC
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => openSettingsTab('security')} 
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '700', 
+                    padding: '5px 11px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px',
+                    background: user?.totp_enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    border: user?.totp_enabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                    color: user?.totp_enabled ? '#4ade80' : '#f59e0b',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:opacity-90"
+                >
+                  <ShieldCheck size={12} /> {user?.totp_enabled ? '2-Step 2FA: Active 🟢' : '2-Step Authenticator 🔑'}
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => openSettingsTab('devices')} 
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '700', 
+                    padding: '5px 11px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px',
+                    background: 'rgba(139, 92, 246, 0.12)',
+                    border: '1px solid rgba(139, 92, 246, 0.35)',
+                    color: '#c084fc',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:bg-purple-500/20"
+                >
+                  <Laptop size={12} /> Device Security
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => openSettingsTab('devices')} 
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '700', 
+                    padding: '5px 11px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    color: '#34d399',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:bg-emerald-500/20"
+                >
+                  <Sparkles size={12} /> 60-Day Trusted Devices
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => openSettingsTab('bank')} 
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '700', 
+                    padding: '5px 11px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px',
+                    background: (user?.upi_id || user?.bank_account_no) ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--border-color)',
+                    color: (user?.upi_id || user?.bank_account_no) ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover:bg-white/10"
+                >
+                  <CreditCard size={12} /> {(user?.upi_id || user?.bank_account_no) ? 'Bank & UPI 💳' : 'Bank & UPI ⚡'}
+                </button>
+              </div>
+
+              {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: '4px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '600' }}>
+              <Star size={13} color="#fbbf24" /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
+            </div>
+            <div style={{ fontSize: '10.5px', color: '#10b981', fontWeight: '700', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+              Verified Client Account ✓
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Banner Grid: Add Funds + Real Cash Rewards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: '16px',
+          marginBottom: '20px'
+        }}>
+          {/* Card 1: Ready to Invest / Deposit */}
+          <div className="glass-panel" style={{
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px',
+            borderLeft: '4px solid var(--color-blue)',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(15, 23, 42, 0.4) 100%)',
+            borderRadius: '12px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '800', color: 'var(--color-blue-light)', flexShrink: 0 }}>
+                ₹
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--color-blue-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', background: 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                    Paper Trading Margin
+                  </span>
+                </div>
+                <div style={{ fontSize: '14.5px', fontWeight: '700', lineHeight: '1.3', color: 'var(--text-primary)' }}>
+                  Add funds to start trading with SkandX
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Instant paper margin top-up or reset anytime.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: 'auto' }}>
+              <button 
+                type="button"
+                onClick={onDepositClick} 
+                style={{ 
+                  flex: 1, 
+                  background: 'var(--color-blue)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  padding: '10px 16px', 
+                  borderRadius: '8px', 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  cursor: 'pointer', 
+                  transition: 'opacity 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Wallet size={14} /> DEPOSIT
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowResetModal(true)} 
+                style={{ 
+                  flex: 1, 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  color: 'var(--color-red-light)', 
+                  border: '1px solid rgba(239, 68, 68, 0.3)', 
+                  padding: '10px 16px', 
+                  borderRadius: '8px', 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  cursor: 'pointer', 
+                  transition: 'background 0.15s' 
+                }}
+              >
+                RESET ACCOUNT
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Real Cash Earnings / Rewards */}
+          <div className="glass-panel" style={{
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px',
+            borderLeft: '4px solid #10b981',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)',
+            borderColor: 'rgba(16, 185, 129, 0.3)',
+            borderRadius: '12px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '10px', 
+                background: 'rgba(16, 185, 129, 0.18)', 
+                border: '1px solid rgba(16, 185, 129, 0.4)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: '#34d399', 
+                flexShrink: 0 
+              }}>
+                <Wallet size={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '10px', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                    Real Cash Earnings
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Total: <strong style={{ color: 'var(--text-primary)' }}>&#8377;{Number(rewardStats?.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                  </span>
+                </div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>Available to Withdraw:</span>
+                  <span style={{ color: '#10b981', fontSize: '17px', fontWeight: '900' }}>
+                    &#8377;{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Direct payout to UPI or Bank Account within 24 hrs.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: 'auto' }}>
+              <button 
+                type="button"
+                onClick={() => { setShowWithdrawModal(true); setWithdrawMsg({ type: '', text: '' }); }}
+                style={{ 
+                  flex: 1, 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  padding: '10px 16px', 
+                  borderRadius: '8px', 
+                  fontSize: '11.5px', 
+                  fontWeight: '800', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.15s' 
+                }}
+              >
+                <ArrowDownToLine size={14} /> WITHDRAW CASH 💸
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowReferrals(true)} 
+                style={{ 
+                  flex: 1, 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  color: 'var(--text-primary)', 
+                  border: '1px solid var(--border-color)', 
+                  padding: '10px 16px', 
+                  borderRadius: '8px', 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px',
+                  transition: 'background 0.15s' 
+                }}
+              >
+                <Gift size={14} color="#fbbf24" /> INVITE & EARN 🎁
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sections */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          
+          {/* Reports */}
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Reports</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '12px', color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>Reports & Statements</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '10px' }}>
+                <FileText size={17} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '12.5px', fontWeight: '600' }}>Funds / Passbook</span>
               </div>
-              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trades & Charges</span>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '10px' }}>
+                <FileText size={17} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '12.5px', fontWeight: '600' }}>Trades & Charges</span>
               </div>
-              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>Statements</span>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '10px' }}>
+                <FileText size={17} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '12.5px', fontWeight: '600' }}>Statements</span>
               </div>
-              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <PieChart size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>Profit & Loss</span>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '10px' }}>
+                <PieChart size={17} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '12.5px', fontWeight: '600' }}>Profit & Loss</span>
               </div>
-              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <BarChart2 size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trading Insights</span>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '10px' }}>
+                <BarChart2 size={17} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '12.5px', fontWeight: '600' }}>Trading Insights</span>
               </div>
             </div>
           </div>
@@ -1558,6 +1710,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         onClose={() => setShowResetModal(false)} 
       />
 
+      </div>
     </div>
   );
 }
