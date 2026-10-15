@@ -1341,7 +1341,7 @@ export default function OrderModal() {
             </div>
           )}
 
-          {/* Advisory Target & Stop Loss Card for Delivery / CNC Orders (from Trade Signal) */}
+          {/* Suggested Target & Stop Loss Card for Delivery / CNC Orders (from Trade Setup) */}
           {(productType === 'DEL' || productType === 'CNC') && (orderModal.target || orderModal.stopLoss) && (
             <div style={{
               margin: '0 0 12px 0',
@@ -1358,7 +1358,7 @@ export default function OrderModal() {
                 <span style={{ fontSize: '14px' }}>🎯</span>
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Signal Advisory Levels (Delivery / Positional)
+                    Setup Reference Levels (Delivery / Positional)
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '1px' }}>
                     Reference levels from trade broadcast. Delivery positions are held until manually exited.

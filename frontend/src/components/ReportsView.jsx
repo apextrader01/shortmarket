@@ -26,7 +26,7 @@ const TradingJournalView = React.lazy(() => import('./TradingJournalView'));
 const LedgerStatement = () => {
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState('Broking');
+  const [activeSubTab, setActiveSubTab] = useState('Ledger');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   useEffect(() => {
@@ -321,9 +321,9 @@ const LedgerStatement = () => {
       {/* Sub Tabs */}
       <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
         <span 
-          onClick={() => setActiveSubTab('Broking')}
-          style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: activeSubTab === 'Broking' ? 'var(--color-blue-light)' : 'var(--text-secondary)', borderBottom: activeSubTab === 'Broking' ? '2px solid var(--color-blue-light)' : 'none', paddingBottom: '12px', marginBottom: '-13px' }}
-        >Broking</span>
+          onClick={() => setActiveSubTab('Ledger')}
+          style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: activeSubTab === 'Ledger' ? 'var(--color-blue-light)' : 'var(--text-secondary)', borderBottom: activeSubTab === 'Ledger' ? '2px solid var(--color-blue-light)' : 'none', paddingBottom: '12px', marginBottom: '-13px' }}
+        >Trading Ledger</span>
         <span 
           onClick={() => setActiveSubTab('MTF')}
           style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: activeSubTab === 'MTF' ? 'var(--color-blue-light)' : 'var(--text-secondary)', borderBottom: activeSubTab === 'MTF' ? '2px solid var(--color-blue-light)' : 'none', paddingBottom: '12px', marginBottom: '-13px', display: 'flex', alignItems: 'center', gap: '6px' }}

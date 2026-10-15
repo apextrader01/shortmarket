@@ -113,7 +113,7 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
                 Notification Center
               </h3>
               <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
-                Real-time trade signals, news & market updates
+                Real-time technical setups, news &amp; market updates
               </p>
             </div>
           </div>
@@ -190,7 +190,7 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
           <div style={{ display: 'flex', gap: '6px' }}>
             {[
               { id: 'ALL', label: 'All' },
-              { id: 'SIGNAL', label: '🎯 Signals' },
+              { id: 'SIGNAL', label: '🎯 Setups' },
               { id: 'NEWS', label: '📰 News' },
               { id: 'ANNOUNCEMENT', label: '📢 Updates' }
             ].map(tab => (
@@ -219,12 +219,12 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
             {user?.is_admin && (
               <button
                 onClick={async () => {
-                  if (confirm('Clean up past-day intraday signals and expired contract alerts platform-wide?')) {
+                  if (confirm('Clean up past-day intraday setups and expired contract alerts platform-wide?')) {
                     const res = await clearOldBroadcasts?.();
                     if (res?.message) alert(res.message);
                   }
                 }}
-                title="Purge past-day intraday signals & expired contracts platform-wide"
+                title="Purge past-day intraday setups & expired contracts platform-wide"
                 style={{
                   padding: '5px 8px',
                   background: 'rgba(234, 179, 8, 0.12)',
@@ -273,7 +273,7 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
               <Bell size={36} style={{ opacity: 0.25, margin: '0 auto 12px auto' }} />
               <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>No Notifications Yet</div>
               <div style={{ fontSize: '12px', maxWidth: '240px', margin: '0 auto', lineHeight: '1.4' }}>
-                Trade signals, market updates, and news will appear here in real time.
+                Technical setups, market updates, and news will appear here in real time.
               </div>
             </div>
           ) : (
@@ -304,12 +304,12 @@ export default function NotificationDrawer({ isOpen, onClose, onOpenBroadcastMod
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {isBuy && (
                         <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10B981', padding: '2px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <TrendingUp size={11} /> BUY SIGNAL
+                          <TrendingUp size={11} /> BULLISH SETUP
                         </span>
                       )}
                       {isSell && (
                         <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#EF4444', padding: '2px 8px', borderRadius: '4px', fontSize: '10.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <TrendingDown size={11} /> SELL SIGNAL
+                          <TrendingDown size={11} /> BEARISH SETUP
                         </span>
                       )}
                       {isSignal && (

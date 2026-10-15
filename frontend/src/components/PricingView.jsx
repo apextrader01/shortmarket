@@ -215,7 +215,7 @@ export default function PricingView({ setActiveTab }) {
     { category: 'Mentorship, Education & Market Study Notes', items: [
       { name: 'Daily Market Structure Study', normal: '—', monthly: '✓ Daily Educational Study', yearly: '✓ Daily Educational Study', highest: '✓ Priority Chart Structure Study', masterclass: '—', lifetime: '✓ Daily Educational Study (Forever)' },
       { name: 'Live Classes by NISM Mentor', normal: '—', monthly: '—', yearly: '—', highest: 'Webinars (Basics to Adv)', masterclass: '✓ Full Live Batches (NISM Mentor)', lifetime: '✓ Full Live Batches (NISM Mentor)' },
-      { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Direct Q&A with NISM Mentor', lifetime: '✓ Direct Q&A + 1-on-1 Mentor Calls' },
+      { name: 'Mentor Guidance & Doubts', normal: '—', monthly: '—', yearly: '—', highest: 'Group Doubts', masterclass: '✓ Direct Q&A with NISM Mentor', lifetime: '✓ Direct Q&A + 1-on-1 Mentor Sessions' },
       { name: 'Study Materials & Recording Vault', normal: '—', monthly: '—', yearly: '—', highest: '—', masterclass: '✓ Full Vault & NISM Prep Notes', lifetime: '✓ Full Vault & NISM Prep Notes' }
     ]},
     { category: 'Alerts & Intelligence', items: [

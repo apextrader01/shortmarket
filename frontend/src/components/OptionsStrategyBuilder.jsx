@@ -319,7 +319,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       {/* METRICS ROW */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
         <MetricCard title="Max Profit" value={maxProfit === Infinity ? 'Unlimited' : `₹${maxProfit.toFixed(2)}`} color={maxProfit === Infinity ? 'var(--color-green)' : 'var(--text-primary)'} />
-        <MetricCard title="Max Loss" value={maxLoss === -Infinity ? 'Unlimited' : (maxLoss >= 0 ? `+₹${maxLoss.toFixed(2)} (Guaranteed Profit)` : `-₹${Math.abs(maxLoss).toFixed(2)}`)} color={maxLoss === -Infinity ? 'var(--color-red)' : (maxLoss >= 0 ? 'var(--color-green)' : 'var(--text-primary)')} />
+        <MetricCard title="Max Loss" value={maxLoss === -Infinity ? 'Unlimited' : (maxLoss >= 0 ? `+₹${maxLoss.toFixed(2)} (Net Credit Lock)` : `-₹${Math.abs(maxLoss).toFixed(2)}`)} color={maxLoss === -Infinity ? 'var(--color-red)' : (maxLoss >= 0 ? 'var(--color-green)' : 'var(--text-primary)')} />
         <MetricCard title="Risk / Reward" value={maxLoss === -Infinity || maxLoss === 0 || maxProfit === Infinity ? 'N/A' : `1 : ${(Math.abs(maxProfit) / Math.abs(maxLoss)).toFixed(1)}`} />
         <MetricCard title="POP" value={`${pop.toFixed(1)}%`} color={pop > 50 ? 'var(--color-green)' : 'var(--color-yellow)'} />
         <MetricCard title="Net Premium" value={netPremium > 0 ? `+ ₹${netPremium.toFixed(0)}` : `- ₹${Math.abs(netPremium).toFixed(0)}`} color={netPremium > 0 ? 'var(--color-green)' : 'var(--color-red)'} />

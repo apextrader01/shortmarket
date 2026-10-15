@@ -114,7 +114,7 @@ export default function AboutUsView({ setActiveTab }) {
             </div>
             <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '40px' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '4px' }}>Next-Gen</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Stock Broking</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Trading Tech</div>
             </div>
             <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '40px' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '4px' }}>Pro</div>

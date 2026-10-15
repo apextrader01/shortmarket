@@ -203,17 +203,17 @@ export default function BroadcastModal({ isOpen, onClose }) {
   if (hasValidEntry) {
     if (signalSide === 'BUY') {
       if (hasValidTarget && numTarget <= numEntry) {
-        targetError = `Target (₹${numTarget.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a BUY call.`;
+        targetError = `Target (₹${numTarget.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a BUY setup.`;
       }
       if (hasValidSL && numSL >= numEntry) {
-        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a BUY call.`;
+        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a BUY setup.`;
       }
     } else { // SELL
       if (hasValidTarget && numTarget >= numEntry) {
-        targetError = `Target (₹${numTarget.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a SELL call.`;
+        targetError = `Target (₹${numTarget.toFixed(2)}) must be LOWER than Entry (₹${numEntry.toFixed(2)}) for a SELL setup.`;
       }
       if (hasValidSL && numSL <= numEntry) {
-        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a SELL call.`;
+        stopLossError = `Stop Loss (₹${numSL.toFixed(2)}) must be HIGHER than Entry (₹${numEntry.toFixed(2)}) for a SELL setup.`;
       }
     }
   }
@@ -441,7 +441,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                 Broadcast Studio
               </h3>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
-                Publish real-time Buy/Sell calls, market news, or announcements
+                Publish educational trade setups, market news, or announcements
               </p>
             </div>
           </div>
@@ -461,7 +461,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
           background: isLight ? 'var(--bg-hover)' : 'rgba(0,0,0,0.1)'
         }}>
           {[
-            { id: 'SIGNAL', label: '🎯 Trade Signal (Buy / Sell)', icon: TrendingUp },
+            { id: 'SIGNAL', label: '🎯 Technical Setup (Buy / Sell)', icon: TrendingUp },
             { id: 'NEWS', label: '📰 Market News', icon: Newspaper },
             { id: 'ANNOUNCEMENT', label: '📢 Announcement', icon: Bell },
             { id: 'HISTORY', label: '📜 Recent Broadcasts', icon: Eye }
@@ -504,7 +504,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (confirm('Clear all past-day intraday signals and expired contract alerts platform-wide?')) {
+                        if (confirm('Clear all past-day intraday setups and expired contract alerts platform-wide?')) {
                           const res = await useStore.getState().clearOldBroadcasts?.();
                           if (res?.message) alert(res.message);
                         }
@@ -521,7 +521,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                       }}
                       className="hoverable"
                     >
-                      🧹 Clear Old Signals
+                      🧹 Clear Old Setups
                     </button>
                     <button
                       type="button"
@@ -647,7 +647,7 @@ export default function BroadcastModal({ isOpen, onClose }) {
                     {/* BUY / SELL Toggle */}
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-                        CALL ACTION
+                        TRADE ACTION
                       </label>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <button

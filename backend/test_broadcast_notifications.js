@@ -63,7 +63,7 @@ const appContent = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src',
 assert(appContent.includes('<BroadcastToast />'), 'App.jsx must render BroadcastToast');
 assert(appContent.includes('<NotificationDrawer'), 'App.jsx must render NotificationDrawer');
 assert(appContent.includes('<BroadcastModal'), 'App.jsx must render BroadcastModal');
-assert(appContent.includes('Notification Center') || appContent.includes('Notifications & Trade Signals'), 'App.jsx must have Bell notification button in header');
+assert(appContent.includes('Notification Center') || appContent.includes('Notifications & Market Alerts') || appContent.includes('Notifications & Trade Signals'), 'App.jsx must have Bell notification button in header');
 console.log('  ✔ [PASS] UI Components wired with Delivery/Intraday and symbol search');
 
 console.log('\n======================================================================');

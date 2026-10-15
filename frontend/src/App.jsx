@@ -1793,7 +1793,7 @@ function App() {
                     minWidth: '28px',
                     flexShrink: 0
                   }}
-                  title="Notifications & Trade Signals"
+                  title="Notifications & Market Alerts"
                 >
                   <Bell size={14} />
                   {unreadNotificationsCount > 0 && (
