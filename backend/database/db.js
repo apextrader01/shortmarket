@@ -1129,6 +1129,16 @@ async function ensureCriticalColumns() {
       )
     `);
     await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS trade_date VARCHAR(20)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT \'[]\'::jsonb').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS screenshot_url TEXT').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS notes TEXT').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS strategy VARCHAR(100)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS emotion VARCHAR(100)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS mistake VARCHAR(100)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS setup_rating INTEGER DEFAULT 5').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS market_segment VARCHAR(20) DEFAULT \'Indian\'').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS product_type VARCHAR(10) DEFAULT \'INT\'').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS roi_percentage DECIMAL(8, 2) DEFAULT 0').catch(() => {});
     await db.raw('ALTER TABLE journal_trades ALTER COLUMN quantity TYPE NUMERIC(14, 4)').catch(() => {});
     await db.raw('ALTER TABLE journal_trades ALTER COLUMN entry_price TYPE NUMERIC(14, 5)').catch(() => {});
     await db.raw('ALTER TABLE journal_trades ALTER COLUMN exit_price TYPE NUMERIC(14, 5)').catch(() => {});

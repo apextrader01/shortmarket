@@ -15001,57 +15001,112 @@ app.get('/api/journal/trades', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper functions for Trade Diary PostgreSQL persistence
+const formatJournalTagsForDb = (tags) => {
+  let cleanTags = [];
+  if (Array.isArray(tags)) {
+    cleanTags = tags;
+  } else if (typeof tags === 'string' && tags.trim()) {
+    try {
+      const parsed = JSON.parse(tags);
+      cleanTags = Array.isArray(parsed) ? parsed : [tags];
+    } catch (_) {
+      cleanTags = tags.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return db.raw('?::jsonb', [JSON.stringify(cleanTags)]);
+};
+
+const normalizeJournalScreenshots = (screenshots, screenshot_url) => {
+  if (screenshots) {
+    return typeof screenshots === 'string' ? screenshots : JSON.stringify(screenshots);
+  }
+  if (screenshot_url) {
+    return typeof screenshot_url === 'string' ? screenshot_url : JSON.stringify(screenshot_url);
+  }
+  return '[]';
+};
+
+const normalizeJournalTradeDate = (trade_date) => {
+  if (trade_date) {
+    if (typeof trade_date === 'string') {
+      const clean = trade_date.trim().slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+    } else if (trade_date instanceof Date) {
+      const y = trade_date.getFullYear();
+      const m = String(trade_date.getMonth() + 1).padStart(2, '0');
+      const d = String(trade_date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+const buildJournalTradeRecord = (item, userId) => {
+  const cleanTradeDate = normalizeJournalTradeDate(item.trade_date);
+  const entryPrice = !isNaN(parseFloat(item.entry_price)) ? parseFloat(item.entry_price) : 0;
+  const exitPrice = !isNaN(parseFloat(item.exit_price)) ? parseFloat(item.exit_price) : 0;
+  const qty = !isNaN(parseFloat(item.quantity)) && parseFloat(item.quantity) > 0 ? parseFloat(item.quantity) : 1;
+  const realizedPnl = !isNaN(parseFloat(item.realized_pnl)) ? parseFloat(item.realized_pnl) : 0;
+  const charges = !isNaN(parseFloat(item.charges)) ? parseFloat(item.charges) : 0;
+  const netPnl = !isNaN(parseFloat(item.net_pnl)) ? parseFloat(item.net_pnl) : (realizedPnl - charges);
+
+  return {
+    user_id: userId,
+    trade_id: (item.trade_id && !String(item.trade_id).startsWith('MANUAL-') && !String(item.trade_id).startsWith('POS-'))
+      ? String(item.trade_id).trim()
+      : `JT-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+    symbol: (item.symbol || 'NIFTY').trim().toUpperCase(),
+    trade_type: (item.trade_type || 'BUY').toUpperCase(),
+    product_type: item.product_type || 'INT',
+    market_segment: item.market_segment || 'Indian',
+    entry_price: entryPrice,
+    exit_price: exitPrice,
+    quantity: qty,
+    realized_pnl: realizedPnl,
+    charges: charges,
+    net_pnl: netPnl,
+    roi_percentage: !isNaN(parseFloat(item.roi_percentage)) ? parseFloat(item.roi_percentage) : 0,
+    strategy: item.strategy || '',
+    emotion: item.emotion || '',
+    mistake: item.mistake || '',
+    setup_rating: parseInt(item.setup_rating) || 5,
+    trade_date: cleanTradeDate,
+    notes: item.notes || '',
+    tags: formatJournalTagsForDb(item.tags),
+    screenshot_url: normalizeJournalScreenshots(item.screenshots, item.screenshot_url)
+  };
+};
+
 app.post('/api/journal/trades', authenticateToken, async (req, res) => {
   try {
-    const {
-      symbol, trade_type, product_type, market_segment, entry_price, exit_price,
-      quantity, realized_pnl, charges, net_pnl, roi_percentage, strategy,
-      emotion, mistake, setup_rating, trade_date, notes, tags, screenshot_url, screenshots
-    } = req.body;
+    const rawBatch = Array.isArray(req.body) ? req.body : (req.body && Array.isArray(req.body.trades) ? req.body.trades : null);
 
-    let normalizedScreenshots = '';
-    if (screenshots) {
-      normalizedScreenshots = typeof screenshots === 'string' ? screenshots : JSON.stringify(screenshots);
-    } else if (screenshot_url) {
-      normalizedScreenshots = typeof screenshot_url === 'string' ? screenshot_url : JSON.stringify(screenshot_url);
+    if (rawBatch && rawBatch.length > 0) {
+      const insertedList = [];
+      for (const item of rawBatch) {
+        if (!item) continue;
+        const record = buildJournalTradeRecord(item, req.user.id);
+        const [inserted] = await db('journal_trades').insert(record).returning('*');
+        if (inserted) {
+          insertedList.push({
+            ...inserted,
+            client_id: item.id || item.client_id || null,
+            trade_date: normalizeJournalTradeDate(inserted.trade_date)
+          });
+        }
+      }
+      return res.json({ success: true, count: insertedList.length, trades: insertedList });
     }
 
-    let cleanTradeDate = '';
-    if (trade_date) {
-      cleanTradeDate = String(trade_date).trim().slice(0, 10);
-    }
-    if (!cleanTradeDate) {
-      const now = new Date();
-      cleanTradeDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    }
-
-    const [newTrade] = await db('journal_trades').insert({
-      user_id: req.user.id,
-      trade_id: `JT-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-      symbol: symbol || 'NIFTY',
-      trade_type: trade_type || 'BUY',
-      product_type: product_type || 'INT',
-      market_segment: market_segment || 'Indian',
-      entry_price: parseFloat(entry_price) || 0,
-      exit_price: parseFloat(exit_price) || 0,
-      quantity: parseInt(quantity) || 1,
-      realized_pnl: parseFloat(realized_pnl) || 0,
-      charges: parseFloat(charges) || 0,
-      net_pnl: parseFloat(net_pnl) || (parseFloat(realized_pnl) || 0),
-      roi_percentage: parseFloat(roi_percentage) || 0,
-      strategy: strategy || '',
-      emotion: emotion || '',
-      mistake: mistake || '',
-      setup_rating: parseInt(setup_rating) || 5,
-      trade_date: cleanTradeDate,
-      notes: notes || '',
-      tags: tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : JSON.stringify([]),
-      screenshot_url: normalizedScreenshots
-    }).returning('*');
+    const record = buildJournalTradeRecord(req.body, req.user.id);
+    const [newTrade] = await db('journal_trades').insert(record).returning('*');
 
     const formattedTrade = newTrade ? {
       ...newTrade,
-      trade_date: cleanTradeDate
+      client_id: req.body.id || req.body.client_id || null,
+      trade_date: normalizeJournalTradeDate(newTrade.trade_date)
     } : newTrade;
 
     res.json({ success: true, trade: formattedTrade });
@@ -15067,8 +15122,10 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
     const updateData = { ...req.body, updated_at: new Date() };
     delete updateData.id;
     delete updateData.user_id;
-    if (updateData.tags && typeof updateData.tags !== 'string') {
-      updateData.tags = JSON.stringify(updateData.tags);
+    delete updateData.client_id;
+
+    if (updateData.tags !== undefined) {
+      updateData.tags = formatJournalTagsForDb(updateData.tags);
     }
 
     if (updateData.screenshots !== undefined) {
@@ -15081,7 +15138,7 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
     }
 
     if (updateData.trade_date) {
-      updateData.trade_date = String(updateData.trade_date).trim().slice(0, 10);
+      updateData.trade_date = normalizeJournalTradeDate(updateData.trade_date);
     }
     if (updateData.entry_price !== undefined) updateData.entry_price = parseFloat(updateData.entry_price) || 0;
     if (updateData.exit_price !== undefined) updateData.exit_price = parseFloat(updateData.exit_price) || 0;
@@ -15100,11 +15157,14 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
     }
 
     const [updated] = await query.update(updateData).returning('*');
+    if (!updated) {
+      return res.status(404).json({ error: 'Trade not found' });
+    }
 
-    const formattedTrade = updated ? {
+    const formattedTrade = {
       ...updated,
-      trade_date: updated.trade_date ? String(updated.trade_date).slice(0, 10) : updated.trade_date
-    } : updated;
+      trade_date: normalizeJournalTradeDate(updated.trade_date)
+    };
 
     res.json({ success: true, trade: formattedTrade });
   } catch (err) {
@@ -15149,6 +15209,18 @@ app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
     const { date, pre_market_data, in_market_data, post_market_data, notes } = req.body;
     const targetDate = date || new Date().toISOString().split('T')[0];
 
+    const formatChecklistJsonb = (val, fallback = {}) => {
+      let str = '{}';
+      if (val && typeof val === 'object') {
+        str = JSON.stringify(val);
+      } else if (typeof val === 'string' && val.trim()) {
+        str = val;
+      } else if (fallback) {
+        str = JSON.stringify(fallback);
+      }
+      return db.raw('?::jsonb', [str]);
+    };
+
     const existing = await db('trading_checklists').where({ user_id: req.user.id, date: targetDate }).first();
     let result;
 
@@ -15156,9 +15228,9 @@ app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
       [result] = await db('trading_checklists')
         .where({ id: existing.id })
         .update({
-          pre_market_data: pre_market_data ? JSON.stringify(pre_market_data) : existing.pre_market_data,
-          in_market_data: in_market_data ? JSON.stringify(in_market_data) : existing.in_market_data,
-          post_market_data: post_market_data ? JSON.stringify(post_market_data) : existing.post_market_data,
+          pre_market_data: pre_market_data !== undefined ? formatChecklistJsonb(pre_market_data) : existing.pre_market_data,
+          in_market_data: in_market_data !== undefined ? formatChecklistJsonb(in_market_data) : existing.in_market_data,
+          post_market_data: post_market_data !== undefined ? formatChecklistJsonb(post_market_data) : existing.post_market_data,
           notes: notes !== undefined ? notes : existing.notes,
           updated_at: new Date()
         })
@@ -15167,9 +15239,9 @@ app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
       [result] = await db('trading_checklists').insert({
         user_id: req.user.id,
         date: targetDate,
-        pre_market_data: JSON.stringify(pre_market_data || {}),
-        in_market_data: JSON.stringify(in_market_data || {}),
-        post_market_data: JSON.stringify(post_market_data || {}),
+        pre_market_data: formatChecklistJsonb(pre_market_data || {}),
+        in_market_data: formatChecklistJsonb(in_market_data || {}),
+        post_market_data: formatChecklistJsonb(post_market_data || {}),
         notes: notes || ''
       }).returning('*');
     }

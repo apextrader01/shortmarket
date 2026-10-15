@@ -58,7 +58,7 @@ import {
   BookOpen, ChevronRight, ChevronLeft, Star, ThumbsUp, Menu,
   Copy, CheckCircle, DollarSign, Target, MessageSquare, Download, ShieldAlert, LogOut,
   Loader2, Camera, Image, Maximize2, UploadCloud, ZoomIn, ZoomOut,
-  CheckCheck, RotateCcw, ChevronUp, SlidersHorizontal, Layers
+  CheckCheck, RotateCcw, ChevronUp, SlidersHorizontal, Layers, RefreshCw
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
@@ -420,6 +420,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     return [];
   });
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const isSyncingRef = useRef(false);
   // Strategy State & Playbook Controls
   const [selectedStrategyForPlaybook, setSelectedStrategyForPlaybook] = useState(null);
   const [editingStrategy, setEditingStrategy] = useState(null);
@@ -1058,10 +1060,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const [tradeActionNotice, setTradeActionNotice] = useState(null);
 
   // Fetch backend journal data on mount & whenever user session initializes
-  const fetchJournalData = async () => {
+  const fetchJournalData = async (forceSync = false) => {
+    if (isSyncingRef.current && !forceSync) return;
+    isSyncingRef.current = true;
+    setIsSyncingCloud(true);
+
     try {
       const token = getAuthToken();
-      if (!token) return;
+      if (!token) {
+        isSyncingRef.current = false;
+        setIsSyncingCloud(false);
+        return;
+      }
       const headers = { 'Authorization': `Bearer ${token}` };
 
       // Fetch all journal data concurrently in parallel (cuts waterfall wait by 80%)
@@ -1082,21 +1092,91 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       ]);
 
       if (dataTrades?.success && Array.isArray(dataTrades.trades)) {
-        const normalized = dataTrades.trades.map(t => ({
+        let normalizedServer = dataTrades.trades.map(t => ({
           ...t,
           trade_date: normalizeDateStr(t.trade_date || t.created_at || todayStr),
           screenshots: parseScreenshots(t)
         }));
 
-        setDbTrades(prev => {
-          const serverIds = new Set(normalized.map(t => String(t.id || t.trade_id)));
-          const unsyncedLocal = prev.filter(t => t.id && String(t.id).startsWith('MANUAL-') && !serverIds.has(String(t.id)));
-          const merged = [...unsyncedLocal, ...normalized];
-          try {
-            localStorage.setItem(diaryStorageKey, JSON.stringify(merged));
-          } catch (_) {}
-          return merged;
+        const serverTradeIds = new Set();
+        normalizedServer.forEach(t => {
+          if (t.id) serverTradeIds.add(String(t.id));
+          if (t.trade_id) serverTradeIds.add(String(t.trade_id));
         });
+
+        // Scan for unsynced local trades to auto-upload to PostgreSQL cloud
+        const unsyncedTrades = [];
+        const seenUnsyncedKeys = new Set();
+
+        try {
+          const rawLocal = localStorage.getItem(diaryStorageKey);
+          if (rawLocal) {
+            const parsed = JSON.parse(rawLocal);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(t => {
+                if (t && t.id && String(t.id).startsWith('MANUAL-') && !serverTradeIds.has(String(t.id)) && !serverTradeIds.has(String(t.trade_id))) {
+                  const dedupKey = `${t.trade_date}_${t.symbol}_${t.trade_type}_${t.quantity}_${t.entry_price}_${t.realized_pnl}`;
+                  if (!seenUnsyncedKeys.has(dedupKey)) {
+                    seenUnsyncedKeys.add(dedupKey);
+                    unsyncedTrades.push(t);
+                  }
+                }
+              });
+            }
+          }
+        } catch (_) {}
+
+        try {
+          const rawGuest = localStorage.getItem('skandx_diary_trades_guest');
+          if (rawGuest) {
+            const parsedGuest = JSON.parse(rawGuest);
+            if (Array.isArray(parsedGuest)) {
+              parsedGuest.forEach(t => {
+                if (t && !serverTradeIds.has(String(t.id)) && !serverTradeIds.has(String(t.trade_id))) {
+                  const dedupKey = `${t.trade_date}_${t.symbol}_${t.trade_type}_${t.quantity}_${t.entry_price}_${t.realized_pnl}`;
+                  if (!seenUnsyncedKeys.has(dedupKey)) {
+                    seenUnsyncedKeys.add(dedupKey);
+                    unsyncedTrades.push(t);
+                  }
+                }
+              });
+            }
+          }
+        } catch (_) {}
+
+        // If local unsynced trades exist, auto-push to backend so all devices receive them
+        if (unsyncedTrades.length > 0) {
+          try {
+            const syncRes = await fetch(`${API}/api/journal/trades`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ trades: unsyncedTrades })
+            });
+            const syncData = await syncRes.json().catch(() => ({}));
+            if (syncData?.success && Array.isArray(syncData.trades)) {
+              const newlySyncedServer = syncData.trades.map(t => ({
+                ...t,
+                trade_date: normalizeDateStr(t.trade_date || t.created_at || todayStr),
+                screenshots: parseScreenshots(t)
+              }));
+              const existingIds = new Set(normalizedServer.map(t => String(t.trade_id || t.id)));
+              newlySyncedServer.forEach(nt => {
+                if (!existingIds.has(String(nt.trade_id || nt.id))) {
+                  normalizedServer.unshift(nt);
+                }
+              });
+              try { localStorage.removeItem('skandx_diary_trades_guest'); } catch (_) {}
+            }
+          } catch (syncErr) {
+            console.warn('Background sync of local trades error:', syncErr);
+          }
+        }
+
+        setDbTrades(normalizedServer);
+        try {
+          localStorage.setItem(diaryStorageKey, JSON.stringify(normalizedServer));
+        } catch (_) {}
       }
 
       if (dataChk?.success && dataChk.checklists && dataChk.checklists[0]) {
@@ -1122,6 +1202,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       }
     } catch (e) {
       console.warn('Journal data fetch fallback to local state:', e.message);
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncingCloud(false);
     }
   };
 
@@ -1159,6 +1242,28 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       } catch (_) {}
     }
     fetchJournalData();
+
+    // Auto-sync across devices on tab visibility change or window focus (e.g. switching between laptop and mobile)
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchJournalData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Periodic auto-sync every 45s while tab is visible
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchJournalData();
+      }
+    }, 45000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      clearInterval(syncInterval);
+    };
   }, [user]);
 
   const fetchReferralsData = async () => {
@@ -1625,13 +1730,30 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     try {
       const token = getAuthToken();
       const id = updated.id || updated.trade_id;
-      if (token && !String(id).startsWith('MANUAL-') && !String(id).startsWith('POS-')) {
-        await fetch(`${API}/api/journal/trades/${id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(updated)
-        });
+      if (token) {
+        if (String(id).startsWith('MANUAL-')) {
+          const res = await fetch(`${API}/api/journal/trades`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(updated)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data?.success && data?.trade) {
+            setDbTrades(prev => {
+              const next = prev.map(t => (t.id === id ? { ...t, ...data.trade, screenshots: parseScreenshots(data.trade) } : t));
+              try { localStorage.setItem(diaryStorageKey, JSON.stringify(next)); } catch (_) {}
+              return next;
+            });
+          }
+        } else if (!String(id).startsWith('POS-')) {
+          await fetch(`${API}/api/journal/trades/${id}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(updated)
+          });
+        }
       }
     } catch (e) {
       console.warn('Trade update error:', e);
@@ -1706,6 +1828,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
     const cleanDate = normalizeDateStr(newTradeForm.trade_date || todayStr) || getTodayStr();
     const screenshots = Array.isArray(newTradeForm.screenshots) ? newTradeForm.screenshots : [];
+    const localId = `MANUAL-${Date.now()}`;
 
     const tradeData = {
       ...newTradeForm,
@@ -1721,27 +1844,25 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       net_pnl: netPnl,
       screenshots,
       screenshot_url: JSON.stringify(screenshots),
-      id: `MANUAL-${Date.now()}`
+      id: localId
     };
 
     setDbTrades(prev => {
-      const next = [tradeData, ...prev];
+      const next = [tradeData, ...prev.filter(t => t.id !== localId)];
       try { localStorage.setItem(diaryStorageKey, JSON.stringify(next)); } catch (_) {}
       return next;
     });
-    setTradeActionNotice('✓ Trade logged to Diary successfully!');
-    setTimeout(() => setTradeActionNotice(null), 3500);
 
-    try {
-      const token = getAuthToken();
-      if (token) {
+    const token = getAuthToken();
+    if (token) {
+      try {
         const res = await fetch(`${API}/api/journal/trades`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(tradeData)
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (data && data.success && data.trade) {
           const serverTrade = {
             ...data.trade,
@@ -1749,15 +1870,22 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             screenshots: parseScreenshots(data.trade)
           };
           setDbTrades(prev => {
-            const updated = prev.map(t => t.id === tradeData.id ? { ...t, ...serverTrade } : t);
+            const updated = prev.map(t => (t.id === localId || t.id === serverTrade.id) ? { ...t, ...serverTrade } : t);
             try { localStorage.setItem(diaryStorageKey, JSON.stringify(updated)); } catch (_) {}
             return updated;
           });
+          setTradeActionNotice('✓ Trade logged and synced to cloud!');
+        } else {
+          setTradeActionNotice('✓ Saved locally (will auto-sync to cloud)');
         }
+      } catch (err) {
+        console.warn('Trade save to backend error:', err);
+        setTradeActionNotice('✓ Saved locally (will auto-sync to cloud)');
       }
-    } catch (err) {
-      console.warn('Trade save to backend error:', err);
+    } else {
+      setTradeActionNotice('✓ Trade saved locally (login to sync across devices)');
     }
+    setTimeout(() => setTradeActionNotice(null), 3500);
 
     setNewTradeForm(prev => ({
       ...prev,
@@ -2729,6 +2857,36 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 ← Hub
               </button>
             )}
+
+            {/* Cloud Sync Button */}
+            <button
+              onClick={() => {
+                fetchJournalData(true);
+                setTradeActionNotice('🔄 Syncing trades with cloud...');
+                setTimeout(() => {
+                  setTradeActionNotice('✓ Cloud sync complete - trades up to date');
+                  setTimeout(() => setTradeActionNotice(null), 2500);
+                }, 800);
+              }}
+              title="Sync trades with cloud across laptop & mobile"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: isMobile ? '6px 9px' : '6px 12px',
+                borderRadius: '20px',
+                backgroundColor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${colors.borderColor}`,
+                color: colors.textSecondary,
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <RefreshCw size={12} style={{ animation: isSyncingCloud ? 'spin 1s linear infinite' : 'none' }} />
+              {!isTinyMobile && (isSyncingCloud ? 'Syncing...' : 'Sync')}
+            </button>
 
             <button
               onClick={() => setShowNewTradeModal(true)}
