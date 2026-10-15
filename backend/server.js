@@ -14970,7 +14970,26 @@ app.get('/api/journal/trades', authenticateToken, async (req, res) => {
     }
 
     const trades = await query;
-    res.json({ success: true, trades });
+    const formattedTrades = trades.map(t => {
+      let cleanDate = '';
+      if (t.trade_date) {
+        if (typeof t.trade_date === 'string') {
+          cleanDate = t.trade_date.slice(0, 10);
+        } else if (t.trade_date instanceof Date) {
+          const y = t.trade_date.getFullYear();
+          const m = String(t.trade_date.getMonth() + 1).padStart(2, '0');
+          const d = String(t.trade_date.getDate()).padStart(2, '0');
+          cleanDate = `${y}-${m}-${d}`;
+        } else {
+          cleanDate = String(t.trade_date).slice(0, 10);
+        }
+      }
+      return {
+        ...t,
+        trade_date: cleanDate || t.trade_date
+      };
+    });
+    res.json({ success: true, trades: formattedTrades });
   } catch (err) {
     console.error('Fetch Journal Trades Error:', err);
     res.status(500).json({ error: err.message });
@@ -14992,6 +15011,15 @@ app.post('/api/journal/trades', authenticateToken, async (req, res) => {
       normalizedScreenshots = typeof screenshot_url === 'string' ? screenshot_url : JSON.stringify(screenshot_url);
     }
 
+    let cleanTradeDate = '';
+    if (trade_date) {
+      cleanTradeDate = String(trade_date).trim().slice(0, 10);
+    }
+    if (!cleanTradeDate) {
+      const now = new Date();
+      cleanTradeDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
     const [newTrade] = await db('journal_trades').insert({
       user_id: req.user.id,
       trade_id: `JT-${Date.now()}-${Math.floor(Math.random()*1000)}`,
@@ -15010,13 +15038,18 @@ app.post('/api/journal/trades', authenticateToken, async (req, res) => {
       emotion: emotion || '',
       mistake: mistake || '',
       setup_rating: parseInt(setup_rating) || 5,
-      trade_date: trade_date || new Date().toISOString().split('T')[0],
+      trade_date: cleanTradeDate,
       notes: notes || '',
       tags: tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : JSON.stringify([]),
       screenshot_url: normalizedScreenshots
     }).returning('*');
 
-    res.json({ success: true, trade: newTrade });
+    const formattedTrade = newTrade ? {
+      ...newTrade,
+      trade_date: cleanTradeDate
+    } : newTrade;
+
+    res.json({ success: true, trade: formattedTrade });
   } catch (err) {
     console.error('Create Journal Trade Error:', err);
     res.status(500).json({ error: err.message });

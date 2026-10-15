@@ -70,6 +70,37 @@ export const getImageSizeKb = (dataUrl) => {
   return Math.round((base64.length * 0.75) / 1024);
 };
 
+// Helper: Normalize date strings to strictly YYYY-MM-DD format (eliminates ISO timezone shifts)
+export const normalizeDateStr = (raw) => {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes('T')) return s.split('T')[0];
+  if (s.includes(' ')) return s.split(' ')[0];
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  } catch (_) {}
+  return s.slice(0, 10);
+};
+
+// Helper: Get user's local current date formatted as YYYY-MM-DD
+export const getTodayStr = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+// Helper: Get current Year-Month string e.g. "2026-10"
+export const getCurrentMonthStr = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
 // Helper: Compress screenshot image client-side to strictly < 50 KB while preserving crisp chart readability
 export const compressImageToDataUrl = (file, targetMaxKb = 48) => {
   return new Promise((resolve) => {
@@ -351,8 +382,9 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
 
   // Filter states
   const [marketSegment, setMarketSegment] = useState('Indian');
-  const [timeRange, setTimeRange] = useState('30D');
+  const [timeRange, setTimeRange] = useState('ALL');
   const [pnlPeriod, setPnlPeriod] = useState('D');
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
 
   // Modals & Forms
   const [showNewTradeModal, setShowNewTradeModal] = useState(false);
@@ -363,8 +395,30 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [selectedTradeForShare, setSelectedTradeForShare] = useState(null);
 
-  // Journal DB State
-  const [dbTrades, setDbTrades] = useState([]);
+  // Dynamic User Storage Key & Auth Token
+  const diaryStorageKey = `skandx_diary_trades_${user?.id || 'guest'}`;
+  const getAuthToken = () => {
+    return localStorage.getItem('token') || useStore.getState().token || useStore.getState().user?.token || user?.token || '';
+  };
+
+  // Journal DB State with LocalStorage Persistence Fallback (Zero trade loss on refresh or across days)
+  const [dbTrades, setDbTrades] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`skandx_diary_trades_${user?.id || 'guest'}`) || localStorage.getItem('skandx_diary_trades_guest');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(t => ({
+            ...t,
+            trade_date: normalizeDateStr(t.trade_date || t.created_at || getTodayStr()),
+            screenshots: parseScreenshots(t)
+          }));
+        }
+      }
+    } catch (_) {}
+    return [];
+  });
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
   // Strategy State & Playbook Controls
   const [selectedStrategyForPlaybook, setSelectedStrategyForPlaybook] = useState(null);
   const [editingStrategy, setEditingStrategy] = useState(null);
@@ -654,7 +708,7 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   ]);
 
   // Form states
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayStr();
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [isLightboxZoomed, setIsLightboxZoomed] = useState(false);
   const [newTradeForm, setNewTradeForm] = useState({
@@ -741,8 +795,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     discipline: '⭐ 5/5 Flawless'
   });
 
-  // Monthly Report Selected Month State
-  const [selectedReportMonth, setSelectedReportMonth] = useState('2026-09');
+  // Monthly Report Selected Month State (dynamic to current year-month e.g. 2026-10)
+  const [selectedReportMonth, setSelectedReportMonth] = useState(() => getCurrentMonthStr());
 
   const [todayChecklist, setTodayChecklist] = useState({
     preMarket: {
@@ -973,10 +1027,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const [viewingTrade, setViewingTrade] = useState(null);
   const [tradeActionNotice, setTradeActionNotice] = useState(null);
 
-  // Fetch backend journal data on mount
+  // Fetch backend journal data on mount & whenever user session initializes
   const fetchJournalData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (!token) return;
       const headers = { 'Authorization': `Bearer ${token}` };
 
@@ -998,7 +1052,21 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       ]);
 
       if (dataTrades?.success && Array.isArray(dataTrades.trades)) {
-        setDbTrades(dataTrades.trades);
+        const normalized = dataTrades.trades.map(t => ({
+          ...t,
+          trade_date: normalizeDateStr(t.trade_date || t.created_at || todayStr),
+          screenshots: parseScreenshots(t)
+        }));
+
+        setDbTrades(prev => {
+          const serverIds = new Set(normalized.map(t => String(t.id || t.trade_id)));
+          const unsyncedLocal = prev.filter(t => t.id && String(t.id).startsWith('MANUAL-') && !serverIds.has(String(t.id)));
+          const merged = [...unsyncedLocal, ...normalized];
+          try {
+            localStorage.setItem(diaryStorageKey, JSON.stringify(merged));
+          } catch (_) {}
+          return merged;
+        });
       }
 
       if (dataChk?.success && dataChk.checklists && dataChk.checklists[0]) {
@@ -1029,7 +1097,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
   useEffect(() => {
     fetchJournalData();
-  }, []);
+  }, [user]);
 
   const fetchReferralsData = async () => {
     try {
@@ -1209,7 +1277,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
   // Compile trades list (strictly from Trade Diary database records - isolated from paper trading)
   const allTrades = useMemo(() => {
-    return [...dbTrades].sort((a, b) => new Date(b.trade_date || 0) - new Date(a.trade_date || 0));
+    return [...dbTrades].sort((a, b) => {
+      const dateB = new Date(normalizeDateStr(b.trade_date) || 0).getTime();
+      const dateA = new Date(normalizeDateStr(a.trade_date) || 0).getTime();
+      return dateB - dateA;
+    });
   }, [dbTrades]);
 
     // Market Currency & Formatting Helpers
@@ -1247,13 +1319,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (seg !== currentSeg) return false;
 
       if (timeRange === 'ALL') return true;
-      if (!t.trade_date) return true;
+      const cleanTradeDate = normalizeDateStr(t.trade_date);
+      if (!cleanTradeDate) return true;
 
-      const tradeTime = new Date(t.trade_date).getTime();
+      const tradeTime = new Date(cleanTradeDate).getTime();
       const now = new Date().getTime();
-      const diffDays = (now - tradeTime) / (1000 * 60 * 60 * 24);
+      const diffDays = Math.max(0, (now - tradeTime) / (1000 * 60 * 60 * 24));
 
-      if (timeRange === 'TODAY') return t.trade_date === todayStr;
+      if (timeRange === 'TODAY') return cleanTradeDate === todayStr;
       if (timeRange === '7D') return diffDays <= 7;
       if (timeRange === '30D') return diffDays <= 30;
       if (timeRange === '90D') return diffDays <= 90;
@@ -1356,12 +1429,16 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const handleDeleteTrade = async (tradeId) => {
     if (!window.confirm('Are you sure you want to delete this trade from your journal?')) return;
     
-    setDbTrades(prev => prev.filter(t => (t.id || t.trade_id) !== tradeId));
+    setDbTrades(prev => {
+      const next = prev.filter(t => (t.id || t.trade_id) !== tradeId);
+      try { localStorage.setItem(diaryStorageKey, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
     setTradeActionNotice('✓ Trade deleted successfully!');
     setTimeout(() => setTradeActionNotice(null), 3000);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (token && !String(tradeId).startsWith('MANUAL-') && !String(tradeId).startsWith('POS-')) {
         await fetch(`${API}/api/journal/trades/${tradeId}`, {
           method: 'DELETE',
@@ -1405,6 +1482,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
     const updated = {
       ...editingTrade,
+      trade_date: normalizeDateStr(editingTrade.trade_date || todayStr),
       entry_price: entry,
       exit_price: exit,
       quantity: qty,
@@ -1415,13 +1493,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       screenshot_url: JSON.stringify(screenshots)
     };
 
-    setDbTrades(prev => prev.map(t => (t.id || t.trade_id) === (updated.id || updated.trade_id) ? updated : t));
+    setDbTrades(prev => {
+      const next = prev.map(t => (t.id || t.trade_id) === (updated.id || updated.trade_id) ? updated : t);
+      try { localStorage.setItem(diaryStorageKey, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
     setEditingTrade(null);
     setTradeActionNotice('✓ Trade updated successfully with screenshots!');
     setTimeout(() => setTradeActionNotice(null), 3000);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       const id = updated.id || updated.trade_id;
       if (token && !String(id).startsWith('MANUAL-') && !String(id).startsWith('POS-')) {
         await fetch(`${API}/api/journal/trades/${id}`, {
@@ -1500,10 +1582,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
     const netPnl = realizedPnl - charges;
 
+    const cleanDate = normalizeDateStr(newTradeForm.trade_date || todayStr);
     const screenshots = Array.isArray(newTradeForm.screenshots) ? newTradeForm.screenshots : [];
 
     const tradeData = {
       ...newTradeForm,
+      trade_date: cleanDate,
       entry_price: entry,
       exit_price: exit,
       quantity: qty,
@@ -1515,10 +1599,16 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       id: `MANUAL-${Date.now()}`
     };
 
-    setDbTrades(prev => [tradeData, ...prev]);
+    setDbTrades(prev => {
+      const next = [tradeData, ...prev];
+      try { localStorage.setItem(diaryStorageKey, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    setTradeActionNotice('✓ Trade logged to Diary successfully!');
+    setTimeout(() => setTradeActionNotice(null), 3500);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (token) {
         const res = await fetch(`${API}/api/journal/trades`, {
           method: 'POST',
@@ -1528,7 +1618,16 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         });
         const data = await res.json();
         if (data && data.success && data.trade) {
-          setDbTrades(prev => prev.map(t => t.id === tradeData.id ? { ...t, ...data.trade } : t));
+          const serverTrade = {
+            ...data.trade,
+            trade_date: normalizeDateStr(data.trade.trade_date || cleanDate),
+            screenshots: parseScreenshots(data.trade)
+          };
+          setDbTrades(prev => {
+            const updated = prev.map(t => t.id === tradeData.id ? { ...t, ...serverTrade } : t);
+            try { localStorage.setItem(diaryStorageKey, JSON.stringify(updated)); } catch (_) {}
+            return updated;
+          });
         }
       }
     } catch (err) {
@@ -4413,6 +4512,20 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <option value="BUY">BUY / LONG</option>
                       <option value="SELL">SELL / SHORT</option>
                     </select>
+
+                    {/* Time Range Filter */}
+                    <select
+                      value={timeRange}
+                      onChange={(e) => setTimeRange(e.target.value)}
+                      style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', outline: 'none', cursor: 'pointer' }}
+                    >
+                      <option value="ALL">📅 All Time ({allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length})</option>
+                      <option value="TODAY">📅 Today's Session</option>
+                      <option value="7D">📅 Last 7 Days</option>
+                      <option value="30D">📅 Last 30 Days</option>
+                      <option value="90D">📅 Last 90 Days</option>
+                      <option value="1Y">📅 1 Year</option>
+                    </select>
                   </div>
 
                   {/* CSV Export */}
@@ -4441,24 +4554,40 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {displayTrades.length === 0 ? (
                   <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, boxShadow: colors.cardShadow }}>
                     <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary, marginBottom: '4px' }}>
-                      No {marketSegment} trades found matching your filters.
+                      No {marketSegment} trades found matching your active filters.
                     </div>
-                    <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
-                      Log a new trade to build your performance history.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setNewTradeForm(prev => ({
-                          ...prev,
-                          market_segment: marketSegment,
-                          symbol: MARKET_CONFIGS[marketSegment]?.suggestions[0] || 'NIFTY 24500 CE'
-                        }));
-                        setShowNewTradeModal(true);
-                      }}
-                      style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      + Log First {marketSegment} Trade
-                    </button>
+                    {allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length > 0 ? (
+                      <>
+                        <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
+                          You have {allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length} trade(s) saved in All Time.
+                        </p>
+                        <button
+                          onClick={() => { setTimeRange('ALL'); setTradeSearch(''); setTradeSideFilter('ALL'); setTradeOutcomeFilter('ALL'); }}
+                          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          View All {marketSegment} Trades ({allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length})
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
+                          Log a new trade to build your performance history.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setNewTradeForm(prev => ({
+                              ...prev,
+                              market_segment: marketSegment,
+                              symbol: MARKET_CONFIGS[marketSegment]?.suggestions[0] || 'NIFTY 24500 CE'
+                            }));
+                            setShowNewTradeModal(true);
+                          }}
+                          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          + Log First {marketSegment} Trade
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -6663,6 +6792,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               }
             });
 
+            // Ensure current month is always available
+            const curMonthStr = getCurrentMonthStr();
+            if (!mergedStatementsMap[curMonthStr]) {
+              mergedStatementsMap[curMonthStr] = {
+                month: curMonthStr, totalTrades: 0, wins: 0, losses: 0, grossPnl: 0, charges: 0, netPnl: 0, bestTrade: 0, worstTrade: 0, returnPct: 0, profitFactor: '0.00', expectancy: 0
+              };
+            }
+
             const monthlyList = Object.values(mergedStatementsMap).sort((a, b) => b.month.localeCompare(a.month));
             const activeMonthData = mergedStatementsMap[selectedReportMonth] || monthlyList[0] || {
               month: selectedReportMonth, totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200
@@ -6750,11 +6887,16 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           boxShadow: colors.cardShadow
                         }}
                       >
-                        <option value="2026-09">📅 September 2026</option>
-                        <option value="2026-08">📅 August 2026</option>
-                        <option value="2026-07">📅 July 2026</option>
-                        <option value="2026-06">📅 June 2026</option>
-                        <option value="2026-05">📅 May 2026</option>
+                        {monthlyList.map(m => {
+                          const [y, mon] = m.month.split('-').map(Number);
+                          const labelDate = new Date(y, mon - 1, 1);
+                          const formattedLabel = labelDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                          return (
+                            <option key={m.month} value={m.month}>
+                              📅 {formattedLabel}
+                            </option>
+                          );
+                        })}
                       </select>
                       <ChevronDown size={12} color={colors.textSecondary} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                     </div>
@@ -6900,51 +7042,80 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-                    {Array.from({ length: 30 }).map((_, i) => {
-                      const dayNum = i + 1;
-                      const dayStr = `${selectedReportMonth}-${dayNum < 10 ? '0' + dayNum : dayNum}`;
-                      const isWeekend = (dayNum % 7 === 0) || (dayNum % 7 === 6);
-                      const isGreen = !isWeekend && [1, 2, 4, 7, 8, 9, 11, 14, 15, 16, 18, 21, 22, 25, 28, 29].includes(dayNum);
-                      const isRed = !isWeekend && [3, 10, 17, 23, 24].includes(dayNum);
-                      const pnlVal = isGreen ? (dayNum * 420 + 1200) : (isRed ? -(dayNum * 210 + 800) : 0);
+                    {(() => {
+                      const [rmYear, rmMonth] = (selectedReportMonth || getCurrentMonthStr()).split('-').map(Number);
+                      const totalDays = new Date(rmYear, rmMonth, 0).getDate();
+                      const leadingSlots = new Date(rmYear, rmMonth - 1, 1).getDay(); // 0 = Sun
+                      const totalSlots = Math.ceil((leadingSlots + totalDays) / 7) * 7;
+                      
+                      return Array.from({ length: totalSlots }).map((_, slotIdx) => {
+                        const dayNum = slotIdx - leadingSlots + 1;
+                        if (dayNum < 1 || dayNum > totalDays) {
+                          return <div key={slotIdx} style={{ minHeight: isMobile ? '44px' : '52px', backgroundColor: 'transparent' }} />;
+                        }
+                        const dayStr = `${selectedReportMonth}-${dayNum < 10 ? '0' + dayNum : dayNum}`;
+                        const dayOfWeek = slotIdx % 7;
+                        const isWeekend = (dayOfWeek === 0) || (dayOfWeek === 6);
 
-                      return (
-                        <div
-                          key={i}
-                          onClick={() => {
-                            if (!isWeekend) {
-                              setSelectedCalendarSession({
-                                date: dayStr,
-                                pnl: pnlVal,
-                                trades: isGreen ? 2 : (isRed ? 3 : 0),
-                                strategy: isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Entry Chop',
-                                discipline: isGreen ? '5/5 Strict Plan Followed' : '3/5 Cut Winners Early',
-                                market: marketSegment
-                              });
-                            }
-                          }}
-                          style={{
-                            backgroundColor: isWeekend ? colors.bgInner : (isGreen ? 'rgba(16, 185, 129, 0.12)' : (isRed ? 'rgba(239, 68, 68, 0.12)' : colors.bgInner)),
-                            border: `1px solid ${isGreen ? 'rgba(16, 185, 129, 0.3)' : (isRed ? 'rgba(239, 68, 68, 0.3)' : colors.borderColor)}`,
-                            borderRadius: '8px',
-                            padding: '6px 4px',
-                            minHeight: isMobile ? '44px' : '52px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            cursor: isWeekend ? 'default' : 'pointer',
-                            opacity: isWeekend ? 0.45 : 1
-                          }}
-                        >
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: colors.textPrimary }}>{dayNum}</span>
-                          {!isWeekend && pnlVal !== 0 && (
-                            <span style={{ fontSize: '9.5px', fontWeight: '800', color: pnlVal > 0 ? colors.accentGreen : colors.accentRed }}>
-                              {pnlVal > 0 ? '+' : ''}{formatMoneyPlain(pnlVal, marketSegment)}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        const dayLoggedTrades = allTrades.filter(t => {
+                          const seg = (t.market_segment || 'Indian').toLowerCase();
+                          return seg === marketSegment.toLowerCase() && (normalizeDateStr(t.trade_date) === dayStr);
+                        });
+
+                        let pnlVal = 0;
+                        let isGreen = false;
+                        let isRed = false;
+                        if (dayLoggedTrades.length > 0) {
+                          pnlVal = dayLoggedTrades.reduce((acc, t) => acc + Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)), 0);
+                          isGreen = pnlVal > 0;
+                          isRed = pnlVal < 0;
+                        }
+
+                        return (
+                          <div
+                            key={slotIdx}
+                            onClick={() => {
+                              if (dayLoggedTrades.length > 0 || pnlVal !== 0) {
+                                setSelectedCalendarSession({
+                                  date: dayStr,
+                                  dayNum: dayNum,
+                                  pnl: pnlVal,
+                                  trades: dayLoggedTrades.length || (isGreen ? 2 : 3),
+                                  strategy: dayLoggedTrades[0]?.strategy || (isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Entry Chop'),
+                                  discipline: dayLoggedTrades[0]?.discipline_score ? `${dayLoggedTrades[0].discipline_score}/5 Strict Plan Followed` : (isGreen ? '5/5 Strict Plan Followed' : '3/5 Cut Winners Early'),
+                                  market: marketSegment,
+                                  tradesList: dayLoggedTrades.length > 0 ? dayLoggedTrades.map(t => ({
+                                    symbol: t.symbol,
+                                    pnl: Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)),
+                                    type: t.trade_type || 'BUY',
+                                    rr: t.risk_reward_ratio || '1:2'
+                                  })) : undefined
+                                });
+                              }
+                            }}
+                            style={{
+                              backgroundColor: isWeekend ? colors.bgInner : (isGreen ? 'rgba(16, 185, 129, 0.12)' : (isRed ? 'rgba(239, 68, 68, 0.12)' : colors.bgInner)),
+                              border: `1px solid ${isGreen ? 'rgba(16, 185, 129, 0.3)' : (isRed ? 'rgba(239, 68, 68, 0.3)' : colors.borderColor)}`,
+                              borderRadius: '8px',
+                              padding: '6px 4px',
+                              minHeight: isMobile ? '44px' : '52px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              cursor: (dayLoggedTrades.length > 0 || pnlVal !== 0) ? 'pointer' : 'default',
+                              opacity: isWeekend ? 0.45 : 1
+                            }}
+                          >
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: colors.textPrimary }}>{dayNum}</span>
+                            {!isWeekend && pnlVal !== 0 && (
+                              <span style={{ fontSize: '9.5px', fontWeight: '800', color: pnlVal > 0 ? colors.accentGreen : colors.accentRed }}>
+                                {pnlVal > 0 ? '+' : ''}{formatMoneyPlain(pnlVal, marketSegment)}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
@@ -8213,10 +8384,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               month: selectedReportMonth, totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200
             };
 
-            // Days definition for the active month (September 2026 starts on Tuesday, Day 1)
-            // Leading empty slots for Sun (0), Mon (1) -> 2 empty slots
-            const leadingEmptySlots = 2; // Sept 1, 2026 is Tuesday
-            const totalDaysInMonth = 30;
+            // Days definition for the active month calculated dynamically
+            const [calYear, calMonth] = (selectedReportMonth || getCurrentMonthStr()).split('-').map(Number);
+            const totalDaysInMonth = new Date(calYear, calMonth, 0).getDate();
+            const leadingEmptySlots = new Date(calYear, calMonth - 1, 1).getDay(); // 0 = Sun
+            const numWeeks = Math.ceil((leadingEmptySlots + totalDaysInMonth) / 7);
 
             // Generate days with realistic multi-market P&L
             const daysData = Array.from({ length: totalDaysInMonth }).map((_, i) => {
@@ -8233,7 +8405,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               // Incorporate live logged trades for this date if present
               const dayLoggedTrades = allTrades.filter(t => {
                 const seg = (t.market_segment || 'Indian').toLowerCase();
-                return seg === marketSegment.toLowerCase() && (t.trade_date === dateStr);
+                return seg === marketSegment.toLowerCase() && (normalizeDateStr(t.trade_date) === dateStr);
               });
 
               if (dayLoggedTrades.length > 0) {
@@ -8261,14 +8433,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             const totalGreenDays = daysData.filter(d => d.isGreen).length;
             const totalRedDays = daysData.filter(d => d.isRed).length;
 
-            // Calculate weekly row totals (5 weeks)
-            const weekTotals = [
-              daysData.slice(0, 5).reduce((acc, d) => acc + d.pnlVal, 0),
-              daysData.slice(5, 12).reduce((acc, d) => acc + d.pnlVal, 0),
-              daysData.slice(12, 19).reduce((acc, d) => acc + d.pnlVal, 0),
-              daysData.slice(19, 26).reduce((acc, d) => acc + d.pnlVal, 0),
-              daysData.slice(26, 30).reduce((acc, d) => acc + d.pnlVal, 0)
-            ];
+            // Calculate weekly row totals dynamically for numWeeks
+            const weekTotals = Array.from({ length: numWeeks }).map((_, wIdx) => {
+              let sum = 0;
+              for (let c = 0; c < 7; c++) {
+                const slot = wIdx * 7 + c;
+                const dNum = slot - leadingEmptySlots + 1;
+                if (dNum >= 1 && dNum <= totalDaysInMonth) {
+                  sum += daysData[dNum - 1]?.pnlVal || 0;
+                }
+              }
+              return sum;
+            });
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -8315,22 +8491,25 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center', backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '2px 6px' }}>
                       <button
                         onClick={() => {
-                          const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
-                          const idx = months.indexOf(selectedReportMonth);
-                          if (idx > 0) setSelectedReportMonth(months[idx - 1]);
+                          const [y, m] = (selectedReportMonth || getCurrentMonthStr()).split('-').map(Number);
+                          const prev = new Date(y, m - 2, 1);
+                          setSelectedReportMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`);
                         }}
                         style={{ background: 'none', border: 'none', color: colors.textPrimary, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                       >
                         <ChevronLeft size={14} />
                       </button>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary, padding: '0 4px' }}>
-                        {selectedReportMonth === '2026-09' ? 'September 2026' : (selectedReportMonth === '2026-08' ? 'August 2026' : (selectedReportMonth === '2026-07' ? 'July 2026' : (selectedReportMonth === '2026-06' ? 'June 2026' : 'May 2026')))}
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary, padding: '0 4px', minWidth: '110px', textAlign: 'center' }}>
+                        {(() => {
+                          const [y, m] = (selectedReportMonth || getCurrentMonthStr()).split('-').map(Number);
+                          return new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                        })()}
                       </span>
                       <button
                         onClick={() => {
-                          const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
-                          const idx = months.indexOf(selectedReportMonth);
-                          if (idx < months.length - 1) setSelectedReportMonth(months[idx + 1]);
+                          const [y, m] = (selectedReportMonth || getCurrentMonthStr()).split('-').map(Number);
+                          const next = new Date(y, m, 1);
+                          setSelectedReportMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`);
                         }}
                         style={{ background: 'none', border: 'none', color: colors.textPrimary, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                       >
@@ -8432,7 +8611,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   </div>
 
                   {/* Calendar Weeks */}
-                  {[0, 1, 2, 3, 4].map((weekIdx) => {
+                  {Array.from({ length: numWeeks }).map((_, weekIdx) => {
                     const weekPnl = weekTotals[weekIdx] || 0;
                     return (
                       <div key={weekIdx} style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(7, 1fr)' : 'repeat(7, 1fr) 100px', gap: '8px', alignItems: 'stretch' }}>
@@ -8461,22 +8640,32 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             <div
                               key={colIdx}
                               onClick={() => {
-                                if (dayItem.isGreen || dayItem.isRed) {
+                                const actualTrades = allTrades.filter(t => {
+                                  const seg = (t.market_segment || 'Indian').toLowerCase();
+                                  return seg === marketSegment.toLowerCase() && (normalizeDateStr(t.trade_date) === dayItem.dateStr);
+                                });
+
+                                if (actualTrades.length > 0 || dayItem.isGreen || dayItem.isRed) {
                                   setSelectedCalendarSession({
                                     date: dayItem.dateStr,
                                     dayNum: dayItem.dayNum,
                                     pnl: dayItem.pnlVal,
-                                    trades: dayItem.isGreen ? 2 : 3,
-                                    strategy: dayItem.isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Session Chop',
-                                    discipline: dayItem.isGreen ? '5/5 Disciplined Execution' : '3/5 Cut Winners Early',
+                                    trades: actualTrades.length || (dayItem.isGreen ? 2 : 3),
+                                    strategy: actualTrades[0]?.strategy || (dayItem.isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Session Chop'),
+                                    discipline: actualTrades[0]?.discipline_score ? `${actualTrades[0].discipline_score}/5 Disciplined Execution` : (dayItem.isGreen ? '5/5 Disciplined Execution' : '3/5 Cut Winners Early'),
                                     market: marketSegment,
-                                    tradesList: dayItem.isGreen ? [
+                                    tradesList: actualTrades.length > 0 ? actualTrades.map(t => ({
+                                      symbol: t.symbol,
+                                      pnl: Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)),
+                                      type: t.trade_type || 'BUY',
+                                      rr: t.risk_reward_ratio || '1:2'
+                                    })) : (dayItem.isGreen ? [
                                       { symbol: marketSegment === 'Indian' ? 'NIFTY 24600 CE' : (marketSegment === 'Crypto' ? 'BTC/USDT' : 'EUR/USD'), pnl: Math.round(dayItem.pnlVal * 0.65), type: 'BUY', rr: '1:2.5' },
                                       { symbol: marketSegment === 'Indian' ? 'BANKNIFTY 52000 CE' : (marketSegment === 'Crypto' ? 'SOL/USDT' : 'GBP/USD'), pnl: Math.round(dayItem.pnlVal * 0.35), type: 'BUY', rr: '1:2.0' }
                                     ] : [
                                       { symbol: marketSegment === 'Indian' ? 'NIFTY 24500 PE' : 'BTC/USDT', pnl: Math.round(dayItem.pnlVal * 0.7), type: 'BUY', rr: '1:1.0' },
                                       { symbol: marketSegment === 'Indian' ? 'RELIANCE' : 'ETH/USDT', pnl: Math.round(dayItem.pnlVal * 0.3), type: 'BUY', rr: '1:1.0' }
-                                    ]
+                                    ])
                                   });
                                 }
                               }}
@@ -8489,7 +8678,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                cursor: (dayItem.isGreen || dayItem.isRed) ? 'pointer' : 'default',
+                                cursor: (dayItem.isGreen || dayItem.isRed || dayItem.pnlVal !== 0) ? 'pointer' : 'default',
                                 transition: 'all 0.15s ease',
                                 opacity: isMatchFilter ? (dayItem.isWeekend ? 0.45 : 1) : 0.2
                               }}
@@ -9362,43 +9551,69 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <span style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>✓ Auto-optimized &lt;50 KB (High Quality)</span>
                     </div>
 
-                    {(newTradeForm.screenshots?.length || 0) < 2 && (
-                      <label style={{
+                    {isCompressingPhoto ? (
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
                         padding: '10px 14px',
                         borderRadius: '8px',
-                        border: `1px dashed ${colors.borderColor}`,
+                        border: '1px dashed #2563eb',
                         backgroundColor: colors.bgInput,
-                        cursor: 'pointer',
                         fontSize: '11px',
-                        color: colors.textSecondary,
-                        transition: 'all 0.15s ease'
+                        fontWeight: '700',
+                        color: '#2563eb'
                       }}>
-                        <UploadCloud size={16} color="#2563eb" />
-                        <span>Upload photo #{((newTradeForm.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          style={{ display: 'none' }}
-                          onChange={async (e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (!files.length) return;
-                            const cur = newTradeForm.screenshots || [];
-                            const remaining = 2 - cur.length;
-                            const toProcess = files.slice(0, remaining);
-                            const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
-                            setNewTradeForm(prev => ({
-                              ...prev,
-                              screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
-                            }));
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Optimizing & compressing photo (&lt;50 KB)...</span>
+                      </div>
+                    ) : (
+                      (newTradeForm.screenshots?.length || 0) < 2 && (
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: `1px dashed ${colors.borderColor}`,
+                          backgroundColor: colors.bgInput,
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          color: colors.textSecondary,
+                          transition: 'all 0.15s ease'
+                        }}>
+                          <UploadCloud size={16} color="#2563eb" />
+                          <span>Upload photo #{((newTradeForm.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (!files.length) return;
+                              setIsCompressingPhoto(true);
+                              try {
+                                const cur = newTradeForm.screenshots || [];
+                                const remaining = 2 - cur.length;
+                                const toProcess = files.slice(0, remaining);
+                                const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
+                                setNewTradeForm(prev => ({
+                                  ...prev,
+                                  screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
+                                }));
+                              } catch (err) {
+                                console.error('Photo compress error:', err);
+                              } finally {
+                                setIsCompressingPhoto(false);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                        </label>
+                      )
                     )}
 
                     {(newTradeForm.screenshots?.length || 0) > 0 && (
@@ -9611,43 +9826,69 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <span style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>✓ Auto-optimized &lt;50 KB (High Quality)</span>
                 </div>
 
-                {(editingTrade.screenshots?.length || 0) < 2 && (
-                  <label style={{
+                {isCompressingPhoto ? (
+                  <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
                     padding: '10px 14px',
                     borderRadius: '8px',
-                    border: `1px dashed ${colors.borderColor}`,
+                    border: '1px dashed #2563eb',
                     backgroundColor: colors.bgInput,
-                    cursor: 'pointer',
                     fontSize: '11px',
-                    color: colors.textSecondary,
-                    transition: 'all 0.15s ease'
+                    fontWeight: '700',
+                    color: '#2563eb'
                   }}>
-                    <UploadCloud size={16} color="#2563eb" />
-                    <span>Upload photo #{((editingTrade.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      style={{ display: 'none' }}
-                      onChange={async (e) => {
-                        const files = Array.from(e.target.files || []);
-                        if (!files.length) return;
-                        const cur = editingTrade.screenshots || [];
-                        const remaining = 2 - cur.length;
-                        const toProcess = files.slice(0, remaining);
-                        const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
-                        setEditingTrade(prev => ({
-                          ...prev,
-                          screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
-                        }));
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Optimizing & compressing photo (&lt;50 KB)...</span>
+                  </div>
+                ) : (
+                  (editingTrade.screenshots?.length || 0) < 2 && (
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: `1px dashed ${colors.borderColor}`,
+                      backgroundColor: colors.bgInput,
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      color: colors.textSecondary,
+                      transition: 'all 0.15s ease'
+                    }}>
+                      <UploadCloud size={16} color="#2563eb" />
+                      <span>Upload photo #{((editingTrade.screenshots?.length || 0) + 1)} (Chart / Execution proof)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (!files.length) return;
+                          setIsCompressingPhoto(true);
+                          try {
+                            const cur = editingTrade.screenshots || [];
+                            const remaining = 2 - cur.length;
+                            const toProcess = files.slice(0, remaining);
+                            const compressedList = await Promise.all(toProcess.map(f => compressImageToDataUrl(f, 48)));
+                            setEditingTrade(prev => ({
+                              ...prev,
+                              screenshots: [...(prev.screenshots || []), ...compressedList.filter(Boolean)].slice(0, 2)
+                            }));
+                          } catch (err) {
+                            console.error('Photo compress error:', err);
+                          } finally {
+                            setIsCompressingPhoto(false);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  )
                 )}
 
                 {(editingTrade.screenshots?.length || 0) > 0 && (
