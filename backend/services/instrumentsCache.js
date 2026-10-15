@@ -259,6 +259,50 @@ function isCommodityContract(sym) {
     return COMMODITIES_LIST.some(c => clean.startsWith(c));
 }
 
+function isIndexContract(sym) {
+    if (!sym || typeof sym !== 'string') return false;
+    const upper = sym.trim().toUpperCase();
+    const clean = upper.replace(/^(NSE:|BSE:|NFO:|BFO:|MCX:|CDS:)/i, '').trim();
+
+    // 1. Exclude ALL derivatives (Options, Futures, NFO/BFO contracts)
+    if (upper.startsWith('NFO:') || upper.startsWith('BFO:') || upper.startsWith('MCX:') || upper.startsWith('CDS:')) {
+        return false;
+    }
+    if (clean.endsWith('CE') || clean.endsWith('PE') || clean.endsWith('FUT') || clean.endsWith('-FUT')) {
+        return false;
+    }
+    if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean)) {
+        return false;
+    }
+    if (/\d+.*?(CE|PE)$/i.test(clean)) {
+        return false;
+    }
+
+    // 2. Identify pure benchmark/spot indices (e.g. NSE:NIFTY50-INDEX, NIFTY, BANKNIFTY, SENSEX)
+    if (clean.includes('INDEX') || clean.endsWith('-INDEX')) {
+        return true;
+    }
+
+    const SPOT_INDICES = [
+        'NIFTY',
+        'NIFTY50',
+        'NIFTY 50',
+        'BANKNIFTY',
+        'NIFTYBANK',
+        'FINNIFTY',
+        'MIDCPNIFTY',
+        'MIDCAPNIFTY',
+        'NIFTYNXT50',
+        'NIFTY NEXT 50',
+        'NIFTYFPI',
+        'SENSEX',
+        'BANKEX'
+    ];
+
+    const normalizedClean = clean.replace(/[^A-Z0-9]/g, '');
+    return SPOT_INDICES.some(idx => normalizedClean === idx.replace(/[^A-Z0-9]/g, ''));
+}
+
 function isFnoEligibleStock(sym) {
     if (!sym || typeof sym !== 'string') return false;
     if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;
@@ -434,6 +478,7 @@ module.exports = {
     searchInstruments,
     isDerivativeContract,
     isCommodityContract,
+    isIndexContract,
     isFnoEligibleStock,
     getAssetSubsegment,
     isMCXWinterSession,

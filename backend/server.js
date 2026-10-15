@@ -9376,9 +9376,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
     const isDeriv = isDerivativeContract(symbol);
     const isCom = isCommodityContract(symbol);
+    const isIdx = isIndexContract(symbol);
 
     // 2. Cash Equity Minimum Liquidity / Volume Threshold Check
-    if (!isDeriv && !isCom) {
+    // Spot Indices (e.g. NIFTYBANK-INDEX, NIFTY50-INDEX) are benchmark indices, not individual cash equities, so exempt them
+    if (!isDeriv && !isCom && !isIdx) {
       const { isFnoEligibleStock } = require('./services/instrumentsCache');
       const isFno = isFnoEligibleStock(symbol);
       const cachedPriceData = getPriceDataFromCache(symbol);
@@ -11289,7 +11291,10 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
         // 2. Cash Equity Minimum Liquidity & Circuit Proximity Checks
         const isDeriv = isDerivativeContract(item.symbol);
-        if (!isDeriv && !isCommodity) {
+        const isCommodity = isCommodityContract(item.symbol);
+        const isIdx = isIndexContract(item.symbol);
+        // Spot Indices (e.g. NIFTYBANK-INDEX, NIFTY50-INDEX) are benchmark indices, not individual cash equities, so exempt them
+        if (!isDeriv && !isCommodity && !isIdx) {
           const { isFnoEligibleStock } = require('./services/instrumentsCache');
           const isFno = isFnoEligibleStock(item.symbol);
           const cachedPriceData = getPriceDataFromCache(item.symbol);
