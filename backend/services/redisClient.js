@@ -31,7 +31,14 @@ const createRedisClient = (name = 'redis') => {
     });
 
     client.on('reconnecting', () => console.log(`[${name}] Redis reconnecting...`));
-    client.on('ready', () => console.log(`[${name}] Redis ready.`));
+    client.on('ready', () => {
+        console.log(`[${name}] Redis ready.`);
+        if (name === 'general') {
+            // Redis Memory Guard: Cap memory at 512MB and evict expired/LRU keys automatically to prevent OOM crashes
+            client.configSet('maxmemory', '512mb').catch(() => {});
+            client.configSet('maxmemory-policy', 'allkeys-lru').catch(() => {});
+        }
+    });
 
     client.connect().catch(err => console.error(`[${name}] Initial connect error:`, err.message));
     return client;

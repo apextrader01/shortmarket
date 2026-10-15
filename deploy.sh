@@ -50,7 +50,20 @@ pm2 delete shortmarket-backend 2>/dev/null || true
 pm2 reload "$APP_NAME" --update-env 2>/dev/null || pm2 restart "$APP_NAME" --update-env 2>/dev/null || pm2 start ecosystem.config.js
 pm2 save 2>/dev/null || true
 
-# 6. Ensure Nginx proxy buffers are configured (Prevents 502 Bad Gateway from upstream header overflow)
+# 6. Production Resource Safeguards (ROM & RAM Protection)
+echo "🛡️  Configuring PM2 Log Rotation & Redis Memory Guard..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 install pm2-logrotate 2>/dev/null || true
+  pm2 set pm2-logrotate:max_size 10M 2>/dev/null || true
+  pm2 set pm2-logrotate:retain 7 2>/dev/null || true
+fi
+
+if command -v redis-cli >/dev/null 2>&1; then
+  redis-cli config set maxmemory 512mb 2>/dev/null || true
+  redis-cli config set maxmemory-policy allkeys-lru 2>/dev/null || true
+fi
+
+# 7. Ensure Nginx proxy buffers are configured (Prevents 502 Bad Gateway from upstream header overflow)
 if [ -d "/etc/nginx/sites-available" ]; then
   for conf in /etc/nginx/sites-available/*; do
     if [ -f "$conf" ] && grep -q "proxy_pass" "$conf" && ! grep -q "proxy_buffer_size" "$conf"; then

@@ -243,6 +243,9 @@ export default function ChartWidget({
     );
     if (!isSessionOpen) return;
 
+    // GPU Optimization: Skip canvas redraws when browser tab is minimized or hidden in background
+    if (typeof document !== 'undefined' && document.hidden) return;
+
     const rawTs = currentPrice.timestamp ? Math.floor(new Date(currentPrice.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000);
     const tickSec = (rawTs > 0 ? rawTs : Math.floor(Date.now() / 1000)) + 19800;
 
@@ -305,6 +308,17 @@ export default function ChartWidget({
       }
     }
   }, [chartInterval, selectedSymbol]);
+
+  // GPU Optimization: Instant catchup when user returns to tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mountedRef.current && candleSeriesRef.current && price) {
+        updateLiveCandle(price);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [price, updateLiveCandle]);
 
   // Push candle and indicator data into chart
   useEffect(() => {

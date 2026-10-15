@@ -1204,7 +1204,7 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
                 }
             }
 
-            await runOrderLifecycleArchive(30);
+            await runOrderLifecycleArchive(14);
             console.log('✅ [CRON 08:05 AM] Morning Order Lifecycle completed successfully.');
         } catch (err) {
             console.error('❌ [CRON 08:05 AM] Morning Order Lifecycle failed:', err.message);
@@ -1349,12 +1349,12 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
             }
             console.log(`✅ [CRON 8:37 AM] Watchlist cleanup complete. Removed ${totalRemoved} expired symbol(s) across ${usersUpdated} user(s).`);
 
-            // Purge stale user sessions older than 30 days to prevent table bloat and protect DB indexes
+            // Purge stale user sessions older than 14 days to prevent table bloat and protect DB indexes
             try {
-                const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
-                const purgedSessions = await db('user_sessions').where('created_at', '<', thirtyDaysAgo).del();
+                const fourteenDaysAgo = new Date(Date.now() - (14 * 24 * 60 * 60 * 1000));
+                const purgedSessions = await db('user_sessions').where('created_at', '<', fourteenDaysAgo).del();
                 if (purgedSessions > 0) {
-                    console.log(`[CRON] Purged ${purgedSessions} stale user session(s) older than 30 days.`);
+                    console.log(`[CRON] Purged ${purgedSessions} stale user session(s) older than 14 days.`);
                 }
             } catch (sessErr) {}
 
@@ -1433,10 +1433,10 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
 
 /**
  * Run the Morning Order Lifecycle Purge & Archive (Executes at 08:05 AM IST every morning).
- * 1. Purge CANCELLED & REJECTED orders older than cutoffDays (default 30 days).
+ * 1. Purge CANCELLED & REJECTED orders older than cutoffDays (default 14 days).
  * 2. Archive EXECUTED orders older than cutoffDays to orders_archive table.
  */
-async function runOrderLifecycleArchive(cutoffDays = 30) {
+async function runOrderLifecycleArchive(cutoffDays = 14) {
     try {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - cutoffDays);
