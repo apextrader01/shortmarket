@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import QRCode from 'qrcode';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Tablet, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy, ChevronDown, ChevronUp, Layers, Cpu, History, Sparkles, CheckCheck } from 'lucide-react';
@@ -1115,12 +1116,11 @@ export function BiometricSettingsSection({ user, mode = 'all' }) {
         setTotpQrDataUrl(totpSetupData.qrCode);
       } else {
         const otpauth = totpSetupData.otpauth_url || `otpauth://totp/SkandX:${encodeURIComponent(user?.email || 'User')}?secret=${totpSetupData.secret}&issuer=SkandX`;
-        import('qrcode').then(m => {
-          const QRCode = m.default || m;
-          QRCode.toDataURL(otpauth, { width: 256, margin: 2 }).then(url => {
+        QRCode.toDataURL(otpauth, { width: 256, margin: 2 })
+          .then(url => {
             if (active) setTotpQrDataUrl(url);
-          }).catch(() => {});
-        }).catch(() => {});
+          })
+          .catch(() => {});
       }
     } else {
       setTotpQrDataUrl('');
@@ -1164,6 +1164,14 @@ export function BiometricSettingsSection({ user, mode = 'all' }) {
     setStatusMsg({ type: '', text: '' });
     const data = await fetchTotpSetup();
     if (data && data.success) {
+      if (data.qrCode && data.qrCode.startsWith('data:image/')) {
+        setTotpQrDataUrl(data.qrCode);
+      } else if (data.otpauth_url) {
+        try {
+          const url = await QRCode.toDataURL(data.otpauth_url, { width: 256, margin: 2 });
+          setTotpQrDataUrl(url);
+        } catch (_) {}
+      }
       setTotpSetupData(data);
       setShowTotpSetup(true);
       setShowTotpDisable(false);
@@ -1661,8 +1669,6 @@ export function BiometricSettingsSection({ user, mode = 'all' }) {
                   style={{ width: '160px', height: '160px', display: 'block', objectFit: 'contain' }}
                   onError={async () => {
                     try {
-                      const m = await import('qrcode');
-                      const QRCode = m.default || m;
                       const otpauth = totpSetupData.otpauth_url || `otpauth://totp/SkandX:${encodeURIComponent(user?.email || 'User')}?secret=${totpSetupData.secret}&issuer=SkandX`;
                       const url = await QRCode.toDataURL(otpauth, { width: 256, margin: 2 });
                       setTotpQrDataUrl(url);

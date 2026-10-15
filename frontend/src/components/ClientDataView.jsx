@@ -28,7 +28,7 @@ function Card({ title, desc, icon: Icon, color, onClick, badge }) {
 
 
 
-export default function ClientDataView({ onDepositClick, setActiveTab }) {
+export default function ClientDataView({ onDepositClick, setActiveTab, activeTab }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const { links: socialLinks } = useSocialLinks();
   const [showSupportChannelsModal, setShowSupportChannelsModal] = useState(false);
@@ -64,13 +64,31 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [showProfile, setShowProfile] = useState(() => activeTab === 'Settings');
   const [settingsTab, setSettingsTab] = useState('all');
   const [showResetModal, setShowResetModal] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'Settings') {
+      setShowProfile(true);
+    } else if (activeTab === 'ClientData') {
+      setShowProfile(false);
+    }
+  }, [activeTab]);
 
   const openSettingsTab = (tab = 'all') => {
     setSettingsTab(tab);
     setShowProfile(true);
+    if (setActiveTab) {
+      setActiveTab('Settings');
+    }
+  };
+
+  const handleBackToDashboard = () => {
+    setShowProfile(false);
+    if (setActiveTab) {
+      setActiveTab('ClientData');
+    }
   };
 
   const [copiedId, setCopiedId] = useState(false);
@@ -384,15 +402,18 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   };
   if (showProfile) {
     return (
-      <div style={{ padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
-        <button 
-          className="btn btn-secondary" 
-          onClick={() => setShowProfile(false)} 
-          style={{ marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
-        >
-          &larr; Back to Dashboard
-        </button>
-        <SettingsView initialTab={settingsTab} onBack={() => setShowProfile(false)} />
+      <div style={{ flex: 1, height: '100%', overflowY: 'auto', background: 'var(--bg-dark)', padding: isMobile ? '16px 12px 90px 12px' : '20px 24px 60px 24px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          <button 
+            type="button"
+            className="btn btn-secondary" 
+            onClick={handleBackToDashboard} 
+            style={{ marginBottom: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '13.5px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            &larr; Back to Dashboard
+          </button>
+          <SettingsView initialTab={settingsTab} onBack={handleBackToDashboard} />
+        </div>
       </div>
     );
   }
@@ -962,7 +983,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button
                     type="button"
-                    onClick={() => setShowProfile(true)}
+                    onClick={() => openSettingsTab('alerts')}
                     style={{
                       padding: '7px 14px',
                       background: 'linear-gradient(135deg, #0088cc 0%, #006699 100%)',

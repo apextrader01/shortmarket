@@ -1979,7 +1979,7 @@ function App() {
               {(activeTab === 'ClientData' || activeTab === 'Settings') && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflow: 'hidden' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
+                    <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} activeTab={activeTab} />
                   </Suspense>
                 </div>
               )}
@@ -2261,7 +2261,7 @@ function App() {
             <Briefcase size={20} />
             <span>Portfolio</span>
           </div>
-          <div className={`mobile-nav-item ${activeTab === 'ClientData' ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
+          <div className={`mobile-nav-item ${(activeTab === 'ClientData' || activeTab === 'Settings') ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
             <User size={20} />
             <span>Profile</span>
           </div>
