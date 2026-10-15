@@ -3115,6 +3115,48 @@ export default function LandingHomeView({
             </div>
           </div>
 
+          {/* Regulatory Safeguards & Platform Compliance Notice */}
+          <div style={{
+            padding: '16px 18px',
+            background: isLight ? 'rgba(248, 250, 252, 0.85)' : 'rgba(17, 24, 39, 0.65)',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+            borderRadius: '12px',
+            fontSize: '11.5px',
+            lineHeight: '1.6',
+            color: t.textSecondary
+          }}>
+            <div style={{ fontWeight: '800', color: t.heading, fontSize: '12.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldCheck size={16} color={isLight ? '#0284c7' : '#38bdf8'} />
+              <span>Website Copy &amp; Regulatory Safeguards</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+              <div style={{ background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}` }}>
+                <div style={{ fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc', marginBottom: '4px' }}>
+                  1. Explicit Risk &amp; Educational Disclaimers
+                </div>
+                <div>
+                  "SkandX is strictly an educational market simulation and financial calculation platform. We are not a SEBI-registered investment advisor, research analyst, or stockbroker. No financial advice, stock tips, buy/sell calls, or guaranteed returns are provided."
+                </div>
+              </div>
+              <div style={{ background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}` }}>
+                <div style={{ fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc', marginBottom: '4px' }}>
+                  2. No Fund Handling / Zero Escrow
+                </div>
+                <div>
+                  "Paper trading simulator uses virtual currency for educational purposes. All trading capital, margins, and P&amp;L are 100% virtual and hold no monetary value. SkandX does not accept, hold, or escrow public deposits or client investment funds."
+                </div>
+              </div>
+              <div style={{ background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}` }}>
+                <div style={{ fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc', marginBottom: '4px' }}>
+                  3. Open Broker Ecosystem (Angel One SmartAPI)
+                </div>
+                <div>
+                  "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level."
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',

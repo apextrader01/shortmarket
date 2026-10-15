@@ -2373,6 +2373,27 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
+              {/* Regulatory & Open Broker Compliance Notice */}
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px 16px',
+                background: 'rgba(56, 189, 248, 0.06)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                fontSize: '12px',
+                color: '#cbd5e1',
+                lineHeight: '1.5'
+              }}>
+                <ShieldCheck size={18} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <strong style={{ color: '#38bdf8' }}>SEBI-Mandated Risk Protection &amp; Open Broker Ecosystem:</strong>{' '}
+                  Rather than forcing a custom execution engine, SkandX interfaces with Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level.
+                </div>
+              </div>
+
               {demats.length === 0 ? (
                 <div style={{
                   background: '#101726',
