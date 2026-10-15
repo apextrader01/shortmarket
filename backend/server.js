@@ -15075,6 +15075,18 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
       updateData.screenshot_url = JSON.stringify(updateData.screenshot_url);
     }
 
+    if (updateData.trade_date) {
+      updateData.trade_date = String(updateData.trade_date).trim().slice(0, 10);
+    }
+    if (updateData.entry_price !== undefined) updateData.entry_price = parseFloat(updateData.entry_price) || 0;
+    if (updateData.exit_price !== undefined) updateData.exit_price = parseFloat(updateData.exit_price) || 0;
+    if (updateData.quantity !== undefined) updateData.quantity = parseFloat(updateData.quantity) || 1;
+    if (updateData.realized_pnl !== undefined) updateData.realized_pnl = parseFloat(updateData.realized_pnl) || 0;
+    if (updateData.net_pnl !== undefined) updateData.net_pnl = parseFloat(updateData.net_pnl) || 0;
+    if (updateData.charges !== undefined) updateData.charges = parseFloat(updateData.charges) || 0;
+    if (updateData.trade_type !== undefined) updateData.trade_type = String(updateData.trade_type).toUpperCase();
+    if (updateData.symbol !== undefined) updateData.symbol = String(updateData.symbol).toUpperCase().trim();
+
     let query = db('journal_trades').where({ user_id: req.user.id });
     if (/^\d+$/.test(String(id))) {
       query = query.where({ id: parseInt(id) });
@@ -15084,7 +15096,12 @@ app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
 
     const [updated] = await query.update(updateData).returning('*');
 
-    res.json({ success: true, trade: updated });
+    const formattedTrade = updated ? {
+      ...updated,
+      trade_date: updated.trade_date ? String(updated.trade_date).slice(0, 10) : updated.trade_date
+    } : updated;
+
+    res.json({ success: true, trade: formattedTrade });
   } catch (err) {
     console.error('Update Journal Trade Error:', err);
     res.status(500).json({ error: err.message });

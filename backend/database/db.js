@@ -1129,6 +1129,9 @@ async function ensureCriticalColumns() {
       )
     `);
     await db.raw('ALTER TABLE journal_trades ADD COLUMN IF NOT EXISTS trade_date VARCHAR(20)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ALTER COLUMN quantity TYPE NUMERIC(14, 4)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ALTER COLUMN entry_price TYPE NUMERIC(14, 5)').catch(() => {});
+    await db.raw('ALTER TABLE journal_trades ALTER COLUMN exit_price TYPE NUMERIC(14, 5)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_id ON journal_trades(user_id)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_trade_date ON journal_trades(trade_date)').catch(() => {});
 

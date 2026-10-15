@@ -585,14 +585,22 @@ tbody tr:hover {
     padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom, 0px))) !important;
   }
 
-  /* Ensure mobile stock sheets and modal drawers clear floating 3-button & gesture bars */
+  /* Ensure mobile stock sheets and modal drawers clear floating 3-button & gesture bars (Samsung, Xiaomi, Pixel, OnePlus) */
   .mobile-stock-footer,
   .order-modal-footer {
-    padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom, 0px))) !important;
+    padding-bottom: max(34px, calc(16px + env(safe-area-inset-bottom, 18px))) !important;
   }
 
   .mobile-stock-sheet {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(32px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Prevent third-party gateway popups (like Cashfree) from falling behind floating 3-button navigation bars */
+  iframe[id*="cashfree"],
+  div[id*="cashfree"],
+  #cf-checkout-modal {
+    padding-bottom: max(36px, env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
   }
 
   /* Ensure fixed-position modals without modal-backdrop also sit above bottom nav */

@@ -1096,6 +1096,38 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   };
 
   useEffect(() => {
+    // When user session initializes or hydrates, check user and guest cached trades immediately
+    if (user?.id) {
+      try {
+        const userSaved = localStorage.getItem(`skandx_diary_trades_${user.id}`);
+        const guestSaved = localStorage.getItem('skandx_diary_trades_guest');
+        let parsedUser = [];
+        let parsedGuest = [];
+        if (userSaved) {
+          try { parsedUser = JSON.parse(userSaved); } catch (_) {}
+        }
+        if (guestSaved) {
+          try { parsedGuest = JSON.parse(guestSaved); } catch (_) {}
+        }
+        const userTrades = Array.isArray(parsedUser) ? parsedUser : [];
+        const guestTrades = Array.isArray(parsedGuest) ? parsedGuest : [];
+        const existingIds = new Set(userTrades.map(t => String(t.id || t.trade_id)));
+        const unmergedGuests = guestTrades.filter(t => !existingIds.has(String(t.id || t.trade_id)));
+        const combined = [...unmergedGuests, ...userTrades];
+        if (combined.length > 0) {
+          setDbTrades(prev => {
+            if (prev.length === 0) {
+              return combined.map(t => ({
+                ...t,
+                trade_date: normalizeDateStr(t.trade_date || t.created_at || todayStr),
+                screenshots: parseScreenshots(t)
+              }));
+            }
+            return prev;
+          });
+        }
+      } catch (_) {}
+    }
     fetchJournalData();
   }, [user]);
 
@@ -1465,16 +1497,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     e.preventDefault();
     if (!editingTrade) return;
 
-    const entry = parseFloat(editingTrade.entry_price);
-    const exit = parseFloat(editingTrade.exit_price);
-    const qty = parseFloat(editingTrade.quantity);
+    const entry = !isNaN(parseFloat(editingTrade.entry_price)) ? parseFloat(editingTrade.entry_price) : 0;
+    const exit = !isNaN(parseFloat(editingTrade.exit_price)) ? parseFloat(editingTrade.exit_price) : 0;
+    const qty = !isNaN(parseFloat(editingTrade.quantity)) && parseFloat(editingTrade.quantity) > 0 ? parseFloat(editingTrade.quantity) : 1;
     const charges = parseFloat(editingTrade.charges) || 0;
 
     let realizedPnl = 0;
-    if (!isNaN(entry) && !isNaN(exit) && !isNaN(qty)) {
-      realizedPnl = editingTrade.trade_type === 'BUY'
+    if (entry > 0 && exit > 0 && qty > 0) {
+      realizedPnl = (editingTrade.trade_type || 'BUY').toUpperCase() === 'BUY'
         ? (exit - entry) * qty
         : (entry - exit) * qty;
+    } else if (!isNaN(parseFloat(editingTrade.realized_pnl))) {
+      realizedPnl = parseFloat(editingTrade.realized_pnl);
     }
     const netPnl = realizedPnl - charges;
 
@@ -1482,7 +1516,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
     const updated = {
       ...editingTrade,
-      trade_date: normalizeDateStr(editingTrade.trade_date || todayStr),
+      symbol: (editingTrade.symbol || 'NIFTY').trim().toUpperCase(),
+      market_segment: editingTrade.market_segment || marketSegment || 'Indian',
+      trade_type: (editingTrade.trade_type || 'BUY').toUpperCase(),
+      trade_date: normalizeDateStr(editingTrade.trade_date || todayStr) || getTodayStr(),
       entry_price: entry,
       exit_price: exit,
       quantity: qty,
@@ -1569,24 +1606,29 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   // Handle Save New Trade Form
   const handleSaveNewTrade = async (e) => {
     e.preventDefault();
-    const entry = parseFloat(newTradeForm.entry_price);
-    const exit = parseFloat(newTradeForm.exit_price);
-    const qty = parseFloat(newTradeForm.quantity);
+    const entry = !isNaN(parseFloat(newTradeForm.entry_price)) ? parseFloat(newTradeForm.entry_price) : 0;
+    const exit = !isNaN(parseFloat(newTradeForm.exit_price)) ? parseFloat(newTradeForm.exit_price) : 0;
+    const qty = !isNaN(parseFloat(newTradeForm.quantity)) && parseFloat(newTradeForm.quantity) > 0 ? parseFloat(newTradeForm.quantity) : 1;
     const charges = !isNaN(parseFloat(newTradeForm.charges)) ? parseFloat(newTradeForm.charges) : (newTradeForm.market_segment === 'Indian' ? 40 : 0);
 
     let realizedPnl = 0;
-    if (!isNaN(entry) && !isNaN(exit) && !isNaN(qty)) {
-      realizedPnl = newTradeForm.trade_type === 'BUY' 
+    if (entry > 0 && exit > 0 && qty > 0) {
+      realizedPnl = (newTradeForm.trade_type || 'BUY').toUpperCase() === 'BUY' 
         ? (exit - entry) * qty 
         : (entry - exit) * qty;
+    } else if (!isNaN(parseFloat(newTradeForm.realized_pnl))) {
+      realizedPnl = parseFloat(newTradeForm.realized_pnl);
     }
     const netPnl = realizedPnl - charges;
 
-    const cleanDate = normalizeDateStr(newTradeForm.trade_date || todayStr);
+    const cleanDate = normalizeDateStr(newTradeForm.trade_date || todayStr) || getTodayStr();
     const screenshots = Array.isArray(newTradeForm.screenshots) ? newTradeForm.screenshots : [];
 
     const tradeData = {
       ...newTradeForm,
+      symbol: (newTradeForm.symbol || 'NIFTY').trim().toUpperCase(),
+      market_segment: newTradeForm.market_segment || marketSegment || 'Indian',
+      trade_type: (newTradeForm.trade_type || 'BUY').toUpperCase(),
       trade_date: cleanDate,
       entry_price: entry,
       exit_price: exit,
@@ -4559,14 +4601,31 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     {allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length > 0 ? (
                       <>
                         <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
-                          You have {allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length} trade(s) saved in All Time.
+                          You have {allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length} trade(s) saved in {marketSegment}.
                         </p>
                         <button
                           onClick={() => { setTimeRange('ALL'); setTradeSearch(''); setTradeSideFilter('ALL'); setTradeOutcomeFilter('ALL'); }}
                           style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                         >
-                          View All {marketSegment} Trades ({allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase()).length})
+                          Show All {marketSegment} Trades
                         </button>
+                      </>
+                    ) : allTrades.length > 0 ? (
+                      <>
+                        <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
+                          You have {allTrades.length} saved trade(s) in other markets.
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+                          {Array.from(new Set(allTrades.map(t => t.market_segment || 'Indian'))).map(seg => (
+                            <button
+                              key={seg}
+                              onClick={() => { setMarketSegment(seg); setTimeRange('ALL'); }}
+                              style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Switch to {seg} ({allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === seg.toLowerCase()).length})
+                            </button>
+                          ))}
+                        </div>
                       </>
                     ) : (
                       <>
