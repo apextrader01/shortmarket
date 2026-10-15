@@ -2957,25 +2957,33 @@ export const useStore = create(persist((set, get) => ({
   fontSize: 'medium',
   accessibilityMode: false,
   setFontSize: (size) => set((state) => {
-    document.body.classList.remove('font-small', 'font-medium', 'font-large');
-    document.body.classList.add('font-' + size);
-    
-    // Direct DOM manipulation for instant scaling bypassing CSS cache
-    if (size === 'small') {
-      document.body.style.zoom = '0.85';
-      document.documentElement.style.setProperty('--app-scale', '0.85');
-      document.body.style.MozTransform = 'scale(0.85)';
-      document.body.style.MozTransformOrigin = 'top left';
-    } else if (size === 'large') {
-      document.body.style.zoom = '1.1';
-      document.documentElement.style.setProperty('--app-scale', '1.1');
-      document.body.style.MozTransform = 'scale(1.1)';
-      document.body.style.MozTransformOrigin = 'top left';
-    } else {
-      document.body.style.zoom = '1';
-      document.documentElement.style.setProperty('--app-scale', '1');
-      document.body.style.MozTransform = 'scale(1)';
-      document.body.style.MozTransformOrigin = 'top left';
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      const body = document.body;
+
+      root.classList.remove('font-small', 'font-medium', 'font-large');
+      root.classList.add('font-' + size);
+      body.classList.remove('font-small', 'font-medium', 'font-large');
+      body.classList.add('font-' + size);
+      
+      // Clear legacy body inline styles that caused the bottom black gap
+      body.style.zoom = '';
+      body.style.MozTransform = '';
+      body.style.MozTransformOrigin = '';
+      body.style.width = '';
+      body.style.height = '';
+
+      // Direct root zoom for full viewport scaling with zero black gap
+      if (size === 'small') {
+        root.style.zoom = '0.9';
+        root.style.setProperty('--app-scale', '0.9');
+      } else if (size === 'large') {
+        root.style.zoom = '1.08';
+        root.style.setProperty('--app-scale', '1.08');
+      } else {
+        root.style.zoom = '1';
+        root.style.setProperty('--app-scale', '1');
+      }
     }
     
     return { fontSize: size };
