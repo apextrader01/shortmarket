@@ -7771,7 +7771,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       { id: 'STANDARD', label: '🎯 Standard (1.0%)', pct: 1.0 },
                       { id: 'AGGRESSIVE', label: '⚡ Aggressive (2.0%)', pct: 2.0 }
                     ].map(p => {
-                      const isActive = riskProfilePreset === p.id || parseFloat(riskCalc.riskPct) === p.pct;
+                      const isActive = Math.abs(parseFloat(riskCalc.riskPct || 0) - p.pct) < 0.001;
                       return (
                         <button
                           key={p.id}
