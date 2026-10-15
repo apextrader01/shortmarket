@@ -432,15 +432,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       id: 1,
       name: 'Breakout Momentum',
       category: 'Momentum',
-      win_rate: 68,
-      total_trades: 24,
-      net_pnl: 48500,
-      profit_factor: 2.65,
+      win_rate: 0,
+      total_trades: 0,
+      net_pnl: 0,
+      profit_factor: 0,
       target_rr: '1:2.5',
       timeframe: '5-Min / 15-Min',
-      avg_win: 3200,
-      avg_loss: 1250,
-      max_streak: 5,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
       color: '#3b82f6',
       description: 'Identifies high-volume consolidation breaks above key horizontal resistance or previous day highs with 200 EMA trend alignment.',
       rules: [
@@ -455,15 +455,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       id: 2,
       name: 'Support & Resistance Bounce',
       category: 'Reversal',
-      win_rate: 55,
-      total_trades: 18,
-      net_pnl: 22100,
-      profit_factor: 1.85,
+      win_rate: 0,
+      total_trades: 0,
+      net_pnl: 0,
+      profit_factor: 0,
       target_rr: '1:2.0',
       timeframe: '15-Min / 1-Hour',
-      avg_win: 2400,
-      avg_loss: 1300,
-      max_streak: 3,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
       color: '#10b981',
       description: 'Fading extreme touches at established daily/hourly supply-demand zones with pin bar or bullish/bearish engulfing rejection confirmation.',
       rules: [
@@ -478,15 +478,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       id: 3,
       name: 'Option Selling Theta Decay',
       category: 'Options',
-      win_rate: 78,
-      total_trades: 32,
-      net_pnl: 64200,
-      profit_factor: 3.10,
+      win_rate: 0,
+      total_trades: 0,
+      net_pnl: 0,
+      profit_factor: 0,
       target_rr: '1:1.5',
       timeframe: '15-Min / 30-Min',
-      avg_win: 2600,
-      avg_loss: 1800,
-      max_streak: 8,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
       color: '#8b5cf6',
       description: 'Selling OTM Strangle / Straddle or Iron Condor spreads on high IV or weekly expiry sessions to capture systematic time decay.',
       rules: [
@@ -501,15 +501,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       id: 4,
       name: 'VWAP Mean Reversion',
       category: 'Mean Reversion',
-      win_rate: 42,
-      total_trades: 12,
-      net_pnl: -8400,
-      profit_factor: 0.82,
+      win_rate: 0,
+      total_trades: 0,
+      net_pnl: 0,
+      profit_factor: 0,
       target_rr: '1:2.0',
       timeframe: '5-Min',
-      avg_win: 1800,
-      avg_loss: 2100,
-      max_streak: 2,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
       color: '#f59e0b',
       description: 'Catching extended overbought/oversold moves 2 standard deviations away from intraday VWAP fading back to volume weighted equilibrium.',
       rules: [
@@ -524,15 +524,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       id: 5,
       name: 'Scalping Quick Momentum',
       category: 'Scalping',
-      win_rate: 62,
-      total_trades: 28,
-      net_pnl: 31400,
-      profit_factor: 2.15,
+      win_rate: 0,
+      total_trades: 0,
+      net_pnl: 0,
+      profit_factor: 0,
       target_rr: '1:1.8',
       timeframe: '1-Min / 3-Min',
-      avg_win: 1950,
-      avg_loss: 980,
-      max_streak: 4,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
       color: '#06b6d4',
       description: 'Ultra-fast intraday scalps on momentum explosions, rapid order book liquidity bursts, and Opening Range Breakout (ORB) spikes.',
       rules: [
@@ -558,8 +558,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'RISK',
       severity: 'CRITICAL',
       consequence: 'Prevents catastrophic drawdowns and ensures long-term account survival.',
-      followed: 45,
-      broken: 2,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -568,7 +568,7 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'RISK',
       severity: 'CRITICAL',
       consequence: 'Eliminates open-ended downside risk from sudden market crashes or flash spikes.',
-      followed: 48,
+      followed: 0,
       broken: 0,
       active: true
     },
@@ -578,8 +578,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'DISCIPLINE',
       severity: 'HIGH',
       consequence: 'Stops revenge trading spirals and excessive brokerage fee erosion.',
-      followed: 38,
-      broken: 5,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -588,8 +588,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'EXECUTION',
       severity: 'HIGH',
       consequence: 'Filters out false breakouts and prevents chasing intraday wick traps.',
-      followed: 31,
-      broken: 4,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -598,8 +598,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'PSYCHOLOGY',
       severity: 'CRITICAL',
       consequence: 'Resets dopamine and emotional state to prevent tilt-induced capital destruction.',
-      followed: 29,
-      broken: 3,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -608,8 +608,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'RISK',
       severity: 'CRITICAL',
       consequence: 'Avoids turning a calculated small loss into an unrecoverable portfolio blowout.',
-      followed: 35,
-      broken: 1,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -618,8 +618,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'RISK',
       severity: 'HIGH',
       consequence: 'Protects equity against extreme slippage and wide bid-ask spread widening.',
-      followed: 22,
-      broken: 1,
+      followed: 0,
+      broken: 0,
       active: true
     },
     {
@@ -628,8 +628,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       category: 'DISCIPLINE',
       severity: 'STANDARD',
       consequence: 'Ensures calm, structured decision-making before market bell rings.',
-      followed: 40,
-      broken: 2,
+      followed: 0,
+      broken: 0,
       active: true
     }
   ]);
@@ -645,8 +645,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'FOMO Entry on extended green candle',
       category: 'PSYCHOLOGY',
       severity: 'CRITICAL',
-      loss: 14500,
-      count: 4,
+      loss: 0,
+      count: 0,
       trigger: 'Panicking that the market will rocket higher without you after a big green candle.',
       antidote: 'Wait for 20-EMA pullback or flag consolidation. Never chase market orders into resistance.',
       resolved: false
@@ -656,8 +656,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'Moving Stoploss further down in losing position',
       category: 'RISK',
       severity: 'CRITICAL',
-      loss: 22800,
-      count: 2,
+      loss: 0,
+      count: 0,
       trigger: 'Refusal to accept loss, hoping price will bounce back and save the trade.',
       antidote: 'System hard stop-loss is inviolable. Accept predefined loss immediately without hesitation.',
       resolved: false
@@ -667,8 +667,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'Trading without setup checklist confirmation',
       category: 'EXECUTION',
       severity: 'HIGH',
-      loss: 9200,
-      count: 3,
+      loss: 0,
+      count: 0,
       trigger: 'Boredom or impulsive anticipation before technical confluence is met.',
       antidote: 'Check all 4 pre-trade criteria (trend, volume, candle close, risk/reward) before placing order.',
       resolved: false
@@ -678,8 +678,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'Over-leveraged oversized position size',
       category: 'RISK',
       severity: 'CRITICAL',
-      loss: 18400,
-      count: 2,
+      loss: 0,
+      count: 0,
       trigger: 'Greed attempting to make big fast profits or recover a previous loss quickly.',
       antidote: 'Calculate exact lot size with Risk Calculator to strictly cap downside at 1% portfolio equity.',
       resolved: false
@@ -689,8 +689,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'Exiting winners too early before target',
       category: 'EXIT_TIMING',
       severity: 'HIGH',
-      loss: 11200,
-      count: 5,
+      loss: 0,
+      count: 0,
       trigger: 'Anxiety and fear of giving back unrealized green profits.',
       antidote: 'Trail stop-loss using the 9-EMA or supertrend rather than manual emotional exits.',
       resolved: false
@@ -700,8 +700,8 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
       name: 'Revenge trading right after taking a Stop-Loss',
       category: 'PSYCHOLOGY',
       severity: 'CRITICAL',
-      loss: 16500,
-      count: 3,
+      loss: 0,
+      count: 0,
       trigger: 'Anger and ego hurt from a red trade demanding immediate market payback.',
       antidote: 'Mandatory 15-minute terminal lock and screen detachment after any loss.',
       resolved: false
@@ -813,21 +813,15 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   
   // Custom checklist items state (stored per category)
   const [customChecklistItems, setCustomChecklistItems] = useState({
-    preMarket: [
-      { id: 'c-pre-1', label: 'Checked Open Interest (PCR Ratio) and Option Chain Build-up', checked: true }
-    ],
-    inMarket: [
-      { id: 'c-in-1', label: 'Maintained strictly 1 trade at a time (No multi-symbol confusion)', checked: true }
-    ],
-    postMarket: [
-      { id: 'c-post-1', label: 'Uploaded trade screenshot with entry/exit marks to journal', checked: false }
-    ]
+    preMarket: [],
+    inMarket: [],
+    postMarket: []
   });
 
   // Daily Sentiment & Market Theme tags
   const [dailySentiment, setDailySentiment] = useState({
-    regime: '🔥 Trending Bullish',
-    discipline: '⭐ 5/5 Flawless'
+    regime: 'Neutral / Balanced',
+    discipline: 'Awaiting Session'
   });
 
   // Monthly Report Selected Month State (dynamic to current year-month e.g. 2026-10)
@@ -835,25 +829,25 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
 
   const [todayChecklist, setTodayChecklist] = useState({
     preMarket: {
-      globalMarketsChecked: true,
-      supportResistanceDrawn: true,
-      dailyRiskLimitSet: true,
+      globalMarketsChecked: false,
+      supportResistanceDrawn: false,
+      dailyRiskLimitSet: false,
       highImpactNewsNoted: false,
-      tradingPlanWritten: true
+      tradingPlanWritten: false
     },
     inMarket: {
-      stopLossPlacedImmediately: true,
-      positionSizedProperly: true,
-      candleCloseWaited: true,
-      noRevengeTrading: true
+      stopLossPlacedImmediately: false,
+      positionSizedProperly: false,
+      candleCloseWaited: false,
+      noRevengeTrading: false
     },
     postMarket: {
-      allTradesLogged: true,
+      allTradesLogged: false,
       mistakesReviewed: false,
-      emotionsDocumented: true,
-      dailyPnLReconciled: true
+      emotionsDocumented: false,
+      dailyPnLReconciled: false
     },
-    notes: 'Today followed the 15m breakout strategy cleanly. Avoided entering chop before 10:30 AM.'
+    notes: ''
   });
 
   // Risk Calculator State
@@ -2096,26 +2090,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (saved) return JSON.parse(saved);
     } catch (_) {}
     return {
-      traderGrade: 'B+',
-      executiveSummary: 'AI Execution Audit ready. Click "Generate AI Audit" to audit your actual logged trades with Google Gemini Flash-Lite.',
-      strengths: [
-        'Morning Breakout Edge: High win rate on early session momentum setups with predefined invalidation.',
-        'Stop-Loss Discipline: Strict predefined Stop-Loss compliance on primary market orders.',
-        'Healthy Expectancy: Average favorable Risk-to-Reward ratio on winning executions yielding consistent alpha.',
-        'High Conviction Sizing: Largest winning setups coincided with clean technical confirmation.'
-      ],
-      leaks: [
-        'Late-Session Chop: Loss accumulation noted during afternoon market fatigue phases.',
-        'Stop-Loss Hesitation: Delay in accepting initial invalidation resulting in avoidable loss drag.',
-        'Premature Profit Taking: Truncating runners prior to designated R:R targets.',
-        'Emotional Tilt Events: Re-entry within short intervals following adverse trade outcomes.'
-      ],
-      actionPlan: [
-        'Enforce hard terminal lock after 01:30 PM (Avoid afternoon decay chop).',
-        'Trail stop-loss using 9 EMA on 5m chart instead of premature manual exit.',
-        'Strict 3-trade daily ceiling to eliminate fatigue tilt and overtrading.'
-      ],
-      timestamp: 'Initial Baseline'
+      traderGrade: '-',
+      executiveSummary: 'AI Execution Audit ready. Click "Generate AI Audit" to audit your logged trades with AI.',
+      strengths: [],
+      leaks: [],
+      actionPlan: [],
+      timestamp: 'Awaiting Run'
     };
   });
   const [aiAuditTimestamp, setAiAuditTimestamp] = useState(() => {
@@ -5121,14 +5101,66 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* 4. STRATEGIES SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'STRATEGIES' && (() => {
-            // Compute Top Alpha Strategy & Global Edge Stats
-            const totalStrats = strategies.length;
-            const topStrategy = [...strategies].sort((a, b) => (b.net_pnl || 0) - (a.net_pnl || 0))[0];
-            const avgWinRate = totalStrats > 0 ? Math.round(strategies.reduce((acc, s) => acc + (s.win_rate || 0), 0) / totalStrats) : 0;
-            const totalStrategyPnL = strategies.reduce((acc, s) => acc + (s.net_pnl || 0), 0);
+            // Dynamically enrich strategies with live performance from allTrades matching active marketSegment
+            const enrichedStrategies = strategies.map(strat => {
+              const stratName = (strat.name || strat.strategy_name || '').toLowerCase();
+              const matchedTrades = allTrades.filter(t => {
+                const seg = (t.market_segment || 'Indian').toLowerCase();
+                if (seg !== marketSegment.toLowerCase()) return false;
+                const tStrat = (t.strategy || '').toLowerCase();
+                return tStrat && (tStrat.includes(stratName) || stratName.includes(tStrat));
+              });
+
+              let totalWins = 0;
+              let winPnl = 0;
+              let lossPnl = 0;
+              let netPnl = 0;
+              let currentStreak = 0;
+              let maxStreak = 0;
+
+              const sorted = [...matchedTrades].sort((a, b) => new Date(a.trade_date || 0) - new Date(b.trade_date || 0));
+              sorted.forEach(t => {
+                const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+                netPnl += net;
+                if (net > 0) {
+                  totalWins += 1;
+                  winPnl += net;
+                  currentStreak += 1;
+                  if (currentStreak > maxStreak) maxStreak = currentStreak;
+                } else if (net < 0) {
+                  lossPnl += Math.abs(net);
+                  currentStreak = 0;
+                }
+              });
+
+              const totalTrades = matchedTrades.length;
+              const winRate = totalTrades > 0 ? Math.round((totalWins / totalTrades) * 100) : 0;
+              const avgWin = totalWins > 0 ? Math.round(winPnl / totalWins) : 0;
+              const lossCount = totalTrades - totalWins;
+              const avgLoss = lossCount > 0 ? Math.round(lossPnl / lossCount) : 0;
+              const profitFactor = lossPnl > 0 ? (winPnl / lossPnl).toFixed(2) : (winPnl > 0 ? '3.00+' : '0.00');
+
+              return {
+                ...strat,
+                total_trades: totalTrades,
+                win_rate: winRate,
+                net_pnl: netPnl,
+                profit_factor: profitFactor,
+                avg_win: avgWin,
+                avg_loss: avgLoss,
+                max_streak: maxStreak
+              };
+            });
+
+            // Compute Top Alpha Strategy & Global Edge Stats strictly from live logged trades
+            const totalStrats = enrichedStrategies.length;
+            const stratsWithTrades = enrichedStrategies.filter(s => s.total_trades > 0);
+            const topStrategy = stratsWithTrades.length > 0 ? [...stratsWithTrades].sort((a, b) => (b.net_pnl || 0) - (a.net_pnl || 0))[0] : null;
+            const avgWinRate = stratsWithTrades.length > 0 ? Math.round(stratsWithTrades.reduce((acc, s) => acc + (s.win_rate || 0), 0) / stratsWithTrades.length) : 0;
+            const totalStrategyPnL = enrichedStrategies.reduce((acc, s) => acc + (s.net_pnl || 0), 0);
 
             // Filter Strategies by Category and Edge
-            const filteredStrategies = strategies.filter(strat => {
+            const filteredStrategies = enrichedStrategies.filter(strat => {
               if (strategyCategoryFilter !== 'ALL' && strat.category !== strategyCategoryFilter) return false;
               if (strategyEdgeFilter === 'HIGH' && (strat.win_rate || 0) < 65) return false;
               if (strategyEdgeFilter === 'MODERATE' && ((strat.win_rate || 0) < 50 || (strat.win_rate || 0) >= 65)) return false;
@@ -5355,9 +5387,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: isMobile ? '12px' : '16px' }}>
                     {filteredStrategies.map((strat) => {
-                      const winRate = strat.win_rate || 60;
-                      const isHighEdge = winRate >= 65;
-                      const isModerate = winRate >= 50 && winRate < 65;
+                      const totalTrades = strat.total_trades || 0;
+                      const hasTrades = totalTrades > 0;
+                      const winRate = hasTrades ? (strat.win_rate || 0) : 0;
+                      const isHighEdge = hasTrades && winRate >= 65;
+                      const isModerate = hasTrades && winRate >= 50 && winRate < 65;
                       const pnl = strat.net_pnl || 0;
                       const isProfit = pnl >= 0;
 
@@ -5385,7 +5419,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             left: 0,
                             right: 0,
                             height: '3px',
-                            backgroundColor: isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed)
+                            backgroundColor: hasTrades ? (isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed)) : colors.borderColor
                           }} />
 
                           {/* Strategy Header */}
@@ -5416,16 +5450,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             <div style={{
                               fontSize: '11px',
                               fontWeight: '800',
-                              color: isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed),
-                              backgroundColor: isHighEdge ? 'rgba(16, 185, 129, 0.12)' : (isModerate ? 'rgba(37, 99, 235, 0.1)' : 'rgba(239, 68, 68, 0.12)'),
+                              color: hasTrades ? (isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed)) : colors.textMuted,
+                              backgroundColor: hasTrades ? (isHighEdge ? 'rgba(16, 185, 129, 0.12)' : (isModerate ? 'rgba(37, 99, 235, 0.1)' : 'rgba(239, 68, 68, 0.12)')) : colors.bgInner,
                               padding: '3px 10px',
                               borderRadius: '12px',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              border: `1px solid ${colors.borderColor}`
                             }}>
-                              {isHighEdge ? '🔥 High Edge' : (isModerate ? '⚖️ Solid Edge' : '⚠️ Review')}
+                              {hasTrades ? (isHighEdge ? '🔥 High Edge' : (isModerate ? '⚖️ Solid Edge' : '⚠️ Review')) : '📝 Playbook Template'}
                             </div>
                           </div>
 
@@ -5445,25 +5480,31 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           )}
 
                           {/* Visual Win Rate Progress Bar */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
-                              <span style={{ color: colors.accentGreen }}>{winRate}% Win</span>
-                              <span style={{ color: colors.accentRed }}>{100 - winRate}% Loss</span>
+                          {hasTrades ? (
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
+                                <span style={{ color: colors.accentGreen }}>{winRate}% Win</span>
+                                <span style={{ color: colors.accentRed }}>{100 - winRate}% Loss</span>
+                              </div>
+                              <div style={{ height: '6px', width: '100%', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.3)', overflow: 'hidden', display: 'flex' }}>
+                                <div style={{ width: `${winRate}%`, backgroundColor: colors.accentGreen, height: '100%', borderRadius: '4px 0 0 4px', transition: 'width 0.4s ease' }} />
+                              </div>
                             </div>
-                            <div style={{ height: '6px', width: '100%', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.3)', overflow: 'hidden', display: 'flex' }}>
-                              <div style={{ width: `${winRate}%`, backgroundColor: colors.accentGreen, height: '100%', borderRadius: '4px 0 0 4px', transition: 'width 0.4s ease' }} />
+                          ) : (
+                            <div style={{ fontSize: '11px', color: colors.textMuted, fontStyle: 'italic' }}>
+                              No live trades logged with this strategy yet.
                             </div>
-                          </div>
+                          )}
 
                           {/* 6-Metric Mini Matrix */}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>TRADES</div>
-                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>{strat.total_trades || 20}</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>{totalTrades}</div>
                             </div>
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>PROFIT FACTOR</div>
-                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>{strat.profit_factor || '2.40'}x</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>{hasTrades ? `${strat.profit_factor}x` : '0.00x'}</div>
                             </div>
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>TARGET R:R</div>
@@ -5472,12 +5513,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>AVG WIN / LOSS</div>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginTop: '2px' }}>
-                                +{formatMoneyPlain(strat.avg_win || 2500, marketSegment)} / -{formatMoneyPlain(strat.avg_loss || 1200, marketSegment)}
+                                {hasTrades ? `+${formatMoneyPlain(strat.avg_win || 0, marketSegment)} / -${formatMoneyPlain(strat.avg_loss || 0, marketSegment)}` : `${formatMoneyPlain(0, marketSegment)} / ${formatMoneyPlain(0, marketSegment)}`}
                               </div>
                             </div>
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>MAX STREAK</div>
-                              <div style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>{strat.max_streak || 4} Wins 🔥</div>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>{hasTrades ? `${strat.max_streak || 0} Wins 🔥` : '0 Wins'}</div>
                             </div>
                             <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                               <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>NET P&L</div>
@@ -6094,19 +6135,46 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* 6. MISTAKES TRACKER SUB-VIEW                                   */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'MISTAKES' && (() => {
+            // Dynamically enrich mistakes with live occurrences from allTrades
+            const enrichedMistakes = mistakes.map(m => {
+              const mName = (m.name || '').toLowerCase();
+              const tradesWithMistake = allTrades.filter(t => {
+                const seg = (t.market_segment || 'Indian').toLowerCase();
+                if (seg !== marketSegment.toLowerCase()) return false;
+                const tMistake = (t.mistake || '').toLowerCase();
+                return tMistake && (tMistake.includes(mName) || mName.includes(tMistake));
+              });
+
+              let dynamicLoss = 0;
+              tradesWithMistake.forEach(t => {
+                const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+                if (net < 0) dynamicLoss += Math.abs(net);
+              });
+
+              const userCount = tradesWithMistake.length > 0 ? tradesWithMistake.length : (m.count || 0);
+              const userLoss = tradesWithMistake.length > 0 ? dynamicLoss : (parseFloat(m.loss) || 0);
+
+              return {
+                ...m,
+                count: userCount,
+                loss: userLoss
+              };
+            });
+
             // Compute Global Mistake & Financial Leak KPIs
-            const totalMistakeLoss = mistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0);
-            const totalOccurrences = mistakes.reduce((acc, m) => acc + (m.count || 1), 0);
+            const totalMistakeLoss = enrichedMistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0);
+            const totalOccurrences = enrichedMistakes.reduce((acc, m) => acc + (m.count || 0), 0);
             
             // Top Most Expensive Leak
-            const topLossMistake = [...mistakes].sort((a, b) => (parseFloat(b.loss) || 0) - (parseFloat(a.loss) || 0))[0];
+            const activeLeaks = enrichedMistakes.filter(m => (m.loss || 0) > 0 || (m.count || 0) > 0);
+            const topLossMistake = activeLeaks.length > 0 ? [...activeLeaks].sort((a, b) => (parseFloat(b.loss) || 0) - (parseFloat(a.loss) || 0))[0] : null;
             
             // Most Frequent Pattern
-            const topFreqMistake = [...mistakes].sort((a, b) => (b.count || 1) - (a.count || 1))[0];
+            const topFreqMistake = activeLeaks.length > 0 ? [...activeLeaks].sort((a, b) => (b.count || 0) - (a.count || 0))[0] : null;
 
             // Category Loss Breakdown
             const catLossMap = { PSYCHOLOGY: 0, RISK: 0, EXECUTION: 0, EXIT_TIMING: 0 };
-            mistakes.forEach(m => {
+            enrichedMistakes.forEach(m => {
               const cat = m.category || 'PSYCHOLOGY';
               const l = parseFloat(m.loss) || 0;
               if (catLossMap[cat] !== undefined) catLossMap[cat] += l;
@@ -6114,7 +6182,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             });
 
             // Filter & Sort Mistakes
-            let filteredMistakes = mistakes.filter(m => {
+            let filteredMistakes = enrichedMistakes.filter(m => {
               if (mistakesCategoryFilter !== 'ALL' && m.category !== mistakesCategoryFilter) return false;
               return true;
             });
@@ -6122,7 +6190,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             if (mistakesSortBy === 'LOSS') {
               filteredMistakes.sort((a, b) => (parseFloat(b.loss) || 0) - (parseFloat(a.loss) || 0));
             } else if (mistakesSortBy === 'COUNT') {
-              filteredMistakes.sort((a, b) => (b.count || 1) - (a.count || 1));
+              filteredMistakes.sort((a, b) => (b.count || 0) - (a.count || 0));
             }
 
             return (
@@ -6195,8 +6263,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     boxShadow: colors.cardShadow
                   }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: colors.accentRed, textTransform: 'uppercase' }}>💸 TOTAL CAPITAL DESTROYED</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentRed }}>
-                      -{formatMoneyPlain(totalMistakeLoss, marketSegment)}
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: totalMistakeLoss > 0 ? colors.accentRed : colors.accentGreen }}>
+                      {totalMistakeLoss > 0 ? `-${formatMoneyPlain(totalMistakeLoss, marketSegment)}` : formatMoneyPlain(0, marketSegment)}
                     </div>
                     <div style={{ fontSize: '10px', color: colors.textMuted }}>Across {totalOccurrences} total events</div>
                   </div>
@@ -6216,8 +6284,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {topLossMistake ? (topLossMistake.name || topLossMistake.mistake_name) : 'None'}
                     </div>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentRed, marginTop: '2px' }}>
-                      {topLossMistake ? `-${formatMoneyPlain(topLossMistake.loss, marketSegment)} (${topLossMistake.count || 1}x)` : '₹0'}
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: topLossMistake ? colors.accentRed : colors.accentGreen, marginTop: '2px' }}>
+                      {topLossMistake ? `-${formatMoneyPlain(topLossMistake.loss, marketSegment)} (${topLossMistake.count || 0}x)` : '₹0 (Zero Leaks)'}
                     </div>
                   </div>
 
@@ -6236,8 +6304,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {topFreqMistake ? (topFreqMistake.name || topFreqMistake.mistake_name) : 'None'}
                     </div>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#f59e0b', marginTop: '2px' }}>
-                      {topFreqMistake ? `${topFreqMistake.count || 1}x Occurrences` : '0x'}
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: topFreqMistake ? '#f59e0b' : colors.accentGreen, marginTop: '2px' }}>
+                      {topFreqMistake ? `${topFreqMistake.count || 0}x Occurrences` : '0x (Disciplined)'}
                     </div>
                   </div>
 
@@ -6400,8 +6468,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {filteredMistakes.map((m) => {
                       const lossVal = parseFloat(m.loss) || 0;
-                      const countVal = m.count || 1;
-                      const avgLossPerEvent = countVal > 0 ? Math.round(lossVal / countVal) : lossVal;
+                      const countVal = m.count || 0;
+                      const avgLossPerEvent = countVal > 0 ? Math.round(lossVal / countVal) : 0;
                       const lossShare = totalMistakeLoss > 0 ? Math.round((lossVal / totalMistakeLoss) * 100) : 0;
                       const severity = m.severity || 'HIGH';
 
@@ -6461,11 +6529,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
                             {/* Total Loss Display */}
                             <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                              <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentRed }}>
-                                -{formatMoneyPlain(lossVal, marketSegment)}
+                              <div style={{ fontSize: '16px', fontWeight: '800', color: lossVal > 0 ? colors.accentRed : colors.textMuted }}>
+                                {lossVal > 0 ? `-${formatMoneyPlain(lossVal, marketSegment)}` : formatMoneyPlain(0, marketSegment)}
                               </div>
                               <div style={{ fontSize: '10px', color: colors.textMuted }}>
-                                Occurred {countVal}x • Avg: -{formatMoneyPlain(avgLossPerEvent, marketSegment)}/ea
+                                {countVal > 0 ? `Occurred ${countVal}x • Avg: -${formatMoneyPlain(avgLossPerEvent, marketSegment)}/ea` : '0 logged occurrences'}
                               </div>
                             </div>
                           </div>
@@ -6614,13 +6682,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {activeTab === 'AI_SUMMARIZER' && (() => {
             // Compute Live Dynamic Metrics from Dataset
             const tradesAnalyzedCount = filteredTrades.length > 0 ? filteredTrades.length : allTrades.length;
-            const winRate = metrics.winRate || 65;
+            const hasTrades = tradesAnalyzedCount > 0;
+            const winRate = metrics.winRate || 0;
             const profitFactor = metrics.profitFactor || '0.00';
             
             // Dynamic Grade Calculation
-            let letterGrade = 'A-';
-            let efficiencyPct = 88;
-            if (winRate >= 70 && Number(profitFactor) >= 2.2) {
+            let letterGrade = '-';
+            let efficiencyPct = 0;
+            if (!hasTrades) {
+              letterGrade = '-';
+              efficiencyPct = 0;
+            } else if (winRate >= 70 && Number(profitFactor) >= 2.2) {
               letterGrade = 'A+';
               efficiencyPct = 96;
             } else if (winRate >= 60 && Number(profitFactor) >= 1.8) {
@@ -6710,10 +6782,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     boxShadow: colors.cardShadow
                   }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🏆 OVERALL TRADER GRADE</div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#8b5cf6' }}>
-                      Grade {letterGrade}
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: hasTrades ? '#8b5cf6' : colors.textMuted }}>
+                      {hasTrades ? `Grade ${letterGrade}` : 'No Trades'}
                     </div>
-                    <div style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>{efficiencyPct}% Execution Efficiency</div>
+                    <div style={{ fontSize: '10px', color: hasTrades ? colors.accentGreen : colors.textMuted, fontWeight: '700' }}>
+                      {hasTrades ? `${efficiencyPct}% Execution Efficiency` : 'Awaiting Trade Logs'}
+                    </div>
                   </div>
 
                   {/* High Alpha Window */}
@@ -6729,9 +6803,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>⏱️ PEAK ALPHA WINDOW</div>
                     <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>
-                      09:30 – 11:15 AM
+                      {hasTrades ? 'Morning Session (09:15 – 11:30 AM)' : 'Awaiting Data'}
                     </div>
-                    <div style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '700' }}>78% Win Rate in Morning Session</div>
+                    <div style={{ fontSize: '10px', color: hasTrades ? colors.accentGreen : colors.textMuted, fontWeight: '700' }}>
+                      {hasTrades ? `${winRate}% Win Rate in Morning Session` : 'No Trades Logged'}
+                    </div>
                   </div>
 
                   {/* Emotional Tilt Risk */}
@@ -6746,10 +6822,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     boxShadow: colors.cardShadow
                   }}>
                     <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🧠 TILT RISK PROBABILITY</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#f59e0b' }}>
-                      Low (14%)
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: hasTrades ? (metrics.losses > 2 ? colors.accentRed : '#f59e0b') : colors.textMuted }}>
+                      {hasTrades ? (metrics.losses > 2 ? 'Elevated' : 'Low') : 'None'}
                     </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Elevates after 2:15 PM</div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>
+                      {hasTrades ? `${metrics.losses} losses recorded` : 'Zero Drawdowns'}
+                    </div>
                   </div>
 
                   {/* Analyzed Dataset */}
@@ -7079,68 +7157,93 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               if (net < m.worstTrade) m.worstTrade = net;
             });
 
-            // Baseline fallback historical statements
-            const fallbackStatements = (typeof HISTORICAL_MONTHLY_STATEMENTS !== 'undefined' && HISTORICAL_MONTHLY_STATEMENTS[marketSegment]) || [
-              { month: '2026-09', totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200, returnPct: 13.2, profitFactor: 2.65, expectancy: 2357 },
-              { month: '2026-08', totalTrades: 34, wins: 21, losses: 13, grossPnl: 51200, charges: 3000, netPnl: 48200, bestTrade: 9800, worstTrade: -3500, returnPct: 9.64, profitFactor: 2.15, expectancy: 1417 },
-              { month: '2026-07', totalTrades: 30, wins: 17, losses: 13, grossPnl: 34500, charges: 3000, netPnl: 31500, bestTrade: 8200, worstTrade: -3100, returnPct: 6.3, profitFactor: 1.85, expectancy: 1050 },
-              { month: '2026-06', totalTrades: 22, wins: 16, losses: 6, grossPnl: 54800, charges: 2000, netPnl: 52800, bestTrade: 12400, worstTrade: -2800, returnPct: 10.56, profitFactor: 2.85, expectancy: 2400 }
-            ];
-
-            // Merge live trades into statement table
-            const mergedStatementsMap = {};
-            fallbackStatements.forEach(f => {
-              mergedStatementsMap[f.month] = { ...f };
-            });
-            Object.keys(liveStatsMap).forEach(k => {
-              if (mergedStatementsMap[k]) {
-                const base = mergedStatementsMap[k];
-                const live = liveStatsMap[k];
-                mergedStatementsMap[k] = {
-                  ...base,
-                  totalTrades: base.totalTrades + live.totalTrades,
-                  wins: base.wins + live.wins,
-                  losses: base.losses + live.losses,
-                  grossPnl: base.grossPnl + live.grossPnl,
-                  charges: base.charges + live.charges,
-                  netPnl: base.netPnl + live.netPnl,
-                  bestTrade: Math.max(base.bestTrade, live.bestTrade),
-                  worstTrade: Math.min(base.worstTrade, live.worstTrade)
-                };
-              } else {
-                mergedStatementsMap[k] = liveStatsMap[k];
-              }
+            // Calculate profit factor & expectancy for each month
+            Object.values(liveStatsMap).forEach(m => {
+              const lossS = m.lossSum || 0;
+              const winS = m.winSum || 0;
+              m.profitFactor = lossS > 0 ? (winS / lossS).toFixed(2) : (winS > 0 ? 'Inf' : '0.00');
+              m.expectancy = m.totalTrades > 0 ? Math.round(m.netPnl / m.totalTrades) : 0;
             });
 
-            // Ensure current month is always available
+            // Statements map strictly from user trades - NO DUMMY DATA
+            const mergedStatementsMap = { ...liveStatsMap };
+
+            // Ensure selected report month or current month is present
             const curMonthStr = getCurrentMonthStr();
-            if (!mergedStatementsMap[curMonthStr]) {
+            const targetMonth = selectedReportMonth || curMonthStr;
+            if (Object.keys(mergedStatementsMap).length === 0) {
               mergedStatementsMap[curMonthStr] = {
                 month: curMonthStr, totalTrades: 0, wins: 0, losses: 0, grossPnl: 0, charges: 0, netPnl: 0, bestTrade: 0, worstTrade: 0, returnPct: 0, profitFactor: '0.00', expectancy: 0
+              };
+            }
+            if (selectedReportMonth && !mergedStatementsMap[selectedReportMonth]) {
+              mergedStatementsMap[selectedReportMonth] = {
+                month: selectedReportMonth, totalTrades: 0, wins: 0, losses: 0, grossPnl: 0, charges: 0, netPnl: 0, bestTrade: 0, worstTrade: 0, returnPct: 0, profitFactor: '0.00', expectancy: 0
               };
             }
 
             const monthlyList = Object.values(mergedStatementsMap).sort((a, b) => b.month.localeCompare(a.month));
             const activeMonthData = mergedStatementsMap[selectedReportMonth] || monthlyList[0] || {
-              month: selectedReportMonth, totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200
+              month: targetMonth, totalTrades: 0, wins: 0, losses: 0, grossPnl: 0, charges: 0, netPnl: 0, bestTrade: 0, worstTrade: 0, returnPct: 0, profitFactor: '0.00', expectancy: 0
             };
 
-            // Strategy breakdown for active month
-            const strategyPresets = [
-              { name: '🔥 Breakout Momentum', count: Math.ceil(activeMonthData.totalTrades * 0.4), wins: Math.ceil(activeMonthData.wins * 0.45), net: Math.round(activeMonthData.netPnl * 0.48), charges: Math.round(activeMonthData.charges * 0.4) },
-              { name: '⚡ Scalping Edge', count: Math.ceil(activeMonthData.totalTrades * 0.25), wins: Math.ceil(activeMonthData.wins * 0.25), net: Math.round(activeMonthData.netPnl * 0.26), charges: Math.round(activeMonthData.charges * 0.3) },
-              { name: '🛡️ Option Selling / Theta', count: Math.ceil(activeMonthData.totalTrades * 0.2), wins: Math.ceil(activeMonthData.wins * 0.2), net: Math.round(activeMonthData.netPnl * 0.18), charges: Math.round(activeMonthData.charges * 0.2) },
-              { name: '🔄 Mean Reversion', count: Math.max(1, Math.floor(activeMonthData.totalTrades * 0.15)), wins: Math.floor(activeMonthData.wins * 0.1), net: Math.round(activeMonthData.netPnl * 0.08), charges: Math.round(activeMonthData.charges * 0.1) }
-            ];
+            // Filter actual trades for active month
+            const activeMonthTrades = allTrades.filter(t => {
+              const seg = (t.market_segment || 'Indian').toLowerCase();
+              if (seg !== marketSegment.toLowerCase()) return false;
+              const d = t.trade_date || todayStr;
+              return d.substring(0, 7) === activeMonthData.month;
+            });
 
-            // Day of Week Distribution
+            // Strategy breakdown for active month from REAL USER TRADES ONLY
+            const stratMap = {};
+            activeMonthTrades.forEach(t => {
+              const sName = t.strategy || 'Discretionary';
+              if (!stratMap[sName]) {
+                stratMap[sName] = { name: sName, count: 0, wins: 0, net: 0, charges: 0 };
+              }
+              const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+              const chg = Number(t.charges !== undefined && t.charges !== null && t.charges !== '' ? t.charges : (marketSegment === 'Indian' ? 40 : 1.5));
+              stratMap[sName].count += 1;
+              if (net > 0) stratMap[sName].wins += 1;
+              stratMap[sName].net += net;
+              stratMap[sName].charges += chg;
+            });
+            const strategyPresets = Object.values(stratMap);
+
+            // Day of Week Distribution from REAL USER TRADES ONLY
+            const daysMap = {
+              Monday: { day: 'Monday', pnl: 0, trades: 0, wins: 0 },
+              Tuesday: { day: 'Tuesday', pnl: 0, trades: 0, wins: 0 },
+              Wednesday: { day: 'Wednesday', pnl: 0, trades: 0, wins: 0 },
+              'Thursday (Expiry)': { day: 'Thursday (Expiry)', pnl: 0, trades: 0, wins: 0 },
+              Friday: { day: 'Friday', pnl: 0, trades: 0, wins: 0 }
+            };
+            activeMonthTrades.forEach(t => {
+              const dStr = t.trade_date || todayStr;
+              const parts = dStr.split('-');
+              if (parts.length === 3) {
+                const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                const dayIdx = dt.getDay();
+                const key = dayIdx === 4 ? 'Thursday (Expiry)' : (dayIdx === 1 ? 'Monday' : dayIdx === 2 ? 'Tuesday' : dayIdx === 3 ? 'Wednesday' : dayIdx === 5 ? 'Friday' : null);
+                if (key && daysMap[key]) {
+                  const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+                  daysMap[key].trades += 1;
+                  daysMap[key].pnl += net;
+                  if (net > 0) daysMap[key].wins += 1;
+                }
+              }
+            });
             const dayOfWeekStats = [
-              { day: 'Monday', pnl: Math.round(activeMonthData.netPnl * 0.28), trades: Math.ceil(activeMonthData.totalTrades * 0.22), wr: 72 },
-              { day: 'Tuesday', pnl: Math.round(activeMonthData.netPnl * 0.22), trades: Math.ceil(activeMonthData.totalTrades * 0.20), wr: 65 },
-              { day: 'Wednesday', pnl: Math.round(activeMonthData.netPnl * 0.36), trades: Math.ceil(activeMonthData.totalTrades * 0.28), wr: 80 },
-              { day: 'Thursday (Expiry)', pnl: Math.round(activeMonthData.netPnl * 0.19), trades: Math.ceil(activeMonthData.totalTrades * 0.20), wr: 62 },
-              { day: 'Friday', pnl: Math.round(activeMonthData.netPnl * -0.05), trades: Math.ceil(activeMonthData.totalTrades * 0.10), wr: 45 }
-            ];
+              daysMap['Monday'],
+              daysMap['Tuesday'],
+              daysMap['Wednesday'],
+              daysMap['Thursday (Expiry)'],
+              daysMap['Friday']
+            ].map(d => ({
+              ...d,
+              wr: d.trades > 0 ? Math.round((d.wins / d.trades) * 100) : 0
+            }));
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -7245,13 +7348,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {/* 8 INSTITUTIONAL PERFORMANCE KPI CARDS */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
                   {[
-                    { label: 'NET PROFIT', val: formatMoney(activeMonthData.netPnl, marketSegment), color: activeMonthData.netPnl >= 0 ? colors.accentGreen : colors.accentRed },
-                    { label: 'PROFIT FACTOR', val: activeMonthData.profitFactor || '2.65', color: colors.accentGreen },
-                    { label: 'EXPECTANCY (AVG/TRADE)', val: formatMoney(Math.round(activeMonthData.netPnl / (activeMonthData.totalTrades || 1)), marketSegment), color: colors.accentBlueLight },
-                    { label: 'WIN RATE', val: `${Math.round((activeMonthData.wins / (activeMonthData.totalTrades || 1)) * 100)}% (${activeMonthData.wins}W / ${activeMonthData.losses}L)`, color: colors.accentGreen },
-                    { label: 'LARGEST WIN', val: formatMoney(activeMonthData.bestTrade, marketSegment), color: colors.accentGreen },
-                    { label: 'WORST LOSS', val: formatMoney(activeMonthData.worstTrade, marketSegment), color: colors.accentRed },
-                    { label: 'GROSS P&L', val: formatMoney(activeMonthData.grossPnl, marketSegment), color: colors.textPrimary },
+                    { label: 'NET PROFIT', val: formatMoney(activeMonthData.netPnl, marketSegment), color: activeMonthData.netPnl > 0 ? colors.accentGreen : (activeMonthData.netPnl < 0 ? colors.accentRed : colors.textMuted) },
+                    { label: 'PROFIT FACTOR', val: activeMonthData.totalTrades > 0 ? (activeMonthData.profitFactor || '0.00') : '0.00', color: (activeMonthData.profitFactor && activeMonthData.profitFactor !== '0.00') ? colors.accentGreen : colors.textMuted },
+                    { label: 'EXPECTANCY (AVG/TRADE)', val: formatMoney(activeMonthData.totalTrades > 0 ? Math.round(activeMonthData.netPnl / activeMonthData.totalTrades) : 0, marketSegment), color: activeMonthData.totalTrades > 0 ? colors.accentBlueLight : colors.textMuted },
+                    { label: 'WIN RATE', val: activeMonthData.totalTrades > 0 ? `${Math.round((activeMonthData.wins / activeMonthData.totalTrades) * 100)}% (${activeMonthData.wins}W / ${activeMonthData.losses}L)` : '0% (0W / 0L)', color: activeMonthData.totalTrades > 0 ? (activeMonthData.wins >= activeMonthData.losses ? colors.accentGreen : colors.accentRed) : colors.textMuted },
+                    { label: 'LARGEST WIN', val: formatMoney(activeMonthData.bestTrade, marketSegment), color: activeMonthData.bestTrade > 0 ? colors.accentGreen : colors.textMuted },
+                    { label: 'WORST LOSS', val: formatMoney(activeMonthData.worstTrade, marketSegment), color: activeMonthData.worstTrade < 0 ? colors.accentRed : colors.textMuted },
+                    { label: 'GROSS P&L', val: formatMoney(activeMonthData.grossPnl, marketSegment), color: activeMonthData.grossPnl > 0 ? colors.accentGreen : (activeMonthData.grossPnl < 0 ? colors.accentRed : colors.textPrimary) },
                     { label: 'BROKERAGE & TAXES', val: formatMoneyPlain(activeMonthData.charges, marketSegment), color: colors.textMuted }
                   ].map((k, i) => (
                     <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
@@ -7287,8 +7390,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <tbody>
                         {monthlyList.map(m => {
                           const wr = m.totalTrades > 0 ? Math.round((m.wins / m.totalTrades) * 100) : 0;
-                          const isWin = m.netPnl >= 0;
+                          const isWin = m.netPnl > 0;
+                          const isLoss = m.netPnl < 0;
                           const isSelected = selectedReportMonth === m.month;
+                          const statusLabel = m.totalTrades === 0 ? 'NO TRADES' : (isWin ? 'PROFITABLE' : (isLoss ? 'DRAWDOWN' : 'BREAKEVEN'));
+                          const statusBg = m.totalTrades === 0 ? colors.bgInner : (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)');
+                          const statusColor = m.totalTrades === 0 ? colors.textMuted : (isWin ? colors.accentGreen : colors.accentRed);
                           return (
                             <tr key={m.month} style={{ borderBottom: `1px solid ${colors.borderColor}`, backgroundColor: isSelected ? (isLight ? 'rgba(37, 99, 235, 0.04)' : 'rgba(37, 99, 235, 0.08)') : 'transparent' }}>
                               <td style={{ padding: '10px', fontWeight: '700', color: colors.textPrimary }}>
@@ -7297,7 +7404,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                               <td style={{ padding: '10px', color: colors.textSecondary }}>
                                 {m.totalTrades} ({m.wins}W / {m.losses}L)
                               </td>
-                              <td style={{ padding: '10px', fontWeight: '700', color: wr >= 50 ? colors.accentGreen : colors.accentRed }}>
+                              <td style={{ padding: '10px', fontWeight: '700', color: m.totalTrades === 0 ? colors.textMuted : (wr >= 50 ? colors.accentGreen : colors.accentRed) }}>
                                 {wr}%
                               </td>
                               <td style={{ padding: '10px', color: colors.textPrimary }}>
@@ -7306,7 +7413,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                               <td style={{ padding: '10px', color: colors.textMuted }}>
                                 {formatMoneyPlain(m.charges, marketSegment)}
                               </td>
-                              <td style={{ padding: '10px', fontWeight: '800', color: isWin ? colors.accentGreen : colors.accentRed }}>
+                              <td style={{ padding: '10px', fontWeight: '800', color: m.netPnl > 0 ? colors.accentGreen : (m.netPnl < 0 ? colors.accentRed : colors.textPrimary) }}>
                                 {formatMoney(m.netPnl, marketSegment)}
                               </td>
                               <td style={{ padding: '10px' }}>
@@ -7315,10 +7422,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                   borderRadius: '12px',
                                   fontSize: '10px',
                                   fontWeight: '800',
-                                  backgroundColor: isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                  color: isWin ? colors.accentGreen : colors.accentRed
+                                  backgroundColor: statusBg,
+                                  color: statusColor,
+                                  border: m.totalTrades === 0 ? `1px solid ${colors.borderColor}` : 'none'
                                 }}>
-                                  {isWin ? 'PROFITABLE' : 'DRAWDOWN'}
+                                  {statusLabel}
                                 </span>
                               </td>
                               <td style={{ padding: '10px', textAlign: 'right' }}>
@@ -7352,7 +7460,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Flame size={16} color="#f59e0b" /> Daily Heatmap Calendar ({selectedReportMonth})
                     </div>
-                    <span style={{ fontSize: '11px', color: colors.textMuted }}>Click any day for session recap</span>
+                    <span style={{ fontSize: '11px', color: colors.textMuted }}>Click any active day for session recap</span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
@@ -7395,21 +7503,21 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                           <div
                             key={slotIdx}
                             onClick={() => {
-                              if (dayLoggedTrades.length > 0 || pnlVal !== 0) {
+                              if (dayLoggedTrades.length > 0) {
                                 setSelectedCalendarSession({
                                   date: dayStr,
                                   dayNum: dayNum,
                                   pnl: pnlVal,
-                                  trades: dayLoggedTrades.length || (isGreen ? 2 : 3),
-                                  strategy: dayLoggedTrades[0]?.strategy || (isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Entry Chop'),
-                                  discipline: dayLoggedTrades[0]?.discipline_score ? `${dayLoggedTrades[0].discipline_score}/5 Strict Plan Followed` : (isGreen ? '5/5 Strict Plan Followed' : '3/5 Cut Winners Early'),
+                                  trades: dayLoggedTrades.length,
+                                  strategy: dayLoggedTrades[0]?.strategy || 'Discretionary',
+                                  discipline: dayLoggedTrades[0]?.discipline_score ? `${dayLoggedTrades[0].discipline_score}/5 Strict Plan Followed` : 'Plan Followed',
                                   market: marketSegment,
-                                  tradesList: dayLoggedTrades.length > 0 ? dayLoggedTrades.map(t => ({
+                                  tradesList: dayLoggedTrades.map(t => ({
                                     symbol: t.symbol,
                                     pnl: Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)),
                                     type: t.trade_type || 'BUY',
                                     rr: t.risk_reward_ratio || '1:2'
-                                  })) : undefined
+                                  }))
                                 });
                               }
                             }}
@@ -7422,7 +7530,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
-                              cursor: (dayLoggedTrades.length > 0 || pnlVal !== 0) ? 'pointer' : 'default',
+                              cursor: dayLoggedTrades.length > 0 ? 'pointer' : 'default',
                               opacity: isWeekend ? 0.45 : 1
                             }}
                           >
@@ -7447,20 +7555,26 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <Target size={16} color="#2563eb" /> Strategy Performance ({selectedReportMonth})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {strategyPresets.map(s => {
-                        const wr = s.count > 0 ? Math.round((s.wins / s.count) * 100) : 0;
-                        return (
-                          <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                            <div>
-                              <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{s.name}</div>
-                              <div style={{ fontSize: '10px', color: colors.textSecondary }}>{s.count} Trades • {wr}% Win Rate • Fee: {formatMoneyPlain(s.charges, marketSegment)}</div>
+                      {strategyPresets.length > 0 ? (
+                        strategyPresets.map(s => {
+                          const wr = s.count > 0 ? Math.round((s.wins / s.count) * 100) : 0;
+                          return (
+                            <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{s.name}</div>
+                                <div style={{ fontSize: '10px', color: colors.textSecondary }}>{s.count} Trades • {wr}% Win Rate • Fee: {formatMoneyPlain(s.charges, marketSegment)}</div>
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: s.net >= 0 ? colors.accentGreen : colors.accentRed }}>
+                                {formatMoney(s.net, marketSegment)}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '13px', fontWeight: '800', color: s.net >= 0 ? colors.accentGreen : colors.accentRed }}>
-                              {formatMoney(s.net, marketSegment)}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      ) : (
+                        <div style={{ padding: '20px', textAlign: 'center', color: colors.textSecondary, fontSize: '12px' }}>
+                          No trades with strategies logged for this month yet.
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -7470,17 +7584,23 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <Clock size={16} color="#f59e0b" /> Performance by Day of Week
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {dayOfWeekStats.map(d => (
-                        <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-                          <span style={{ width: '110px', fontWeight: '600', color: colors.textPrimary, fontSize: '11px' }}>{d.day}</span>
-                          <div style={{ flex: 1, backgroundColor: colors.bgInner, height: '16px', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-                            <div style={{ width: `${Math.min(100, Math.max(12, Math.abs(d.pnl) / ((activeMonthData.netPnl || 1) * 0.005)))}%`, backgroundColor: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, height: '100%' }} />
+                      {dayOfWeekStats.map(d => {
+                        const maxAbsPnl = Math.max(1, ...dayOfWeekStats.map(x => Math.abs(x.pnl)));
+                        const widthPct = d.trades > 0 ? Math.min(100, Math.max(10, Math.round((Math.abs(d.pnl) / maxAbsPnl) * 100))) : 0;
+                        return (
+                          <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                            <span style={{ width: '110px', fontWeight: '600', color: colors.textPrimary, fontSize: '11px' }}>{d.day}</span>
+                            <div style={{ flex: 1, backgroundColor: colors.bgInner, height: '16px', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+                              {d.trades > 0 && (
+                                <div style={{ width: `${widthPct}%`, backgroundColor: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, height: '100%' }} />
+                              )}
+                            </div>
+                            <span style={{ width: '85px', textAlign: 'right', fontWeight: '700', color: d.trades === 0 ? colors.textMuted : (d.pnl >= 0 ? colors.accentGreen : colors.accentRed), fontSize: '11px' }}>
+                              {d.trades > 0 ? formatMoney(d.pnl, marketSegment) : `${formatMoneyPlain(0, marketSegment)} (0T)`}
+                            </span>
                           </div>
-                          <span style={{ width: '85px', textAlign: 'right', fontWeight: '700', color: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, fontSize: '11px' }}>
-                            {formatMoney(d.pnl, marketSegment)}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -8485,10 +8605,25 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* 11. CHALLENGE SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'CHALLENGE' && (() => {
+            // Compute real trading streak & performance for current market
+            const uniqueTradingDays = Array.from(new Set(
+              allTrades
+                .filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase() && t.trade_date)
+                .map(t => normalizeDateStr(t.trade_date))
+            )).sort();
+            const realStreakDays = uniqueTradingDays.length;
+            const currentChallengeDay = Math.min(30, Math.max(0, realStreakDays));
+
+            const segTrades = allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase());
+            const challengePnL = segTrades.reduce((acc, t) => acc + Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)), 0);
+            const winCount = segTrades.filter(t => Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)) > 0).length;
+            const adherenceStr = segTrades.length > 0 ? `${Math.round((winCount / segTrades.length) * 100)}% Win Rate` : 'Awaiting Trades';
+            const traderGradeStr = segTrades.length === 0 ? 'Awaiting Data' : (challengePnL >= 0 ? '⭐ A (Profitable)' : '⚠️ Drawdown Alert');
+
             const challengesList = [
-              { id: 'PROP_30', name: '🏆 30-Day Prop Consistency', targetDays: 30, currentDay: challengeDay, desc: 'Execute 30 consecutive sessions respecting daily risk and stop-losses.' },
-              { id: 'FOMO_14', name: '🛡️ 14-Day Zero FOMO Sprint', targetDays: 14, currentDay: 14, desc: 'Zero impulsive entries on green candles without pullback confirmation.' },
-              { id: 'RR_21', name: '⚡ 21-Day 1:2 R:R Master', targetDays: 21, currentDay: 15, desc: 'Maintain minimum 1:2 risk-to-reward on all closed journal trades.' }
+              { id: 'PROP_30', name: '🏆 30-Day Prop Consistency', targetDays: 30, currentDay: currentChallengeDay, desc: 'Execute 30 consecutive sessions respecting daily risk and stop-losses.' },
+              { id: 'FOMO_14', name: '🛡️ 14-Day Zero FOMO Sprint', targetDays: 14, currentDay: Math.min(14, currentChallengeDay), desc: 'Zero impulsive entries on green candles without pullback confirmation.' },
+              { id: 'RR_21', name: '⚡ 21-Day 1:2 R:R Master', targetDays: 21, currentDay: Math.min(21, currentChallengeDay), desc: 'Maintain minimum 1:2 risk-to-reward on all closed journal trades.' }
             ];
 
             const activeChallenge = challengesList.find(c => c.id === challengeType) || challengesList[0];
@@ -8554,10 +8689,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {/* 4 KPI Discipline Matrix Strip */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
                   {[
-                    { label: 'DISCIPLINE ADHERENCE', val: '96.8% (Flawless)', color: colors.accentGreen },
-                    { label: 'ACTIVE STREAK', val: `${challengeDay} Days Active`, color: '#2563eb' },
-                    { label: 'CHALLENGE P&L', val: formatMoney(54800, marketSegment), color: colors.accentGreen },
-                    { label: 'TRADER GRADE', val: '⭐ A+ (Prop Ready)', color: '#f59e0b' }
+                    { label: 'DISCIPLINE ADHERENCE', val: adherenceStr, color: colors.accentGreen },
+                    { label: 'ACTIVE STREAK', val: `${realStreakDays} Day${realStreakDays === 1 ? '' : 's'} Active`, color: '#2563eb' },
+                    { label: 'CHALLENGE P&L', val: formatMoney(challengePnL, marketSegment), color: challengePnL >= 0 ? colors.accentGreen : colors.accentRed },
+                    { label: 'TRADER GRADE', val: traderGradeStr, color: challengePnL >= 0 ? '#f59e0b' : colors.accentRed }
                   ].map((k, i) => (
                     <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
                       <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
@@ -8626,9 +8761,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(10, 1fr)', gap: '8px' }}>
                     {Array.from({ length: 30 }).map((_, i) => {
                       const day = i + 1;
-                      const isDone = day < challengeDay;
-                      const isCurrent = day === challengeDay;
-                      const isLocked = day > challengeDay;
+                      const isDone = day <= realStreakDays;
+                      const isCurrent = day === realStreakDays + 1;
+                      const isLocked = day > realStreakDays + 1;
+
+                      const matchingDate = uniqueTradingDays[day - 1];
+                      const dayTrades = matchingDate ? allTrades.filter(t => (t.market_segment || 'Indian').toLowerCase() === marketSegment.toLowerCase() && normalizeDateStr(t.trade_date) === matchingDate) : [];
+                      const dayPnlVal = dayTrades.reduce((acc, t) => acc + Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)), 0);
 
                       return (
                         <div
@@ -8637,8 +8776,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             setSelectedChallengeDayInfo({
                               day,
                               status: isDone ? 'COMPLETED' : (isCurrent ? 'ACTIVE_TODAY' : 'LOCKED'),
-                              adherence: isDone ? '100% (Zero Violations)' : (isCurrent ? '95% (In Progress)' : 'Upcoming'),
-                              pnl: isDone ? (day * 320 + 1200) : (isCurrent ? 4200 : 0),
+                              adherence: isDone ? 'Disciplined Execution' : (isCurrent ? 'Ready to Log' : 'Upcoming'),
+                              pnl: isDone ? dayPnlVal : 0,
                               rulesObeyed: ['Pre-market checklist completed', 'Stop-loss respected immediately', 'Max 3 trades daily ceiling', 'Emotions documented in journal'],
                               market: marketSegment
                             });
@@ -8672,11 +8811,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {/* 5 Milestone Badges Progression Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px' }}>
                   {[
-                    { name: 'Day 1 Kickoff', icon: '🔰', unlocked: true, reward: 'Basic Journal Access' },
-                    { name: '7-Day Zero FOMO', icon: '🛡️', unlocked: true, reward: 'AI Coach Audit' },
-                    { name: '14-Day Discipline', icon: '🎯', unlocked: true, reward: 'Monte Carlo Simulator' },
-                    { name: '21-Day Precision', icon: '⚡', unlocked: false, reward: 'Dark Pool Heatmaps' },
-                    { name: '30-Day Master Prop', icon: '🏆', unlocked: false, reward: 'Certified Diploma' }
+                    { name: 'Day 1 Kickoff', icon: '🔰', unlocked: realStreakDays >= 1, reward: 'Basic Journal Access' },
+                    { name: '7-Day Zero FOMO', icon: '🛡️', unlocked: realStreakDays >= 7, reward: 'AI Coach Audit' },
+                    { name: '14-Day Discipline', icon: '🎯', unlocked: realStreakDays >= 14, reward: 'Monte Carlo Simulator' },
+                    { name: '21-Day Precision', icon: '⚡', unlocked: realStreakDays >= 21, reward: 'Dark Pool Heatmaps' },
+                    { name: '30-Day Master Prop', icon: '🏆', unlocked: realStreakDays >= 30, reward: 'Certified Diploma' }
                   ].map((b, i) => (
                     <div
                       key={i}
@@ -8712,9 +8851,52 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* 12. CALENDAR SUB-VIEW                                          */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'CALENDAR' && (() => {
-            // Month statements lookup
-            const monthStatement = (typeof HISTORICAL_MONTHLY_STATEMENTS !== 'undefined' && HISTORICAL_MONTHLY_STATEMENTS[marketSegment]?.find(m => m.month === selectedReportMonth)) || {
-              month: selectedReportMonth, totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200
+            // Month statements calculated strictly from real user trades
+            const activeCalMonth = selectedReportMonth || getCurrentMonthStr();
+            const monthTrades = allTrades.filter(t => {
+              const seg = (t.market_segment || 'Indian').toLowerCase();
+              if (seg !== marketSegment.toLowerCase()) return false;
+              const d = t.trade_date || todayStr;
+              return d.substring(0, 7) === activeCalMonth;
+            });
+
+            let calGross = 0;
+            let calNet = 0;
+            let calWins = 0;
+            let calLosses = 0;
+            let calBestTrade = 0;
+            let calWorstTrade = 0;
+            let calWinSum = 0;
+            let calLossSum = 0;
+
+            monthTrades.forEach(t => {
+              const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+              const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
+              calGross += gross;
+              calNet += net;
+              if (net > 0) {
+                calWins++;
+                calWinSum += net;
+                if (net > calBestTrade) calBestTrade = net;
+              } else if (net < 0) {
+                calLosses++;
+                calLossSum += Math.abs(net);
+                if (net < calWorstTrade) calWorstTrade = net;
+              }
+            });
+
+            const calProfitFactor = calLossSum > 0 ? (calWinSum / calLossSum).toFixed(2) : (calWinSum > 0 ? 'Inf' : '0.00');
+
+            const monthStatement = {
+              month: activeCalMonth,
+              totalTrades: monthTrades.length,
+              wins: calWins,
+              losses: calLosses,
+              grossPnl: calGross,
+              netPnl: calNet,
+              bestTrade: calBestTrade,
+              worstTrade: calWorstTrade,
+              profitFactor: calProfitFactor
             };
 
             // Days definition for the active month calculated dynamically
@@ -8885,11 +9067,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {/* 5 Monthly KPI Cards Strip */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '10px' }}>
                   {[
-                    { label: 'NET MONTHLY P&L', val: formatMoney(monthStatement.netPnl, marketSegment), color: monthStatement.netPnl >= 0 ? colors.accentGreen : colors.accentRed },
-                    { label: 'SESSION WIN RATE', val: `${Math.round((totalGreenDays / (totalGreenDays + totalRedDays || 1)) * 100)}% (${totalGreenDays}G / ${totalRedDays}R)`, color: colors.accentGreen },
-                    { label: 'LARGEST GAIN DAY', val: formatMoney(monthStatement.bestTrade, marketSegment), color: colors.accentGreen },
-                    { label: 'LARGEST DRAWDOWN', val: formatMoney(monthStatement.worstTrade, marketSegment), color: colors.accentRed },
-                    { label: 'PROFIT FACTOR', val: monthStatement.profitFactor || '2.65', color: colors.accentBlueLight }
+                    { label: 'NET MONTHLY P&L', val: formatMoney(monthStatement.netPnl, marketSegment), color: monthStatement.netPnl > 0 ? colors.accentGreen : (monthStatement.netPnl < 0 ? colors.accentRed : colors.textMuted) },
+                    { label: 'SESSION WIN RATE', val: (totalGreenDays + totalRedDays) > 0 ? `${Math.round((totalGreenDays / (totalGreenDays + totalRedDays)) * 100)}% (${totalGreenDays}G / ${totalRedDays}R)` : '0% (0G / 0R)', color: (totalGreenDays + totalRedDays) > 0 ? colors.accentGreen : colors.textMuted },
+                    { label: 'LARGEST GAIN DAY', val: formatMoney(monthStatement.bestTrade, marketSegment), color: monthStatement.bestTrade > 0 ? colors.accentGreen : colors.textMuted },
+                    { label: 'LARGEST DRAWDOWN', val: formatMoney(monthStatement.worstTrade, marketSegment), color: monthStatement.worstTrade < 0 ? colors.accentRed : colors.textMuted },
+                    { label: 'PROFIT FACTOR', val: monthStatement.totalTrades > 0 ? (monthStatement.profitFactor || '0.00') : '0.00', color: (monthStatement.profitFactor && monthStatement.profitFactor !== '0.00') ? colors.accentBlueLight : colors.textMuted }
                   ].map((k, i) => (
                     <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
                       <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
@@ -8978,27 +9160,21 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                   return seg === marketSegment.toLowerCase() && (normalizeDateStr(t.trade_date) === dayItem.dateStr);
                                 });
 
-                                if (actualTrades.length > 0 || dayItem.isGreen || dayItem.isRed) {
+                                if (actualTrades.length > 0) {
                                   setSelectedCalendarSession({
                                     date: dayItem.dateStr,
                                     dayNum: dayItem.dayNum,
                                     pnl: dayItem.pnlVal,
-                                    trades: actualTrades.length || (dayItem.isGreen ? 2 : 3),
-                                    strategy: actualTrades[0]?.strategy || (dayItem.isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Session Chop'),
-                                    discipline: actualTrades[0]?.discipline_score ? `${actualTrades[0].discipline_score}/5 Disciplined Execution` : (dayItem.isGreen ? '5/5 Disciplined Execution' : '3/5 Cut Winners Early'),
+                                    trades: actualTrades.length,
+                                    strategy: actualTrades[0]?.strategy || 'Discretionary',
+                                    discipline: actualTrades[0]?.discipline_score ? `${actualTrades[0].discipline_score}/5 Disciplined Execution` : 'Plan Followed',
                                     market: marketSegment,
-                                    tradesList: actualTrades.length > 0 ? actualTrades.map(t => ({
+                                    tradesList: actualTrades.map(t => ({
                                       symbol: t.symbol,
                                       pnl: Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)),
                                       type: t.trade_type || 'BUY',
                                       rr: t.risk_reward_ratio || '1:2'
-                                    })) : (dayItem.isGreen ? [
-                                      { symbol: marketSegment === 'Indian' ? 'NIFTY 24600 CE' : (marketSegment === 'Crypto' ? 'BTC/USDT' : 'EUR/USD'), pnl: Math.round(dayItem.pnlVal * 0.65), type: 'BUY', rr: '1:2.5' },
-                                      { symbol: marketSegment === 'Indian' ? 'BANKNIFTY 52000 CE' : (marketSegment === 'Crypto' ? 'SOL/USDT' : 'GBP/USD'), pnl: Math.round(dayItem.pnlVal * 0.35), type: 'BUY', rr: '1:2.0' }
-                                    ] : [
-                                      { symbol: marketSegment === 'Indian' ? 'NIFTY 24500 PE' : 'BTC/USDT', pnl: Math.round(dayItem.pnlVal * 0.7), type: 'BUY', rr: '1:1.0' },
-                                      { symbol: marketSegment === 'Indian' ? 'RELIANCE' : 'ETH/USDT', pnl: Math.round(dayItem.pnlVal * 0.3), type: 'BUY', rr: '1:1.0' }
-                                    ])
+                                    }))
                                   });
                                 }
                               }}
@@ -9011,7 +9187,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                cursor: (dayItem.isGreen || dayItem.isRed || dayItem.pnlVal !== 0) ? 'pointer' : 'default',
+                                cursor: dayItem.pnlVal !== 0 ? 'pointer' : 'default',
                                 transition: 'all 0.15s ease',
                                 opacity: isMatchFilter ? (dayItem.isWeekend ? 0.45 : 1) : 0.2
                               }}
@@ -11301,22 +11477,26 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>Trades Taken in this Session</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {(selectedCalendarSession.tradesList || [
-                  { symbol: (selectedCalendarSession.market === 'Crypto' ? 'BTC/USDT' : (selectedCalendarSession.market === 'Indian' ? 'NIFTY 24600 CE' : 'EUR/USD')), pnl: selectedCalendarSession.pnl, type: 'BUY', rr: selectedCalendarSession.pnl >= 0 ? '1:2.4' : '1:1.0' }
-                ]).map((tr, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ backgroundColor: tr.type === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: tr.type === 'BUY' ? colors.accentGreen : colors.accentRed, fontSize: '10px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px' }}>
-                        {tr.type}
-                      </span>
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{tr.symbol}</span>
-                      {tr.rr && <span style={{ fontSize: '10px', color: colors.textMuted }}>R:R {tr.rr}</span>}
+                {selectedCalendarSession.tradesList && selectedCalendarSession.tradesList.length > 0 ? (
+                  selectedCalendarSession.tradesList.map((tr, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ backgroundColor: tr.type === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: tr.type === 'BUY' ? colors.accentGreen : colors.accentRed, fontSize: '10px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px' }}>
+                          {tr.type}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{tr.symbol}</span>
+                        {tr.rr && <span style={{ fontSize: '10px', color: colors.textMuted }}>R:R {tr.rr}</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: tr.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
+                        {tr.pnl > 0 ? '+' : ''}{formatMoney(tr.pnl, selectedCalendarSession.market || marketSegment)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: tr.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
-                      {tr.pnl > 0 ? '+' : ''}{formatMoney(tr.pnl, selectedCalendarSession.market || marketSegment)}
-                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '14px', textAlign: 'center', color: colors.textSecondary, fontSize: '12px' }}>
+                    No trades logged for this session.
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -11352,33 +11532,60 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       )}
 
       {/* 11. INSTITUTIONAL STATEMENT AUDIT & TAX P&L MODAL */}
-      {showStatementAuditModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ShieldCheck size={18} color="#2563eb" /> Institutional Tax & Audit Statement ({marketSegment})
+      {showStatementAuditModal && (() => {
+        const auditMonth = selectedReportMonth || getCurrentMonthStr();
+        const [ay, am] = auditMonth.split('-').map(Number);
+        const auditMonthLabel = new Date(ay, am - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const auditTrades = allTrades.filter(t => {
+          const seg = (t.market_segment || 'Indian').toLowerCase();
+          if (seg !== marketSegment.toLowerCase()) return false;
+          const d = t.trade_date || todayStr;
+          return d.substring(0, 7) === auditMonth;
+        });
+        let auditGross = 0;
+        let auditFees = 0;
+        let auditNet = 0;
+        auditTrades.forEach(t => {
+          const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+          const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
+          const chg = Number(t.charges !== undefined && t.charges !== null && t.charges !== '' ? t.charges : (marketSegment === 'Indian' ? 40 : 1.5));
+          auditGross += gross;
+          auditFees += chg;
+          auditNet += net;
+        });
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+            <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={18} color="#2563eb" /> Institutional Tax & Audit Statement ({marketSegment})
+                </div>
+                <button onClick={() => setShowStatementAuditModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
               </div>
-              <button onClick={() => setShowStatementAuditModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
-            </div>
-            <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: 0 }}>
-              Verified trade ledger reconciliation for accounting, compliance, and capital gains filings.
-            </p>
-            <div style={{ backgroundColor: colors.bgInner, padding: '12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}`, display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Statement Period:</span> <b>September 2026</b></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Gross Realized Turnover:</span> <b>{formatMoney(68400, marketSegment)}</b></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Exchange & Statutory Fees:</span> <b>{formatMoneyPlain(2400, marketSegment)}</b></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${colors.borderColor}`, paddingTop: '6px' }}><span style={{ fontWeight: '700', color: colors.textPrimary }}>Net Taxable P&L:</span> <b style={{ color: colors.accentGreen, fontSize: '14px' }}>{formatMoney(66000, marketSegment)}</b></div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button onClick={() => window.print()} style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Download size={14} /> Print PDF
-              </button>
-              <button onClick={() => setShowStatementAuditModal(false)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
+              <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: 0 }}>
+                Verified trade ledger reconciliation for accounting, compliance, and capital gains filings.
+              </p>
+              <div style={{ backgroundColor: colors.bgInner, padding: '12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}`, display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Statement Period:</span> <b>{auditMonthLabel}</b></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Total Executed Trades:</span> <b>{auditTrades.length}</b></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Gross Realized Turnover:</span> <b>{formatMoney(auditGross, marketSegment)}</b></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: colors.textMuted }}>Exchange & Statutory Fees:</span> <b>{formatMoneyPlain(auditFees, marketSegment)}</b></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${colors.borderColor}`, paddingTop: '6px' }}>
+                  <span style={{ fontWeight: '700', color: colors.textPrimary }}>Net Taxable P&L:</span>
+                  <b style={{ color: auditNet >= 0 ? colors.accentGreen : colors.accentRed, fontSize: '14px' }}>{formatMoney(auditNet, marketSegment)}</b>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button onClick={() => window.print()} style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Download size={14} /> Print PDF
+                </button>
+                <button onClick={() => setShowStatementAuditModal(false)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
 
       {/* 12. COMMUNITY DISCUSSION & COMMENTS MODAL */}
