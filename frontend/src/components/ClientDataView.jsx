@@ -3,9 +3,9 @@ import { Bell, ShieldAlert } from 'lucide-react';
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send, Sparkles } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, ShieldCheck, Wallet, ArrowDownToLine, Send, Sparkles, User, CreditCard, Laptop } from 'lucide-react';
 import ReferralsView from './ReferralsView';
-import SettingsView, { BiometricSettingsSection } from './SettingsView';
+import SettingsView from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
 import { useSocialLinks } from '../utils/socialLinks';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -65,7 +65,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('all');
   const [showResetModal, setShowResetModal] = useState(false);
+
+  const openSettingsTab = (tab = 'all') => {
+    setSettingsTab(tab);
+    setShowProfile(true);
+  };
 
   useEffect(() => {
     fetchTelegramSettings?.();
@@ -375,7 +381,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         >
           &larr; Back to Dashboard
         </button>
-        <SettingsView />
+        <SettingsView initialTab={settingsTab} onBack={() => setShowProfile(false)} />
       </div>
     );
   }
@@ -436,15 +442,15 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
               Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ marginTop: '6px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button 
                 type="button"
-                onClick={() => setShowProfile(true)} 
+                onClick={() => openSettingsTab('profile')} 
                 className="btn btn-secondary"
                 style={{ 
                   fontSize: '11.5px', 
                   fontWeight: '700', 
-                  padding: '5px 12px', 
+                  padding: '6px 12px', 
                   borderRadius: '6px', 
                   display: 'inline-flex', 
                   alignItems: 'center', 
@@ -455,22 +461,16 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                   cursor: 'pointer'
                 }}
               >
-                <Settings size={13} /> Profile & Settings &rarr;
+                <User size={13} /> Profile & KYC
               </button>
+
               <button 
                 type="button"
-                onClick={() => {
-                  const el = document.getElementById('security-2fa-section');
-                  if (el) {
-                    el.scrollIntoView({ behavior: 'smooth' });
-                  } else {
-                    setShowProfile(true);
-                  }
-                }} 
+                onClick={() => openSettingsTab('security')} 
                 style={{ 
                   fontSize: '11.5px', 
                   fontWeight: '700', 
-                  padding: '5px 12px', 
+                  padding: '6px 12px', 
                   borderRadius: '6px', 
                   display: 'inline-flex', 
                   alignItems: 'center', 
@@ -481,7 +481,67 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                   cursor: 'pointer'
                 }}
               >
-                <ShieldCheck size={13} /> {user?.totp_enabled ? 'Google 2FA: Active ✅' : 'Google Authenticator (2FA) 🔑'}
+                <ShieldCheck size={13} /> {user?.totp_enabled ? '2-Step 2FA: Active 🟢' : '2-Step Authenticator 🔑'}
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => openSettingsTab('devices')} 
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '6px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(139, 92, 246, 0.12)',
+                  border: '1px solid rgba(139, 92, 246, 0.35)',
+                  color: '#c084fc',
+                  cursor: 'pointer'
+                }}
+              >
+                <Laptop size={13} /> Device Security
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => openSettingsTab('devices')} 
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '6px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  color: '#34d399',
+                  cursor: 'pointer'
+                }}
+              >
+                <Sparkles size={13} /> 60-Day Trusted Devices
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => openSettingsTab('bank')} 
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '6px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: (user?.upi_id || user?.bank_account_no) ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid var(--border-color)',
+                  color: (user?.upi_id || user?.bank_account_no) ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                <CreditCard size={13} /> {(user?.upi_id || user?.bank_account_no) ? 'Bank & UPI 💳' : 'Bank & UPI ⚡'}
               </button>
             </div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
@@ -989,7 +1049,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
@@ -997,19 +1057,6 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               <div onClick={() => setOneClickMode(!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
                 <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
-            </div>
-
-            {/* 🔐 Two-Factor Authentication & App Security */}
-            <div id="security-2fa-section" style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', gridColumn: isMobile ? '1' : '1 / -1' }}>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldCheck size={16} color="var(--color-blue-light)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
-                </div>
-              </div>
-              <BiometricSettingsSection user={user} />
             </div>
           </div>
         </div>
@@ -1327,7 +1374,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                     </div>
                   </div>
                   <button 
-                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    onClick={() => { setShowWithdrawModal(false); openSettingsTab('bank'); }}
                     style={{ background: 'transparent', border: 'none', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                   >
                     Change
@@ -1347,7 +1394,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                     Please add your UPI ID or Bank Account in Profile Settings to receive payouts.
                   </div>
                   <button 
-                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    onClick={() => { setShowWithdrawModal(false); openSettingsTab('bank'); }}
                     style={{ 
                       background: 'var(--color-blue)', 
                       color: '#fff', 

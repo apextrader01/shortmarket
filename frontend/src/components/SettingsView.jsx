@@ -28,7 +28,7 @@ import {
   playRiskAlertSound
 } from '../utils/soundManager';
 
-export default function SettingsView() {
+export default function SettingsView({ initialTab = 'all', onBack }) {
   const { 
     user, updatePassword, logout, oneClickMode, setOneClickMode, 
     oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails,
@@ -59,6 +59,23 @@ export default function SettingsView() {
   })));
 
   const isLight = theme === 'light';
+
+  const [activeTab, setActiveTab] = useState(initialTab || 'all');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const SETTINGS_TABS = [
+    { id: 'all', label: 'All Settings', icon: Sparkles },
+    { id: 'profile', label: 'Profile & KYC', icon: User },
+    { id: 'security', label: '2-Step Authenticator & PIN', icon: ShieldCheck },
+    { id: 'devices', label: 'Device Security & Sessions', icon: Laptop },
+    { id: 'bank', label: 'Bank & UPI Details', icon: CreditCard },
+    { id: 'alerts', label: 'Audio & Telegram Alerts', icon: Bell }
+  ];
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
@@ -237,12 +254,16 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="settings-container" style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: isMobile ? '90px' : '40px' }}>
+    <div className="settings-container" style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: isMobile ? '90px' : '40px' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '0' }}>
         <div>
-          <h2 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', marginBottom: '8px' }}>Account Settings</h2>
-          <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '14px' }}>Manage your profile and security preferences</div>
+          <h2 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '800', marginBottom: '6px', color: isLight ? '#0f172a' : '#fff', letterSpacing: '-0.3px' }}>
+            Account Settings & Preferences
+          </h2>
+          <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '14px' }}>
+            Manage your personal profile, bank payout details, two-step security, and authorized devices.
+          </div>
         </div>
         <button 
           onClick={logout}
@@ -253,10 +274,63 @@ export default function SettingsView() {
         </button>
       </div>
 
-      <div className="settings-grid">
+      {/* Modern High-Performance Responsive Tabs Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        padding: '6px',
+        background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.03)',
+        borderRadius: '12px',
+        border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none'
+      }}>
+        {SETTINGS_TABS.map(tab => {
+          const isActive = activeTab === tab.id;
+          const TabIcon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: isMobile ? '8px 14px' : '9px 18px',
+                borderRadius: '8px',
+                border: isActive 
+                  ? '1px solid rgba(59, 130, 246, 0.8)' 
+                  : '1px solid transparent',
+                background: isActive 
+                  ? (isLight ? '#2563eb' : 'linear-gradient(135deg, #2563eb, #1d4ed8)') 
+                  : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
+                color: isActive 
+                  ? '#ffffff' 
+                  : (isLight ? '#334155' : 'var(--text-secondary)'),
+                fontSize: isMobile ? '12px' : '13px',
+                fontWeight: isActive ? '700' : '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                boxShadow: isActive ? '0 2px 10px rgba(37, 99, 235, 0.35)' : 'none'
+              }}
+            >
+              <TabIcon size={isMobile ? 14 : 16} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: (activeTab === 'all') ? (isMobile ? '1fr' : '1fr 1fr') : '1fr', gap: '24px' }}>
         
         {/* Profile Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        {(activeTab === 'all' || activeTab === 'profile') && (
+          <div style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gridColumn: activeTab === 'profile' ? '1 / -1' : 'auto' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -410,312 +484,320 @@ export default function SettingsView() {
             )}
           </div>
         </div>
+        )}
 
         {/* Bank Details Card (For Withdrawals) */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CreditCard size={18} color="var(--color-blue)" /> Bank & UPI Details (For Withdrawals)
-          </h3>
-          {bankMsg.text && (
-            <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', background: bankMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: bankMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '14px' }}>
-              {bankMsg.text}
-            </div>
-          )}
-          <form onSubmit={handleBankSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>UPI ID</label>
-              <input type="text" className="input" value={bankDetails.upi_id} onChange={e => setBankDetails({...bankDetails, upi_id: e.target.value})} placeholder="username@upi" />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank Account Number</label>
-              <input type="text" className="input" value={bankDetails.bank_account_no} onChange={e => setBankDetails({...bankDetails, bank_account_no: e.target.value})} placeholder="Account Number" />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank IFSC Code</label>
-              <input type="text" className="input" value={bankDetails.bank_ifsc} onChange={e => setBankDetails({...bankDetails, bank_ifsc: e.target.value})} placeholder="IFSC Code" />
-            </div>
-            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={bankLoading}>
-              <Save size={16} /> {bankLoading ? 'Saving...' : 'Save Bank Details'}
-            </button>
-          </form>
-        </div>
-
-        {/* Security Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Lock size={18} color="var(--color-blue)" /> Change Password
-          </h3>
-          
-          <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Current Password</label>
-              <input 
-                type="password" 
-                className="input-field" 
-                value={oldPassword} 
-                onChange={e => setOldPassword(e.target.value)} 
-                required 
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>New Password</label>
-              <input 
-                type="password" 
-                className="input-field" 
-                value={newPassword} 
-                onChange={e => setNewPassword(e.target.value)} 
-                required 
-                minLength={6}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Confirm New Password</label>
-              <input 
-                type="password" 
-                className="input-field" 
-                value={confirmPassword} 
-                onChange={e => setConfirmPassword(e.target.value)} 
-                required 
-                minLength={6}
-              />
-            </div>
-            
-            {message && (
-              <div style={{ padding: '12px', borderRadius: '6px', fontSize: '13px', background: message.includes('success') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: message.includes('success') ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                {message}
+        {(activeTab === 'all' || activeTab === 'bank') && (
+          <div style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: activeTab === 'bank' ? '1 / -1' : 'auto' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CreditCard size={18} color="var(--color-blue)" /> Bank & UPI Details (For Withdrawals)
+            </h3>
+            {bankMsg.text && (
+              <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', background: bankMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: bankMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '14px' }}>
+                {bankMsg.text}
               </div>
             )}
+            <form onSubmit={handleBankSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>UPI ID</label>
+                <input type="text" className="input" value={bankDetails.upi_id} onChange={e => setBankDetails({...bankDetails, upi_id: e.target.value})} placeholder="username@upi" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank Account Number</label>
+                <input type="text" className="input" value={bankDetails.bank_account_no} onChange={e => setBankDetails({...bankDetails, bank_account_no: e.target.value})} placeholder="Account Number" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank IFSC Code</label>
+                <input type="text" className="input" value={bankDetails.bank_ifsc} onChange={e => setBankDetails({...bankDetails, bank_ifsc: e.target.value})} placeholder="IFSC Code" />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={bankLoading}>
+                <Save size={16} /> {bankLoading ? 'Saving...' : 'Save Bank Details'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Security / Password Card */}
+        {(activeTab === 'all' || activeTab === 'profile' || activeTab === 'security') && (
+          <div style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: (activeTab === 'profile' || activeTab === 'security') ? '1 / -1' : 'auto' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Lock size={18} color="var(--color-blue)" /> Change Password
+            </h3>
             
-            <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <Save size={16} /> {loading ? 'Updating...' : 'Update Password'}
-            </button>
-          </form>
-        </div>
+            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Current Password</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  value={oldPassword} 
+                  onChange={e => setOldPassword(e.target.value)} 
+                  required 
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>New Password</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  value={newPassword} 
+                  onChange={e => setNewPassword(e.target.value)} 
+                  required 
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Confirm New Password</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  value={confirmPassword} 
+                  onChange={e => setConfirmPassword(e.target.value)} 
+                  required 
+                  minLength={6}
+                />
+              </div>
+              
+              {message && (
+                <div style={{ padding: '12px', borderRadius: '6px', fontSize: '13px', background: message.includes('success') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: message.includes('success') ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                  {message}
+                </div>
+              )}
+              
+              <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Save size={16} /> {loading ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Audio Cues & Sound Engine Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Volume2 size={20} color="var(--color-blue)" /> Audio Cues & Sound Engine (Only When Hit)
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                Synthesizes instant real-time sound effects when your orders execute, stop-loss triggers, or target prices are hit.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const next = !soundActive;
-                setSoundActive(next);
-                setSoundEnabled(next);
-                if (next) playOrderExecutedSound();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: soundActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
-                border: soundActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
-                color: soundActive ? '#4ade80' : '#ef4444',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer'
-              }}
-            >
-              {soundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
-              {soundActive ? 'Audio Enabled (Active)' : 'Audio Muted (Off)'}
-            </button>
-          </div>
-
-          {/* Master Volume Slider */}
-          <div style={{ marginTop: '16px', padding: '14px 18px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '8px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Volume2 size={16} color="var(--color-blue-light)" /> Master Audio Volume: {soundVolume}%
+        {(activeTab === 'all' || activeTab === 'alerts') && (
+          <div style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Volume2 size={20} color="var(--color-blue)" /> Audio Cues & Sound Engine (Only When Hit)
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Synthesizes instant real-time sound effects when your orders execute, stop-loss triggers, or target prices are hit.
+                </p>
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Adjust synthesized chime and alert volume for order fills and triggers
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !soundActive;
+                  setSoundActive(next);
+                  setSoundEnabled(next);
+                  if (next) playOrderExecutedSound();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  background: soundActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                  border: soundActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
+                  color: soundActive ? '#4ade80' : '#ef4444',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {soundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                {soundActive ? 'Audio Enabled (Active)' : 'Audio Muted (Off)'}
+              </button>
+            </div>
+
+            {/* Master Volume Slider */}
+            <div style={{ marginTop: '16px', padding: '14px 18px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '8px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: isLight ? '#0f172a' : '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Volume2 size={16} color="var(--color-blue-light)" /> Master Audio Volume: {soundVolume}%
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Adjust synthesized chime and alert volume for order fills and triggers
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : '240px' }}>
+                <VolumeX size={16} color="var(--text-secondary)" />
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={soundVolume} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setSoundVolumeState(val);
+                    setSoundVolume(val / 100);
+                  }}
+                  style={{ flex: 1, accentColor: 'var(--color-blue)' }} 
+                />
+                <Volume2 size={16} color="var(--color-blue-light)" />
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : '240px' }}>
-              <VolumeX size={16} color="var(--text-secondary)" />
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                value={soundVolume} 
-                onChange={e => {
-                  const val = Number(e.target.value);
-                  setSoundVolumeState(val);
-                  setSoundVolume(val / 100);
+
+            {/* Granular Sound Triggers */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '14px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
+                <input 
+                  type="checkbox" 
+                  checked={soundConfig.targetHit} 
+                  onChange={e => {
+                    const val = e.target.checked;
+                    setSoundConfig('target', val);
+                    setSoundConfigState(prev => ({ ...prev, targetHit: val }));
+                  }}
+                  style={{ accentColor: '#4ade80' }}
+                />
+                <span>🎯 Target Hit</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
+                <input 
+                  type="checkbox" 
+                  checked={soundConfig.stopLoss} 
+                  onChange={e => {
+                    const val = e.target.checked;
+                    setSoundConfig('sl', val);
+                    setSoundConfigState(prev => ({ ...prev, stopLoss: val }));
+                  }}
+                  style={{ accentColor: '#ef4444' }}
+                />
+                <span>🛑 Stop Loss</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
+                <input 
+                  type="checkbox" 
+                  checked={soundConfig.orderExecuted} 
+                  onChange={e => {
+                    const val = e.target.checked;
+                    setSoundConfig('exec', val);
+                    setSoundConfigState(prev => ({ ...prev, orderExecuted: val }));
+                  }}
+                  style={{ accentColor: 'var(--color-blue)' }}
+                />
+                <span>🔔 Order Fill</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
+                <input 
+                  type="checkbox" 
+                  checked={soundConfig.riskAlert} 
+                  onChange={e => {
+                    const val = e.target.checked;
+                    setSoundConfig('risk', val);
+                    setSoundConfigState(prev => ({ ...prev, riskAlert: val }));
+                  }}
+                  style={{ accentColor: '#fbbf24' }}
+                />
+                <span>⚠️ Risk Limit</span>
+              </label>
+            </div>
+
+            {/* Audio Test Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
+              <button
+                type="button"
+                onClick={() => playTargetHitSound()}
+                disabled={!soundActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: 'rgba(34, 197, 94, 0.08)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  color: '#4ade80',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: soundActive ? 'pointer' : 'not-allowed',
+                  opacity: soundActive ? 1 : 0.5
                 }}
-                style={{ flex: 1, accentColor: 'var(--color-blue)' }} 
-              />
-              <Volume2 size={16} color="var(--color-blue-light)" />
+              >
+                <span>🎯 Test Target Hit</span>
+                <Play size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => playStopLossHitSound()}
+                disabled={!soundActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: soundActive ? 'pointer' : 'not-allowed',
+                  opacity: soundActive ? 1 : 0.5
+                }}
+              >
+                <span>🛑 Test Stop Loss Hit</span>
+                <Play size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => playOrderExecutedSound()}
+                disabled={!soundActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  color: 'var(--color-blue-light)',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: soundActive ? 'pointer' : 'not-allowed',
+                  opacity: soundActive ? 1 : 0.5
+                }}
+              >
+                <span>🔔 Test Order Executed</span>
+                <Play size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => playRiskAlertSound()}
+                disabled={!soundActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  color: '#fbbf24',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: soundActive ? 'pointer' : 'not-allowed',
+                  opacity: soundActive ? 1 : 0.5
+                }}
+              >
+                <span>⚠️ Test Risk Guardian Alert</span>
+                <Play size={14} />
+              </button>
             </div>
           </div>
-
-          {/* Granular Sound Triggers */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '14px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
-              <input 
-                type="checkbox" 
-                checked={soundConfig.targetHit} 
-                onChange={e => {
-                  const val = e.target.checked;
-                  setSoundConfig('target', val);
-                  setSoundConfigState(prev => ({ ...prev, targetHit: val }));
-                }}
-                style={{ accentColor: '#4ade80' }}
-              />
-              <span>🎯 Target Hit</span>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
-              <input 
-                type="checkbox" 
-                checked={soundConfig.stopLoss} 
-                onChange={e => {
-                  const val = e.target.checked;
-                  setSoundConfig('sl', val);
-                  setSoundConfigState(prev => ({ ...prev, stopLoss: val }));
-                }}
-                style={{ accentColor: '#ef4444' }}
-              />
-              <span>🛑 Stop Loss</span>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
-              <input 
-                type="checkbox" 
-                checked={soundConfig.orderExecuted} 
-                onChange={e => {
-                  const val = e.target.checked;
-                  setSoundConfig('exec', val);
-                  setSoundConfigState(prev => ({ ...prev, orderExecuted: val }));
-                }}
-                style={{ accentColor: 'var(--color-blue)' }}
-              />
-              <span>🔔 Order Fill</span>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: isLight ? '#f8fafc' : 'var(--bg-dark)', borderRadius: '6px', border: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: isLight ? '#0f172a' : '#fff' }}>
-              <input 
-                type="checkbox" 
-                checked={soundConfig.riskAlert} 
-                onChange={e => {
-                  const val = e.target.checked;
-                  setSoundConfig('risk', val);
-                  setSoundConfigState(prev => ({ ...prev, riskAlert: val }));
-                }}
-                style={{ accentColor: '#fbbf24' }}
-              />
-              <span>⚠️ Risk Limit</span>
-            </label>
-          </div>
-
-          {/* Audio Test Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
-            <button
-              type="button"
-              onClick={() => playTargetHitSound()}
-              disabled={!soundActive}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(34, 197, 94, 0.08)',
-                border: '1px solid rgba(34, 197, 94, 0.25)',
-                color: '#4ade80',
-                fontSize: '12.5px',
-                fontWeight: '600',
-                cursor: soundActive ? 'pointer' : 'not-allowed',
-                opacity: soundActive ? 1 : 0.5
-              }}
-            >
-              <span>🎯 Test Target Hit</span>
-              <Play size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => playStopLossHitSound()}
-              disabled={!soundActive}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                color: '#ef4444',
-                fontSize: '12.5px',
-                fontWeight: '600',
-                cursor: soundActive ? 'pointer' : 'not-allowed',
-                opacity: soundActive ? 1 : 0.5
-              }}
-            >
-              <span>🛑 Test Stop Loss Hit</span>
-              <Play size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => playOrderExecutedSound()}
-              disabled={!soundActive}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
-                color: 'var(--color-blue-light)',
-                fontSize: '12.5px',
-                fontWeight: '600',
-                cursor: soundActive ? 'pointer' : 'not-allowed',
-                opacity: soundActive ? 1 : 0.5
-              }}
-            >
-              <span>🔔 Test Order Executed</span>
-              <Play size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => playRiskAlertSound()}
-              disabled={!soundActive}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(245, 158, 11, 0.08)',
-                border: '1px solid rgba(245, 158, 11, 0.25)',
-                color: '#fbbf24',
-                fontSize: '12.5px',
-                fontWeight: '600',
-                cursor: soundActive ? 'pointer' : 'not-allowed',
-                opacity: soundActive ? 1 : 0.5
-              }}
-            >
-              <span>⚠️ Test Risk Guardian Alert</span>
-              <Play size={14} />
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Telegram Live Trade & Risk Alerts Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+        {(activeTab === 'all' || activeTab === 'alerts') && (
+          <div style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ background: 'rgba(0, 136, 204, 0.15)', color: '#0088cc', padding: '10px', borderRadius: '50%' }}>
@@ -948,18 +1030,28 @@ export default function SettingsView() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Security, Two-Factor Authentication & App Unlock Card */}
-        <div id="security-2fa-section" style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={20} color="var(--color-blue)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
-          </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-            Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
-          </p>
+        {(activeTab === 'all' || activeTab === 'security') && (
+          <div id="security-2fa-section" style={{ background: 'var(--bg-panel)', padding: isMobile ? '18px' : '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: isLight ? '#0f172a' : '#fff' }}>
+              <ShieldCheck size={20} color="var(--color-blue)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
+            </p>
 
-          <BiometricSettingsSection user={user} />
-        </div>
+            <BiometricSettingsSection user={user} mode="auth" />
+          </div>
+        )}
+
+        {/* Device Security Command Center & 60-Day Trusted Devices */}
+        {(activeTab === 'all' || activeTab === 'devices') && (
+          <div id="device-security-section" style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <BiometricSettingsSection user={user} mode="devices" />
+          </div>
+        )}
 
       </div>
 
@@ -969,7 +1061,9 @@ export default function SettingsView() {
   );
 }
 
-export function BiometricSettingsSection({ user }) {
+export function BiometricSettingsSection({ user, mode = 'all' }) {
+  const showAuth = mode === 'all' || mode === 'auth';
+  const showDevices = mode === 'all' || mode === 'devices';
   const userId = user?.id || 'default';
   const { 
     userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession, cleanDuplicateSessions,
@@ -1332,7 +1426,9 @@ export function BiometricSettingsSection({ user }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {statusMsg.text && (
+      {showAuth && (
+        <>
+          {statusMsg.text && (
         <div style={{
           padding: '12px 16px',
           borderRadius: '8px',
@@ -1720,8 +1816,25 @@ export function BiometricSettingsSection({ user }) {
           </button>
         </div>
       )}
+    </>
+  )}
 
-      {/* ─── Session & Device Security Command Center ───────────────────────── */}
+  {/* ─── Session & Device Security Command Center ───────────────────────── */}
+  {showDevices && (
+    <>
+      {!showAuth && statusMsg.text && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: '600',
+          background: statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+          color: statusMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)',
+          border: `1px solid ${statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          {statusMsg.text}
+        </div>
+      )}
       <div style={{
         background: 'var(--bg-panel)',
         borderRadius: '16px',
@@ -2604,7 +2717,9 @@ export function BiometricSettingsSection({ user }) {
           )}
         </div>
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 }
 
