@@ -12,6 +12,42 @@ let pendingUserStats = {};
 let pendingMbStats = {};
 let isFlushing = false;
 
+// Per-User In-Memory Ring Buffers (Keeps last 100 entries for instant admin retrieval)
+const userApiCallBuffers = new Map();
+const userActivityBuffers = new Map();
+
+function recordUserApiCallInMemory(userId, entry) {
+    if (!userId || userId === 'anonymous') return;
+    const key = String(userId);
+    let list = userApiCallBuffers.get(key);
+    if (!list) {
+        list = [];
+        userApiCallBuffers.set(key, list);
+    }
+    list.unshift(typeof entry === 'string' ? JSON.parse(entry) : entry);
+    if (list.length > 100) list.pop();
+}
+
+function recordUserActivityInMemory(userId, entry) {
+    if (!userId || userId === 'anonymous') return;
+    const key = String(userId);
+    let list = userActivityBuffers.get(key);
+    if (!list) {
+        list = [];
+        userActivityBuffers.set(key, list);
+    }
+    list.unshift(typeof entry === 'string' ? JSON.parse(entry) : entry);
+    if (list.length > 100) list.pop();
+}
+
+function getUserApiLogs(userId) {
+    return userApiCallBuffers.get(String(userId)) || [];
+}
+
+function getUserActivityLogs(userId) {
+    return userActivityBuffers.get(String(userId)) || [];
+}
+
 async function flushTelemetry() {
     if (isFlushing || !generalClient || !generalClient.isReady) return;
     isFlushing = true;
@@ -154,6 +190,28 @@ function recordTelemetry(req, res, next) {
                 pendingMbStats[mbUserKey].api_calls = (pendingMbStats[mbUserKey].api_calls || 0) + 1;
                 pendingMbStats[mbUserKey].api_time_ms = (pendingMbStats[mbUserKey].api_time_ms || 0) + timeMs;
                 pendingMbStats[mbUserKey].api_bytes = (pendingMbStats[mbUserKey].api_bytes || 0) + responseBodySize;
+
+                // Per-user granular API audit log entry
+                const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip || '').slice(0, 45);
+                const apiEntry = {
+                    method: req.method,
+                    path: routePath,
+                    fullUrl: (req.originalUrl || req.url || '').slice(0, 150),
+                    status: res.statusCode,
+                    timeMs: timeMs,
+                    bytes: responseBodySize,
+                    timestamp: Date.now(),
+                    ip: clientIp
+                };
+
+                recordUserApiCallInMemory(userId, apiEntry);
+
+                if (generalClient && generalClient.isReady) {
+                    const jsonStr = JSON.stringify(apiEntry);
+                    generalClient.lPush(`telemetry:user_api_calls:${userId}`, jsonStr).catch(() => {});
+                    generalClient.lTrim(`telemetry:user_api_calls:${userId}`, 0, 99).catch(() => {});
+                    generalClient.expire(`telemetry:user_api_calls:${userId}`, 7 * 86400).catch(() => {});
+                }
             }
         } catch (err) {
             console.error("TELEMETRY ERROR:", err);
@@ -165,5 +223,9 @@ function recordTelemetry(req, res, next) {
 
 recordTelemetry.flushTelemetry = flushTelemetry;
 recordTelemetry.recordTelemetry = recordTelemetry;
+recordTelemetry.recordUserActivityInMemory = recordUserActivityInMemory;
+recordTelemetry.recordUserApiCallInMemory = recordUserApiCallInMemory;
+recordTelemetry.getUserApiLogs = getUserApiLogs;
+recordTelemetry.getUserActivityLogs = getUserActivityLogs;
 module.exports = recordTelemetry;
 

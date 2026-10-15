@@ -5,6 +5,7 @@ import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Ch
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
 import BroadcastModal from './BroadcastModal';
 import { updateCachedAdConfig, RewardedAdModal } from './AdBannerWidget';
+import UserActivityInspectorModal from './UserActivityInspectorModal';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
   const now = new Date();
@@ -2340,6 +2341,38 @@ export default function AdminDashboard() {
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
+  const [inspectedUserTelemetry, setInspectedUserTelemetry] = useState(null);
+  const [telemetryInspectorLoading, setTelemetryInspectorLoading] = useState(false);
+
+  const handleInspectUserTelemetry = async (userObjOrId) => {
+    const targetId = userObjOrId?.id || userObjOrId?.userId || userObjOrId?.client_id || userObjOrId;
+    if (!targetId || targetId === 'anonymous') return;
+    setTelemetryInspectorLoading(true);
+    setInspectedUserTelemetry(prev => ({
+      user: typeof userObjOrId === 'object' ? userObjOrId : (prev?.user || { id: targetId }),
+      stats: prev?.stats || {},
+      apiLogs: prev?.apiLogs || [],
+      activityLogs: prev?.activityLogs || []
+    }));
+    try {
+      const API_URL = API || import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/user/${encodeURIComponent(targetId)}/telemetry-details`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInspectedUserTelemetry(data);
+      } else {
+        alert(data.error || 'Failed to load user telemetry');
+      }
+    } catch (err) {
+      console.error('Fetch user telemetry error:', err);
+    } finally {
+      setTelemetryInspectorLoading(false);
+    }
+  };
+
   const [newBalance, setNewBalance] = useState('');
   const [newSubTier, setNewSubTier] = useState('BASIC');
   const [newUsername, setNewUsername] = useState('');
@@ -7239,6 +7272,23 @@ export default function AdminDashboard() {
                             >
                               Manage
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleInspectUserTelemetry(u)}
+                              style={{
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                border: '1px solid rgba(59, 130, 246, 0.35)',
+                                color: 'var(--color-blue)',
+                                padding: '2px 7px',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                              title={`Inspect ${u.username}'s clicks & API calls`}
+                            >
+                              🔍 Activity
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -8108,7 +8158,16 @@ export default function AdminDashboard() {
                           const isDeleted = u.isDeleted === true || !u.clientId || String(u.username || '').toLowerCase().includes('deleted') || String(u.username || '').toLowerCase().includes('anonymous');
                           
                           return (
-                            <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <tr
+                              key={u.userId}
+                              onClick={() => !isDeleted && handleInspectUserTelemetry(u)}
+                              style={{
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                cursor: isDeleted ? 'default' : 'pointer',
+                                transition: 'background 0.12s ease'
+                              }}
+                              title={!isDeleted ? `Click to inspect ${u.username}'s clicks & API calls` : ''}
+                            >
                               <td style={{ padding: '5px 8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                                   <span style={{
@@ -8147,7 +8206,30 @@ export default function AdminDashboard() {
                                   : `${u.wsMinutes || 0} mins`}
                               </td>
                               <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
-                              <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--color-blue)', fontWeight: '600' }}>{sizeMb} MB</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                  <span style={{ color: 'var(--color-blue)', fontWeight: '600' }}>{sizeMb} MB</span>
+                                  {!isDeleted && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInspectUserTelemetry(u); }}
+                                      style={{
+                                        background: 'rgba(59, 130, 246, 0.15)',
+                                        border: '1px solid rgba(59, 130, 246, 0.35)',
+                                        color: 'var(--color-blue)',
+                                        borderRadius: '4px',
+                                        padding: '2px 6px',
+                                        fontSize: '9.5px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Inspect what this user clicked and what APIs they called"
+                                    >
+                                      🔍 Audit
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
                             </tr>
                           );
                         })
@@ -8404,6 +8486,26 @@ export default function AdminDashboard() {
                   title="Instantly sign into this client's terminal account"
                 >
                   ⚡ Login as Client
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInspectUserTelemetry(selectedUser)}
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Inspect what this user clicked and what APIs they called"
+                >
+                  🔍 Clicks & APIs
                 </button>
               </div>
               <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setSelectedUser(null)} />
@@ -9081,6 +9183,16 @@ export default function AdminDashboard() {
           onClose={() => setShowBroadcastStudio(false)}
         />
       )}
+
+      {/* User Activity & API Telemetry Inspector Modal */}
+      <UserActivityInspectorModal
+        isOpen={Boolean(inspectedUserTelemetry)}
+        data={inspectedUserTelemetry}
+        loading={telemetryInspectorLoading}
+        onRefresh={() => handleInspectUserTelemetry(inspectedUserTelemetry?.user?.id || inspectedUserTelemetry?.user?.client_id)}
+        onClose={() => setInspectedUserTelemetry(null)}
+        isLight={isLight}
+      />
     </div>
   );
 }

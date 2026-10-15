@@ -92,6 +92,7 @@ import SessionExpiredModal from './components/SessionExpiredModal';
 import PermissionDenied from './components/PermissionDenied';
 import GlobalToast from './components/GlobalToast';
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recordUserActivity } from './utils/biometricAuth';
+import { trackUserAction } from './utils/userActivityTracker';
 import { useStore, DEFAULT_WATCHLIST_SYMBOLS, ensureWatchlistsWithDefaults } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu, ArrowLeft } from 'lucide-react';
@@ -474,7 +475,10 @@ function App() {
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
     activeTabRef.current = activeTab;
-  }, [activeTab]);
+    if (user?.id) {
+      trackUserAction('NAVIGATE', `Navigated to ${activeTab} tab`, { tab: activeTab });
+    }
+  }, [activeTab, user?.id]);
 
   const userRef = useRef(user);
   useEffect(() => {

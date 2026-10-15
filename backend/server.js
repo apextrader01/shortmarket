@@ -5838,6 +5838,159 @@ app.post('/api/admin/telemetry/purge-ghosts', authenticateToken, async (req, res
     }
 });
 
+// ─── User Activity & Clickstream Logging (Client Telemetry) ─────────────────
+app.post('/api/telemetry/user-activity', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { events } = req.body || {};
+    if (Array.isArray(events) && events.length > 0) {
+      const { recordUserActivityInMemory } = require('./middleware/telemetry');
+      const { generalClient } = require('./services/redisClient');
+      const clientIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip || '').slice(0, 45);
+
+      for (const ev of events.slice(0, 30)) {
+        const entry = {
+          type: ev.type || 'CLICK',
+          action: String(ev.action || 'User Action').slice(0, 100),
+          target: String(ev.target || '').slice(0, 50),
+          meta: ev.meta || {},
+          timestamp: ev.timestamp || Date.now(),
+          url: String(ev.url || '').slice(0, 100),
+          ip: clientIp
+        };
+
+        if (typeof recordUserActivityInMemory === 'function') {
+          recordUserActivityInMemory(userId, entry);
+        }
+
+        if (generalClient && generalClient.isReady) {
+          const jsonStr = JSON.stringify(entry);
+          generalClient.lPush(`telemetry:user_activity_logs:${userId}`, jsonStr).catch(() => {});
+          generalClient.lTrim(`telemetry:user_activity_logs:${userId}`, 0, 99).catch(() => {});
+          generalClient.expire(`telemetry:user_activity_logs:${userId}`, 7 * 86400).catch(() => {});
+        }
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Per-User Activity & API Calls Inspector (Admin) ────────────────────────
+app.get('/api/admin/user/:userId/telemetry-details', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const rawTargetId = String(req.params.userId || '').trim();
+    let targetUser = null;
+    if (!isNaN(Number(rawTargetId))) {
+      targetUser = await db('users').where({ id: Number(rawTargetId) }).first().catch(() => null);
+    }
+    if (!targetUser) {
+      targetUser = await db('users').whereRaw('LOWER(client_id) = ?', [rawTargetId.toLowerCase()])
+        .orWhereRaw('LOWER(username) = ?', [rawTargetId.toLowerCase()])
+        .first().catch(() => null);
+    }
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUserId = targetUser.id;
+    const { generalClient } = require('./services/redisClient');
+    const { getUserApiLogs, getUserActivityLogs } = require('./middleware/telemetry');
+
+    // 1. Get in-memory logs
+    const inMemApi = typeof getUserApiLogs === 'function' ? getUserApiLogs(targetUserId) : [];
+    const inMemActivity = typeof getUserActivityLogs === 'function' ? getUserActivityLogs(targetUserId) : [];
+
+    // 2. Fetch from Redis if available
+    let redisApi = [];
+    let redisActivity = [];
+    let redisUserStats = {};
+
+    if (generalClient && generalClient.isReady) {
+      const rawApiList = await generalClient.lRange(`telemetry:user_api_calls:${targetUserId}`, 0, 99).catch(() => []);
+      if (Array.isArray(rawApiList)) {
+        redisApi = rawApiList.map(item => {
+          try { return JSON.parse(item); } catch (_) { return null; }
+        }).filter(Boolean);
+      }
+
+      const rawActList = await generalClient.lRange(`telemetry:user_activity_logs:${targetUserId}`, 0, 99).catch(() => []);
+      if (Array.isArray(rawActList)) {
+        redisActivity = rawActList.map(item => {
+          try { return JSON.parse(item); } catch (_) { return null; }
+        }).filter(Boolean);
+      }
+
+      redisUserStats = await generalClient.hGetAll(`telemetry:user:${targetUserId}`).catch(() => ({}));
+    }
+
+    // Merge and deduplicate by timestamp + path/action
+    const combinedApiMap = new Map();
+    [...inMemApi, ...redisApi].forEach(item => {
+      const key = `${item.timestamp}_${item.method}_${item.path}`;
+      if (!combinedApiMap.has(key)) combinedApiMap.set(key, item);
+    });
+    const apiLogs = Array.from(combinedApiMap.values()).sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
+
+    const combinedActMap = new Map();
+    [...inMemActivity, ...redisActivity].forEach(item => {
+      const key = `${item.timestamp}_${item.action}`;
+      if (!combinedActMap.has(key)) combinedActMap.set(key, item);
+    });
+    const activityLogs = Array.from(combinedActMap.values()).sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
+
+    // Fetch audit logs from Postgres if any
+    const auditLogs = await db('audit_logs')
+      .where({ user_id: targetUserId })
+      .orderBy('created_at', 'desc')
+      .limit(20)
+      .catch(() => []);
+
+    const totalCalls = parseInt(redisUserStats.api_calls || 0, 10) || apiLogs.length;
+    const totalBytes = parseInt(redisUserStats.api_bytes || 0, 10);
+    const wsMin = parseInt(redisUserStats.ws_minutes || 0, 10);
+    const avgLatency = apiLogs.length > 0 ? Math.round(apiLogs.reduce((acc, l) => acc + (l.timeMs || 0), 0) / apiLogs.length) : 0;
+
+    res.json({
+      success: true,
+      user: {
+        id: targetUser.id,
+        username: targetUser.username,
+        client_id: targetUser.client_id || `SE${String(targetUser.id).padStart(6, '0')}`,
+        email: targetUser.email,
+        phone: targetUser.phone,
+        role: targetUser.role,
+        subscription_tier: targetUser.subscription_tier,
+        last_ip: targetUser.last_ip,
+        registration_ip: targetUser.registration_ip,
+        device_model: targetUser.device_model,
+        os_name: targetUser.os_name,
+        browser_name: targetUser.browser_name,
+        city: targetUser.city,
+        state: targetUser.state
+      },
+      stats: {
+        apiCalls: totalCalls,
+        apiBytes: totalBytes,
+        wsMinutes: wsMin,
+        avgLatencyMs: avgLatency
+      },
+      apiLogs,
+      activityLogs,
+      auditLogs
+    });
+  } catch (err) {
+    console.error('telemetry-details error:', err);
+    res.status(500).json({ error: 'Failed to fetch user telemetry details' });
+  }
+});
+
 app.post('/api/admin/master_square_off', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
