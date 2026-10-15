@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { X, Search, RefreshCw, Activity, MousePointer, Globe, Clock, Shield, Laptop, ArrowUpRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Search, RefreshCw, Activity, MousePointer, Globe, Clock, Shield, Laptop, ArrowUpRight, Download, AlertTriangle } from 'lucide-react';
 
 function formatTimeAgo(ts) {
   if (!ts) return '';
@@ -37,12 +37,29 @@ export default function UserActivityInspectorModal({
 }) {
   const [activeTab, setActiveTab] = useState('CLICKS'); // 'CLICKS' | 'APIS'
   const [searchQuery, setSearchQuery] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [errorsOnly, setErrorsOnly] = useState(false);
 
   const user = data?.user || {};
   const stats = data?.stats || {};
   const apiLogs = data?.apiLogs || [];
   const activityLogs = data?.activityLogs || [];
 
+  // 1. Auto-Refresh CCTV Mode (polls every 5s while modal is active)
+  useEffect(() => {
+    if (!autoRefresh || !isOpen || typeof onRefresh !== 'function') return;
+    const timer = setInterval(() => {
+      onRefresh();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [autoRefresh, isOpen, onRefresh]);
+
+  // 2. Count errors and slow requests
+  const errorCount = useMemo(() => {
+    return apiLogs.filter(api => Number(api.status) >= 400 || (api.timeMs && api.timeMs >= 2000)).length;
+  }, [apiLogs]);
+
+  // 3. Filter activities
   const filteredActivities = useMemo(() => {
     if (!searchQuery.trim()) return activityLogs;
     const q = searchQuery.toLowerCase().trim();
@@ -54,16 +71,72 @@ export default function UserActivityInspectorModal({
     );
   }, [activityLogs, searchQuery]);
 
+  // 4. Filter APIs (including Errors Only Red Alert filter)
   const filteredApis = useMemo(() => {
-    if (!searchQuery.trim()) return apiLogs;
+    let list = apiLogs;
+    if (errorsOnly) {
+      list = list.filter(api => Number(api.status) >= 400 || (api.timeMs && api.timeMs >= 2000));
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return apiLogs.filter(api => 
+    return list.filter(api => 
       (api.path || '').toLowerCase().includes(q) ||
       (api.method || '').toLowerCase().includes(q) ||
       String(api.status || '').includes(q) ||
       (api.ip || '').toLowerCase().includes(q)
     );
-  }, [apiLogs, searchQuery]);
+  }, [apiLogs, errorsOnly, searchQuery]);
+
+  // 5. Client-Side CSV Export (Zero server overhead)
+  const handleExportCsv = () => {
+    try {
+      const rows = [];
+      const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `telemetry_${user.client_id || user.username || 'user'}_${activeTab.toLowerCase()}_${timestampStr}.csv`;
+
+      if (activeTab === 'CLICKS') {
+        rows.push(['Timestamp', 'Date Time', 'Type', 'Action / Button', 'Route URL', 'Target / Tag', 'IP Address']);
+        activityLogs.forEach(act => {
+          rows.push([
+            act.timestamp || '',
+            act.timestamp ? formatFullTime(act.timestamp) : '',
+            `"${(act.type || '').replace(/"/g, '""')}"`,
+            `"${(act.action || '').replace(/"/g, '""')}"`,
+            `"${(act.url || '').replace(/"/g, '""')}"`,
+            `"${(act.target || act.meta?.tag || '').replace(/"/g, '""')}"`,
+            `"${(act.ip || '').replace(/"/g, '""')}"`
+          ]);
+        });
+      } else {
+        rows.push(['Timestamp', 'Date Time', 'HTTP Method', 'API Endpoint / Route', 'HTTP Status', 'Latency (ms)', 'Payload Size (bytes)', 'IP Address']);
+        apiLogs.forEach(api => {
+          rows.push([
+            api.timestamp || '',
+            api.timestamp ? formatFullTime(api.timestamp) : '',
+            `"${(api.method || '').replace(/"/g, '""')}"`,
+            `"${(api.path || api.fullUrl || '').replace(/"/g, '""')}"`,
+            api.status || '',
+            api.timeMs || 0,
+            api.bytes || 0,
+            `"${(api.ip || '').replace(/"/g, '""')}"`
+          ]);
+        });
+      }
+
+      const csvContent = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to export CSV:', e);
+    }
+  };
 
   if (!isOpen || !data) return null;
 
@@ -144,6 +217,30 @@ export default function UserActivityInspectorModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Auto-Refresh Live CCTV Toggle */}
+            <button
+              type="button"
+              onClick={() => setAutoRefresh(prev => !prev)}
+              style={{
+                background: autoRefresh ? 'rgba(16, 185, 129, 0.16)' : isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${autoRefresh ? '#10b981' : 'var(--border-color, rgba(255, 255, 255, 0.15))'}`,
+                color: autoRefresh ? '#10b981' : 'var(--text-secondary, #94a3b8)',
+                padding: '6px 12px', borderRadius: '6px',
+                fontSize: '11.5px', fontWeight: '700',
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              title="Auto-refresh user activity every 5 seconds (Live CCTV Mode)"
+            >
+              <span style={{
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: autoRefresh ? '#10b981' : '#64748b',
+                boxShadow: autoRefresh ? '0 0 8px #10b981' : 'none'
+              }} />
+              {autoRefresh ? 'Live CCTV (5s)' : 'Auto-Refresh'}
+            </button>
+
+            {/* Manual Refresh */}
             <button
               type="button"
               onClick={onRefresh}
@@ -161,6 +258,26 @@ export default function UserActivityInspectorModal({
               <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               {loading ? 'Refreshing...' : 'Live Refresh'}
             </button>
+
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              title="Download activity report as CSV"
+              style={{
+                background: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.15))',
+                color: 'var(--text-primary, #fff)',
+                padding: '6px 12px', borderRadius: '6px',
+                fontSize: '11.5px', fontWeight: '700',
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <Download size={13} />
+              Export CSV
+            </button>
+
+            {/* Close */}
             <button
               type="button"
               onClick={onClose}
@@ -216,7 +333,7 @@ export default function UserActivityInspectorModal({
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           flexWrap: 'wrap', gap: '10px'
         }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => setActiveTab('CLICKS')}
@@ -256,6 +373,33 @@ export default function UserActivityInspectorModal({
                 {apiLogs.length}
               </span>
             </button>
+
+            {activeTab === 'APIS' && (
+              <button
+                type="button"
+                onClick={() => setErrorsOnly(prev => !prev)}
+                style={{
+                  padding: '5px 11px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                  border: errorsOnly ? '1px solid #ef4444' : '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+                  background: errorsOnly ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                  color: errorsOnly ? '#f87171' : 'var(--text-secondary, #94a3b8)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Filter to show only failed API requests (HTTP 4xx / 5xx) or slow requests (>= 2000ms)"
+              >
+                <AlertTriangle size={12} color={errorsOnly ? "#f87171" : "#94a3b8"} />
+                Errors & Slow
+                {errorCount > 0 && (
+                  <span style={{
+                    background: '#ef4444', color: '#fff',
+                    padding: '0 5px', borderRadius: '8px', fontSize: '10px', fontWeight: '800'
+                  }}>
+                    {errorCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           <div style={{ position: 'relative', width: '240px' }}>

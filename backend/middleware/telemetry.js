@@ -12,20 +12,38 @@ let pendingUserStats = {};
 let pendingMbStats = {};
 let isFlushing = false;
 
-// Per-User In-Memory Ring Buffers (Keeps last 100 entries for instant admin retrieval)
+// Scale Guard: Cap in-memory active users to 500 to keep Node.js RAM <= 25 MB permanently
+const MAX_CACHED_USERS = 500;
 const userApiCallBuffers = new Map();
 const userActivityBuffers = new Map();
+
+// Pending Redis Batches (flushed every 10 seconds via multi() to eliminate DB churn)
+let pendingUserApiLogs = {};
+let pendingUserActivityLogs = {};
 
 function recordUserApiCallInMemory(userId, entry) {
     if (!userId || userId === 'anonymous') return;
     const key = String(userId);
     let list = userApiCallBuffers.get(key);
     if (!list) {
+        if (userApiCallBuffers.size >= MAX_CACHED_USERS) {
+            const oldestKey = userApiCallBuffers.keys().next().value;
+            userApiCallBuffers.delete(oldestKey);
+        }
         list = [];
         userApiCallBuffers.set(key, list);
+    } else {
+        userApiCallBuffers.delete(key);
+        userApiCallBuffers.set(key, list);
     }
-    list.unshift(typeof entry === 'string' ? JSON.parse(entry) : entry);
+    const parsedEntry = typeof entry === 'string' ? JSON.parse(entry) : entry;
+    list.unshift(parsedEntry);
     if (list.length > 100) list.pop();
+
+    // Queue for 10-second batched Redis pipeline
+    if (!pendingUserApiLogs[key]) pendingUserApiLogs[key] = [];
+    pendingUserApiLogs[key].push(JSON.stringify(parsedEntry));
+    if (pendingUserApiLogs[key].length > 100) pendingUserApiLogs[key].shift();
 }
 
 function recordUserActivityInMemory(userId, entry) {
@@ -33,11 +51,24 @@ function recordUserActivityInMemory(userId, entry) {
     const key = String(userId);
     let list = userActivityBuffers.get(key);
     if (!list) {
+        if (userActivityBuffers.size >= MAX_CACHED_USERS) {
+            const oldestKey = userActivityBuffers.keys().next().value;
+            userActivityBuffers.delete(oldestKey);
+        }
         list = [];
         userActivityBuffers.set(key, list);
+    } else {
+        userActivityBuffers.delete(key);
+        userActivityBuffers.set(key, list);
     }
-    list.unshift(typeof entry === 'string' ? JSON.parse(entry) : entry);
+    const parsedEntry = typeof entry === 'string' ? JSON.parse(entry) : entry;
+    list.unshift(parsedEntry);
     if (list.length > 100) list.pop();
+
+    // Queue for 10-second batched Redis pipeline
+    if (!pendingUserActivityLogs[key]) pendingUserActivityLogs[key] = [];
+    pendingUserActivityLogs[key].push(JSON.stringify(parsedEntry));
+    if (pendingUserActivityLogs[key].length > 100) pendingUserActivityLogs[key].shift();
 }
 
 function getUserApiLogs(userId) {
@@ -97,6 +128,29 @@ async function flushTelemetry() {
                 p.expire(`telemetry:mb_keys:${mbParts[2]}`, 86400);
             }
             opsCount++;
+        }
+
+        const userApiLogsSnapshot = pendingUserApiLogs;
+        const userActLogsSnapshot = pendingUserActivityLogs;
+        pendingUserApiLogs = {};
+        pendingUserActivityLogs = {};
+
+        for (const [uId, logs] of Object.entries(userApiLogsSnapshot)) {
+            if (logs.length > 0) {
+                p.lPush(`telemetry:user_api_calls:${uId}`, ...logs);
+                p.lTrim(`telemetry:user_api_calls:${uId}`, 0, 99);
+                p.expire(`telemetry:user_api_calls:${uId}`, 7 * 86400);
+                opsCount++;
+            }
+        }
+
+        for (const [uId, logs] of Object.entries(userActLogsSnapshot)) {
+            if (logs.length > 0) {
+                p.lPush(`telemetry:user_activity_logs:${uId}`, ...logs);
+                p.lTrim(`telemetry:user_activity_logs:${uId}`, 0, 99);
+                p.expire(`telemetry:user_activity_logs:${uId}`, 7 * 86400);
+                opsCount++;
+            }
         }
 
         if (opsCount > 0) {
@@ -205,13 +259,6 @@ function recordTelemetry(req, res, next) {
                 };
 
                 recordUserApiCallInMemory(userId, apiEntry);
-
-                if (generalClient && generalClient.isReady) {
-                    const jsonStr = JSON.stringify(apiEntry);
-                    generalClient.lPush(`telemetry:user_api_calls:${userId}`, jsonStr).catch(() => {});
-                    generalClient.lTrim(`telemetry:user_api_calls:${userId}`, 0, 99).catch(() => {});
-                    generalClient.expire(`telemetry:user_api_calls:${userId}`, 7 * 86400).catch(() => {});
-                }
             }
         } catch (err) {
             console.error("TELEMETRY ERROR:", err);

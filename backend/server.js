@@ -5864,13 +5864,6 @@ app.post('/api/telemetry/user-activity', authenticateToken, async (req, res) => 
         if (typeof recordUserActivityInMemory === 'function') {
           recordUserActivityInMemory(userId, entry);
         }
-
-        if (generalClient && generalClient.isReady) {
-          const jsonStr = JSON.stringify(entry);
-          generalClient.lPush(`telemetry:user_activity_logs:${userId}`, jsonStr).catch(() => {});
-          generalClient.lTrim(`telemetry:user_activity_logs:${userId}`, 0, 99).catch(() => {});
-          generalClient.expire(`telemetry:user_activity_logs:${userId}`, 7 * 86400).catch(() => {});
-        }
       }
     }
     res.json({ success: true });
