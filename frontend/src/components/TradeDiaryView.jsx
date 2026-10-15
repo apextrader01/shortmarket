@@ -57,7 +57,8 @@ import {
   Flame, Check, X, Edit3, Trash2, Search,
   BookOpen, ChevronRight, ChevronLeft, Star, ThumbsUp, Menu,
   Copy, CheckCircle, DollarSign, Target, MessageSquare, Download, ShieldAlert, LogOut,
-  Loader2, Camera, Image, Maximize2, UploadCloud, ZoomIn, ZoomOut
+  Loader2, Camera, Image, Maximize2, UploadCloud, ZoomIn, ZoomOut,
+  CheckCheck, RotateCcw, ChevronUp, SlidersHorizontal, Layers
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
@@ -768,6 +769,25 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
     rationale: 'Daily consolidation breakout retest with high buying volume.'
   });
 
+  // Simple Mode state for Trade Diary (defaults to true for clean, streamlined UX)
+  const [simpleMode, setSimpleMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('skandx_trade_diary_simple_mode');
+      return saved !== null ? saved === 'true' : true;
+    } catch (_) {
+      return true;
+    }
+  });
+  const [showMoreSidebarTools, setShowMoreSidebarTools] = useState(false);
+
+  const toggleSimpleMode = () => {
+    setSimpleMode(prev => {
+      const next = !prev;
+      try { localStorage.setItem('skandx_trade_diary_simple_mode', String(next)); } catch (_) {}
+      return next;
+    });
+  };
+
   // Today checklist state
   // Checklist Date & Active Selected Day
   const [selectedChecklistDate, setSelectedChecklistDate] = useState(todayStr);
@@ -775,6 +795,21 @@ export default function TradeDiaryView({ initialTab, onOpenPaperTrading, onBack,
   const [showAddCustomChecklistModal, setShowAddCustomChecklistModal] = useState(false);
   const [customChecklistSection, setCustomChecklistSection] = useState('preMarket');
   const [newCustomTaskText, setNewCustomTaskText] = useState('');
+  
+  // Checklist View Phase Filter ('ALL' | 'preMarket' | 'inMarket' | 'postMarket')
+  const [checklistActivePhase, setChecklistActivePhase] = useState('ALL');
+  // Collapsed sections in Checklist view
+  const [checklistCollapsed, setChecklistCollapsed] = useState({
+    preMarket: false,
+    inMarket: false,
+    postMarket: false
+  });
+  // Inline quick task inputs per section
+  const [inlineTaskInputs, setInlineTaskInputs] = useState({
+    preMarket: '',
+    inMarket: '',
+    postMarket: ''
+  });
   
   // Custom checklist items state (stored per category)
   const [customChecklistItems, setCustomChecklistItems] = useState({
@@ -1246,6 +1281,56 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     const current = new Date(selectedChecklistDate);
     current.setDate(current.getDate() + days);
     setSelectedChecklistDate(current.toISOString().split('T')[0]);
+  };
+
+  // Batch toggle all items in a phase (Check All or Reset)
+  const handleBatchTogglePhase = async (section, targetChecked) => {
+    const currentSectionItems = { ...todayChecklist[section] };
+    Object.keys(currentSectionItems).forEach(k => {
+      currentSectionItems[k] = targetChecked;
+    });
+    const updated = {
+      ...todayChecklist,
+      [section]: currentSectionItems
+    };
+    setTodayChecklist(updated);
+
+    setCustomChecklistItems(prev => ({
+      ...prev,
+      [section]: (prev[section] || []).map(item => ({ ...item, checked: targetChecked }))
+    }));
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await fetch(`${API}/api/journal/checklists`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            date: selectedChecklistDate,
+            pre_market_data: section === 'preMarket' ? currentSectionItems : todayChecklist.preMarket,
+            post_market_data: section === 'postMarket' ? currentSectionItems : todayChecklist.postMarket,
+            notes: todayChecklist.notes
+          })
+        });
+      }
+    } catch (_) {}
+  };
+
+  // Inline quick add custom task
+  const handleInlineQuickAddTask = (section) => {
+    const text = (inlineTaskInputs[section] || '').trim();
+    if (!text) return;
+    const newItem = {
+      id: `custom-${Date.now()}`,
+      label: text,
+      checked: false
+    };
+    setCustomChecklistItems(prev => ({
+      ...prev,
+      [section]: [...(prev[section] || []), newItem]
+    }));
+    setInlineTaskInputs(prev => ({ ...prev, [section]: '' }));
   };
 
   // Explicit Save Checklist Routine
@@ -2199,21 +2284,21 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     };
   }, [riskCalc]);
 
-  // Sidebar navigation items matching tradediary.in
+  // Sidebar navigation items organized with primary and specialized groups
   const sidebarItems = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'CHECKLIST', label: 'Trading Checklist', icon: CheckSquare },
-    { id: 'TRADES', label: 'Trades', icon: ListOrdered },
-    { id: 'STRATEGIES', label: 'Strategies', icon: TrendingUp },
-    { id: 'RULES', label: 'Rules', icon: Scale },
-    { id: 'MISTAKES', label: 'Mistakes', icon: AlertTriangle },
-    { id: 'AI_SUMMARIZER', label: 'AI Summarizer', icon: Sparkles },
-    { id: 'REPORTS', label: 'Reports', icon: BarChart2 },
-    { id: 'RISK_MANAGEMENT', label: 'Risk Management', icon: ShieldCheck },
-    { id: 'COMMUNITY', label: 'Community', icon: Users },
-    { id: 'CHALLENGE', label: 'Challenge', icon: Trophy },
-    { id: 'CALENDAR', label: 'Calendar', icon: Calendar },
-    { id: 'AFFILIATE', label: 'Invite & Earn', icon: Share2, badge: '10%' }
+    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'CORE', sectionLabel: 'DAILY WORKFLOW' },
+    { id: 'CHECKLIST', label: 'Trading Checklist', icon: CheckSquare, group: 'CORE', sectionLabel: 'DAILY WORKFLOW' },
+    { id: 'TRADES', label: 'Trades Journal', icon: ListOrdered, group: 'CORE', sectionLabel: 'DAILY WORKFLOW' },
+    { id: 'STRATEGIES', label: 'Strategies', icon: TrendingUp, group: 'CORE', sectionLabel: 'PLAYBOOK & RULES' },
+    { id: 'CALENDAR', label: 'Calendar', icon: Calendar, group: 'MORE', sectionLabel: 'DAILY WORKFLOW' },
+    { id: 'RULES', label: 'Rules', icon: Scale, group: 'MORE', sectionLabel: 'PLAYBOOK & RULES' },
+    { id: 'MISTAKES', label: 'Mistakes', icon: AlertTriangle, group: 'MORE', sectionLabel: 'PLAYBOOK & RULES' },
+    { id: 'AI_SUMMARIZER', label: 'AI Summarizer', icon: Sparkles, group: 'MORE', sectionLabel: 'ANALYTICS & AI' },
+    { id: 'REPORTS', label: 'Reports', icon: BarChart2, group: 'MORE', sectionLabel: 'ANALYTICS & AI' },
+    { id: 'RISK_MANAGEMENT', label: 'Risk Management', icon: ShieldCheck, group: 'MORE', sectionLabel: 'ANALYTICS & AI' },
+    { id: 'COMMUNITY', label: 'Community', icon: Users, group: 'MORE', sectionLabel: 'COMMUNITY & HUB' },
+    { id: 'CHALLENGE', label: 'Challenge', icon: Trophy, group: 'MORE', sectionLabel: 'COMMUNITY & HUB' },
+    { id: 'AFFILIATE', label: 'Invite & Earn', icon: Share2, badge: '10%', group: 'MORE', sectionLabel: 'COMMUNITY & HUB' }
   ];
 
   // Helper for index ticker pills
@@ -2254,9 +2339,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       {/* ── LEFT SIDEBAR (Desktop Fixed / Mobile Slide-Out Drawer) ───────── */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <aside style={{
-        width: isMobile ? '280px' : '240px',
-        minWidth: isMobile ? '280px' : '240px',
-        maxWidth: isMobile ? '85vw' : '240px',
+        width: isMobile ? '280px' : '230px',
+        minWidth: isMobile ? '280px' : '230px',
+        maxWidth: isMobile ? '85vw' : '230px',
         backgroundColor: colors.bgSidebar,
         borderRight: `1px solid ${colors.borderColor}`,
         display: 'flex',
@@ -2274,7 +2359,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       }}>
         {/* Brand Header */}
         <div style={{
-          padding: '16px 18px',
+          padding: '14px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -2286,20 +2371,20 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               src={logoImg}
               alt="SkandX Logo"
               style={{
-                width: '32px',
-                height: '32px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '8px',
-                boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)',
+                boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)',
                 border: '1px solid rgba(125, 211, 252, 0.35)',
                 objectFit: 'cover',
                 flexShrink: 0
               }}
             />
             <div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 SkandX Diary
               </div>
-              <div style={{ fontSize: '10px', color: colors.textSecondary, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div style={{ fontSize: '9.5px', color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 JOURNAL &amp; TERMINAL
               </div>
             </div>
@@ -2326,103 +2411,206 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           )}
         </div>
 
+        {/* View Mode Toggle Strip: Simple vs Full Suite */}
+        <div style={{
+          padding: '8px 12px',
+          borderBottom: `1px solid ${colors.borderColor}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)',
+          flexShrink: 0
+        }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <SlidersHorizontal size={12} color={colors.accentBlueLight} /> Navigation
+          </span>
+          <button
+            onClick={toggleSimpleMode}
+            title={simpleMode ? "Switch to Full Suite with all 13 tools" : "Switch to Simple Mode with 4 core tools"}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '12px',
+              fontSize: '10.5px',
+              fontWeight: '700',
+              border: `1px solid ${simpleMode ? '#2563eb' : colors.borderColor}`,
+              backgroundColor: simpleMode ? (isLight ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.22)') : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'),
+              color: simpleMode ? colors.accentBlueLight : colors.textSecondary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {simpleMode ? '✨ Simple' : '🛠️ Full'}
+          </button>
+        </div>
+
         {/* Sidebar Navigation Items */}
-        <nav style={{ padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-          {sidebarItems.map((item) => {
-            const isActive = activeTab === item.id;
-            const Icon = item.icon;
+        <nav style={{ padding: '8px 8px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto' }}>
+          {/* In Simple Mode: show 4 core tools, then expander */}
+          {(() => {
+            const isTabInMore = sidebarItems.filter(i => i.group === 'MORE').some(i => i.id === activeTab);
+            const showExtra = !simpleMode || showMoreSidebarTools || isTabInMore;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (isMobile) setShowMobileSidebar(false);
-                  if (item.isBridge) {
-                    if (onOpenPaperTrading) {
-                      onOpenPaperTrading();
-                    } else if (onBack) {
-                      onBack();
+            const renderNavItem = (item) => {
+              const isActive = activeTab === item.id;
+              const Icon = item.icon;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (isMobile) setShowMobileSidebar(false);
+                    if (item.isBridge) {
+                      if (onOpenPaperTrading) {
+                        onOpenPaperTrading();
+                      } else if (onBack) {
+                        onBack();
+                      }
+                    } else {
+                      setActiveTab(item.id);
                     }
-                  } else {
-                    setActiveTab(item.id);
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: isActive ? '700' : '500',
-                  color: isActive ? colors.accentBlueLight : (item.isBridge ? (isLight ? '#0284c7' : '#38bdf8') : colors.textSecondary),
-                  backgroundColor: isActive ? (isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)') : 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease',
-                  outline: 'none',
-                  position: 'relative'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <Icon size={16} color={isActive ? '#2563eb' : (item.isBridge ? '#0284c7' : (isLight ? '#64748b' : '#94a3b8'))} />
-                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.label}
-                </span>
-
-                {item.badge && (
-                  <span style={{
-                    fontSize: '9px',
-                    fontWeight: '800',
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    padding: '2px 6px',
-                    borderRadius: '10px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.4px',
-                    boxShadow: '0 0 8px rgba(37, 99, 235, 0.5)'
-                  }}>
-                    {item.badge}
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: isActive ? '700' : '500',
+                    color: isActive ? colors.accentBlueLight : (item.isBridge ? (isLight ? '#0284c7' : '#38bdf8') : colors.textSecondary),
+                    backgroundColor: isActive ? (isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)') : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    outline: 'none',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Icon size={15} color={isActive ? '#2563eb' : (item.isBridge ? '#0284c7' : (isLight ? '#64748b' : '#94a3b8'))} />
+                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {item.label}
                   </span>
-                )}
-              </button>
-            );
-          })}
+
+                  {item.badge && (
+                    <span style={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      padding: '2px 5px',
+                      borderRadius: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                      boxShadow: '0 0 8px rgba(37, 99, 235, 0.5)'
+                    }}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            };
+
+            if (simpleMode) {
+              return (
+                <>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: colors.textMuted, letterSpacing: '0.5px', padding: '6px 10px 4px 10px', textTransform: 'uppercase' }}>
+                    Core Essentials
+                  </div>
+                  {sidebarItems.filter(it => it.group === 'CORE').map(renderNavItem)}
+
+                  <div style={{ margin: '6px 0 2px 0', borderTop: `1px dashed ${colors.borderColor}` }} />
+
+                  <button
+                    onClick={() => setShowMoreSidebarTools(prev => !prev)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: isTabInMore ? colors.accentBlueLight : colors.textSecondary,
+                      backgroundColor: isTabInMore ? (isLight ? 'rgba(37,99,235,0.06)' : 'rgba(37,99,235,0.12)') : 'transparent',
+                      border: `1px solid ${isTabInMore ? '#2563eb' : colors.borderColor}`,
+                      cursor: 'pointer',
+                      marginTop: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Layers size={13} color={colors.accentBlueLight} />
+                      {showExtra ? 'Collapse Extra Tools' : 'More Tools (9)'}
+                    </span>
+                    {showExtra ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+
+                  {showExtra && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px', paddingLeft: '4px', borderLeft: `2px solid ${colors.borderColor}` }}>
+                      {sidebarItems.filter(it => it.group === 'MORE').map(renderNavItem)}
+                    </div>
+                  )}
+                </>
+              );
+            }
+
+            // Full Suite View: grouped with section headers
+            const groups = ['DAILY WORKFLOW', 'PLAYBOOK & RULES', 'ANALYTICS & AI', 'COMMUNITY & HUB'];
+            return groups.map((gLabel) => {
+              const itemsInGroup = sidebarItems.filter(it => it.sectionLabel === gLabel);
+              if (itemsInGroup.length === 0) return null;
+              return (
+                <div key={gLabel} style={{ marginBottom: '8px' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '800', color: colors.textMuted, letterSpacing: '0.6px', padding: '6px 10px 4px 10px', textTransform: 'uppercase' }}>
+                    {gLabel}
+                  </div>
+                  {itemsInGroup.map(renderNavItem)}
+                </div>
+              );
+            });
+          })()}
         </nav>
 
         {/* Live Terminal Launcher Card at Bottom of Sidebar */}
         <div style={{
-          padding: '12px',
-          margin: '8px',
+          padding: '10px 12px',
+          margin: '6px 8px 10px 8px',
           borderRadius: '10px',
           background: isLight 
             ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(14, 165, 233, 0.04))' 
             : 'linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(14, 165, 233, 0.06))',
           border: `1px solid ${isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(59, 130, 246, 0.25)'}`,
           display: 'flex',
-          flexDirection: 'column',
-          gap: '6px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontSize: '11px', fontWeight: '800' }}>
-            <Zap size={14} /> LIVE TERMINAL
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#2563eb', fontSize: '11px', fontWeight: '800' }}>
+              <Zap size={13} /> LIVE TERMINAL
+            </div>
+            <div style={{ fontSize: '10px', color: colors.textSecondary, marginTop: '1px' }}>
+              Live F&O tick feed
+            </div>
           </div>
-          <p style={{ fontSize: '11px', color: colors.textSecondary, margin: 0, lineHeight: 1.35 }}>
-            Trade live F&O, futures & equities with real-time tick feed.
-          </p>
           <button
             onClick={() => {
               if (isMobile) setShowMobileSidebar(false);
               onOpenPaperTrading ? onOpenPaperTrading() : onBack && onBack();
             }}
             style={{
-              padding: '8px 10px',
+              padding: '6px 10px',
               borderRadius: '6px',
               backgroundColor: '#2563eb',
               color: '#ffffff',
@@ -2432,13 +2620,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-              marginTop: '2px'
+              gap: '4px',
+              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.35)',
+              whiteSpace: 'nowrap'
             }}
           >
-            Launch Terminal <ArrowUpRight size={13} />
+            Launch <ArrowUpRight size={12} />
           </button>
         </div>
       </aside>
@@ -3743,33 +3930,98 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             // Timing subheaders based on market
             const timingHeaders = {
               Indian: {
-                pre: '1. Pre-Market Prep (Before 09:15 AM)',
-                in: '2. In-Market Execution (09:15 AM - 03:30 PM)',
-                post: '3. Post-Market Review (After 03:30 PM)'
+                pre: 'Pre-Market Preparation',
+                preTime: 'Before 09:15 AM',
+                in: 'In-Market Execution',
+                inTime: '09:15 AM - 03:30 PM',
+                post: 'Post-Market Review',
+                postTime: 'After 03:30 PM'
               },
               Crypto: {
-                pre: '1. Daily Open Analysis & Liquidity Scan',
-                in: '2. Active Setup & High-Volume Execution',
-                post: '3. Daily Settlement & Position Review'
+                pre: 'Daily Open Analysis',
+                preTime: 'Liquidity Scan & Bias',
+                in: 'Active Setup Execution',
+                inTime: 'High-Volume Window',
+                post: 'Settlement & Journaling',
+                postTime: 'Daily Close Review'
               },
               Forex: {
-                pre: '1. London / NY Pre-Session Analysis',
-                in: '2. Session Overlap Execution',
-                post: '3. Daily Close & Pip Reconciliation'
+                pre: 'Session Preparation',
+                preTime: 'London / NY Open',
+                in: 'Session Overlap Execution',
+                inTime: 'Peak Volume Hours',
+                post: 'Daily Close & Pip Reconciliation',
+                postTime: 'End of Session'
               },
               US: {
-                pre: '1. US Pre-Market Prep (Before 09:30 AM EST)',
-                in: '2. Regular Trading Hours (09:30 AM - 04:00 PM EST)',
-                post: '3. After-Hours Review & Journaling'
+                pre: 'US Pre-Market Prep',
+                preTime: 'Before 09:30 AM EST',
+                in: 'Regular Trading Hours',
+                inTime: '09:30 AM - 04:00 PM EST',
+                post: 'After-Hours Review',
+                postTime: 'Post 04:00 PM EST'
               }
             }[marketSegment] || {
-              pre: '1. Pre-Market Checklist',
-              in: '2. In-Market Execution',
-              post: '3. Post-Market Review'
+              pre: 'Pre-Market Preparation',
+              preTime: 'Morning Session',
+              in: 'In-Market Execution',
+              inTime: 'Live Session',
+              post: 'Post-Market Review',
+              postTime: 'Evening Debrief'
             };
 
+            // Phase definitions
+            const phaseConfigs = [
+              {
+                key: 'preMarket',
+                title: `1. ${timingHeaders.pre}`,
+                time: timingHeaders.preTime,
+                icon: Flame,
+                accentColor: '#2563eb',
+                done: preDone,
+                total: preTotal,
+                builtInItems: [
+                  { key: 'globalMarketsChecked', label: 'Checked Global Indices (Gift Nifty, US Futures, Asia Open, DXY)' },
+                  { key: 'supportResistanceDrawn', label: 'Identified Key Support & Resistance Levels on 15m/1h Chart' },
+                  { key: 'dailyRiskLimitSet', label: 'Defined Max Daily Loss Limit (Hard stop if hit)' },
+                  { key: 'highImpactNewsNoted', label: 'Checked RBI, Fed, or Corporate Earnings News Calendar' },
+                  { key: 'tradingPlanWritten', label: 'Written Trade Plan (Predefined Entry, SL, and Target Price)' }
+                ]
+              },
+              {
+                key: 'inMarket',
+                title: `2. ${timingHeaders.in}`,
+                time: timingHeaders.inTime,
+                icon: Scale,
+                accentColor: '#f59e0b',
+                done: inDone,
+                total: inTotal,
+                builtInItems: [
+                  { key: 'stopLossPlacedImmediately', label: 'Placed hard Stop-Loss in system immediately upon entry' },
+                  { key: 'positionSizedProperly', label: 'Position size strictly within 1% risk limit' },
+                  { key: 'candleCloseWaited', label: 'Waited for 5-minute candle close confirmation (No FOMO)' },
+                  { key: 'noRevengeTrading', label: 'No revenge trades taken after initial outcome' }
+                ]
+              },
+              {
+                key: 'postMarket',
+                title: `3. ${timingHeaders.post}`,
+                time: timingHeaders.postTime,
+                icon: ShieldCheck,
+                accentColor: colors.accentGreen,
+                done: postDone,
+                total: postTotal,
+                builtInItems: [
+                  { key: 'allTradesLogged', label: 'All executed trades logged with Entry, Exit, and Quantities' },
+                  { key: 'mistakesReviewed', label: 'Logged behavioral or execution mistakes (if any)' },
+                  { key: 'emotionsDocumented', label: 'Documented emotional mindset during entries and exits' },
+                  { key: 'dailyPnLReconciled', label: 'Net P&L and charges reconciled with broker statement' }
+                ]
+              }
+            ];
+
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '16px', maxWidth: '960px', margin: '0 auto' }}>
                 {/* Header & Date Switcher */}
                 <div style={{ 
                   display: 'flex', 
@@ -3779,11 +4031,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   gap: '10px'
                 }}>
                   <div>
-                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckSquare size={22} color="#2563eb" /> Daily Trading Checklist
+                    <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckSquare size={20} color="#2563eb" /> Daily Trading Checklist
                     </h2>
-                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
-                      Build systematic discipline with pre-market prep, in-market execution, and post-market review ({marketSegment}).
+                    <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Systematic discipline for pre-market prep, in-market execution, and post-market review.
                     </p>
                   </div>
 
@@ -3796,7 +4048,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       backgroundColor: colors.bgCard,
                       border: `1px solid ${colors.borderColor}`,
                       borderRadius: '8px',
-                      padding: '4px 6px',
+                      padding: '3px 6px',
                       boxShadow: colors.cardShadow
                     }}>
                       <button 
@@ -3804,9 +4056,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         title="Previous Day"
                         style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '3px', display: 'flex' }}
                       >
-                        <ChevronLeft size={16} />
+                        <ChevronLeft size={15} />
                       </button>
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: colors.accentBlueLight, padding: '0 4px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: '700', color: colors.accentBlueLight, padding: '0 4px' }}>
                         📅 {selectedChecklistDate}
                       </span>
                       <button 
@@ -3814,12 +4066,12 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         title="Next Day"
                         style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '3px', display: 'flex' }}
                       >
-                        <ChevronRight size={16} />
+                        <ChevronRight size={15} />
                       </button>
                       {selectedChecklistDate !== todayStr && (
                         <button 
                           onClick={() => setSelectedChecklistDate(todayStr)} 
-                          style={{ background: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '4px', fontSize: '10px', fontWeight: '700', padding: '2px 6px', color: colors.textPrimary, cursor: 'pointer', marginLeft: '2px' }}
+                          style={{ background: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '4px', fontSize: '9.5px', fontWeight: '700', padding: '2px 5px', color: colors.textPrimary, cursor: 'pointer', marginLeft: '2px' }}
                         >
                           Today
                         </button>
@@ -3831,432 +4083,440 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       fontWeight: '800',
                       color: '#f59e0b',
                       backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                      padding: '6px 12px',
+                      padding: '5px 10px',
                       borderRadius: '8px',
                       border: '1px solid rgba(245, 158, 11, 0.3)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px'
                     }}>
-                      <Flame size={14} /> 14-Day Streak
+                      <Flame size={13} /> 14-Day Streak
                     </div>
                   </div>
                 </div>
 
-                {/* Overall Routine Completion Progress Card */}
+                {/* Overall Routine Completion & Phase Focus Card */}
                 <div style={{
                   backgroundColor: colors.bgCard,
                   border: `1px solid ${is100Pct ? colors.accentGreen : colors.borderColor}`,
                   borderRadius: '12px',
-                  padding: isMobile ? '14px' : '18px 20px',
+                  padding: isMobile ? '12px' : '16px 18px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
                   boxShadow: colors.cardShadow,
-                  background: is100Pct ? (isLight ? 'rgba(16, 185, 129, 0.05)' : 'rgba(16, 185, 129, 0.1)') : colors.bgCard
+                  background: is100Pct ? (isLight ? 'rgba(16, 185, 129, 0.04)' : 'rgba(16, 185, 129, 0.08)') : colors.bgCard
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>
                         Daily Routine Completion
                       </span>
-                      {is100Pct && (
+                      {is100Pct ? (
                         <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: colors.accentGreen, color: '#ffffff', padding: '2px 8px', borderRadius: '12px' }}>
-                          🏆 100% ROUTINE MASTERED!
+                          🏆 100% MASTERED!
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>
+                          {totalDone} of {totalTasks} Completed
                         </span>
                       )}
                     </div>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: is100Pct ? colors.accentGreen : colors.accentBlueLight }}>
-                      {pctCompleted}% ({totalDone}/{totalTasks} Tasks Done)
+                      {pctCompleted}%
                     </div>
                   </div>
 
                   {/* Visual Progress Bar */}
-                  <div style={{ width: '100%', height: '8px', backgroundColor: colors.bgInner, borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '6px', backgroundColor: colors.bgInner, borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ 
                       width: `${pctCompleted}%`, 
                       height: '100%', 
                       background: is100Pct ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
                       transition: 'width 0.3s ease',
-                      borderRadius: '4px'
+                      borderRadius: '3px'
                     }} />
                   </div>
 
-                  {/* Section Breakdown Badges */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', marginTop: '2px' }}>
-                    <span style={{ color: colors.textSecondary }}>
-                      Pre-Market: <b style={{ color: preDone === preTotal ? colors.accentGreen : colors.textPrimary }}>{preDone}/{preTotal}</b>
+                  {/* ── FOCUS PHASE FILTER TABS (Cuts clutter by letting trader focus on 1 phase) ── */}
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '6px', 
+                    alignItems: 'center', 
+                    overflowX: 'auto', 
+                    scrollbarWidth: 'none', 
+                    marginTop: '2px',
+                    paddingBottom: '2px'
+                  }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted, marginRight: '2px' }}>
+                      Phase:
                     </span>
-                    <span style={{ color: colors.borderColor }}>•</span>
-                    <span style={{ color: colors.textSecondary }}>
-                      In-Market: <b style={{ color: inDone === inTotal ? colors.accentGreen : colors.textPrimary }}>{inDone}/{inTotal}</b>
-                    </span>
-                    <span style={{ color: colors.borderColor }}>•</span>
-                    <span style={{ color: colors.textSecondary }}>
-                      Post-Market: <b style={{ color: postDone === postTotal ? colors.accentGreen : colors.textPrimary }}>{postDone}/{postTotal}</b>
-                    </span>
+
+                    {[
+                      { id: 'ALL', label: 'All Routines', done: totalDone, total: totalTasks, icon: Layers },
+                      { id: 'preMarket', label: '🌅 Pre-Market', done: preDone, total: preTotal },
+                      { id: 'inMarket', label: '⚡ In-Market', done: inDone, total: inTotal },
+                      { id: 'postMarket', label: '🌙 Post-Market', done: postDone, total: postTotal }
+                    ].map(tab => {
+                      const isSel = checklistActivePhase === tab.id;
+                      const isPhaseComplete = tab.done === tab.total && tab.total > 0;
+
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setChecklistActivePhase(tab.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: isMobile ? '5px 9px' : '5px 12px',
+                            borderRadius: '20px',
+                            fontSize: isMobile ? '11px' : '11.5px',
+                            fontWeight: isSel ? '700' : '600',
+                            border: isSel ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
+                            backgroundColor: isSel ? '#2563eb' : (isLight ? '#f8fafc' : colors.bgInner),
+                            color: isSel ? '#ffffff' : colors.textPrimary,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSel ? '0 2px 6px rgba(37,99,235,0.3)' : 'none'
+                          }}
+                        >
+                          <span>{tab.label}</span>
+                          <span style={{
+                            fontSize: '9.5px',
+                            fontWeight: '800',
+                            padding: '1px 5px',
+                            borderRadius: '8px',
+                            backgroundColor: isSel ? 'rgba(255,255,255,0.25)' : (isPhaseComplete ? 'rgba(16,185,129,0.15)' : colors.borderColor),
+                            color: isSel ? '#ffffff' : (isPhaseComplete ? colors.accentGreen : colors.textSecondary)
+                          }}>
+                            {tab.done}/{tab.total}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* 1. Pre-Market Section */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Flame size={16} /> {timingHeaders.pre}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setCustomChecklistSection('preMarket');
-                        setShowAddCustomChecklistModal(true);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                    >
-                      <Plus size={13} /> Add Task
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {[
-                      { key: 'globalMarketsChecked', label: 'Checked Global Indices (Gift Nifty, US Futures, Asia Open, DXY)' },
-                      { key: 'supportResistanceDrawn', label: 'Identified Key Support & Resistance Levels on 15m/1h Chart' },
-                      { key: 'dailyRiskLimitSet', label: 'Defined Max Daily Loss Limit (Hard stop if hit)' },
-                      { key: 'highImpactNewsNoted', label: 'Checked RBI, Fed, or Corporate Earnings News Calendar' },
-                      { key: 'tradingPlanWritten', label: 'Written Trade Plan (Predefined Entry, SL, and Target Price)' }
-                    ].map(item => (
-                      <div
-                        key={item.key}
-                        onClick={() => handleToggleChecklistItem('preMarket', item.key)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: todayChecklist.preMarket[item.key] ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '4px',
-                          backgroundColor: todayChecklist.preMarket[item.key] ? '#2563eb' : 'transparent',
-                          border: todayChecklist.preMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                          flexShrink: 0
-                        }}>
-                          {todayChecklist.preMarket[item.key] && <Check size={12} strokeWidth={3} />}
-                        </div>
-                        <span style={{
-                          fontSize: '12px',
-                          color: todayChecklist.preMarket[item.key] ? colors.textPrimary : colors.textSecondary,
-                          textDecoration: todayChecklist.preMarket[item.key] ? 'line-through' : 'none',
-                          lineHeight: 1.35
-                        }}>
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
+                {/* ── CHECKLIST PHASE SECTIONS ── */}
+                {phaseConfigs.map(phase => {
+                  const isVisible = checklistActivePhase === 'ALL' || checklistActivePhase === phase.key;
+                  if (!isVisible) return null;
 
-                    {/* Custom Pre-Market Items */}
-                    {customChecklistItems.preMarket.map(item => (
-                      <div
-                        key={item.id}
-                        onClick={() => handleToggleCustomChecklistItem('preMarket', item.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
+                  const isCollapsed = Boolean(checklistCollapsed[phase.key]);
+                  const Icon = phase.icon;
+                  const isPhaseDone = phase.done === phase.total && phase.total > 0;
+                  const customItems = customChecklistItems[phase.key] || [];
+
+                  return (
+                    <div 
+                      key={phase.key} 
+                      style={{ 
+                        backgroundColor: colors.bgCard, 
+                        border: `1px solid ${isPhaseDone ? (isLight ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.4)') : colors.borderColor}`, 
+                        borderRadius: '12px', 
+                        overflow: 'hidden',
+                        boxShadow: colors.cardShadow,
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* Section Header */}
+                      <div 
+                        style={{ 
+                          padding: isMobile ? '12px 14px' : '14px 18px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
                           justifyContent: 'space-between',
                           gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: item.checked ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
+                          backgroundColor: isPhaseDone 
+                            ? (isLight ? 'rgba(16,185,129,0.03)' : 'rgba(16,185,129,0.06)') 
+                            : 'transparent',
+                          borderBottom: isCollapsed ? 'none' : `1px solid ${colors.borderColor}`,
+                          cursor: checklistActivePhase === 'ALL' ? 'pointer' : 'default'
+                        }}
+                        onClick={() => {
+                          if (checklistActivePhase === 'ALL') {
+                            setChecklistCollapsed(prev => ({ ...prev, [phase.key]: !prev[phase.key] }));
+                          }
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                        {/* Left: Phase Title, Timing & Status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                           <div style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '4px',
-                            backgroundColor: item.checked ? '#2563eb' : 'transparent',
-                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            backgroundColor: isPhaseDone ? 'rgba(16,185,129,0.12)' : (isLight ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.15)'),
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#ffffff',
+                            color: isPhaseDone ? colors.accentGreen : phase.accentColor,
                             flexShrink: 0
                           }}>
-                            {item.checked && <Check size={12} strokeWidth={3} />}
+                            <Icon size={16} />
                           </div>
-                          <span style={{
-                            fontSize: '12px',
-                            color: item.checked ? colors.textPrimary : colors.textSecondary,
-                            textDecoration: item.checked ? 'line-through' : 'none',
-                            lineHeight: 1.35
-                          }}>
-                            {item.label} <i style={{ fontSize: '10px', color: '#2563eb', fontStyle: 'normal' }}>(Custom)</i>
-                          </span>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>
+                                {phase.title}
+                              </span>
+                              <span style={{ fontSize: '10.5px', color: colors.textMuted, fontWeight: '500' }}>
+                                ({phase.time})
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <button 
-                          onClick={(e) => handleDeleteCustomChecklistItem('preMarket', item.id, e)}
-                          title="Delete custom task"
-                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
+
+                        {/* Right: Batch Actions + Status Badge + Collapse Toggle */}
+                        <div 
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                          onClick={e => e.stopPropagation()}
                         >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                          {/* Completion Badge */}
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: '700',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            backgroundColor: isPhaseDone ? 'rgba(16,185,129,0.12)' : (isLight ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.15)'),
+                            color: isPhaseDone ? colors.accentGreen : phase.accentColor
+                          }}>
+                            {isPhaseDone ? '✓ All Done' : `${phase.done}/${phase.total} Done`}
+                          </span>
 
-                {/* 2. In-Market Execution Section */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Scale size={16} /> {timingHeaders.in}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setCustomChecklistSection('inMarket');
-                        setShowAddCustomChecklistModal(true);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                    >
-                      <Plus size={13} /> Add Task
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {[
-                      { key: 'stopLossPlacedImmediately', label: 'Placed hard Stop-Loss in system immediately upon entry' },
-                      { key: 'positionSizedProperly', label: 'Position size strictly within 1% risk limit' },
-                      { key: 'candleCloseWaited', label: 'Waited for 5-minute candle close confirmation (No FOMO)' },
-                      { key: 'noRevengeTrading', label: 'No revenge trades taken after initial outcome' }
-                    ].map(item => (
-                      <div
-                        key={item.key}
-                        onClick={() => handleToggleChecklistItem('inMarket', item.key)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: todayChecklist.inMarket?.[item.key] ? '1px solid #f59e0b' : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '4px',
-                          backgroundColor: todayChecklist.inMarket?.[item.key] ? '#f59e0b' : 'transparent',
-                          border: todayChecklist.inMarket?.[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                          flexShrink: 0
-                        }}>
-                          {todayChecklist.inMarket?.[item.key] && <Check size={12} strokeWidth={3} />}
+                          {/* 1-Click Batch Complete */}
+                          <button
+                            onClick={() => handleBatchTogglePhase(phase.key, true)}
+                            title="Mark all tasks in this phase as completed"
+                            style={{
+                              background: 'none',
+                              border: `1px solid ${colors.borderColor}`,
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              color: colors.textSecondary,
+                              fontSize: '10.5px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: isMobile ? 'none' : 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <CheckCheck size={12} color={colors.accentGreen} /> Check All
+                          </button>
+
+                          {/* 1-Click Batch Reset */}
+                          <button
+                            onClick={() => handleBatchTogglePhase(phase.key, false)}
+                            title="Reset all tasks in this phase"
+                            style={{
+                              background: 'none',
+                              border: `1px solid ${colors.borderColor}`,
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              color: colors.textMuted,
+                              fontSize: '10.5px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: isMobile ? 'none' : 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <RotateCcw size={11} /> Reset
+                          </button>
+
+                          {checklistActivePhase === 'ALL' && (
+                            <button
+                              onClick={() => setChecklistCollapsed(prev => ({ ...prev, [phase.key]: !prev[phase.key] }))}
+                              aria-label={isCollapsed ? "Expand section" : "Collapse section"}
+                              style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '4px', display: 'flex' }}
+                            >
+                              {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                            </button>
+                          )}
                         </div>
-                        <span style={{
-                          fontSize: '12px',
-                          color: todayChecklist.inMarket?.[item.key] ? colors.textPrimary : colors.textSecondary,
-                          textDecoration: todayChecklist.inMarket?.[item.key] ? 'line-through' : 'none',
-                          lineHeight: 1.35
-                        }}>
-                          {item.label}
-                        </span>
                       </div>
-                    ))}
 
-                    {/* Custom In-Market Items */}
-                    {customChecklistItems.inMarket.map(item => (
-                      <div
-                        key={item.id}
-                        onClick={() => handleToggleCustomChecklistItem('inMarket', item.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: item.checked ? '1px solid #f59e0b' : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                      {/* Section Content: Tasks & Quick Add */}
+                      {!isCollapsed && (
+                        <div style={{ padding: isMobile ? '12px' : '16px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {/* Built-in Tasks */}
+                          {phase.builtInItems.map(item => {
+                            const isChecked = Boolean(todayChecklist[phase.key]?.[item.key]);
+
+                            return (
+                              <div
+                                key={item.key}
+                                onClick={() => handleToggleChecklistItem(phase.key, item.key)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  padding: '9px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: isChecked ? (isLight ? 'rgba(37, 99, 235, 0.03)' : 'rgba(37, 99, 235, 0.06)') : colors.bgInner,
+                                  border: isChecked 
+                                    ? `1px solid ${isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(59, 130, 246, 0.25)'}` 
+                                    : `1px solid ${colors.borderColor}`,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.12s ease'
+                                }}
+                              >
+                                <div style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '5px',
+                                  backgroundColor: isChecked ? '#2563eb' : 'transparent',
+                                  border: isChecked ? 'none' : `2px solid ${colors.textMuted}`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#ffffff',
+                                  flexShrink: 0,
+                                  transition: 'all 0.12s ease'
+                                }}>
+                                  {isChecked && <Check size={12} strokeWidth={3} />}
+                                </div>
+                                <span style={{
+                                  fontSize: '12px',
+                                  color: isChecked ? colors.textMuted : colors.textPrimary,
+                                  textDecoration: isChecked ? 'line-through' : 'none',
+                                  lineHeight: 1.4,
+                                  flex: 1
+                                }}>
+                                  {item.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+
+                          {/* Custom Tasks */}
+                          {customItems.map(item => {
+                            const isChecked = Boolean(item.checked);
+
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => handleToggleCustomChecklistItem(phase.key, item.id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '10px',
+                                  padding: '9px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: isChecked ? (isLight ? 'rgba(37, 99, 235, 0.03)' : 'rgba(37, 99, 235, 0.06)') : colors.bgInner,
+                                  border: isChecked 
+                                    ? `1px solid ${isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(59, 130, 246, 0.25)'}` 
+                                    : `1px solid ${colors.borderColor}`,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.12s ease'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                                  <div style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '5px',
+                                    backgroundColor: isChecked ? '#2563eb' : 'transparent',
+                                    border: isChecked ? 'none' : `2px solid ${colors.textMuted}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#ffffff',
+                                    flexShrink: 0
+                                  }}>
+                                    {isChecked && <Check size={12} strokeWidth={3} />}
+                                  </div>
+                                  <span style={{
+                                    fontSize: '12px',
+                                    color: isChecked ? colors.textMuted : colors.textPrimary,
+                                    textDecoration: isChecked ? 'line-through' : 'none',
+                                    lineHeight: 1.4
+                                  }}>
+                                    {item.label} <i style={{ fontSize: '10px', color: phase.accentColor, fontStyle: 'normal', fontWeight: '700' }}>(Custom)</i>
+                                  </span>
+                                </div>
+                                <button 
+                                  onClick={(e) => handleDeleteCustomChecklistItem(phase.key, item.id, e)}
+                                  title="Delete custom task"
+                                  style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                          {/* Sleek Inline Quick Add Bar (No modal needed!) */}
                           <div style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '4px',
-                            backgroundColor: item.checked ? '#f59e0b' : 'transparent',
-                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
                             display: 'flex',
+                            gap: '8px',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            flexShrink: 0
+                            marginTop: '4px'
                           }}>
-                            {item.checked && <Check size={12} strokeWidth={3} />}
+                            <input
+                              type="text"
+                              value={inlineTaskInputs[phase.key] || ''}
+                              onChange={(e) => setInlineTaskInputs(prev => ({ ...prev, [phase.key]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleInlineQuickAddTask(phase.key);
+                                }
+                              }}
+                              placeholder={`+ Add custom ${phase.key === 'preMarket' ? 'pre-market' : (phase.key === 'inMarket' ? 'in-market' : 'post-market')} check...`}
+                              style={{
+                                flex: 1,
+                                padding: '7px 12px',
+                                borderRadius: '7px',
+                                border: `1px dashed ${colors.borderHighlight}`,
+                                backgroundColor: colors.bgInner,
+                                color: colors.textPrimary,
+                                fontSize: '11.5px',
+                                outline: 'none'
+                              }}
+                            />
+                            <button
+                              onClick={() => handleInlineQuickAddTask(phase.key)}
+                              disabled={!inlineTaskInputs[phase.key]?.trim()}
+                              style={{
+                                padding: '7px 12px',
+                                borderRadius: '7px',
+                                backgroundColor: inlineTaskInputs[phase.key]?.trim() ? '#2563eb' : (isLight ? '#e2e8f0' : '#1e293b'),
+                                color: inlineTaskInputs[phase.key]?.trim() ? '#ffffff' : colors.textMuted,
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                border: 'none',
+                                cursor: inlineTaskInputs[phase.key]?.trim() ? 'pointer' : 'default',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Plus size={12} /> Add
+                            </button>
                           </div>
-                          <span style={{
-                            fontSize: '12px',
-                            color: item.checked ? colors.textPrimary : colors.textSecondary,
-                            textDecoration: item.checked ? 'line-through' : 'none',
-                            lineHeight: 1.35
-                          }}>
-                            {item.label} <i style={{ fontSize: '10px', color: '#f59e0b', fontStyle: 'normal' }}>(Custom)</i>
-                          </span>
                         </div>
-                        <button 
-                          onClick={(e) => handleDeleteCustomChecklistItem('inMarket', item.id, e)}
-                          title="Delete custom task"
-                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. Post-Market Section */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentGreen, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ShieldCheck size={16} /> {timingHeaders.post}
+                      )}
                     </div>
-                    <button 
-                      onClick={() => {
-                        setCustomChecklistSection('postMarket');
-                        setShowAddCustomChecklistModal(true);
-                      }}
-                      style={{ background: 'none', border: 'none', color: colors.accentGreen, fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                    >
-                      <Plus size={13} /> Add Task
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {[
-                      { key: 'allTradesLogged', label: 'All executed trades logged with Entry, Exit, and Quantities' },
-                      { key: 'mistakesReviewed', label: 'Logged behavioral or execution mistakes (if any)' },
-                      { key: 'emotionsDocumented', label: 'Documented emotional mindset during entries and exits' },
-                      { key: 'dailyPnLReconciled', label: 'Net P&L and charges reconciled with broker statement' }
-                    ].map(item => (
-                      <div
-                        key={item.key}
-                        onClick={() => handleToggleChecklistItem('postMarket', item.key)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: todayChecklist.postMarket[item.key] ? `1px solid ${colors.accentGreen}` : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '4px',
-                          backgroundColor: todayChecklist.postMarket[item.key] ? colors.accentGreen : 'transparent',
-                          border: todayChecklist.postMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                          flexShrink: 0
-                        }}>
-                          {todayChecklist.postMarket[item.key] && <Check size={12} strokeWidth={3} />}
-                        </div>
-                        <span style={{
-                          fontSize: '12px',
-                          color: todayChecklist.postMarket[item.key] ? colors.textPrimary : colors.textSecondary,
-                          textDecoration: todayChecklist.postMarket[item.key] ? 'line-through' : 'none',
-                          lineHeight: 1.35
-                        }}>
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
+                  );
+                })}
 
-                    {/* Custom Post-Market Items */}
-                    {customChecklistItems.postMarket.map(item => (
-                      <div
-                        key={item.id}
-                        onClick={() => handleToggleCustomChecklistItem('postMarket', item.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          backgroundColor: colors.bgInner,
-                          borderRadius: '8px',
-                          border: item.checked ? `1px solid ${colors.accentGreen}` : `1px solid ${colors.borderColor}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                          <div style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '4px',
-                            backgroundColor: item.checked ? colors.accentGreen : 'transparent',
-                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            flexShrink: 0
-                          }}>
-                            {item.checked && <Check size={12} strokeWidth={3} />}
-                          </div>
-                          <span style={{
-                            fontSize: '12px',
-                            color: item.checked ? colors.textPrimary : colors.textSecondary,
-                            textDecoration: item.checked ? 'line-through' : 'none',
-                            lineHeight: 1.35
-                          }}>
-                            {item.label} <i style={{ fontSize: '10px', color: colors.accentGreen, fontStyle: 'normal' }}>(Custom)</i>
-                          </span>
-                        </div>
-                        <button 
-                          onClick={(e) => handleDeleteCustomChecklistItem('postMarket', item.id, e)}
-                          title="Delete custom task"
-                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Daily Reflections & Sentiment Tags */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                {/* ── DAILY REFLECTIONS & SESSION DEBRIEF ── */}
+                <div style={{ 
+                  backgroundColor: colors.bgCard, 
+                  border: `1px solid ${colors.borderColor}`, 
+                  borderRadius: '12px', 
+                  padding: isMobile ? '12px' : '16px 18px', 
+                  boxShadow: colors.cardShadow 
+                }}>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '10px' }}>
-                    Daily Reflections & Session Observations
+                    Daily Reflections &amp; Session Observations
                   </div>
 
                   {/* Sentiment & Regime Tag Chips */}
@@ -4313,7 +4573,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   </div>
 
                   <textarea
-                    rows={3}
+                    rows={2}
                     value={todayChecklist.notes}
                     onChange={(e) => handleChecklistNotesChange(e.target.value)}
                     placeholder="What was the market theme today? Did you follow your rules? What will you do better tomorrow?"
@@ -4322,13 +4582,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       backgroundColor: colors.bgInput,
                       border: `1px solid ${colors.borderColor}`,
                       borderRadius: '8px',
-                      padding: '10px 12px',
+                      padding: '8px 12px',
                       color: colors.textPrimary,
-                      fontSize: '12px',
+                      fontSize: '11.5px',
                       resize: 'vertical',
                       outline: 'none',
                       lineHeight: 1.4,
-                      marginBottom: '12px'
+                      marginBottom: '10px'
                     }}
                   />
 
@@ -4342,9 +4602,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       style={{
                         backgroundColor: '#2563eb',
                         color: '#ffffff',
-                        padding: '8px 18px',
+                        padding: '7px 16px',
                         borderRadius: '8px',
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         fontWeight: '700',
                         border: 'none',
                         cursor: 'pointer',
@@ -4354,7 +4614,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
                       }}
                     >
-                      <CheckCircle size={15} /> Save & Lock Daily Routine
+                      <CheckCircle size={14} /> Save &amp; Lock Daily Routine
                     </button>
                   </div>
                 </div>
