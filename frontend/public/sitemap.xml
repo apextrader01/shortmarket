@@ -152,7 +152,13 @@
   </url>
   <url>
     <loc>https://skandx.in/terms</loc>
-    <lastmod>2026-10-11</lastmod>
+    <lastmod>2026-10-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>https://skandx.in/refund-policy</loc>
+    <lastmod>2026-10-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
   </url>

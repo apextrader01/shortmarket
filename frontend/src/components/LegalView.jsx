@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldCheck, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp } from 'lucide-react';
+import { Shield, ShieldCheck, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp, RotateCcw } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function LegalView({ initialTab = 'privacy', onBack }) {
@@ -18,6 +18,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
       const tabUrlMap = {
         'privacy': '/privacy-policy',
         'terms': '/terms',
+        'refund': '/refund-policy',
         'data-rights': '/data-rights',
         'delete-account': '/delete-account',
         'risk': '/risk-policy',
@@ -26,6 +27,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
       const tabTitleMap = {
         'privacy': 'Privacy Policy | SkandX',
         'terms': 'Terms of Service | SkandX',
+        'refund': 'Cancellation & Refund Policy | SkandX',
         'data-rights': 'Data Principal Rights Portal (DPDP Act) | SkandX',
         'delete-account': 'Request Account Deletion & Data Purge | SkandX',
         'risk': 'Risk Disclosure Document | SkandX',
@@ -232,6 +234,27 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
             }}
           >
             <FileText size={16} /> Terms of Service
+          </button>
+
+          <button
+            onClick={() => handleSelectTab('refund')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              backgroundColor: activeTab === 'refund' ? '#10b981' : '#111827',
+              color: activeTab === 'refund' ? '#000' : '#9ca3af',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <RotateCcw size={16} /> Cancellation & Refund
           </button>
 
           <button
@@ -514,6 +537,144 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 <p style={{ margin: 0, fontSize: '13.5px' }}>
                   <strong>5.4 Cross-Border Transfers:</strong> Personal data is processed primarily on secure Indian cloud availability zones. Any cross-border infrastructure relays comply strictly with government notifications and international adequacy safeguards.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CANCELLATION & REFUND POLICY */}
+          {activeTab === 'refund' && (
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <RotateCcw size={26} color="#10b981" /> Cancellation & Refund Policy
+              </h1>
+              <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '24px' }}>
+                Effective Date: October 1, 2026 | Last Updated: October 2026 | Version: v2026.1
+              </p>
+
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '16px 20px', borderRadius: '10px', marginBottom: '24px' }}>
+                <div style={{ color: '#10b981', fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>
+                  🛡️ 7-Day Money-Back Guarantee for Digital Subscriptions
+                </div>
+                <div style={{ fontSize: '13.5px', color: '#d1d5db', lineHeight: '1.6' }}>
+                  We want you to be completely confident using SkandX. If our platform, simulators, or analytics tools do not meet your expectations, first-time subscribers can request a <strong>100% full refund within 7 calendar days</strong> of payment. Duplicate or accidental charges are automatically refunded within 24–48 hours.
+                </div>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                1. Nature of Our Services & Free Access
+              </h2>
+              <p>
+                SkandX (<strong>https://skandx.in</strong>) operates a specialized virtual paper trading simulator, financial educational tools, algorithmic trading bridges, and financial calculators.
+              </p>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                <li><strong style={{ color: '#fff' }}>Free Tier:</strong> All users receive free access to simulated paper trading, virtual capital, charts, and public financial calculators without any payment obligation.</li>
+                <li><strong style={{ color: '#fff' }}>Paid Subscriptions (Pro, Yearly, Lifetime, Masterclass):</strong> Optional premium tiers providing real-time low-latency market depth, algorithmic webhook bridges, extended watchlists, multi-broker connectivity, and NISM-curated educational masterclass cohorts.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                2. Subscription Cancellation Policy
+              </h2>
+              <p>
+                We believe in total freedom and user autonomy. You can cancel your subscription at any time without penalty or cancellation fees:
+              </p>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                <li><strong style={{ color: '#fff' }}>Self-Service Cancellation:</strong> Navigate to your <strong>Account Profile / Settings</strong> (<code>/clientdata</code>) and toggle off recurring renewals with a single click.</li>
+                <li><strong style={{ color: '#fff' }}>Assisted Cancellation:</strong> Send an email from your registered email address to <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> with the subject line <em>"Subscription Cancellation Request"</em>. Our support desk will process it within 24 hours.</li>
+                <li><strong style={{ color: '#fff' }}>Effect of Cancellation:</strong> When you cancel, you will continue to enjoy full access to your paid tier benefits until the conclusion of your current billing cycle. After expiry, your account automatically transitions to the standard Free Tier with zero data loss.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                3. Refund Eligibility & Refund Window
+              </h2>
+              <p>Refunds are evaluated under transparent guidelines:</p>
+              <div style={{ overflowX: 'auto', marginTop: '12px', marginBottom: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.04)', color: '#fff', borderBottom: '1px solid #374151' }}>
+                      <th style={{ padding: '10px' }}>Purchase Type</th>
+                      <th style={{ padding: '10px' }}>Refund Window</th>
+                      <th style={{ padding: '10px' }}>Eligibility & Conditions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>First-Time Subscription (Monthly / Yearly / Pro)</td>
+                      <td style={{ padding: '10px', color: '#10b981', fontWeight: '700' }}>7 Calendar Days</td>
+                      <td style={{ padding: '10px' }}>100% full refund. No questions asked if requested within 7 days from transaction timestamp.</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Automatic Renewal Debits</td>
+                      <td style={{ padding: '10px', color: '#38bdf8', fontWeight: '700' }}>48 Hours</td>
+                      <td style={{ padding: '10px' }}>Full refund if reported within 48 hours of renewal debit, provided premium features were not actively utilized post-renewal.</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Masterclass & Live Coaching Cohorts</td>
+                      <td style={{ padding: '10px', color: '#f59e0b', fontWeight: '700' }}>Up to 48 Hours Before Batch Launch</td>
+                      <td style={{ padding: '10px' }}>100% full refund before the first live lecture starts. Once live sessions commence and proprietary study vaults are unlocked, fees become non-refundable.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '10px', color: '#fff', fontWeight: '600' }}>Lifetime Access License</td>
+                      <td style={{ padding: '10px', color: '#10b981', fontWeight: '700' }}>7 Calendar Days</td>
+                      <td style={{ padding: '10px' }}>Eligible for full refund within 7 days of initial activation.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                4. Duplicate Debits & Failed Payment Auto-Reversals
+              </h2>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                <li><strong style={{ color: '#fff' }}>Duplicate Deductions:</strong> If your bank account or card is charged more than once for a single order due to network timeouts, the duplicate charge is identified by our payment gateway (Cashfree Payments) and auto-reversed within <strong>24 to 48 business hours</strong>.</li>
+                <li><strong style={{ color: '#fff' }}>Payment Deducted But Plan Not Activated:</strong> If funds are debited from your bank/UPI but network disruption prevents instant activation, our automated reconciliation worker resolves this within 15 minutes. In the rare event of an unresolvable bank drop, the funds are automatically reversed by your issuing bank within <strong>3 to 5 business days</strong> in compliance with Reserve Bank of India (RBI) turnaround regulations.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                5. Refund Payment Mode & Settlement Timelines
+              </h2>
+              <p>
+                In compliance with anti-money laundering (AML) and banking standards:
+              </p>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                <li>All refunds are issued <strong>strictly to the original source payment instrument</strong> (e.g. original UPI handle, debit/credit card, or net banking account). Cash refunds or transfers to alternate accounts are not permitted under any circumstances.</li>
+                <li>Once approved by our billing team, the refund order is initiated via our payment gateway within <strong>24 hours</strong>.</li>
+                <li>Depending on your issuing bank or card network (RuPay, Visa, Mastercard, NPCI), the credited funds will reflect on your statement within <strong>5 to 7 business days</strong>.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                6. How to Request a Refund
+              </h2>
+              <p>To request a refund, follow these simple steps:</p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '20px', borderRadius: '10px', marginTop: '12px' }}>
+                <p style={{ margin: '0 0 10px 0' }}>
+                  Send an email to our dedicated billing and customer grievance desk:
+                </p>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#10b981', marginBottom: '12px' }}>
+                  📧 <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a>
+                </div>
+                <div style={{ fontSize: '13px', color: '#9ca3af', lineHeight: '1.6' }}>
+                  Please include the following details for immediate same-day processing:
+                  <ul style={{ paddingLeft: '20px', marginTop: '6px', color: '#d1d5db' }}>
+                    <li><strong>Registered Email Address / Mobile Number</strong></li>
+                    <li><strong>Order ID / Cashfree Reference ID / Bank UTR Number</strong></li>
+                    <li><strong>Date & Amount of Transaction</strong></li>
+                    <li><strong>Reason for Request</strong> (Optional — helps our engineering team improve)</li>
+                  </ul>
+                </div>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>
+                7. Official Compliance & Grievance Contact
+              </h2>
+              <p>
+                For questions regarding billing, charge reconciliations, or cancellation assistance:
+              </p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
+                <div>🏢 <strong>Merchant & Platform:</strong> SkandX</div>
+                <div style={{ marginTop: '6px' }}>👤 <strong>Grievance & Compliance Officer:</strong> Hari</div>
+                <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Support Helpline:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a> (Mon–Sat, 9:00 AM – 6:00 PM IST)</div>
+                <div style={{ marginTop: '6px' }}>📍 <strong>Registered Office:</strong> SkandX, Trivandrum, Kerala, India</div>
               </div>
             </div>
           )}

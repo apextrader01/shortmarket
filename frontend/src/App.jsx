@@ -670,6 +670,7 @@ function App() {
       const standaloneSegments = new Set([
         'privacy', 'privacy-policy', 'privacypolicy',
         'terms', 'terms-of-service', 'termsofservice',
+        'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
         'delete', 'delete-account', 'deleteaccount',
         'risk', 'risk-policy', 'riskpolicy', 'risk-disclosure',
         'data', 'data-rights', 'datarights',
@@ -687,6 +688,7 @@ function App() {
         'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
         'adminpanel', 'clientdata', 'profile', 'account', 'settings',
         'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
+        'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
         'risk', 'riskpolicy', 'risk-policy', 'risk-disclosure', 'delete', 'delete-account', 'deleteaccount',
         'data', 'data-rights', 'datarights', 'legal', 'accessibility', 'manifest.webmanifest',
         'manifest', 'sitemap.xml', 'sitemap', 'robots.txt', 'robots', 'sw.js', 'ref'
@@ -1150,6 +1152,7 @@ function App() {
     'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
     'adminpanel', 'clientdata', 'profile', 'account', 'settings',
     'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
+    'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
     'risk', 'riskpolicy', 'risk-policy', 'risk-disclosure', 'delete', 'delete-account', 'deleteaccount',
     'data', 'data-rights', 'datarights', 'legal', 'accessibility', 'manifest.webmanifest',
     'manifest', 'sitemap.xml', 'sitemap', 'robots.txt', 'robots', 'sw.js', 'ref'
@@ -1193,6 +1196,8 @@ function App() {
 
     if (currentPath.includes('terms')) {
       document.title = 'Terms of Service | SkandX';
+    } else if (currentPath.includes('refund') || currentPath.includes('cancellation')) {
+      document.title = 'Cancellation & Refund Policy | SkandX';
     } else if (currentPath.includes('privacy')) {
       document.title = 'Privacy Policy | SkandX';
     } else if (currentPath.includes('delete')) {
@@ -1225,6 +1230,7 @@ function App() {
   const legalRouteSegments = new Set([
     'privacy', 'privacy-policy', 'privacypolicy',
     'terms', 'terms-of-service', 'termsofservice',
+    'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
     'delete', 'delete-account', 'deleteaccount',
     'risk', 'risk-policy', 'riskpolicy', 'risk-disclosure',
     'data', 'data-rights', 'datarights',
@@ -1234,6 +1240,8 @@ function App() {
     legalRouteSegments.has(cleanFirstSegment) ||
     currentPath.includes('privacy') || 
     currentPath.includes('terms') || 
+    currentPath.includes('refund') || 
+    currentPath.includes('cancellation') || 
     currentPath.includes('delete-account') || 
     currentPath.includes('deleteaccount') || 
     currentPath.includes('risk-policy') || 
@@ -1244,7 +1252,8 @@ function App() {
     currentPath.includes('accessibility') ||
     currentPath.includes('legal')
   ) {
-    const initialTab = currentPath.includes('terms') ? 'terms' : 
+    const initialTab = (currentPath.includes('refund') || currentPath.includes('cancellation')) ? 'refund' :
+                       currentPath.includes('terms') ? 'terms' : 
                        (currentPath.includes('delete') ? 'delete-account' : 
                        (currentPath.includes('risk') ? 'risk' : 
                        (currentPath.includes('data') ? 'data-rights' : 

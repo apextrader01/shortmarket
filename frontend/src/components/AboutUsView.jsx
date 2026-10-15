@@ -33,6 +33,12 @@ export default function AboutUsView({ setActiveTab }) {
       linkLabel: 'View Terms of Service →'
     },
     {
+      title: 'Cancellation & Refund Policy',
+      content: 'We offer a 7-day money-back guarantee for first-time digital subscriptions and automated 24-48 hour reconciliation for duplicate debits. You can cancel your subscription at any time without fees.',
+      link: '/refund-policy',
+      linkLabel: 'View Cancellation & Refund Policy →'
+    },
+    {
       title: 'Risk Policies',
       content: 'Options and margin trading are highly leveraged and carry a high degree of risk. Please review our comprehensive Risk Disclosure Document before engaging in leveraged trading.',
       link: '/risk-policy',

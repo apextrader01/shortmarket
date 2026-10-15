@@ -666,6 +666,31 @@ export default function PricingView({ setActiveTab }) {
             </tbody>
           </table>
         </div>
+
+        {/* Compliance, Security & Refund Assurance Footer */}
+        <div style={{
+          marginTop: '36px',
+          padding: '20px 24px',
+          background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+          border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+          borderRadius: '12px',
+          textAlign: 'center',
+          fontSize: '13px',
+          color: 'var(--text-secondary, #94a3b8)',
+          lineHeight: '1.7'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', fontWeight: '700', color: 'var(--text-primary, #f3f4f6)', fontSize: '14px', flexWrap: 'wrap' }}>
+            <span>🔒 Bank-Grade 256-Bit SSL Encrypted Checkout</span>
+            <span>•</span>
+            <span style={{ color: '#10b981' }}>🛡️ 7-Day Money-Back Guarantee</span>
+          </div>
+          <div>
+            All transactions are processed securely via RBI-compliant payment gateways (Cashfree Payments). Digital subscriptions are covered under our <a href="/refund-policy" style={{ color: '#10b981', textDecoration: 'underline', fontWeight: '600' }}>Cancellation & Refund Policy</a> and <a href="/terms" style={{ color: '#38bdf8', textDecoration: 'underline' }}>Terms of Service</a>.
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary, #64748b)' }}>
+            Need help with billing or plan selection? Contact Support: <a href="mailto:skandx.in@gmail.com" style={{ color: 'var(--text-primary, #e2e8f0)' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8' }}>+919497861379</a> (SkandX, Trivandrum, Kerala)
+          </div>
+        </div>
       </div>
     </div>
   );

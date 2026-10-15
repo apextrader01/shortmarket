@@ -3133,6 +3133,7 @@ export default function LandingHomeView({
               <a href="/pricing" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Pricing</a>
               <a href="/privacy-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
               <a href="/terms" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
+              <a href="/refund-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Cancellation & Refund Policy</a>
               <a href="/risk-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Risk Disclosure</a>
               <a href="/data-rights" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Data Rights (DPDP)</a>
               <a href="/accessibility" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Accessibility</a>

@@ -212,6 +212,24 @@ export const SEO_ROUTES = {
     keywords: 'skandx terms of service, terms and conditions skandx',
     category: 'FinanceApplication'
   },
+  '/refund-policy': {
+    title: 'Cancellation & Refund Policy | SkandX',
+    description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    category: 'FinanceApplication'
+  },
+  '/refunds': {
+    title: 'Cancellation & Refund Policy | SkandX',
+    description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    category: 'FinanceApplication'
+  },
+  '/cancellation-policy': {
+    title: 'Cancellation & Refund Policy | SkandX',
+    description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    category: 'FinanceApplication'
+  },
   '/risk-policy': {
     title: 'Risk Disclosure Document — SEBI & Derivative Risk Warning | SkandX',
     description: 'Mandatory Risk Disclosure Document for Equity, Futures & Options derivative simulation and algorithmic trading tools on SkandX.',

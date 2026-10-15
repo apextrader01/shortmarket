@@ -2018,6 +2018,8 @@ export default function LoginView() {
               {' '}&bull;{' '}
               <a href="/privacy-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Privacy Policy</a>
               {' '}&bull;{' '}
+              <a href="/refund-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Refund Policy</a>
+              {' '}&bull;{' '}
               <a href="/risk-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Risk Disclosure</a>
               {' '}&bull;{' '}
               <a href="/aboutus" style={{ color: '#10b981', textDecoration: 'none' }}>About Us</a>
