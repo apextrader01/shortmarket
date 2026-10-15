@@ -698,6 +698,9 @@ export default function AlgoPaymentGatewayModal({
                 <div style={{ fontSize: '11px', color: isLight ? '#64748b' : '#64748b', textAlign: 'center' }}>
                   100% One-Time Payment (No Auto-Debit) • Verified by Cashfree PG v3
                 </div>
+                <div style={{ fontSize: '10px', color: isLight ? '#94a3b8' : '#64748b', textAlign: 'center', lineHeight: '1.4' }}>
+                  Fees are solely for cloud computing infrastructure (Static IPs, multi-account sync &amp; webhook bridge). Holds zero monetary value for trading capital or escrow.
+                </div>
               </div>
             ) : (
               <div style={{

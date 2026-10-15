@@ -1403,7 +1403,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               fontWeight: '600'
             }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-              <span>NSE Colocation Tick Gateway: 1.8ms</span>
+              <span>Mumbai Low-Latency Tick Gateway: 1.8ms</span>
             </div>
           )}
 
@@ -1474,7 +1474,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             fontWeight: '700',
             whiteSpace: 'nowrap'
           }}>
-            {!isMobile && <span style={{ padding: '5px 9px', color: '#94a3b8' }}>Credit:</span>}
+            {!isMobile && <span style={{ padding: '5px 9px', color: '#94a3b8' }}>API Credits:</span>}
             <span style={{ padding: isMobile ? '5px 8px' : '5px 10px', background: '#7c3aed', color: '#fff' }}>
               ₹{Number(config.availableCredit || 0).toFixed(0)}
             </span>
@@ -1491,7 +1491,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 whiteSpace: 'nowrap'
               }}
             >
-              + Add Funds
+              + Buy Credits
             </button>
           </div>
 
@@ -2015,7 +2015,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {staticIps.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                    Mumbai BKC Colocation
+                    Mumbai BKC Server Node
                   </div>
                 </div>
 
@@ -2613,7 +2613,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     Dedicated Static IP Addresses ({staticIps.length})
                   </h2>
                   <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
-                    Dedicated Indian IPv4 proxy addresses whitelisted with Angel One SmartAPI and NSE colocation servers.
+                    Dedicated Indian IPv4 proxy addresses whitelisted with Angel One SmartAPI and Mumbai financial data center servers.
                   </p>
                 </div>
                 <button
@@ -4417,7 +4417,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     ₹2,499 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
-                    Institutional multi-account API execution engine with BKC colocation proximity routing.
+                    Institutional multi-account API execution engine with BKC low-latency proximity routing.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
@@ -4728,7 +4728,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', background: adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e', boxShadow: `0 0 10px ${adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e'}` }}></span>
-                    <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (NSE Colocation)'}</span>
+                    <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (SmartAPI Gateway)'}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '18px', color: '#94a3b8', flexWrap: 'wrap' }}>
                     <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>±0.4μs OK</strong></span>
