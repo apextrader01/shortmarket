@@ -1008,10 +1008,31 @@ export function BiometricSettingsSection({ user }) {
   // TOTP & 30-day Trusted Devices States
   const [showTotpSetup, setShowTotpSetup] = useState(false);
   const [totpSetupData, setTotpSetupData] = useState(null);
+  const [totpQrDataUrl, setTotpQrDataUrl] = useState('');
   const [totpVerificationCode, setTotpVerificationCode] = useState('');
   const [totpCopied, setTotpCopied] = useState(false);
   const [showTotpDisable, setShowTotpDisable] = useState(false);
   const [totpDisablePassword, setTotpDisablePassword] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (totpSetupData) {
+      if (totpSetupData.qrCode && totpSetupData.qrCode.startsWith('data:image/')) {
+        setTotpQrDataUrl(totpSetupData.qrCode);
+      } else {
+        const otpauth = totpSetupData.otpauth_url || `otpauth://totp/SkandX:${encodeURIComponent(user?.email || 'User')}?secret=${totpSetupData.secret}&issuer=SkandX`;
+        import('qrcode').then(m => {
+          const QRCode = m.default || m;
+          QRCode.toDataURL(otpauth, { width: 256, margin: 2 }).then(url => {
+            if (active) setTotpQrDataUrl(url);
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    } else {
+      setTotpQrDataUrl('');
+    }
+    return () => { active = false; };
+  }, [totpSetupData, user?.email]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -1536,12 +1557,21 @@ export function BiometricSettingsSection({ user }) {
           </p>
 
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'center' }}>
-            {(totpSetupData.qrCode || totpSetupData.otpauth_url) && (
-              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', flexShrink: 0 }}>
+            {(totpQrDataUrl || totpSetupData.qrCode || totpSetupData.otpauth_url) && (
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <img
-                  src={totpSetupData.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetupData.otpauth_url || '')}`}
-                  alt="TOTP QR Code"
-                  style={{ width: '160px', height: '160px', display: 'block' }}
+                  src={totpQrDataUrl || totpSetupData.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(totpSetupData.otpauth_url || '')}`}
+                  alt="Google Authenticator QR Code"
+                  style={{ width: '160px', height: '160px', display: 'block', objectFit: 'contain' }}
+                  onError={async () => {
+                    try {
+                      const m = await import('qrcode');
+                      const QRCode = m.default || m;
+                      const otpauth = totpSetupData.otpauth_url || `otpauth://totp/SkandX:${encodeURIComponent(user?.email || 'User')}?secret=${totpSetupData.secret}&issuer=SkandX`;
+                      const url = await QRCode.toDataURL(otpauth, { width: 256, margin: 2 });
+                      setTotpQrDataUrl(url);
+                    } catch (_) {}
+                  }}
                 />
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#334155', fontWeight: '700', marginTop: '6px' }}>
                   Scan in Authenticator

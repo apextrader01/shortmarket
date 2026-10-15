@@ -3658,8 +3658,17 @@ export const useStore = create(persist((set, get) => ({
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
-      if (data && data.success && !data.qrCode && data.otpauth_url) {
-        data.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.otpauth_url)}`;
+      if (data && data.success && data.otpauth_url) {
+        if (!data.qrCode || !data.qrCode.startsWith('data:image/')) {
+          try {
+            const QRCode = (await import('qrcode')).default || (await import('qrcode'));
+            data.qrCode = await QRCode.toDataURL(data.otpauth_url, { width: 256, margin: 2 });
+          } catch (_) {
+            if (!data.qrCode) {
+              data.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data.otpauth_url)}`;
+            }
+          }
+        }
       }
       return data;
     } catch (e) {

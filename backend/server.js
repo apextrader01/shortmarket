@@ -2183,9 +2183,25 @@ app.get('/api/user/totp/setup', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const { generateSecret } = require('otplib');
+    const QRCode = require('qrcode');
     const secret = generateSecret();
-    const otpauthUrl = `otpauth://totp/SkandX:${encodeURIComponent(user.email || user.username)}?secret=${secret}&issuer=SkandX`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
+    const accountLabel = user.email || user.username || 'User';
+    const otpauthUrl = `otpauth://totp/SkandX:${encodeURIComponent(accountLabel)}?secret=${secret}&issuer=SkandX`;
+    
+    let qrCodeUrl = '';
+    try {
+      qrCodeUrl = await QRCode.toDataURL(otpauthUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+    } catch (qrErr) {
+      console.warn('Backend QRCode generation error, falling back:', qrErr.message);
+      qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(otpauthUrl)}`;
+    }
 
     res.json({
       success: true,
