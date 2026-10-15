@@ -1451,7 +1451,7 @@ function App() {
     );
   }
   const isImpersonating = typeof window !== 'undefined' && Boolean(localStorage.getItem('admin_token_backup'));
-  if (user && !user.is_onboarded && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel' && activeTab !== 'Home') {
+  if (user && !user.is_onboarded && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel') {
     return (
       <>
         <NetworkStatusBanner />

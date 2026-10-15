@@ -1903,6 +1903,9 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) { 
+        set(state => ({
+          user: state.user ? { ...state.user, is_onboarded: true } : state.user
+        }));
         get().fetchUserData(); 
         return { success: true }; 
       }

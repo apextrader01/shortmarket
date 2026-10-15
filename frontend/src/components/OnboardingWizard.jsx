@@ -5,7 +5,10 @@ import { User, Briefcase, TrendingUp, CheckCircle, ChevronRight, ChevronLeft, Up
 import indianStatesData from '../data/indianStates.json';
 
 export default function OnboardingWizard() {
-  const { saveProfile } = useStore(useShallow(state => ({ saveProfile: state.saveProfile })));
+  const { saveProfile, skipOnboarding } = useStore(useShallow(state => ({
+    saveProfile: state.saveProfile,
+    skipOnboarding: state.skipOnboarding
+  })));
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -139,8 +142,12 @@ export default function OnboardingWizard() {
     if (!res.success) {
       setError(res.error || 'Failed to save profile. Please try again.');
       setLoading(false);
+    } else {
+      if (typeof skipOnboarding === 'function') {
+        skipOnboarding();
+      }
+      setLoading(false);
     }
-    else { skipOnboarding(); } // Force local state to bypass modal permanently on success
   };
 
   const steps = [

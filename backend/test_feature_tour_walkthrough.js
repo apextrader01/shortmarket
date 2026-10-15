@@ -40,18 +40,18 @@ assert(landingCode.includes('Feature Tour'), 'LandingHomeView must render Featur
 assert(landingCode.includes('<FeatureTourModal'), 'LandingHomeView must render FeatureTourModal component');
 console.log('✔ [PASS] Module 2: LandingHomeView mounts tour, auto-triggers on registration & provides header button');
 
-// 3. Verify App.jsx unblocked Home routing
+// 3. Verify App.jsx OnboardingWizard routing
 const appPath = path.join(__dirname, '../frontend/src/App.jsx');
 const appCode = fs.readFileSync(appPath, 'utf8');
-assert(appCode.includes("activeTab !== 'Home'"), 'App.jsx must not block Home tab with OnboardingWizard');
-console.log('✔ [PASS] Module 3: App.jsx allows newly registered users to land on Home / Landing page unblocked');
+assert(appCode.includes("!user.is_onboarded && !user.is_admin && !isImpersonating && window.location.pathname !== '/adminpanel'"), 'App.jsx must present OnboardingWizard to newly registered non-onboarded users');
+console.log('✔ [PASS] Module 3: App.jsx presents OnboardingWizard to newly registered users on login/creation');
 
-// 4. Verify OnboardingWizard.jsx Skip option
+// 4. Verify OnboardingWizard.jsx Profile form
 const wizardPath = path.join(__dirname, '../frontend/src/components/OnboardingWizard.jsx');
 const wizardCode = fs.readFileSync(wizardPath, 'utf8');
-assert(wizardCode.includes('Skip for now'), 'OnboardingWizard must provide Skip for now button in header');
-assert(wizardCode.includes('Skip setup'), 'OnboardingWizard must provide Skip setup button in step 1 footer');
-console.log('✔ [PASS] Module 4: OnboardingWizard provides clear skip options so users are never trapped');
+assert(wizardCode.includes('Complete Your Profile'), 'OnboardingWizard must render Complete Your Profile');
+assert(wizardCode.includes('saveProfile'), 'OnboardingWizard must submit profile data via saveProfile');
+console.log('✔ [PASS] Module 4: OnboardingWizard renders complete profile form and saves onboarding details');
 
 // 5. Verify LoginView.jsx and store.js flags
 const loginPath = path.join(__dirname, '../frontend/src/components/LoginView.jsx');
