@@ -206,7 +206,7 @@ export default function PricingView({ setActiveTab }) {
       { name: 'Real-time WebSocket Streaming', normal: 'Standard (~1s)', monthly: 'High-speed (<200ms)', yearly: 'High-speed (<200ms)', highest: 'Direct Tick Feed (<50ms)', masterclass: 'Standard (~1s)', lifetime: 'High-speed (<200ms)' }
     ]},
     { category: 'Order Execution & Risk Control', items: [
-      { name: 'Daily Order Limits', normal: '25 Trades / mo (Cash)', monthly: '500 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders / day', masterclass: '25 Trades / mo (Cash)', lifetime: '500 Orders / day (Forever)' },
+      { name: 'Daily Order Limits', normal: '40 Trades / mo (40 Buy + 40 Sell, MF Free)', monthly: '500 Orders / day', yearly: '500 Orders / day', highest: 'Unlimited Orders / day', masterclass: '40 Trades / mo (40 Buy + 40 Sell, MF Free)', lifetime: '500 Orders / day (Forever)' },
       { name: 'Index Buying (Nifty/BankNifty)', normal: '—', monthly: '✓ Allowed', yearly: '✓ Allowed', highest: '✓ Allowed', masterclass: '— (Sub Required)', lifetime: '✓ Allowed (Forever)' },
       { name: 'Market Depth (Order Book)', normal: '5-Depth (Level 1)', monthly: '20-Depth (Level 2)', yearly: '20-Depth (Level 2)', highest: '20-Depth (Level 2)', masterclass: '5-Depth (Level 1)', lifetime: '20-Depth (Level 2)' },
       { name: 'Basket Orders (Multi-Leg)', normal: '—', monthly: 'Up to 15 legs', yearly: 'Up to 15 legs', highest: 'Unlimited legs', masterclass: '—', lifetime: 'Up to 15 legs' },
@@ -290,7 +290,7 @@ export default function PricingView({ setActiveTab }) {
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>2 Watchlists</strong> (30 symbols/list)</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#34D399', fontWeight: '600' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>25 Trades / month</strong> (25 Buy + 25 Sell)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#34D399', fontWeight: '600' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>40 Trades / month</strong> (40 Buy + 40 Sell · Mutual Funds Excluded)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> Standard 5-Depth Market Depth</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> 3 Active Price Alerts</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> 1 Portfolio Reset / month</li>
@@ -517,7 +517,7 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> NISM Certification Guidance & Exam Prep</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Course Completion Certificate signed by Mentor</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 🎓 Masterclass Scholar Leaderboard Badge</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}><Check size={16} style={{ color: '#94A3B8', flexShrink: 0 }}/> <em>Paper Trading: Free Tier (2 lists, 25 trades/mo)</em></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}><Check size={16} style={{ color: '#94A3B8', flexShrink: 0 }}/> <em>Paper Trading: Free Tier (2 lists, 40 trades/mo, MF Excluded)</em></li>
           </ul>
 
           {isMasterclass ? (

@@ -9410,31 +9410,50 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // ── Monthly Trade Quota Enforcement for Free / Basic Plan ──────────────────
-  // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
+  // Free Plan allows max 40 trades per month (40 Buy + 40 Sell total in a calendar month, excluding Mutual Funds)
   // Exits and square-off orders are NEVER blocked so traders can always close open positions.
   const userRecord = await db('users').where({ id: req.user.id }).select('subscription_tier', 'subscription_expires', 'is_admin').first();
   const isPaidTier = Boolean(userRecord?.is_admin) || (userRecord && ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(userRecord.subscription_tier) && (!userRecord.subscription_expires || new Date(userRecord.subscription_expires) > new Date()));
   
-  if (!isPaidTier && !isExplicitExit) {
+  // Mutual fund orders are 100% exempt from the monthly trade limit
+  const isOrderMf = Boolean(
+    String(symbol || '').toUpperCase().endsWith('-MF') ||
+    String(symbol || '').toUpperCase().includes('MUTUALFUND') ||
+    String(product_type || '').toUpperCase() === 'MF' ||
+    String(order_variety || '').toUpperCase() === 'SIP' ||
+    /^\d+$/.test(String(symbol || '').trim())
+  );
+
+  if (!isPaidTier && !isExplicitExit && !isOrderMf) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const orderSide = String(side).toUpperCase();
     
-    // Check monthly order count for this specific side (BUY or SELL)
+    // Check monthly order count for this specific side (BUY or SELL), EXCLUDING Mutual Funds
     const monthlySideCount = await db('orders')
       .where({ user_id: req.user.id })
       .whereRaw('UPPER(side) = ?', [orderSide])
       .where('created_at', '>=', startOfMonth)
       .whereNotIn('status', ['CANCELLED', 'REJECTED'])
+      .where(function() {
+        this.whereNull('order_variety').orWhere('order_variety', '!=', 'SIP');
+      })
+      .where(function() {
+        this.whereRaw("symbol NOT ILIKE '%-MF'")
+            .whereRaw("symbol NOT ILIKE '%MUTUALFUND%'");
+      })
+      .where(function() {
+        this.whereNull('remarks').orWhereRaw("remarks NOT ILIKE '%Mutual Fund%' AND remarks NOT ILIKE '%SIP%'");
+      })
       .count('* as count')
       .first();
 
     const currentCount = parseInt(monthlySideCount?.count || 0, 10);
-    const MONTHLY_FREE_TRADE_LIMIT = 25; // 25 Buy and 25 Sell per month
+    const MONTHLY_FREE_TRADE_LIMIT = 40; // 40 Buy and 40 Sell per month (Mutual Funds excluded)
 
     if (currentCount >= MONTHLY_FREE_TRADE_LIMIT) {
       return res.status(403).json({
-        error: `Monthly trade quota reached: Free Plan allows maximum 25 ${orderSide} trades per month (used: ${currentCount}/${MONTHLY_FREE_TRADE_LIMIT}). Upgrade to Pro Monthly, Yearly, or Feature Plan for higher or unlimited trades.`,
+        error: `Monthly trade quota reached: Free Plan allows maximum 40 ${orderSide} trades per month (used: ${currentCount}/${MONTHLY_FREE_TRADE_LIMIT}, Mutual Funds excluded). Upgrade to Pro Monthly, Yearly, or Feature Plan for higher or unlimited trades.`,
         limit_reached: true,
         tier: 'BASIC',
         quota: MONTHLY_FREE_TRADE_LIMIT,
