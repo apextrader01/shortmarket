@@ -337,6 +337,27 @@ export default function LoginView() {
         setLoading(false);
         return;
       }
+      const cleanEmail = email.trim().toLowerCase();
+      const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        useStore.setState({ authError: 'Please enter a properly formatted email address (e.g., yourname@gmail.com).' });
+        setLoading(false);
+        return;
+      }
+      const emailDomain = cleanEmail.split('@')[1] || '';
+      const DISPOSABLE_DOMAINS_QUICK = new Set([
+        'temp-mail.org', 'tempmail.com', 'temp-mail.io', 'tempmailo.com', 'tempmail.net',
+        '10minutemail.com', '10minutemail.net', '10minutemail.org', '20minutemail.com',
+        'guerrillamail.com', 'sharklasers.com', 'grr.la', 'mailinator.com', 'yopmail.com',
+        'trashmail.com', 'throwawaymail.com', 'getnada.com', 'dropmail.me', 'mohmal.com',
+        'fakemailgenerator.com', 'dispostable.com', 'crazymailing.com', 'maildrop.cc',
+        'emailondeck.com', 'burnermail.io', 'fakeinbox.com', 'inboxkitten.com'
+      ]);
+      if (DISPOSABLE_DOMAINS_QUICK.has(emailDomain) || /temp.*mail|throwaway|fake.*inbox|fake.*mail|disposable|10minute|guerrilla|trash.*mail|yopmail/i.test(emailDomain)) {
+        useStore.setState({ authError: 'Temporary and disposable email addresses are not permitted. Please use your permanent email (e.g., Gmail, Yahoo, Outlook).' });
+        setLoading(false);
+        return;
+      }
       if (!password || password.length < 6) {
         useStore.setState({ authError: 'Password must be at least 6 characters long.' });
         setLoading(false);

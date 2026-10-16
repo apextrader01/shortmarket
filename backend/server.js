@@ -1550,6 +1550,13 @@ app.post('/api/auth/send-registration-otp', authLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
   }
 
+  // 🛡️ Anti-Disposable & Real-Time Domain Verification
+  const { validateEmailAddress } = require('./services/emailValidator');
+  const emailValidation = await validateEmailAddress(cleanEmail);
+  if (!emailValidation.valid) {
+    return res.status(400).json({ error: emailValidation.error });
+  }
+
   try {
     // Check if account already exists
     const existing = await findUserByIdentifier(cleanEmail);
@@ -1629,6 +1636,13 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
   if (cleanPhone.length !== 10) {
     return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
+  }
+
+  // 🛡️ Anti-Disposable & Real-Time Domain Verification
+  const { validateEmailAddress } = require('./services/emailValidator');
+  const emailValidation = await validateEmailAddress(cleanEmail);
+  if (!emailValidation.valid) {
+    return res.status(400).json({ error: emailValidation.error });
   }
 
   // Validate OTP or Firebase token if provided (supports both numeric OTP and direct Firebase verification link)
@@ -1790,6 +1804,13 @@ app.post('/api/auth/resend-verification-email', authLimiter, async (req, res) =>
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email is required' });
   const cleanEmail = String(email).trim().toLowerCase();
+
+  // 🛡️ Anti-Disposable & Real-Time Domain Verification
+  const { validateEmailAddress } = require('./services/emailValidator');
+  const emailValidation = await validateEmailAddress(cleanEmail);
+  if (!emailValidation.valid) {
+    return res.status(400).json({ error: emailValidation.error });
+  }
 
   try {
     const { sendFirebaseVerificationEmail } = require('./services/firebaseAuth');
