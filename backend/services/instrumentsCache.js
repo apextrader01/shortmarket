@@ -47,6 +47,91 @@ function initializeCache() {
     
     // Filtering and Deduplication
     const symbolMap = new Map();
+
+    // ⚡ 1. Seed Core Benchmark Spot Indices at the VERY TOP of the cache with humanized names & keywords
+    const BENCHMARK_INDICES = [
+        {
+            symbol: 'NSE:NIFTY50-INDEX',
+            unique_symbol: 'NSE:NIFTY50-INDEX',
+            name: 'NIFTY 50',
+            description: 'NIFTY 50 Index',
+            exchange: 'NSE',
+            lotsize: 75,
+            token: '26000',
+            expiryTimestamp: null,
+            search_string: 'nse:nifty50-index nifty 50 nifty50 nifty-50 nifty index benchmark nse'
+        },
+        {
+            symbol: 'NSE:NIFTYBANK-INDEX',
+            unique_symbol: 'NSE:NIFTYBANK-INDEX',
+            name: 'BANK NIFTY',
+            description: 'NIFTY Bank Index',
+            exchange: 'NSE',
+            lotsize: 30,
+            token: '26009',
+            expiryTimestamp: null,
+            search_string: 'nse:niftybank-index bank nifty banknifty niftybank index benchmark nse'
+        },
+        {
+            symbol: 'BSE:SENSEX-INDEX',
+            unique_symbol: 'BSE:SENSEX-INDEX',
+            name: 'SENSEX',
+            description: 'S&P BSE SENSEX Index',
+            exchange: 'BSE',
+            lotsize: 20,
+            token: '1',
+            expiryTimestamp: null,
+            search_string: 'bse:sensex-index sensex bse-sensex sensex50 index benchmark bse'
+        },
+        {
+            symbol: 'NSE:FINNIFTY-INDEX',
+            unique_symbol: 'NSE:FINNIFTY-INDEX',
+            name: 'FIN NIFTY',
+            description: 'NIFTY Financial Services Index',
+            exchange: 'NSE',
+            lotsize: 65,
+            token: '26037',
+            expiryTimestamp: null,
+            search_string: 'nse:finnifty-index fin nifty finnifty nifty finance index benchmark nse'
+        },
+        {
+            symbol: 'NSE:MIDCPNIFTY-INDEX',
+            unique_symbol: 'NSE:MIDCPNIFTY-INDEX',
+            name: 'MIDCAP NIFTY',
+            description: 'NIFTY Midcap Select Index',
+            exchange: 'NSE',
+            lotsize: 120,
+            token: '26074',
+            expiryTimestamp: null,
+            search_string: 'nse:midcpnifty-index midcap nifty midcpnifty nifty midcap index benchmark nse'
+        },
+        {
+            symbol: 'BSE:BANKEX-INDEX',
+            unique_symbol: 'BSE:BANKEX-INDEX',
+            name: 'BANKEX',
+            description: 'BSE BANKEX Index',
+            exchange: 'BSE',
+            lotsize: 30,
+            token: '12',
+            expiryTimestamp: null,
+            search_string: 'bse:bankex-index bankex bse-bankex index benchmark bse'
+        },
+        {
+            symbol: 'NSE:INDIAVIX-INDEX',
+            unique_symbol: 'NSE:INDIAVIX-INDEX',
+            name: 'INDIA VIX',
+            description: 'India Volatility Index',
+            exchange: 'NSE',
+            lotsize: 1,
+            token: '26017',
+            expiryTimestamp: null,
+            search_string: 'nse:indiavix-index india vix indiavix volatility index benchmark nse'
+        }
+    ];
+
+    BENCHMARK_INDICES.forEach(item => {
+        symbolMap.set(item.unique_symbol, item);
+    });
     
     rawInstruments.forEach(item => {
         // Filter out debt/bonds, debentures, government securities, etc.

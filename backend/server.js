@@ -1257,7 +1257,7 @@ app.get('/api/stocks', async (req, res) => {
 
     try {
       const { generalClient } = require('./services/redisClient');
-      const cacheKey = `api:search:v6:${qLower}`;
+      const cacheKey = `api:search:v7:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
@@ -1276,16 +1276,36 @@ app.get('/api/stocks', async (req, res) => {
       
       const dbResults = searchInstruments(qLower);
 
+      const qClean = qLower.replace(/[-_\s]/g, '');
+      const isMajorIndex = (item) => {
+        const sym = item.symbol || '';
+        return sym.includes('-INDEX') || (item.name && item.name.includes('INDEX'));
+      };
+
       dbResults.sort((a, b) => {
-        const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
-        const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
+        const aSymClean = a.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
+        const bSymClean = b.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
+        
+        // Priority 1: Benchmark Spot Indices when user searches index names (e.g. Nifty 50, Bank Nifty, Sensex)
+        const aIsMajor = isMajorIndex(a);
+        const bIsMajor = isMajorIndex(b);
+        const aIndexMatch = aIsMajor && (aSymClean === qClean || (qClean === 'nifty50' && aSymClean === 'nifty50') || (qClean === 'nifty' && (aSymClean === 'nifty50' || aSymClean === 'nifty')) || (qClean === 'banknifty' && (aSymClean === 'niftybank' || aSymClean === 'banknifty')) || (qClean === 'sensex' && aSymClean === 'sensex'));
+        const bIndexMatch = bIsMajor && (bSymClean === qClean || (qClean === 'nifty50' && bSymClean === 'nifty50') || (qClean === 'nifty' && (bSymClean === 'nifty50' || bSymClean === 'nifty')) || (qClean === 'banknifty' && (bSymClean === 'niftybank' || bSymClean === 'banknifty')) || (qClean === 'sensex' && bSymClean === 'sensex'));
+        
+        if (aIndexMatch && !bIndexMatch) return -1;
+        if (!aIndexMatch && bIndexMatch) return 1;
+
+        // Priority 2: Exact matches on symbol, name, or clean symbol
+        const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower) || aSymClean === qClean;
+        const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower) || bSymClean === qClean;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         
-        const aIsCash = (a.exchange === 'NSE' || a.exchange === 'BSE');
-        const bIsCash = (b.exchange === 'NSE' || b.exchange === 'BSE');
-        if (aIsCash && !bIsCash) return -1;
-        if (!aIsCash && bIsCash) return 1;
+        // Priority 3: Cash equities & Benchmark Indices prioritized over derivatives
+        const aIsCashOrIndex = aIsMajor || (a.exchange === 'NSE' || a.exchange === 'BSE');
+        const bIsCashOrIndex = bIsMajor || (b.exchange === 'NSE' || b.exchange === 'BSE');
+        if (aIsCashOrIndex && !bIsCashOrIndex) return -1;
+        if (!aIsCashOrIndex && bIsCashOrIndex) return 1;
         
         const aIsFut = a.symbol.includes('FUT');
         const bIsFut = b.symbol.includes('FUT');
