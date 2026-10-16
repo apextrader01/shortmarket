@@ -161,7 +161,7 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     // Data Compression logic: Decompress Array to Object if needed
     let data = rawData;
     if (Array.isArray(rawData)) {
-      // [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
+      // [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan, upper_circuit, lower_circuit, oi, pOI, oi_change]
       data = {
         symbol: symbol,
         ltp: rawData[0],
@@ -179,7 +179,11 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         totBuyQuan: rawData[9],
         totSellQuan: rawData[10],
         upper_circuit: rawData[11] || 0,
-        lower_circuit: rawData[12] || 0
+        lower_circuit: rawData[12] || 0,
+        oi: rawData[13] || 0,
+        pOI: rawData[14] || 0,
+        prev_oi: rawData[14] || 0,
+        oi_change: rawData[15] || 0
       };
     } else if (rawData && typeof rawData === 'object') {
       data = {
@@ -190,6 +194,10 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         pct: rawData.pct ?? rawData.chp ?? 0,
         vol: rawData.vol ?? rawData.volume ?? 0,
         volume: rawData.volume ?? rawData.vol ?? 0,
+        oi: rawData.oi ?? rawData.open_interest ?? 0,
+        pOI: rawData.pOI ?? rawData.prev_oi ?? 0,
+        prev_oi: rawData.prev_oi ?? rawData.pOI ?? 0,
+        oi_change: rawData.oi_change ?? ((rawData.oi !== undefined && rawData.pOI !== undefined) ? (rawData.oi - rawData.pOI) : 0)
       };
     }
 
@@ -205,12 +213,13 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         continue;
     }
 
-    // ⚡ Value Equality Guard: If prices, volume, and change are identical, skip re-allocation
+    // ⚡ Value Equality Guard: If prices, volume, OI, and change are identical, skip re-allocation
     if (
       old &&
       old.ltp === data.ltp &&
       old.ch === data.ch &&
       old.vol === data.vol &&
+      (data.oi === undefined || old.oi === data.oi) &&
       (!data.timestamp || old.timestamp === data.timestamp)
     ) {
       if (isFromWebSocket) {

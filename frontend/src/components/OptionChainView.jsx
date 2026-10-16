@@ -65,6 +65,57 @@ const SymbolDropdown = ({ value, options, onChange }) => {
 
 const ALLOWED_INDEX_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BANKEX'];
 
+const formatOI = (oi) => {
+  if (!oi || isNaN(Number(oi)) || Number(oi) === 0) return '0';
+  const n = Number(oi);
+  if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
+  if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n.toLocaleString('en-IN');
+};
+
+const PcrSummary = React.memo(({ strikes, chain }) => {
+  const pcrStats = useStore(useShallow(state => {
+    let callOi = 0;
+    let putOi = 0;
+    const prices = state.prices;
+    for (const s of (strikes || [])) {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      if (c) {
+        const cRaw = c.symbol ? c.symbol.replace(/^[A-Z]+:/, '') : null;
+        const cKey = c.symbol ? (c.symbol.includes('-') ? c.symbol : `${c.symbol}-${c.exch_seg}`) : null;
+        const cPref = c.symbol && !c.symbol.includes(':') ? `${c.exch_seg || 'NSE'}:${c.symbol}` : c.symbol;
+        const cData = prices[c.symbol] || (cRaw ? prices[cRaw] : null) || (cPref ? prices[cPref] : null) || (cKey ? prices[cKey] : null);
+        const cVal = Number(cData?.oi ?? c.oi ?? 0);
+        if (cVal > 0) callOi += cVal;
+      }
+      if (p) {
+        const pRaw = p.symbol ? p.symbol.replace(/^[A-Z]+:/, '') : null;
+        const pKey = p.symbol ? (p.symbol.includes('-') ? p.symbol : `${p.symbol}-${p.exch_seg}`) : null;
+        const pPref = p.symbol && !p.symbol.includes(':') ? `${p.exch_seg || 'NSE'}:${p.symbol}` : p.symbol;
+        const pData = prices[p.symbol] || (pRaw ? prices[pRaw] : null) || (pPref ? prices[pPref] : null) || (pKey ? prices[pKey] : null);
+        const pVal = Number(pData?.oi ?? p.oi ?? 0);
+        if (pVal > 0) putOi += pVal;
+      }
+    }
+    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
+    return { callOi, putOi, pcr };
+  }));
+
+  return (
+    <div className="top-bar-section">
+      <span className="top-bar-label">PCR (OI)</span>
+      <span className="top-bar-value" style={{ fontWeight: '700', color: Number(pcrStats.pcr) >= 1 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+        {pcrStats.pcr}
+      </span>
+      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>
+        ({formatOI(pcrStats.putOi)}P / {formatOI(pcrStats.callOi)}C)
+      </span>
+    </div>
+  );
+});
+
 const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState(ALLOWED_INDEX_SYMBOLS);
@@ -124,11 +175,11 @@ const OptionChainViewInternal = () => {
       setError(null);
       setOptionsData({}); // Clear old chain data
       try {
+        const idxCandidates = getIndexCandidates(symbol);
         const idxKey = getIndexKey(symbol);
         const isCommodity = commodities.includes(symbol);
 
-        const initialToFetch = ['INDIA VIX-NSE'];
-        if (idxKey) initialToFetch.push(idxKey);
+        const initialToFetch = ['NSE:INDIAVIX-INDEX', 'INDIAVIX-INDEX', ...idxCandidates];
 
         // Fire ALL requests in parallel — don't wait for one before starting the next
         const [futRes, chainRes, _] = await Promise.all([
@@ -157,9 +208,13 @@ const OptionChainViewInternal = () => {
         // Set initialSpotPrice immediately from the store (don't wait for React re-render)
         const storeState = useStore.getState().prices;
         let resolvedSpotPrice = null;
-        if (idxKey && storeState[idxKey]?.ltp > 0) {
-          resolvedSpotPrice = storeState[idxKey].ltp;
-        } else if (isCommodity && futDataResult) {
+        for (const k of idxCandidates) {
+          if (storeState[k]?.ltp > 0) {
+            resolvedSpotPrice = storeState[k].ltp;
+            break;
+          }
+        }
+        if (resolvedSpotPrice === null && isCommodity && futDataResult) {
           const futKey = futDataResult.symbol;
           if (storeState[futKey]?.ltp > 0) {
             resolvedSpotPrice = storeState[futKey].ltp;
@@ -214,14 +269,36 @@ const OptionChainViewInternal = () => {
     'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
   ];
 
+  const getIndexCandidates = (sym) => {
+    switch (sym) {
+      case 'NIFTY': return ['NSE:NIFTY50-INDEX', 'NIFTY50-INDEX', 'NIFTY-NSE', 'NIFTY 50', 'NIFTY'];
+      case 'BANKNIFTY': return ['NSE:NIFTYBANK-INDEX', 'NIFTYBANK-INDEX', 'BANKNIFTY-NSE', 'NIFTY BANK', 'BANKNIFTY'];
+      case 'FINNIFTY': return ['NSE:FINNIFTY-INDEX', 'FINNIFTY-INDEX', 'FINNIFTY-NSE', 'NIFTY FIN SERVICE', 'FINNIFTY'];
+      case 'SENSEX': return ['BSE:SENSEX-INDEX', 'SENSEX-INDEX', 'SENSEX-BSE', 'SENSEX'];
+      case 'BANKEX': return ['BSE:BANKEX-INDEX', 'BANKEX-INDEX', 'BANKEX-BSE', 'BANKEX'];
+      default: return [`NSE:${sym}-INDEX`, `${sym}-NSE`];
+    }
+  };
+
   const getIndexKey = (sym) => {
-    if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
-    if (commodities.includes(sym)) return null; // Commodities use futures price, not spot
-    return `${sym}-NSE`;
+    switch (sym) {
+      case 'NIFTY': return 'NSE:NIFTY50-INDEX';
+      case 'BANKNIFTY': return 'NSE:NIFTYBANK-INDEX';
+      case 'FINNIFTY': return 'NSE:FINNIFTY-INDEX';
+      case 'SENSEX': return 'BSE:SENSEX-INDEX';
+      case 'BANKEX': return 'BSE:BANKEX-INDEX';
+      default: return `NSE:${sym}-INDEX`;
+    }
   };
 
   const indexKey = getIndexKey(symbol);
-  const spotPriceData = useStore(state => indexKey ? state.prices[indexKey] : undefined) || {};
+  const indexCandidates = getIndexCandidates(symbol);
+  const spotPriceData = useStore(state => {
+    for (const k of indexCandidates) {
+      if (state.prices[k]?.ltp > 0) return state.prices[k];
+    }
+    return {};
+  });
   const spotPrice = spotPriceData.ltp || 0;
   const spotPct = spotPriceData.pct || 0;
   
@@ -229,7 +306,12 @@ const OptionChainViewInternal = () => {
   const futPrice = futPriceData?.ltp || 0;
   const futPct = futPriceData?.pct || 0;
 
-  const vixData = useStore(state => state.prices['INDIA VIX-NSE']) || {};
+  const vixData = useStore(state => {
+    return state.prices['NSE:INDIAVIX-INDEX'] || 
+           state.prices['INDIAVIX-INDEX'] || 
+           state.prices['INDIAVIX'] || 
+           state.prices['INDIA VIX-NSE'] || {};
+  });
   const vixPrice = vixData.ltp || 0;
   const vixPct = vixData.pct || 0;
   const vixChange = vixData.change || 0;
@@ -245,11 +327,10 @@ const OptionChainViewInternal = () => {
   useEffect(() => {
     if (!expiry || !optionsData[expiry]) return;
 
-    // Also subscribe to the underlying index for Spot Price
-    if (indexKey) {
-      subscribeToSymbol(indexKey);
-    }
-    subscribeToSymbol('INDIA VIX-NSE');
+    // Also subscribe to all underlying index aliases for Spot Price and VIX
+    indexCandidates.forEach(sym => subscribeToSymbol(sym));
+    subscribeToSymbol('NSE:INDIAVIX-INDEX');
+    subscribeToSymbol('INDIAVIX-INDEX');
 
     if (futureData) {
       subscribeToOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
@@ -268,7 +349,7 @@ const OptionChainViewInternal = () => {
         );
         
         const atmIndex = allStrikes.indexOf(atmStrike);
-        // Take 15 strikes below and 15 strikes above ATM (30 total strikes)
+        // Take 15 strikes below and 15 strikes above ATM (31 total strikes: 15 ITM, 1 ATM, 15 OTM)
         const startIndex = Math.max(0, atmIndex - 15);
         const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
         
@@ -284,9 +365,7 @@ const OptionChainViewInternal = () => {
           subscribeToOptionBatch(tokensToSub);
           
           // Instantly fetch snapshot of the visible options so they load immediately
-          const uniqueSymbolsToFetch = [];
-          if (indexKey) uniqueSymbolsToFetch.push(indexKey);
-          uniqueSymbolsToFetch.push('INDIA VIX-NSE');
+          const uniqueSymbolsToFetch = [...indexCandidates, 'NSE:INDIAVIX-INDEX'];
           if (futureData) uniqueSymbolsToFetch.push(futureData.symbol);
 
           visibleStrikes.forEach((strike) => {
@@ -304,8 +383,9 @@ const OptionChainViewInternal = () => {
     setHasScrolled(false); // Reset scroll on expiry change
 
     return () => {
-      if (indexKey) unsubscribeFromSymbol(indexKey);
-      unsubscribeFromSymbol('INDIA VIX-NSE');
+      indexCandidates.forEach(sym => unsubscribeFromSymbol(sym));
+      unsubscribeFromSymbol('NSE:INDIAVIX-INDEX');
+      unsubscribeFromSymbol('INDIAVIX-INDEX');
       if (futureData) {
         unsubscribeFromOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
       }
@@ -526,36 +606,6 @@ const OptionChainViewInternal = () => {
     }
   };
 
-  // Defect 49: Calculate Aggregate Open Interest (OI) and Put-Call Ratio (PCR)
-  const formatOI = (oi) => {
-    if (!oi || isNaN(Number(oi)) || Number(oi) === 0) return '0';
-    const n = Number(oi);
-    if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
-    if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-    return n.toLocaleString('en-IN');
-  };
-
-  const { totalCallOI, totalPutOI, pcrRatio } = useMemo(() => {
-    let callOi = 0;
-    let putOi = 0;
-    const currentPrices = useStore.getState().prices || {};
-    (strikes || []).forEach(s => {
-      const c = chain[s]?.CE;
-      const p = chain[s]?.PE;
-      const cKey = c ? (c.symbol.includes('-') ? c.symbol : `${c.symbol}-${c.exch_seg}`) : null;
-      const pKey = p ? (p.symbol.includes('-') ? p.symbol : `${p.symbol}-${p.exch_seg}`) : null;
-      const cData = cKey ? currentPrices[cKey] : null;
-      const pData = pKey ? currentPrices[pKey] : null;
-      const cVal = Number(cData?.oi ?? c?.oi ?? 0);
-      const pVal = Number(pData?.oi ?? p?.oi ?? 0);
-      if (cVal > 0) callOi += cVal;
-      if (pVal > 0) putOi += pVal;
-    });
-    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
-    return { totalCallOI: callOi, totalPutOI: putOi, pcrRatio: pcr };
-  }, [strikes, chain]);
-
   return (
     <div className="option-chain-container glass-panel">
       {/* Header */}
@@ -643,15 +693,7 @@ const OptionChainViewInternal = () => {
         <div className="top-bar-divider"></div>
 
         {/* Section 5: PCR (Defect 49) */}
-        <div className="top-bar-section">
-          <span className="top-bar-label">PCR (OI)</span>
-          <span className="top-bar-value" style={{ fontWeight: '700', color: Number(pcrRatio) >= 1 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-            {pcrRatio}
-          </span>
-          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>
-            ({formatOI(totalPutOI)}P / {formatOI(totalCallOI)}C)
-          </span>
-        </div>
+        <PcrSummary strikes={strikes} chain={chain} />
 
         <div className="top-bar-divider"></div>
 

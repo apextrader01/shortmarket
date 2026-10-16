@@ -97,7 +97,7 @@ const OptionChainRow = React.memo(({
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(2) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>{callPriceData?.volume || '-'}</td>
+      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} title={callPriceData?.volume ? Number(callPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(callPriceData?.volume)}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
         {callPriceData?.change ? (
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
@@ -146,7 +146,7 @@ const OptionChainRow = React.memo(({
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
             <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{cBreakeven.toFixed(1)}</span>
             <span style={{ fontSize: '10px', color: cBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-              {cBreakPct > 0 ? '+' : ''}{cBreakPct.toFixed(1)}%
+              ({cBreakPct > 0 ? '+' : ''}{cBreakPct.toFixed(1)}%)
             </span>
           </div>
         ) : '-'}
@@ -161,7 +161,7 @@ const OptionChainRow = React.memo(({
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
             <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{pBreakeven.toFixed(1)}</span>
             <span style={{ fontSize: '10px', color: pBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-              {pBreakPct > 0 ? '+' : ''}{pBreakPct.toFixed(1)}%
+              ({pBreakPct > 0 ? '+' : ''}{pBreakPct.toFixed(1)}%)
             </span>
           </div>
         ) : '-'}
@@ -209,7 +209,7 @@ const OptionChainRow = React.memo(({
           </div>
         ) : '-'}
       </td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>{putPriceData?.volume || '-'}</td>
+      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} title={putPriceData?.volume ? Number(putPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(putPriceData?.volume)}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(2) : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(2) : '-'}</td>
