@@ -13385,32 +13385,67 @@ io.on('connection', (socket) => {
     }
   });
 
+  const getSymbolAliases = (sym) => {
+    if (!sym || typeof sym !== 'string') return [];
+    const aliases = new Set([sym]);
+    if (sym.includes(':')) {
+      const parts = sym.split(':');
+      const ex = parts[0];
+      const raw = parts[1];
+      aliases.add(raw);
+      const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+      if (clean !== raw) {
+        aliases.add(clean);
+        aliases.add(`${ex}:${clean}`);
+      }
+    } else {
+      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => sym.startsWith(c)) || sym.includes('-MCX');
+      if (isCommodity) {
+        aliases.add(`MCX:${sym}`);
+      } else {
+        aliases.add(`NSE:${sym}`);
+        aliases.add(`BSE:${sym}`);
+        const clean = sym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+        if (clean !== sym) {
+          aliases.add(clean);
+          aliases.add(`NSE:${clean}`);
+          aliases.add(`BSE:${clean}`);
+        }
+      }
+    }
+    return Array.from(aliases);
+  };
+
   const emitCachedPricesForNewRooms = (symbolsList) => {
     const requestedCache = {};
-    symbolsList.forEach(sym => {
+    symbolsList.forEach(rawItem => {
+      const sym = typeof rawItem === 'string' ? rawItem : rawItem?.symbol;
       if (sym && typeof sym === 'string') {
-        const isNewRoom = !socket.rooms.has(sym);
-        socket.join(sym);
-        if (isNewRoom) {
-          const p = getPriceDataFromCache(sym);
-          if (p && p.ltp !== undefined) {
-            requestedCache[sym] = [
-              p.ltp,
-              p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),
-              p.pct !== undefined ? p.pct : (p.chp !== undefined ? p.chp : 0),
-              p.timestamp || p.ts || Date.now(),
-              p.open,
-              p.high,
-              p.low,
-              p.close,
-              p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
-              p.totBuyQuan || 0,
-              p.totSellQuan || 0,
-              p.upper_circuit || p.upper_ckt || 0,
-              p.lower_circuit || p.lower_ckt || 0
-            ];
+        const aliases = getSymbolAliases(sym);
+        aliases.forEach(aliasSym => {
+          const isNewRoom = !socket.rooms.has(aliasSym);
+          socket.join(aliasSym);
+          if (isNewRoom) {
+            const p = getPriceDataFromCache(aliasSym) || getPriceDataFromCache(sym);
+            if (p && p.ltp !== undefined) {
+              requestedCache[aliasSym] = [
+                p.ltp,
+                p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),
+                p.pct !== undefined ? p.pct : (p.chp !== undefined ? p.chp : 0),
+                p.timestamp || p.ts || Date.now(),
+                p.open,
+                p.high,
+                p.low,
+                p.close,
+                p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
+                p.totBuyQuan || 0,
+                p.totSellQuan || 0,
+                p.upper_circuit || p.upper_ckt || 0,
+                p.lower_circuit || p.lower_ckt || 0
+              ];
+            }
           }
-        }
+        });
       }
     });
     if (Object.keys(requestedCache).length > 0) {
@@ -13465,15 +13500,13 @@ io.on('connection', (socket) => {
 
 
   socket.on('unsubscribe', (data) => {
-    if (Array.isArray(data)) {
-      data.forEach(item => {
-        const sym = typeof item === 'string' ? item : item?.symbol;
-        if (sym) socket.leave(sym);
-      });
-    } else if (data) {
-      const sym = typeof data === 'string' ? data : data.symbol;
-      if (sym) socket.leave(sym);
-    }
+    const items = Array.isArray(data) ? data : (data ? [data] : []);
+    items.forEach(item => {
+      const sym = typeof item === 'string' ? item : item?.symbol;
+      if (sym) {
+        getSymbolAliases(sym).forEach(aliasSym => socket.leave(aliasSym));
+      }
+    });
   });
 
     socket.on('subscribe_depth', (symbol) => {

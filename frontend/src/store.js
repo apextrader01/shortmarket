@@ -705,8 +705,14 @@ export const useStore = create(persist((set, get) => ({
     set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
 
-    // ⚡ Immediately subscribe via WebSocket using canonical uniqueSymbol
+    // ⚡ Immediately subscribe via WebSocket using canonical uniqueSymbol and alias
     socket.emit('subscribe', uniqueSymbol);
+    if (uniqueSymbol.includes(':')) {
+      socket.emit('subscribe', uniqueSymbol.split(':')[1]);
+    } else {
+      const isCom = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => uniqueSymbol.startsWith(c)) || uniqueSymbol.includes('-MCX');
+      socket.emit('subscribe', isCom ? `MCX:${uniqueSymbol}` : `NSE:${uniqueSymbol}`);
+    }
     get().pingSubscriptions();
     get().fetchBatchPrices([uniqueSymbol], true);
   },
@@ -945,31 +951,48 @@ export const useStore = create(persist((set, get) => ({
     const activeWl = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
     
     const symbols = new Set();
+    const addWithAliases = (s) => {
+      if (!s || typeof s !== 'string') return;
+      symbols.add(s);
+      if (s.includes(':')) {
+        const raw = s.split(':')[1];
+        symbols.add(raw);
+      } else {
+        const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
+        if (isCommodity) {
+          symbols.add(`MCX:${s}`);
+        } else {
+          symbols.add(`NSE:${s}`);
+          symbols.add(`BSE:${s}`);
+        }
+      }
+    };
+
     if (activeWl?.symbols) {
-      activeWl.symbols.forEach(s => symbols.add(s));
+      activeWl.symbols.forEach(addWithAliases);
     }
     
     if (positions && positions.length > 0) {
-      positions.forEach(p => symbols.add(p.symbol));
+      positions.forEach(p => { if (p?.symbol) addWithAliases(p.symbol); });
     }
 
     const orders = get().orders;
     if (orders && orders.length > 0) {
       const activeOrderStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
       orders.forEach(o => {
-        if (o.symbol && activeOrderStatuses.includes(o.status)) {
-          symbols.add(o.symbol);
+        if (o?.symbol && activeOrderStatuses.includes(o.status)) {
+          addWithAliases(o.symbol);
         }
       });
     }
     
     const holdings = get().holdings;
     if (holdings && holdings.length > 0) {
-      holdings.forEach(h => symbols.add(h.symbol));
+      holdings.forEach(h => { if (h?.symbol) addWithAliases(h.symbol); });
     }
 
     if (selectedSymbol) {
-      symbols.add(selectedSymbol);
+      addWithAliases(selectedSymbol);
     }
 
     // Add active alert symbols so price ticks always stream even if instrument is not on active watchlist
@@ -977,13 +1000,13 @@ export const useStore = create(persist((set, get) => ({
     if (alerts && alerts.length > 0) {
       alerts.forEach(a => {
         if (!a.triggered && a.symbol) {
-          symbols.add(a.symbol);
+          addWithAliases(a.symbol);
         }
       });
     }
     
     // Add temporary options
-    temporaryOptionSubscriptions.forEach(s => symbols.add(s));
+    temporaryOptionSubscriptions.forEach(addWithAliases);
     
     // Add indices — MUST use exact Fyers-format symbols (not the old aliases)
     symbols.add('NSE:NIFTY50-INDEX');
@@ -1691,7 +1714,19 @@ export const useStore = create(persist((set, get) => ({
           const posSymbols = (get().positions || []).map(p => p?.symbol).filter(Boolean);
           const holdSymbols = (get().holdings || []).map(h => h?.symbol).filter(Boolean);
           const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
-          const allSymbolsToSubscribe = [...new Set([...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols])];
+          const rawList = [...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols];
+          const expandedUserSyms = [];
+          rawList.forEach(s => {
+            if (!s || typeof s !== 'string') return;
+            expandedUserSyms.push(s);
+            if (s.includes(':')) {
+              expandedUserSyms.push(s.split(':')[1]);
+            } else {
+              const isCom = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
+              expandedUserSyms.push(isCom ? `MCX:${s}` : `NSE:${s}`);
+            }
+          });
+          const allSymbolsToSubscribe = [...new Set(expandedUserSyms)];
           if (allSymbolsToSubscribe.length > 0) {
             if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
             const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));

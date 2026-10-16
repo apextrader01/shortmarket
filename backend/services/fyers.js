@@ -549,7 +549,20 @@ async function initFyers(io, pc, isMaster = true) {
                 for (const sym of Object.keys(batchUpdate)) {
                     const room = global_io.sockets?.adapter?.rooms?.get(sym);
                     const lastPingTime = clientViewerLastSeen.get(sym) || 0;
-                    const hasActiveViewers = (now - lastPingTime <= 60000) || (room && room.size > 0);
+                    const rawSym = sym.includes(':') ? sym.split(':')[1] : null;
+                    const rawLastPing = rawSym ? (clientViewerLastSeen.get(rawSym) || 0) : 0;
+                    const rawRoom = rawSym ? global_io.sockets?.adapter?.rooms?.get(rawSym) : null;
+                    const isCom = !sym.includes(':') && (['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => sym.startsWith(c)) || sym.includes('-MCX'));
+                    const pref = !sym.includes(':') ? (isCom ? `MCX:${sym}` : `NSE:${sym}`) : null;
+                    const prefLastPing = pref ? (clientViewerLastSeen.get(pref) || 0) : 0;
+                    const prefRoom = pref ? global_io.sockets?.adapter?.rooms?.get(pref) : null;
+
+                    const hasActiveViewers = (now - lastPingTime <= 60000) || 
+                                             (rawSym && (now - rawLastPing <= 60000)) || 
+                                             (pref && (now - prefLastPing <= 60000)) || 
+                                             (room && room.size > 0) || 
+                                             (rawRoom && rawRoom.size > 0) || 
+                                             (prefRoom && prefRoom.size > 0);
                     if (hasActiveViewers) {
                         const p = batchUpdate[sym];
                         const snapshotPayload = {
@@ -569,8 +582,21 @@ async function initFyers(io, pc, isMaster = true) {
                                 p.lower_circuit || 0
                             ]
                         };
+                        if (rawSym) {
+                            snapshotPayload[rawSym] = snapshotPayload[sym];
+                        }
+                        if (pref) {
+                            snapshotPayload[pref] = snapshotPayload[sym];
+                        }
+
                         if (room && room.size > 0) {
                             (global_io.local || global_io).to(sym).emit('price_snapshot', snapshotPayload);
+                        }
+                        if (rawRoom && rawRoom.size > 0) {
+                            (global_io.local || global_io).to(rawSym).emit('price_snapshot', snapshotPayload);
+                        }
+                        if (prefRoom && prefRoom.size > 0) {
+                            (global_io.local || global_io).to(pref).emit('price_snapshot', snapshotPayload);
                         }
                     }
                 }
@@ -1052,6 +1078,21 @@ function handlePingSubscriptions(symbols) {
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
         const fSym = toFyersSymbol(s);
+        if (fSym && fSym !== s) {
+            symbolLastSeen.set(fSym, now);
+            clientViewerLastSeen.set(fSym, now);
+        }
+        if (s.includes(':')) {
+            const raw = s.split(':')[1];
+            symbolLastSeen.set(raw, now);
+            clientViewerLastSeen.set(raw, now);
+        } else {
+            const isCom = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
+            const pref = isCom ? `MCX:${s}` : `NSE:${s}`;
+            symbolLastSeen.set(pref, now);
+            clientViewerLastSeen.set(pref, now);
+        }
+
         const cached = sharedPriceCache[s] || (fSym ? sharedPriceCache[fSym] : null);
         if (cached) {
             sharedPriceCache[s] = cached;
@@ -1059,6 +1100,11 @@ function handlePingSubscriptions(symbols) {
             if (fSym) {
                 sharedPriceCache[fSym] = cached;
                 dirtySymbols.add(fSym);
+            }
+            if (s.includes(':')) {
+                const raw = s.split(':')[1];
+                sharedPriceCache[raw] = cached;
+                dirtySymbols.add(raw);
             }
         }
         
