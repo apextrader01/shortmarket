@@ -1369,6 +1369,15 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
             </div>
             <a
               href="/privacy-policy"
+              onClick={(e) => {
+                if (typeof setActiveTab === 'function') {
+                  e.preventDefault();
+                  setActiveTab('Privacy');
+                  try {
+                    window.history.pushState({ appTab: 'Privacy' }, '', '/privacy-policy');
+                  } catch (_) {}
+                }
+              }}
               className="glass-panel hoverable"
               style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
             >
@@ -1377,6 +1386,15 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
             </a>
             <a
               href="/delete-account"
+              onClick={(e) => {
+                if (typeof setActiveTab === 'function') {
+                  e.preventDefault();
+                  setActiveTab('Legal');
+                  try {
+                    window.history.pushState({ appTab: 'Legal' }, '', '/delete-account');
+                  } catch (_) {}
+                }
+              }}
               className="glass-panel hoverable"
               style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textDecoration: 'none', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}
             >

@@ -1317,7 +1317,7 @@ function App() {
                        (currentPath.includes('accessibility') ? 'accessibility' : 'privacy'))));
     return (
       <Suspense fallback={<TabLoader />}>
-        <LegalView initialTab={initialTab} />
+        <LegalView initialTab={initialTab} onBack={user ? handleBackNavigation : undefined} />
         <Suspense fallback={null}>
           <ConsentBanner />
         </Suspense>
@@ -2092,7 +2092,7 @@ function App() {
               {(activeTab === 'Legal' || activeTab === 'Privacy') && (
                 <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-main)' }}>
                   <Suspense fallback={<TabLoader />}>
-                    <LegalView initialTab="privacy" onBack={handleBackNavigation} />
+                    <LegalView initialTab={activeTab === 'Legal' ? 'delete-account' : 'privacy'} onBack={handleBackNavigation} />
                   </Suspense>
                 </div>
               )}
