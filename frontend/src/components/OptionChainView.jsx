@@ -360,7 +360,7 @@ const OptionChainViewInternal = () => {
 
   const chain = optionsData[expiry] || {};
   const allStrikes = useMemo(() => Object.keys(chain).map(Number).sort((a, b) => a - b), [chain]);
-  const effectiveSpotPrice = initialSpotPrice || (basePrice > 0 ? basePrice : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null));
+  const effectiveSpotPrice = (basePrice > 0 ? basePrice : initialSpotPrice) || (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
 
   // Memoized strike window based on strikeRange (±10, ±20, or All)
   const strikes = useMemo(() => {
