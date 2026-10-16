@@ -9063,7 +9063,7 @@ app.get('/api/options/chain/:symbol', async (req, res) => {
   }
 });
 
-// Endpoint to fetch all available underlying symbols for options (e.g., NIFTY, RELIANCE, CRUDEOIL)
+// Endpoint to fetch all available underlying symbols for options (prioritized 5 major indices)
 app.get('/api/options/symbols', async (req, res) => {
   try {
     if (!cachedOptionsData) {
@@ -9072,6 +9072,12 @@ app.get('/api/options/symbols', async (req, res) => {
 
     if (!cachedOptionsData) {
       return res.status(503).json({ error: 'Options database is currently being built.' });
+    }
+
+    const priorityIndices = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BANKEX'];
+    if (req.query.all !== 'true') {
+      res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
+      return res.json(priorityIndices.filter(sym => cachedOptionsData[sym]));
     }
 
     res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');

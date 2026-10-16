@@ -63,9 +63,11 @@ const SymbolDropdown = ({ value, options, onChange }) => {
   );
 };
 
+const ALLOWED_INDEX_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BANKEX'];
+
 const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
-  const [availableSymbols, setAvailableSymbols] = useState([]);
+  const [availableSymbols, setAvailableSymbols] = useState(ALLOWED_INDEX_SYMBOLS);
   const [expiry, setExpiry] = useState('');
   const [expiries, setExpiries] = useState([]);
   const [optionsData, setOptionsData] = useState({});
@@ -81,11 +83,16 @@ const OptionChainViewInternal = () => {
         const res = await fetch(`${API}/api/options/symbols`);
         if (res.ok) {
           const data = await res.json();
-          setAvailableSymbols(data);
+          if (Array.isArray(data)) {
+            const matched = ALLOWED_INDEX_SYMBOLS.filter(s => data.includes(s));
+            setAvailableSymbols(matched.length > 0 ? matched : ALLOWED_INDEX_SYMBOLS);
+            return;
+          }
         }
       } catch (err) {
-        console.error('Error fetching symbols', err);
+        console.warn('Using default 5 major index symbols for option chain', err);
       }
+      setAvailableSymbols(ALLOWED_INDEX_SYMBOLS);
     };
     fetchSymbols();
   }, []);
@@ -548,22 +555,41 @@ const OptionChainViewInternal = () => {
     <div className="option-chain-container glass-panel">
       {/* Header */}
       <div className="option-chain-top-bar">
-        {/* Section 1: Search & Spot */}
-        <div className="top-bar-section">
-          <SymbolDropdown 
-            value={symbol}
-            options={availableSymbols.length > 0 ? availableSymbols : [symbol]}
-            onChange={setSymbol}
-          />
-          
-          <span className="top-bar-price" style={{ marginLeft: '4px' }}>{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
-          <span className={`top-bar-pct ${spotPct >= 0 ? 'positive' : 'negative'}`}>
-            {spotPct > 0 ? '+' : ''}{spotPct.toFixed(2)}%
-          </span>
+        {/* Section 1: Major Index Switcher & Spot Price */}
+        <div className="top-bar-section" style={{ gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            {ALLOWED_INDEX_SYMBOLS.map((idxSym) => {
+              const isSelected = symbol === idxSym;
+              return (
+                <button
+                  key={idxSym}
+                  onClick={() => setSymbol(idxSym)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '11.5px',
+                    fontWeight: isSelected ? '800' : '600',
+                    border: isSelected ? '1px solid #3b82f6' : '1px solid transparent',
+                    background: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                    color: isSelected ? '#60a5fa' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    letterSpacing: '0.3px'
+                  }}
+                >
+                  {idxSym}
+                </button>
+              );
+            })}
+          </div>
 
-          <div className="top-bar-icons">
-            <button className="icon-btn" title="View Chart"><i className="fi fi-rr-chart-line-up"></i></button>
-            <button className="icon-btn info-btn" title="Information">Info</button>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginLeft: '4px' }}>
+            <span className="top-bar-price" style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+              {spotPrice > 0 ? spotPrice.toFixed(2) : '-'}
+            </span>
+            <span className={`top-bar-pct ${spotPct >= 0 ? 'positive' : 'negative'}`} style={{ fontSize: '11.5px', fontWeight: '700' }}>
+              {spotPct > 0 ? '+' : ''}{spotPct.toFixed(2)}%
+            </span>
           </div>
         </div>
 

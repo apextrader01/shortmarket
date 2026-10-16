@@ -441,7 +441,7 @@ function App() {
       'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
       'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
       'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
-      'options': 'Options', 'positions': 'Positions',
+      'options': 'Options', 'optionchain': 'Options', 'option-chain': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
       'leaderboard': 'Leaderboard',
@@ -926,7 +926,7 @@ function App() {
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
         'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
-        'options': 'Options', 'positions': 'Positions',
+        'options': 'Options', 'optionchain': 'Options', 'option-chain': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
         'leaderboard': 'Leaderboard',
@@ -1814,6 +1814,7 @@ function App() {
                   { key: 'Algo', label: 'SkandX Algo' },
                   { key: 'TradeDiary', label: 'Trade Diary' },
                   { key: 'Markets', label: 'Paper Trading' },
+                  { key: 'Options', label: 'Option Chain' },
                   { key: 'Positions', label: 'Positions' },
                   { key: 'Orders', label: 'Orders' },
                   { key: 'Portfolio', label: 'Portfolio' },
@@ -1959,7 +1960,7 @@ function App() {
             </header>
 
           <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'Community', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
+            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'Community', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal', 'Options'].includes(activeTab) && (
               <MarketWatch 
                 className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
                 onStockSelect={(sym) => {
@@ -2231,6 +2232,7 @@ function App() {
             { label: 'SkandX Algo', key: 'Algo', icon: Cpu },
             { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
             { label: 'Paper Trading', key: 'Markets', icon: TrendingUp },
+            { label: 'Option Chain', key: 'Options', icon: Layers },
             { label: 'Positions', key: 'Positions', icon: Briefcase },
             { label: 'Orders', key: 'Orders', icon: List },
             { label: 'Portfolio', key: 'Portfolio', icon: Briefcase },
