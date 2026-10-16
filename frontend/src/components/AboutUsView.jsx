@@ -52,7 +52,7 @@ export default function AboutUsView({ setActiveTab }) {
     },
     {
       title: 'Cancellation & Refund Policy',
-      content: 'We offer a 7-day money-back guarantee for first-time digital subscriptions and automated 24-48 hour reconciliation for duplicate debits. You can cancel your subscription at any time without fees.',
+      content: 'All new users receive an unrestricted 12-day free all-access trial. Paid digital subscriptions are non-refundable once activated as digital services are fulfilled immediately. Duplicate or accidental charges are automatically reconciled within 24–48 hours.',
       link: '/refund-policy',
       linkLabel: 'View Cancellation & Refund Policy →'
     },

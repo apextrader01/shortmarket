@@ -686,7 +686,7 @@ export const useStore = create(persist((set, get) => ({
     const activeTier = isExpired ? 'BASIC' : tier;
     const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
     const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(activeTier);
-    const maxWatchlists = isAdmin ? Infinity : (isHighest ? 5 : (isYearlyOrMonthly ? 4 : 2));
+    const maxWatchlists = isAdmin ? Infinity : (isHighest ? 5 : (isYearlyOrMonthly ? 4 : 3));
 
     if (!isAdmin && get().watchlists.length >= maxWatchlists) {
       alert(`Your ${activeTier} plan allows a maximum of ${maxWatchlists} custom watchlists. Please upgrade to Monthly/Yearly (4) or Feature Plan (5) to create more watchlists.`);

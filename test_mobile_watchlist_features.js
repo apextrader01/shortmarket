@@ -28,7 +28,7 @@ test('App.jsx: Bottom navigation contains Watchlist, Positions, Orders, Portfoli
   const appContent = fs.readFileSync(path.join(__dirname, 'frontend/src/App.jsx'), 'utf8');
   
   // Extract mobile-bottom-nav block
-  const navMatch = appContent.match(/<div className="mobile-bottom-nav">([\s\S]*?)<\/div>\s*\)/);
+  const navMatch = appContent.match(/<(?:div|nav)[^>]*className="mobile-bottom-nav">([\s\S]*?)<\/(?:div|nav)>\s*\)/);
   assert(navMatch, 'mobile-bottom-nav container must exist in App.jsx');
   const navBlock = navMatch[1];
 

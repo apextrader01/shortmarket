@@ -1793,11 +1793,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (!city && req.body?.client_city) city = req.body.client_city;
     if (!state && req.body?.client_state) state = req.body.client_state;
 
+    const twelveDaysLater = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
     const [id] = await db('users').insert({ 
       username: cleanUsername, 
       email: cleanEmail, 
       phone: cleanPhone, 
       password_hash, 
+      subscription_tier: 'MONTHLY',
+      subscription_expires: twelveDaysLater,
       watchlists: defaultWatchlist,
       registration_ip: clientIp, last_ip: clientIp,
       device_model: deviceModel, os_name: osName, browser_name: browserName,
@@ -2907,6 +2910,7 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         { id: 1, name: 'Watchlist 1', symbols: ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX', 'NSE:RELIANCE', 'NSE:TCS', 'NSE:HDFCBANK', 'NSE:INFY', 'NSE:ICICIBANK', 'NSE:SBIN'] }
       ]);
 
+      const twelveDaysLater = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
       const [inserted] = await db('users').insert({
         username: cleanUsername,
         email,
@@ -2914,7 +2918,8 @@ app.post('/api/auth/google-login', authLimiter, async (req, res) => {
         password_hash: passwordHash,
         balance: 1000000.00,
         profile_picture_url: decoded.picture || null,
-        subscription_tier: 'BASIC',
+        subscription_tier: 'MONTHLY',
+        subscription_expires: twelveDaysLater,
         watchlists: defaultWatchlist,
         registration_ip: clientIp,
         last_ip: clientIp,
@@ -7766,7 +7771,7 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     if (!user?.is_admin) {
       const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME', 'YEARLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
       const isYearlyOrMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-      const limit = isHighest ? 5 : (isYearlyOrMonthly ? 4 : 2);
+      const limit = isHighest ? 5 : (isYearlyOrMonthly ? 4 : 3);
       const maxSymbols = isHighest ? 100 : (isYearlyOrMonthly ? 75 : 30);
       
       if (watchlists.length > limit) {

@@ -2202,21 +2202,29 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
-                {user.subscription_tier === 'LIFETIME' && (
-                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #e11d48, #f59e0b)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 LIFETIME</span>
-                )}
-                {user.subscription_tier === 'MASTERCLASS' && (
-                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>🎓 MASTERCLASS</span>
-                )}
-                {['HIGHEST', 'FEATURE', 'VIP'].includes(user.subscription_tier) && (
-                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #a855f7)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 VIP</span>
-                )}
-                {user.subscription_tier === 'YEARLY' && (
-                  <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>⭐ YEARLY</span>
-                )}
-                {(user.subscription_tier === 'MONTHLY' || user.subscription_tier === 'PRO') && (
-                  <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>⚡ PRO</span>
-                )}
+                {(() => {
+                  const isSubExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+                  const effectiveTier = isSubExpired ? 'BASIC' : (user?.subscription_tier || 'BASIC');
+                  return (
+                    <>
+                      {effectiveTier === 'LIFETIME' && (
+                        <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #e11d48, #f59e0b)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 LIFETIME</span>
+                      )}
+                      {effectiveTier === 'MASTERCLASS' && (
+                        <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>🎓 MASTERCLASS</span>
+                      )}
+                      {['HIGHEST', 'FEATURE', 'VIP'].includes(effectiveTier) && (
+                        <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #a855f7)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>👑 VIP</span>
+                      )}
+                      {effectiveTier === 'YEARLY' && (
+                        <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', padding: '2px 6px', borderRadius: '12px', fontWeight: '800' }}>⭐ YEARLY</span>
+                      )}
+                      {(effectiveTier === 'MONTHLY' || effectiveTier === 'PRO') && (
+                        <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>⚡ PRO</span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

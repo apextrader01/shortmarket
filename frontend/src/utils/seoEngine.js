@@ -215,19 +215,19 @@ export const SEO_ROUTES = {
   '/refund-policy': {
     title: 'Cancellation & Refund Policy | SkandX',
     description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
-    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription policy skandx, digital subscription refund',
     category: 'FinanceApplication'
   },
   '/refunds': {
     title: 'Cancellation & Refund Policy | SkandX',
     description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
-    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription policy skandx, digital subscription refund',
     category: 'FinanceApplication'
   },
   '/cancellation-policy': {
     title: 'Cancellation & Refund Policy | SkandX',
     description: 'Cancellation and Refund Policy for SkandX digital subscriptions, educational tools, automated renewal cancellations, and duplicate transaction reversals.',
-    keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
+    keywords: 'skandx refund policy, skandx cancellation policy, subscription policy skandx, digital subscription refund',
     category: 'FinanceApplication'
   },
   '/shipping-policy': {

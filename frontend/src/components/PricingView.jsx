@@ -201,7 +201,7 @@ export default function PricingView({ setActiveTab }) {
 
   const comparisonRows = [
     { category: 'Watchlists & Marketwatch', items: [
-      { name: 'Max Custom Watchlists', normal: '2 Watchlists', monthly: '4 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists (Max)', masterclass: '2 Watchlists (Free Tier)', lifetime: '4 Watchlists (Forever)' },
+      { name: 'Max Custom Watchlists', normal: '3 Watchlists', monthly: '4 Watchlists', yearly: '4 Watchlists', highest: '5 Watchlists (Max)', masterclass: '3 Watchlists (Free Tier)', lifetime: '4 Watchlists (Forever)' },
       { name: 'Symbols per Watchlist', normal: '30 symbols', monthly: '75 symbols', yearly: '75 symbols', highest: '100 symbols (Max)', masterclass: '30 symbols (Free Tier)', lifetime: '75 symbols' },
       { name: 'Real-time WebSocket Streaming', normal: 'Standard (~1s)', monthly: 'High-speed (<200ms)', yearly: 'High-speed (<200ms)', highest: 'Direct Tick Feed (<50ms)', masterclass: 'Standard (~1s)', lifetime: 'High-speed (<200ms)' }
     ]},
@@ -250,9 +250,55 @@ export default function PricingView({ setActiveTab }) {
           Choose Your Trading Edge
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '15px', maxWidth: '780px', margin: '0 auto', lineHeight: '1.5' }}>
-          Select the plan that matches your goals. Direct one-time payment with instant activation — zero trial delays, zero recurring mandates.
+          Select the plan that matches your goals. Every new account receives an <strong>unrestricted 12-Day All-Access PRO Trial</strong> upon registration. Direct one-time payment with instant activation — zero recurring mandates.
         </p>
       </div>
+
+      {isMonthly && user?.subscription_expires && (
+        <div style={{
+          margin: '0 auto 24px auto',
+          maxWidth: '780px',
+          padding: '12px 18px',
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.35)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          textAlign: 'center',
+          fontSize: '13.5px',
+          color: '#93c5fd'
+        }}>
+          <Zap size={18} style={{ color: '#60a5fa', flexShrink: 0 }} />
+          <span>
+            <strong>12-Day All-Access PRO Plan Active</strong> — Valid until {new Date(user.subscription_expires).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. After this, your account automatically transitions to the Free Plan (3 Watchlists &amp; 40 trades/mo) unless extended.
+          </span>
+        </div>
+      )}
+
+      {isNormal && (
+        <div style={{
+          margin: '0 auto 24px auto',
+          maxWidth: '780px',
+          padding: '12px 18px',
+          background: 'rgba(16, 185, 129, 0.08)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          textAlign: 'center',
+          fontSize: '13.5px',
+          color: '#6ee7b7'
+        }}>
+          <Shield size={18} style={{ color: '#10b981', flexShrink: 0 }} />
+          <span>
+            <strong>Free Base Plan Active</strong>: 3 Custom Watchlists (30 symbols each) &amp; 40 Trades / month (40 Buy + 40 Sell, Mutual Funds 100% Free). Upgrade anytime for live Level-2 depth, basket orders &amp; 500 orders/day.
+          </span>
+        </div>
+      )}
 
       {/* 6 Pricing Cards Grid */}
       <div style={{ 
@@ -289,7 +335,7 @@ export default function PricingView({ setActiveTab }) {
           </p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: '11px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>2 Watchlists</strong> (30 symbols/list)</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>3 Watchlists</strong> (30 symbols/list)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#34D399', fontWeight: '600' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> <strong>40 Trades / month</strong> (40 Buy + 40 Sell · Mutual Funds Excluded)</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> Standard 5-Depth Market Depth</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#10B981', flexShrink: 0 }}/> 3 Active Price Alerts</li>
@@ -682,7 +728,9 @@ export default function PricingView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', fontWeight: '700', color: 'var(--text-primary, #f3f4f6)', fontSize: '14px', flexWrap: 'wrap' }}>
             <span>🔒 Bank-Grade 256-Bit SSL Encrypted Checkout</span>
             <span>•</span>
-            <span style={{ color: '#10b981' }}>🛡️ 7-Day Money-Back Guarantee</span>
+            <span style={{ color: '#10b981' }}>⚡ Instant Digital Provisioning</span>
+            <span>•</span>
+            <span style={{ color: '#38bdf8' }}>🎁 12-Day All-Access Trial on Signup</span>
           </div>
           <div>
             All transactions are processed securely via RBI-authorized payment partners (Cashfree Payments). Digital subscriptions are fulfilled immediately upon payment and governed by our <a href="/refund-policy" style={{ color: '#10b981', textDecoration: 'underline', fontWeight: '600' }}>Cancellation &amp; Refund Policy</a>, <a href="/shipping-policy" style={{ color: '#10b981', textDecoration: 'underline' }}>Shipping &amp; Delivery Policy</a>, and <a href="/terms" style={{ color: '#38bdf8', textDecoration: 'underline' }}>Terms of Service</a>.

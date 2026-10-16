@@ -23,7 +23,7 @@ import { useStore } from '../store';
 const LEGAL_TABS = [
   { id: 'privacy', label: 'Privacy Notice', icon: Shield, badge: 'DPDP Act 2023', description: 'Data protection, collection & rights' },
   { id: 'terms', label: 'Terms of Service', icon: FileText, badge: 'User Agreement', description: 'Platform usage, rules & disclaimers' },
-  { id: 'refund', label: 'Cancellation & Refund', icon: RotateCcw, badge: '7-Day Guarantee', description: 'Refund eligibility & bank timelines' },
+  { id: 'refund', label: 'Cancellation & Refund', icon: RotateCcw, badge: 'Digital Policy', description: 'Cancellation rules & bank timelines' },
   { id: 'shipping', label: 'Shipping & Delivery', icon: Truck, badge: 'Instant Delivery', description: 'Cloud SaaS electronic fulfillment' },
   { id: 'contact', label: 'Contact Us', icon: PhoneCall, badge: 'Official Directory', description: 'Corporate entity, phones & address' },
   { id: 'data-rights', label: 'Data Rights (DPDP)', icon: UserCheck, badge: 'Statutory Portal', description: 'Export JSON data, access & corrections' },
@@ -902,12 +902,12 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   Effective Date: October 1, 2026 &nbsp;|&nbsp; Last Updated: October 2026 &nbsp;|&nbsp; Version: v2026.1
                 </p>
 
-                <div style={{ backgroundColor: colors.successBg, border: `1px solid ${colors.successBorder}`, padding: '18px 22px', borderRadius: '12px', marginBottom: '28px' }}>
-                  <div style={{ color: colors.successText, fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>
-                    🛡️ 7-Day Money-Back Guarantee for Digital Subscriptions
+                <div style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.08)' : '#eff6ff', border: `1px solid ${isDark ? 'rgba(59, 130, 246, 0.25)' : '#bfdbfe'}`, padding: '18px 22px', borderRadius: '12px', marginBottom: '28px' }}>
+                  <div style={{ color: isDark ? '#93c5fd' : '#1d4ed8', fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>
+                    ⚡ Instant Digital Delivery &amp; Non-Refundable Subscriptions
                   </div>
-                  <div style={{ fontSize: '14px', color: colors.successSubtext, lineHeight: '1.7' }}>
-                    We want you to be completely confident using SkandX. If our platform, simulators, or analytics tools do not meet your expectations, first-time subscribers can request a <strong>100% full refund within 7 calendar days</strong> of payment. Duplicate or accidental charges are automatically refunded within 24–48 hours.
+                  <div style={{ fontSize: '14px', color: isDark ? '#cbd5e1' : '#334155', lineHeight: '1.7' }}>
+                    Every user receives an <strong>unrestricted 12-day all-access trial</strong> upon signup to evaluate all simulators, live market depth, and analytics tools prior to paying. Because digital software subscriptions provide immediate, non-revocable provisioning of proprietary real-time data and server infrastructure, <strong>all paid digital subscription plans are strictly non-refundable and all sales are final once activated</strong>. Duplicate transactions or unfulfilled bank debits are automatically reconciled and refunded within 24–48 hours.
                   </div>
                 </div>
 
@@ -949,24 +949,24 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>First-Time Subscription (Monthly / Yearly / Pro)</td>
-                        <td style={{ color: '#16a34a', fontWeight: '700' }}>7 Calendar Days</td>
-                        <td>100% full refund. No questions asked if requested within 7 days from transaction timestamp.</td>
+                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Paid Digital Subscriptions (Monthly / Yearly / Pro / Lifetime)</td>
+                        <td style={{ color: '#ef4444', fontWeight: '700' }}>Non-Refundable</td>
+                        <td>All sales are final once activated. Users receive a 12-day free all-access trial upon account creation to test and evaluate the platform before making any payment.</td>
                       </tr>
                       <tr>
-                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Automatic Renewal Debits</td>
-                        <td style={{ color: '#2563eb', fontWeight: '700' }}>48 Hours</td>
-                        <td>Full refund if reported within 48 hours of renewal debit, provided premium features were not actively utilized post-renewal.</td>
+                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Duplicate Debits / Over-Charges</td>
+                        <td style={{ color: '#16a34a', fontWeight: '700' }}>24–48 Hours</td>
+                        <td>100% full auto-reversal to the source payment method if charged more than once for a single checkout.</td>
+                      </tr>
+                      <tr>
+                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Payment Debited But Plan Not Activated</td>
+                        <td style={{ color: '#2563eb', fontWeight: '700' }}>Instant / 3–5 Business Days</td>
+                        <td>Automated reconciliation within 15 minutes, or automatic reversal by issuing bank under RBI turnaround regulations.</td>
                       </tr>
                       <tr>
                         <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Masterclass &amp; Live Coaching Cohorts</td>
                         <td style={{ color: '#d97706', fontWeight: '700' }}>Up to 48 Hours Before Batch Launch</td>
                         <td>100% full refund before the first live lecture starts. Once live sessions commence and proprietary study vaults are unlocked, fees become non-refundable.</td>
-                      </tr>
-                      <tr>
-                        <td style={{ color: colors.textPrimary, fontWeight: '600' }}>Lifetime Access License</td>
-                        <td style={{ color: '#16a34a', fontWeight: '700' }}>7 Calendar Days</td>
-                        <td>Eligible for full refund within 7 days of initial activation.</td>
                       </tr>
                     </tbody>
                   </table>
