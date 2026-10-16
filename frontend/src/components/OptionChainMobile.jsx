@@ -48,6 +48,8 @@ export default function OptionChainMobile({
   pricingPrice,
   maxPain,
   pcr,
+  maxCallOI = 1,
+  maxPutOI = 1,
   T,
   r,
   isIndex,
@@ -64,28 +66,7 @@ export default function OptionChainMobile({
   const mobileListRef = useRef(null);
   const atmRowRef = useRef(null);
 
-  // Compute maximum OI across all strikes for visual depth bars
   const prices = useStore(state => state.prices);
-
-  const { maxCallOI, maxPutOI } = useMemo(() => {
-    let maxC = 1;
-    let maxP = 1;
-    (strikes || []).forEach(s => {
-      const c = chain[s]?.CE;
-      const p = chain[s]?.PE;
-      if (c) {
-        const cData = prices[c.symbol] || (c.symbol?.includes(':') ? prices[c.symbol.split(':')[1]] : null);
-        const val = Number(cData?.oi ?? c.oi ?? 0);
-        if (val > maxC) maxC = val;
-      }
-      if (p) {
-        const pData = prices[p.symbol] || (p.symbol?.includes(':') ? prices[p.symbol.split(':')[1]] : null);
-        const val = Number(pData?.oi ?? p.oi ?? 0);
-        if (val > maxP) maxP = val;
-      }
-    });
-    return { maxCallOI: maxC, maxPutOI: maxP };
-  }, [strikes, chain, prices]);
 
   // Auto-scroll to ATM strike when loaded or expiry changes
   useEffect(() => {

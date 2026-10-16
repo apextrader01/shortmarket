@@ -422,32 +422,32 @@ const OptionChainViewInternal = () => {
     return bestStrike;
   }, [allStrikes, chain, expiry]);
 
-  // Max Call & Put OI for depth bar visualization and live PCR stats
-  const { maxCallOI, maxPutOI, pcrStats } = useStore(useShallow(state => {
+  // Max Call & Put OI for depth bar visualization and live PCR value (memoized, zero re-render loops)
+  const { maxCallOI, maxPutOI, pcr } = useMemo(() => {
     let maxC = 1;
     let maxP = 1;
     let callOi = 0;
     let putOi = 0;
-    const prices = state.prices;
+    const currentPrices = useStore.getState().prices;
     (strikes || []).forEach(s => {
       const c = chain[s]?.CE;
       const p = chain[s]?.PE;
       if (c) {
-        const cData = prices[c.symbol] || (c.symbol?.includes(':') ? prices[c.symbol.split(':')[1]] : null);
+        const cData = currentPrices[c.symbol] || (c.symbol?.includes(':') ? currentPrices[c.symbol.split(':')[1]] : null);
         const val = Number(cData?.oi ?? c.oi ?? 0);
         if (val > maxC) maxC = val;
         if (val > 0) callOi += val;
       }
       if (p) {
-        const pData = prices[p.symbol] || (p.symbol?.includes(':') ? prices[p.symbol.split(':')[1]] : null);
+        const pData = currentPrices[p.symbol] || (p.symbol?.includes(':') ? currentPrices[p.symbol.split(':')[1]] : null);
         const val = Number(pData?.oi ?? p.oi ?? 0);
         if (val > maxP) maxP = val;
         if (val > 0) putOi += val;
       }
     });
-    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
-    return { maxCallOI: maxC, maxPutOI: maxP, pcrStats: { callOi, putOi, pcr } };
-  }));
+    const computedPcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
+    return { maxCallOI: maxC, maxPutOI: maxP, pcr: computedPcr };
+  }, [strikes, chain]);
 
   const isIndex = useMemo(() => ALLOWED_INDEX_SYMBOLS.includes(symbol), [symbol]);
 
@@ -769,7 +769,9 @@ const OptionChainViewInternal = () => {
             basePrice={basePrice}
             pricingPrice={pricingPrice}
             maxPain={maxPain}
-            pcr={pcrStats.pcr}
+            pcr={pcr}
+            maxCallOI={maxCallOI}
+            maxPutOI={maxPutOI}
             T={T}
             r={r}
             isIndex={isIndex}
