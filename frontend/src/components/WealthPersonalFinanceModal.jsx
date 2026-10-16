@@ -65,7 +65,7 @@ export default function WealthPersonalFinanceModal({
     { id: 'BUDGET', label: '50/30/20 Budget & Leak Detector', shortLabel: '50/30/20 Budget', badge: 'Cashflow Audit', icon: Wallet, color: '#38bdf8' },
     { id: 'INSURANCE', label: 'Term Life & Health Gap (HLV)', shortLabel: 'Insurance (HLV)', badge: 'Actuarial Shield', icon: HeartPulse, color: '#f59e0b' },
     { id: 'TAX_LOSS', label: 'Income Tax Slabs & Capital Gains', shortLabel: 'Tax Engine (Budget)', badge: 'New vs Old & 20%/12.5%', icon: Scale, color: '#ec4899' },
-    { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', shortLabel: 'AI Copilot', badge: 'Google Gemini 3.5', icon: Sparkles, color: '#a855f7' }
+    { id: 'AI_COPILOT', label: '24/7 AI Wealth Copilot', shortLabel: 'AI Copilot', badge: 'AI-Optimized', icon: Sparkles, color: '#a855f7' }
   ];
 
   const renderActiveView = () => {
@@ -153,7 +153,7 @@ export default function WealthPersonalFinanceModal({
                 </div>
                 {!isMobile && (
                   <p style={{ margin: 0, fontSize: '11.5px', color: '#94a3b8' }}>
-                    Institutional Net Worth, 50/30/20 Cashflow Audit, Union Budget Tax Slabs & 24/7 Google Gemini Copilot
+                    Institutional Net Worth, 50/30/20 Cashflow Audit, Union Budget Tax Slabs & 24/7 AI-Optimized Copilot
                   </p>
                 )}
               </div>
@@ -1673,8 +1673,8 @@ function TaxLossHarvestingView({ isMobile, isLight }) {
 function AiWealthCopilotView({ isMobile, isLight }) {
   const INITIAL_GREETING = {
     sender: 'ai',
-    source: 'gemini-3.5-flash',
-    text: "Namaste! I am your 24/7 Personal AI Wealth & Strategy Copilot powered by Google Gemini 3.5 Flash. Ask me any Indian tax, SIP, or portfolio question — or share your age, monthly salary, and financial goal (e.g., 'Age 25, ₹20k salary, need ₹15 Lakhs in 10 years') for an exact rupee-by-rupee blueprint!"
+    source: 'AI-Optimized Engine',
+    text: "Namaste! I am your 24/7 Personal AI-Optimized Wealth & Strategy Copilot. Ask me any Indian tax, SIP, or portfolio question — or share your age, monthly salary, and financial goal (e.g., 'Age 25, ₹20k salary, need ₹15 Lakhs in 10 years') for an exact rupee-by-rupee blueprint!"
   };
 
   const [messages, setMessages] = useState([INITIAL_GREETING]);
@@ -1737,7 +1737,7 @@ function AiWealthCopilotView({ isMobile, isLight }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const reply = data.reply || "I am ready to help optimize your investments, calculate compound SIPs, and plan taxes under the latest Union Budget.";
-      setMessages(prev => [...prev, { sender: 'ai', text: reply, source: data.source || 'gemini-3.5-flash' }]);
+      setMessages(prev => [...prev, { sender: 'ai', text: reply, source: data.source || 'AI-Optimized Engine' }]);
     } catch (err) {
       console.error('Failed to query AI copilot:', err);
       setMessages(prev => [...prev, {
@@ -1772,7 +1772,7 @@ function AiWealthCopilotView({ isMobile, isLight }) {
             boxShadow: '0 0 10px #10b981'
           }} />
           <span style={{ fontSize: '12.5px', fontWeight: '800', color: isLight ? 'var(--text-primary)' : '#e2e8f0' }}>
-            Google Gemini 3.5 Flash • Quantitative Indian Wealth &amp; Tax Engine
+            AI-Optimized • Quantitative Indian Wealth &amp; Tax Engine
           </span>
         </div>
         <button
@@ -1863,7 +1863,7 @@ function AiWealthCopilotView({ isMobile, isLight }) {
             gap: '8px'
           }}>
             <Sparkles size={14} className="animate-spin" color="#c084fc" />
-            <span>Google Gemini 3.5 Flash is calculating your personalized wealth &amp; tax blueprint...</span>
+            <span>AI-Optimized Engine is calculating your personalized wealth &amp; tax blueprint...</span>
           </div>
         )}
       </div>

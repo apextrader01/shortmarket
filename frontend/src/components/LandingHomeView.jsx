@@ -618,15 +618,15 @@ export default function LandingHomeView({
       id: 6,
       hubNum: '06',
       category: 'TRADING',
-      title: 'SkandX Algo Demat & Bridge Suite',
-      shortDesc: 'Angel One SmartAPI Demat connection, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account API sync.',
+      title: 'SkandX Algo & Trading Bridge Suite',
+      shortDesc: 'Automated Trading Engine, Dedicated Mumbai BKC Static IPs, TradingView JSON Webhook Bridge & multi-account API sync.',
       icon: Cpu,
       color: '#0284c7',
       gradient: isLight ? 'linear-gradient(145deg, rgba(2, 132, 199, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(2, 132, 199, 0.22), rgba(15, 23, 42, 0.95))',
       border: isLight ? 'rgba(2, 132, 199, 0.35)' : 'rgba(56, 189, 248, 0.35)',
       badge: 'ALGO PRO',
       badgeColor: isLight ? '#0284c7' : '#38bdf8',
-      kpiLeft: { label: 'Supported Broker', value: 'Angel One SmartAPI' },
+      kpiLeft: { label: 'Execution Engine', value: 'Real Volume Matching' },
       kpiRight: { label: 'Bridge Latency', value: '<15ms Webhook' },
       tags: ['Share Demat Link', 'Demat API Keys', 'Static IPs', 'JSON Webhook Bridge', 'TradingView Alerts', 'Multi-Account Sync'],
       tagActions: {
@@ -3148,10 +3148,10 @@ export default function LandingHomeView({
               </div>
               <div style={{ background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '8px', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'}` }}>
                 <div style={{ fontWeight: '700', color: isLight ? '#0f172a' : '#f8fafc', marginBottom: '4px' }}>
-                  3. Open Broker Ecosystem (Angel One SmartAPI)
+                  3. Realistic Order Matching &amp; Institutional Volume Depth
                 </div>
                 <div>
-                  "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level."
+                  "SkandX is India's best paper trading app and web platform, featuring a proprietary real-time order matching engine with live tick pacing and realistic market volume matching. All simulated trades reflect real market liquidity depth and apply automated pre-trade risk checks, kill switches, and margin discipline with zero financial risk."
                 </div>
               </div>
             </div>
@@ -3168,7 +3168,7 @@ export default function LandingHomeView({
             fontSize: '11px'
           }}>
             <div style={{ color: isLight ? '#64748b' : '#64748b' }}>
-              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari • <a href="mailto:skandx.in@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
+              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari Krishnan I V • <a href="mailto:skandx.in@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <a href="/aboutus" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>About Us</a>

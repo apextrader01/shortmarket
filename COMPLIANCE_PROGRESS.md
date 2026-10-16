@@ -88,7 +88,7 @@ A comprehensive audit of personal data touchpoints across SkandX was conducted:
   2. Public platform footer and drawer navigation menu.
   3. `BREACH_RUNBOOK.md`.
 - **Contact Details Published:**
-  - Name: Hari (Designated Grievance Redressal Officer)
+  - Name: Hari Krishnan I V (Designated Grievance Redressal Officer)
   - Address: SkandX, Trivandrum, Kerala
   - Phone: `+919497861379`
   - Email: `skandx.in@gmail.com`
@@ -160,7 +160,7 @@ All statutory legal text implemented in `LegalView.jsx`, `Terms of Service`, and
    - Confirm legal name: *SkandX*
    - Confirm official registered office address: SkandX, Trivandrum, Kerala.
 2. **Grievance Redressal Officer Appointment:**
-   - Confirm the formal appointment of the named Grievance Redressal Officer (Hari, +919497861379, skandx.in@gmail.com).
+   - Confirm the formal appointment of the named Grievance Redressal Officer (Hari Krishnan I V, +919497861379, skandx.in@gmail.com).
 3. **PMLA vs. DPDP Erasure Retention Balance:**
    - Review the legal interaction between Section 12 of the DPDP Act (Right to Erasure) and Section 12 of PMLA, 2002 (Mandatory 8-year financial records retention). Ensure wording adequately protects the company from regulatory non-compliance when declining erasure of ledger/trading logs.
 4. **Governing Law & Arbitration Jurisdiction:**

@@ -464,7 +464,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '13px' }}>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Name:</span><br />
-                    <strong style={{ color: '#fff' }}>Hari</strong>
+                    <strong style={{ color: '#fff' }}>Hari Krishnan I V</strong>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Official Email & Phone:</span><br />
@@ -522,9 +522,9 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   </div>
                 </div>
                 <div>
-                  <strong style={{ color: '#f59e0b' }}>2.3 Open Broker Ecosystem:</strong>
+                  <strong style={{ color: '#f59e0b' }}>2.3 Realistic Order Matching &amp; Institutional Volume Depth:</strong>
                   <div style={{ color: '#d1d5db', marginTop: '4px', fontStyle: 'italic' }}>
-                    "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level."
+                    "SkandX is India's best paper trading app and web platform, featuring a proprietary real-time order matching engine with live tick pacing and realistic market volume matching. All simulated trades reflect real market liquidity depth and apply automated pre-trade risk checks, kill switches, and margin discipline with zero financial risk."
                   </div>
                 </div>
               </div>
@@ -692,7 +692,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
                 <div>🏢 <strong>Merchant & Platform:</strong> SkandX</div>
-                <div style={{ marginTop: '6px' }}>👤 <strong>Grievance & Compliance Officer:</strong> Hari</div>
+                <div style={{ marginTop: '6px' }}>👤 <strong>Grievance & Compliance Officer:</strong> Hari Krishnan I V</div>
                 <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
                 <div style={{ marginTop: '6px' }}>📞 <strong>Support Helpline:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a> (Mon–Sat, 9:00 AM – 6:00 PM IST)</div>
                 <div style={{ marginTop: '6px' }}>📍 <strong>Registered Office:</strong> SkandX, Trivandrum, Kerala, India</div>
@@ -1020,7 +1020,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 risk guardians, but traders should maintain independent stop-loss discipline.
               </p>
 
-              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#f59e0b', marginTop: '20px' }}>3. Regulatory Safeguards &amp; Open Broker Execution Model</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#f59e0b', marginTop: '20px' }}>3. Regulatory Safeguards &amp; Realistic Order Execution Model</h2>
               <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '16px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
                   <strong style={{ color: '#fff' }}>Explicit Non-Advisory Protection:</strong>
@@ -1035,9 +1035,9 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                   </p>
                 </div>
                 <div>
-                  <strong style={{ color: '#fff' }}>Open Broker Ecosystem:</strong>
+                  <strong style={{ color: '#fff' }}>Realistic Order Matching &amp; Institutional Volume Depth:</strong>
                   <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#d1d5db', fontStyle: 'italic' }}>
-                    "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level."
+                    "SkandX is India's best paper trading app and web platform, featuring a proprietary real-time order matching engine with live tick pacing and realistic market volume matching. All simulated trades reflect real market liquidity depth and apply automated pre-trade risk checks, kill switches, and margin discipline with zero financial risk."
                   </p>
                 </div>
               </div>
@@ -1100,7 +1100,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 We welcome suggestions to improve our usability. If you encounter any accessibility barrier or have questions, please reach out to our team:
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
-                <div>👤 <strong>Contact Person:</strong> Hari</div>
+                <div>👤 <strong>Contact Person:</strong> Hari Krishnan I V</div>
                 <div style={{ marginTop: '6px' }}>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
                 <div style={{ marginTop: '6px' }}>📞 <strong>Legal & Support Phone:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a></div>
                 <div style={{ marginTop: '6px' }}>🏢 <strong>Office Address:</strong> SkandX, Trivandrum, Kerala</div>
@@ -1113,7 +1113,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         {/* Footer with Grievance Contact */}
         <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '12px', lineHeight: '1.8' }}>
           <div>&copy; 2026 SkandX. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
-          <div>Grievance Redressal Officer: Hari (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>) | SkandX, Trivandrum, Kerala</div>
+          <div>Grievance Redressal Officer: Hari Krishnan I V (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>) | SkandX, Trivandrum, Kerala</div>
         </div>
 
       </div>

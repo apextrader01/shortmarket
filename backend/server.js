@@ -15882,7 +15882,7 @@ Key Knowledge & Rules:
     }
 
     if (aiResponseText) {
-      return res.json({ success: true, reply: aiResponseText, source: modelUsed || 'gemini-3.5-flash' });
+      return res.json({ success: true, reply: aiResponseText, source: 'AI-Optimized Engine' });
     }
 
     const fallbackReply = buildQuantitativeWealthReply(cleanQuery, cleanHistory);
@@ -16148,7 +16148,7 @@ Provide an honest, professional prop-firm grade audit in valid JSON format only:
                     leaks: Array.isArray(parsed.leaks) ? parsed.leaks : algorithmicFallback.leaks,
                     actionPlan: Array.isArray(parsed.actionPlan) ? parsed.actionPlan : algorithmicFallback.actionPlan
                   },
-                  source: model,
+                  source: 'AI-Optimized Engine',
                   tradeCount: totalTrades
                 });
               }

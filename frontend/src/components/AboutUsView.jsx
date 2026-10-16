@@ -25,10 +25,10 @@ export default function AboutUsView({ setActiveTab }) {
       linkLabel: 'View Terms of Service →'
     },
     {
-      title: 'Open Broker Ecosystem (Angel One SmartAPI)',
-      content: "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level.",
+      title: 'Realistic Order Matching & Institutional Volume Depth',
+      content: "SkandX is India's best paper trading app and web platform, featuring a proprietary real-time order matching engine with live tick pacing and realistic market volume matching. All simulated trades reflect real market liquidity depth and apply automated pre-trade risk checks, kill switches, and margin discipline with zero financial risk.",
       link: '/terms',
-      linkLabel: 'View Ecosystem Compliance →'
+      linkLabel: 'View Platform Compliance →'
     },
     {
       title: 'Membership Details',
@@ -130,7 +130,7 @@ export default function AboutUsView({ setActiveTab }) {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name & Phone</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                Hari • <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+919497861379</a>
+                Hari Krishnan I V • <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+919497861379</a>
               </div>
             </div>
           </div>

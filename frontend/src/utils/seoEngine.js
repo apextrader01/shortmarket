@@ -3,15 +3,15 @@
 
 export const SEO_ROUTES = {
   '/': {
-    title: 'SkandX — Free Paper Trading India, Live NSE/BSE/MCX Options Simulator & Algo Terminal (skandx.in)',
-    description: "SkandX (skandx.in) is India's #1 real-time paper trade and virtual stock market simulator for NSE, BSE & MCX. Practice Nifty 50, Bank Nifty options with Greeks, bracket orders, 10 financial calculators (SIP, Loan EMI, MTF, Brokerage), and algorithmic trading with ₹10 Lakh to ₹10 Crore risk-free demo capital.",
-    keywords: 'SkandX, skandx paper trade, skandx paper trading, skandx.in, paper trading india, virtual trading nse, sip calculator, reducing loan emi calculator, algo trading india, option chain simulator',
+    title: "SkandX — India's Best Paper Trading App & Web Platform with Real Matching Volume (skandx.in)",
+    description: "SkandX (skandx.in) is India's best paper trading app and web platform with real matching volume, realistic order execution & virtual stock market simulator for NSE, BSE & MCX. Practice Nifty 50, Bank Nifty options with Greeks, bracket orders, 10 financial calculators, and algorithmic trading with ₹10 Lakh to ₹10 Crore risk-free demo capital.",
+    keywords: 'SkandX, skandx paper trade, skandx paper trading, skandx.in, paper trading app india, best paper trading app india, real matching volume paper trading, virtual trading nse, sip calculator, algo trading india, option chain simulator',
     category: 'FinanceApplication'
   },
   '/paper-trading': {
-    title: 'SkandX Paper Trade — Free Paper Trading India, Live NSE, BSE & MCX Options Simulator | SkandX',
-    description: 'SkandX Paper Trade (skandx.in/paper-trading): Trade NSE Nifty 50, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,000 to ₹10,00,00,000 virtual capital and real-time WebSocket ticks.',
-    keywords: 'skandx paper trade, skandx paper trading, paper trading india, free option trading simulator, nifty paper trading app, virtual stock trading india, live option chain paper trade',
+    title: "SkandX Paper Trade — India's Best Paper Trading App & Web Platform with Real Matching Volume | SkandX",
+    description: "SkandX Paper Trade (skandx.in/paper-trading): India's best paper trading app and web platform with real matching volume. Trade NSE Nifty 50, BankNifty Options, Futures, Stocks & MCX Commodities risk-free with ₹10,00,00,000 virtual capital and real-time WebSocket ticks.",
+    keywords: 'skandx paper trade, skandx paper trading, india best paper trading app, paper trading web platform, real matching volume, free option trading simulator, nifty paper trading app, virtual stock trading india, live option chain paper trade',
     category: 'FinanceApplication'
   },
   '/markets': {

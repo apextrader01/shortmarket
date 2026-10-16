@@ -55,7 +55,7 @@ const TOUR_STEPS = [
     id: 'diary',
     hubNumber: '02',
     category: 'COGNITIVE PERFORMANCE',
-    title: 'Automated Trade Diary & Gemini AI Coach',
+    title: 'Automated Trade Diary & AI-Optimized Coach',
     tagline: 'Eliminate emotional trading leaks, track trade psychology, and upload chart proofs under 50 KB.',
     badge: 'AI Cognitive Audits',
     badgeColor: '#a855f7',
@@ -65,7 +65,7 @@ const TOUR_STEPS = [
     highlights: [
       {
         icon: Sparkles,
-        title: 'Gemini AI Psychological Audit',
+        title: 'AI-Optimized Psychological Audit',
         desc: 'Detect revenge trading, FOMO bias, and over-leveraging with instant personalized AI feedback.'
       },
       {

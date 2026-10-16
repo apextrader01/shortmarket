@@ -109,7 +109,7 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
 1. DATA FIDUCIARY IDENTIFIERS:
    - Organization Name: SkandX
    - Registered Office: SkandX, Trivandrum, Kerala
-   - Data Protection Officer (DPO): Hari (skandx.in@gmail.com / +919497861379)
+   - Data Protection Officer (DPO): Hari Krishnan I V (skandx.in@gmail.com / +919497861379)
 
 2. INCIDENT SUMMARY:
    - Date and Time of Incident Detection: [YYYY-MM-DD, HH:MM IST]
@@ -143,7 +143,7 @@ Subject: Formal Statutory Notification of Personal Data Incident — SkandX Tech
    - Dispatch Schedule: Commenced on [YYYY-MM-DD, HH:MM IST].
 
 7. CONTACT POINT FOR REGULATORY INQUIRIES:
-   - Contact Person: Hari (Grievance & Data Protection Officer)
+   - Contact Person: Hari Krishnan I V (Grievance & Data Protection Officer)
    - Email: skandx.in@gmail.com
    - Direct Phone: +919497861379
 

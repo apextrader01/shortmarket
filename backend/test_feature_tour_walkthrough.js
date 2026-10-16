@@ -16,7 +16,7 @@ const tourModalCode = fs.readFileSync(tourModalPath, 'utf8');
 
 assert(tourModalCode.includes('TOUR_STEPS'), 'FeatureTourModal must define TOUR_STEPS array');
 assert(tourModalCode.includes('Multi-Market Live Trading Terminal'), 'Must introduce Hub 01 Trading Terminal');
-assert(tourModalCode.includes('Automated Trade Diary & Gemini AI Coach'), 'Must introduce Hub 02 Trade Diary');
+assert(tourModalCode.includes('Automated Trade Diary & AI-Optimized Coach'), 'Must introduce Hub 02 Trade Diary');
 assert(tourModalCode.includes('SkandX Algo & Multi-Broker Bridge'), 'Must introduce Hub 03 Algo Bridge');
 assert(tourModalCode.includes('15+ Institutional Financial Engines'), 'Must introduce Hub 04 Financial Calculators');
 assert(tourModalCode.includes('Wealth OS & Union Budget 2025 Tax Hub'), 'Must introduce Hub 05 Wealth OS');

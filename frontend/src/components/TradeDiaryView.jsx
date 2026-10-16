@@ -2285,7 +2285,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         try {
           localStorage.setItem('shortedge_trade_ai_audit_cache', JSON.stringify(newAudit));
         } catch (_) {}
-        const modelLabel = data.source ? data.source.replace(/gemini-/g, 'Gemini ').replace(/-/g, ' ') : 'Gemini Flash';
+        const modelLabel = data.source ? data.source.replace(/gemini-[a-z0-9.-]+/gi, 'AI-Optimized Engine').replace(/-/g, ' ') : 'AI-Optimized Engine';
         setAiToast(`✓ AI Audit generated successfully using ${modelLabel}!`);
       } else {
         setAiToast('⚠️ Could not complete AI audit. Please verify trade records.');
@@ -7072,7 +7072,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <span style={{ fontSize: '11px', color: colors.textMuted }}>Dataset: {tradesAnalyzedCount} Verified Trade Logs</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle size={14} /> Audit Engine: {aiAuditData.source ? aiAuditData.source.replace(/gemini-/g, 'Gemini ').replace(/-/g, ' ') : 'Gemini Flash'}
+                      <CheckCircle size={14} /> Audit Engine: {aiAuditData.source ? aiAuditData.source.replace(/gemini-[a-z0-9.-]+/gi, 'AI-Optimized Engine').replace(/-/g, ' ') : 'AI-Optimized Engine'}
                     </div>
                   </div>
 
