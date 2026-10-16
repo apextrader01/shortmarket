@@ -2174,3 +2174,15 @@ select option {
 .light-theme .skx-calculators-suite table tr:hover td {
   background: #e2e8f0 !important;
 }
+
+/* Accessibility Mode Enhanced Focus & Contrast */
+html.accessibility-mode *:focus-visible {
+  outline: 3px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+}
+
+html.accessibility-mode button,
+html.accessibility-mode input,
+html.accessibility-mode select {
+  min-height: 38px;
+}

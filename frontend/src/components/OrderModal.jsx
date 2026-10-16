@@ -1,14 +1,14 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API, isIndexContract } from '../store';
-import { X, Maximize2, FileText, ShoppingBag, AlertTriangle, Lock } from 'lucide-react';
+import { X, Maximize2, FileText, ShoppingBag, AlertTriangle, Lock, ShieldCheck } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract, isCommodityContract, getAssetSubsegment, setContractLotsize } from '../utils/lotsizeHelper';
 import { getFreezeLimit, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions, oneClickMode } = useStore(useShallow(state => ({ 
     orderModal: state.orderModal, 
     closeOrderModal: state.closeOrderModal, 
     user: state.user, 
@@ -16,10 +16,11 @@ export default function OrderModal() {
     restrictedStocks: state.restrictedStocks, 
     openMarketDepthModal: state.openMarketDepthModal, 
     marketDepthModal: state.marketDepthModal, 
-    marketStatus: state.marketStatus,
+    marketStatus: state.marketStatus, 
     marketCalendar: state.marketCalendar,
     holdings: state.holdings,
-    positions: state.positions
+    positions: state.positions,
+    oneClickMode: state.oneClickMode
   })));
   const rawModalSymbol = orderModal?.symbol;
   const livePriceData = useStore(state => {
@@ -52,6 +53,7 @@ export default function OrderModal() {
   const [tgtPrice, setTgtPrice] = useState('');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
   const [showIntradayBlockedPopup, setShowIntradayBlockedPopup] = useState(false);
+  const [showReconfirmPreview, setShowReconfirmPreview] = useState(false);
   
   // Tax estimates
   const [estimatedTaxes, setEstimatedTaxes] = useState(null);
@@ -84,6 +86,7 @@ export default function OrderModal() {
   // Initialize modal state when it opens
   useEffect(() => {
     if (orderModal.isOpen) {
+      setShowReconfirmPreview(false);
       setValidationError(null);
       setSide(orderModal.type);
       const isIdx = isIndexContract(orderModal.symbol);
@@ -653,7 +656,7 @@ export default function OrderModal() {
     }
   }, [orderModal.isOpen, orderModal.variety]);
 
-  const handlePlaceOrder = async (bypassCaution = false) => {
+  const handlePlaceOrder = async (bypassCaution = false, bypassReconfirm = false) => {
     const failValidation = (msg) => {
       setValidationError(msg);
       useStore.getState().showToast(msg, 'warning', 'Validation Error');
@@ -822,6 +825,12 @@ export default function OrderModal() {
       is_exit: Boolean(isTrueExit),
       remarks: isTrueExit ? (isDelSellFromHoldings ? 'Exit Holding' : 'Exit Position') : undefined
     };
+
+    // Re-Confirm Order (Order Preview) check
+    if (!oneClickMode && !bypassReconfirm) {
+      setShowReconfirmPreview(true);
+      return;
+    }
 
     try {
       setIsPlacing(true);
@@ -1889,6 +1898,74 @@ export default function OrderModal() {
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                      *Actual charges may vary based on order execution. <span style={{ color: 'var(--color-blue)', cursor: 'pointer' }}>Learn more</span>
                   </div>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* Re-Confirm Order Preview Modal */}
+      {showReconfirmPreview && (
+         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40, padding: '16px' }}>
+            <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <ShieldCheck size={20} color="var(--color-blue)" />
+                     <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Order Preview &amp; Confirmation</h3>
+                  </div>
+                  <X size={18} onClick={() => setShowReconfirmPreview(false)} style={{ color: 'var(--text-secondary)', cursor: 'pointer' }} />
+               </div>
+               
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Instrument</span>
+                     <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{symbol}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Action / Side</span>
+                     <span style={{ fontWeight: '800', color: side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', background: side === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', padding: '2px 8px', borderRadius: '4px' }}>{side}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Quantity</span>
+                     <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {effectiveQuantity.toLocaleString('en-IN')} {orderModal.lotsize > 1 ? `(${Math.round(effectiveQuantity / orderModal.lotsize)} Lots)` : 'Shares'}
+                     </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Order Type</span>
+                     <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {orderType} {orderType !== 'MARKET' ? `@ ₹${parseFloat(price).toFixed(2)}` : `(LTP: ₹${livePrice.toFixed(2)})`}
+                     </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Product</span>
+                     <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {isBO ? 'Bracket Order (BO)' : isCO ? 'Cover Order (CO)' : productType === 'INT' ? 'Intraday (MIS)' : 'Delivery (CNC)'}
+                     </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                     <span style={{ color: 'var(--text-secondary)' }}>Estimated Margin</span>
+                     <span style={{ fontWeight: '800', color: 'var(--color-blue-light)' }}>
+                        ₹{Number(requiredMargin || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                     </span>
+                  </div>
+               </div>
+
+               <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                     type="button"
+                     onClick={() => setShowReconfirmPreview(false)} 
+                     style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                     Modify
+                  </button>
+                  <button 
+                     type="button"
+                     disabled={isPlacing}
+                     onClick={() => { setShowReconfirmPreview(false); handlePlaceOrder(false, true); }} 
+                     style={{ flex: 1.5, padding: '10px', borderRadius: '6px', border: 'none', background: side === 'BUY' ? 'var(--color-green)' : 'var(--color-red)', color: '#fff', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
+                  >
+                     {isPlacing ? 'Placing...' : 'Confirm & Place Order'}
+                  </button>
                </div>
             </div>
          </div>

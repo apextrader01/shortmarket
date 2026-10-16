@@ -299,7 +299,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, isAdModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, isAdModalOpen: state.isAdModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, isAdModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications, accessibilityMode } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, isAdModalOpen: state.isAdModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications, accessibilityMode: state.accessibilityMode })));
 
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
@@ -1135,11 +1135,22 @@ function App() {
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Accessibility Mode DOM Attribute
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('accessibility-mode', Boolean(accessibilityMode));
+      document.documentElement.setAttribute('data-accessibility-mode', accessibilityMode ? 'true' : 'false');
+    }
+  }, [accessibilityMode]);
+
   // Global Hotkey Engine (Shift+B, Shift+S)
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't trigger if user is typing in an input or textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // Disable all shortcuts when Accessibility Mode is active
+      if (accessibilityMode) return;
 
       if (e.shiftKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
@@ -1158,7 +1169,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSymbol]);
+  }, [selectedSymbol, accessibilityMode]);
 
   // ── Guard: show login screen when not authenticated ──────────────────────────
   
