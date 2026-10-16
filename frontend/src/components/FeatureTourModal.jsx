@@ -102,7 +102,7 @@ const TOUR_STEPS = [
       {
         icon: Zap,
         title: 'Multi-Broker Demat Integration',
-        desc: 'Connect Fyers, Angel One, Zerodha, Dhan, and Upstox with one-click token authorization.'
+        desc: 'Connect your preferred Demat accounts and API bridges with one-click token authorization.'
       },
       {
         icon: Cpu,
@@ -117,7 +117,7 @@ const TOUR_STEPS = [
     ],
     preview: {
       type: 'algo',
-      brokers: ['Fyers', 'Angel One', 'Dhan', 'Zerodha'],
+      brokers: ['TradingView Webhooks', 'API Bridge', 'Multi-Demat Sync', 'Strategy Engine'],
       status: 'Ready for Webhook Routing · 0.08ms Execution'
     },
     hubKey: 'Algo'

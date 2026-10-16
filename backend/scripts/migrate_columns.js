@@ -212,12 +212,38 @@ async function runMigration() {
       'ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_orders BOOLEAN DEFAULT TRUE',
       'ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_targets BOOLEAN DEFAULT TRUE',
       'ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_stoploss BOOLEAN DEFAULT TRUE',
-      'ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_risk BOOLEAN DEFAULT TRUE'
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_risk BOOLEAN DEFAULT TRUE',
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS default_landing_tab VARCHAR(50) DEFAULT \'Home\''
     ];
     for (const sql of userColumns) {
       await db.raw(sql);
     }
     console.log('  ✅ users table columns verified');
+
+    // 5b. User profiles table and default_landing_tab
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        dob VARCHAR(50),
+        gender VARCHAR(50),
+        state VARCHAR(100),
+        city VARCHAR(100),
+        occupation VARCHAR(100),
+        annual_income VARCHAR(100),
+        financial_goal VARCHAR(100),
+        trading_experience VARCHAR(100),
+        preferred_segment VARCHAR(100),
+        trading_style VARCHAR(100),
+        primary_strategy VARCHAR(100),
+        hear_about_us VARCHAR(100),
+        default_landing_tab VARCHAR(50) DEFAULT 'Home',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS default_landing_tab VARCHAR(50) DEFAULT 'Home'`).catch(() => {});
+    console.log('  ✅ user_profiles table and default_landing_tab verified');
 
     // 6. Drop restrictive legacy check constraints
     await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check').catch(() => {});
@@ -339,6 +365,10 @@ async function runMigration() {
       }
     } catch (e) {
       console.warn('  ⚠️ Trusted devices 60-day migration notice:', e.message);
+    }
+
+    if (typeof db.ensureCriticalColumns === 'function') {
+      await db.ensureCriticalColumns().catch((e) => console.warn('  ⚠️ ensureCriticalColumns fallback note:', e.message));
     }
 
     console.log('\n🎉 ALL DATABASE MIGRATIONS APPLIED SUCCESSFULLY!');

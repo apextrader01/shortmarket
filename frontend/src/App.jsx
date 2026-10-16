@@ -482,12 +482,25 @@ function App() {
   }, [activeTab, user?.id]);
 
   const userRef = useRef(user);
+  const prevUserIdRef = useRef(null);
   useEffect(() => {
     userRef.current = user;
     if (user?.default_landing_tab && typeof window !== 'undefined') {
       try {
         localStorage.setItem('skandx_default_landing', user.default_landing_tab);
       } catch (_) {}
+    }
+    if (user?.id && prevUserIdRef.current !== user.id) {
+      prevUserIdRef.current = user.id;
+      const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
+      if (!rawPath || rawPath === 'home') {
+        const preferredLanding = user.default_landing_tab || localStorage.getItem('skandx_default_landing') || 'Home';
+        if (preferredLanding === 'Markets') {
+          setActiveTab('Markets');
+        }
+      }
+    } else if (!user) {
+      prevUserIdRef.current = null;
     }
   }, [user]);
 
@@ -1200,7 +1213,7 @@ function App() {
       Home: 'SkandX | Next-Gen Paper Trading & Wealth Operating System',
       Calculators: 'Financial Calculators Suite & Amortization Terminal | SkandX',
       WealthOS: 'Wealth OS & Tax Hub — Net Worth, ITR Tax Saving & FIRE Planner | SkandX',
-      Algo: 'SkandX Algo Trading Bridge — TradingView Webhook to Angel One SmartAPI | SkandX',
+      Algo: 'SkandX Algo Trading Bridge — TradingView Webhook & Multi-Broker Bridge | SkandX',
       Markets: 'Live Markets & Paper Trading | SkandX',
       PrimaryMarkets: 'Primary Markets, Bhavcopy & IPO Hub | SkandX',
       Orders: 'Order Book & Executions | SkandX',

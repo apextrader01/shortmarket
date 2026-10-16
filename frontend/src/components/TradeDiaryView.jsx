@@ -2246,7 +2246,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     return 'Just now';
   });
 
-  // Trigger Dynamic AI Analysis (Powered by Gemini Flash-Lite + Algorithmic Engine)
+  // Trigger Dynamic AI Analysis (Powered by AI-Optimized Engine)
   const handleRunAiAnalysis = async () => {
     if (aiGenerating) return;
     setAiGenerating(true);
@@ -2324,7 +2324,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     setTimeout(() => setAiToast(null), 3500);
   };
 
-  // Ask AI Coach Question (Powered by Live Gemini 3.8 Flash Backend)
+  // Ask AI Coach Question (Powered by Live AI-Optimized Engine Backend)
   const handleAskAiCoach = async (e) => {
     if (e) e.preventDefault();
     if (!aiCustomQuestion.trim()) return;

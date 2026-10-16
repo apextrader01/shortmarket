@@ -100,7 +100,7 @@ export const SEO_ROUTES = {
   },
   '/algo-trading': {
     title: 'Algo Trading India — TradingView Webhook Bridge & Multi-Broker Execution | SkandX',
-    description: 'Connect Zerodha, Fyers, AngelOne, Dhan & Upstox with TradingView alerts, static IP compliance, and 1-click algorithmic strategy templates.',
+    description: 'Connect your broker Demat accounts with TradingView alerts, static IP compliance, and 1-click algorithmic strategy templates.',
     keywords: 'algo trading india, tradingview to broker bridge, automated option trading india, static ip algo trading',
     category: 'FinanceApplication'
   },

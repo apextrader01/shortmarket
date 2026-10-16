@@ -1,5 +1,5 @@
 // frontend/src/components/WealthPersonalFinanceModal.jsx
-// 💰 HUB 04: Institutional Wealth OS, 50/30/20 Cashflow Audit, Actuarial HLV Protection, FY25/26 Income Tax Slabs & 24/7 Gemini AI Wealth Copilot
+// 💰 HUB 04: Institutional Wealth OS, 50/30/20 Cashflow Audit, Actuarial HLV Protection, FY25/26 Income Tax Slabs & 24/7 AI-Optimized Wealth Copilot
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { API, useStore } from '../store';
@@ -1668,7 +1668,7 @@ function TaxLossHarvestingView({ isMobile, isLight }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 5. 24/7 AI WEALTH & TAX COPILOT (POWERED BY GOOGLE GEMINI 3.5 FLASH)
+// 5. 24/7 AI WEALTH & TAX COPILOT (POWERED BY AI-OPTIMIZED ENGINE)
 // ══════════════════════════════════════════════════════════════════════════════
 function AiWealthCopilotView({ isMobile, isLight }) {
   const INITIAL_GREETING = {
