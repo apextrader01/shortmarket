@@ -685,10 +685,11 @@ export default function PricingView({ setActiveTab }) {
             <span style={{ color: '#10b981' }}>🛡️ 7-Day Money-Back Guarantee</span>
           </div>
           <div>
-            All transactions are processed securely via RBI-compliant payment gateways (Cashfree Payments). Digital subscriptions are covered under our <a href="/refund-policy" style={{ color: '#10b981', textDecoration: 'underline', fontWeight: '600' }}>Cancellation & Refund Policy</a> and <a href="/terms" style={{ color: '#38bdf8', textDecoration: 'underline' }}>Terms of Service</a>.
+            All transactions are processed securely via RBI-authorized payment partners (Cashfree Payments). Digital subscriptions are fulfilled immediately upon payment and governed by our <a href="/refund-policy" style={{ color: '#10b981', textDecoration: 'underline', fontWeight: '600' }}>Cancellation &amp; Refund Policy</a>, <a href="/shipping-policy" style={{ color: '#10b981', textDecoration: 'underline' }}>Shipping &amp; Delivery Policy</a>, and <a href="/terms" style={{ color: '#38bdf8', textDecoration: 'underline' }}>Terms of Service</a>.
           </div>
-          <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary, #64748b)' }}>
-            Need help with billing or plan selection? Contact Support: <a href="mailto:skandx.in@gmail.com" style={{ color: 'var(--text-primary, #e2e8f0)' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8' }}>+919497861379</a> (SkandX, Trivandrum, Kerala)
+          <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary, #64748b)', lineHeight: '1.6' }}>
+            SkandX • Legal Entity: Sole Proprietor <strong>HARI KRISHNAN I VIJAYAN</strong>, Trivandrum, Kerala - 695001, India<br />
+            Official: <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981' }}>h4harikrishnan2015@gmail.com</a> • Support: <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> • Helpline: <a href="tel:+917306587969" style={{ color: '#38bdf8' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8' }}>+91 9497861379</a>
           </div>
         </div>
       </div>

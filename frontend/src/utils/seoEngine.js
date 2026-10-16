@@ -360,14 +360,16 @@ export function applyDynamicSEO(pathname = '/') {
         publisher: {
           '@type': 'Organization',
           name: 'SkandX',
+          legalName: 'HARI KRISHNAN I VIJAYAN',
           url: 'https://skandx.in',
-          email: 'skandx.in@gmail.com',
-          telephone: '+919497861379',
+          email: 'h4harikrishnan2015@gmail.com',
+          telephone: '+917306587969',
           address: {
             '@type': 'PostalAddress',
             streetAddress: 'SkandX',
             addressLocality: 'Trivandrum',
             addressRegion: 'Kerala',
+            postalCode: '695001',
             addressCountry: 'IN'
           }
         }

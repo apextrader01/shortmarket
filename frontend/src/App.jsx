@@ -447,7 +447,7 @@ function App() {
       'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
-      'aboutus': 'AboutUs', 'about': 'AboutUs'
+      'aboutus': 'AboutUs', 'about': 'AboutUs', 'about-us': 'AboutUs'
     };
     return tabsMap[rawPath.toLowerCase()] || tabsMap[firstSeg] || 'Home';
   });
@@ -900,7 +900,7 @@ function App() {
         'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'profile': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
-        'aboutus': 'AboutUs', 'about': 'AboutUs'
+        'aboutus': 'AboutUs', 'about': 'AboutUs', 'about-us': 'AboutUs'
       };
       setActiveTab(tabsMap[rawPath.toLowerCase()] || tabsMap[firstSeg] || 'Home');
     };
@@ -1295,7 +1295,7 @@ function App() {
     );
   }
 
-  if ((cleanFirstSegment === 'aboutus' || cleanFirstSegment === 'about') && !user) {
+  if ((cleanFirstSegment === 'aboutus' || cleanFirstSegment === 'about' || cleanFirstSegment === 'about-us') && !user) {
     return (
       <Suspense fallback={<TabLoader />}>
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
