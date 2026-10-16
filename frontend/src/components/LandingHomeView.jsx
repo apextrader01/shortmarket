@@ -3167,15 +3167,17 @@ export default function LandingHomeView({
             borderTop: `1px solid ${t.border}`,
             fontSize: '11px'
           }}>
-            <div style={{ color: isLight ? '#64748b' : '#64748b' }}>
-              &copy; {new Date().getFullYear()} SkandX, Trivandrum, Kerala • Hari Krishnan I V • <a href="mailto:skandx.in@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • <a href="tel:+919497861379" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+919497861379</a>
+            <div style={{ color: isLight ? '#64748b' : '#64748b', lineHeight: '1.6' }}>
+              &copy; {new Date().getFullYear()} SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN), Trivandrum, Kerala • Official: <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a> / <a href="mailto:skandx.in@gmail.com" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>skandx.in@gmail.com</a> • Helpline: <a href="tel:+917306587969" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: isLight ? '#0284c7' : '#38bdf8', textDecoration: 'none' }}>+91 9497861379</a>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <a href="/aboutus" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>About Us</a>
+              <a href="/contact" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Contact Us</a>
               <a href="/pricing" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Pricing</a>
               <a href="/privacy-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
               <a href="/terms" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
               <a href="/refund-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Cancellation & Refund Policy</a>
+              <a href="/shipping-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Shipping & Delivery</a>
               <a href="/risk-policy" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Risk Disclosure</a>
               <a href="/data-rights" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Data Rights (DPDP)</a>
               <a href="/accessibility" style={{ color: isLight ? '#475569' : '#94a3b8', textDecoration: 'none' }}>Accessibility</a>

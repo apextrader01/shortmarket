@@ -230,6 +230,30 @@ export const SEO_ROUTES = {
     keywords: 'skandx refund policy, skandx cancellation policy, subscription refund skandx, money back guarantee',
     category: 'FinanceApplication'
   },
+  '/shipping-policy': {
+    title: 'Shipping & Delivery Policy (Digital Services) | SkandX',
+    description: 'Shipping and Delivery Policy for SkandX cloud software, educational market tools, and digital subscription provisioning fulfilled instantly online.',
+    keywords: 'skandx shipping policy, skandx delivery policy, digital service fulfillment, instant access provisioning',
+    category: 'FinanceApplication'
+  },
+  '/delivery-policy': {
+    title: 'Shipping & Delivery Policy (Digital Services) | SkandX',
+    description: 'Shipping and Delivery Policy for SkandX cloud software, educational market tools, and digital subscription provisioning fulfilled instantly online.',
+    keywords: 'skandx shipping policy, skandx delivery policy, digital service fulfillment, instant access provisioning',
+    category: 'FinanceApplication'
+  },
+  '/contact': {
+    title: 'Contact Us & Corporate Identification | SkandX',
+    description: 'Contact details, official helpline, registered address, and corporate identity of SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN).',
+    keywords: 'contact skandx, skandx support, skandx phone number, skandx email, corporate address',
+    category: 'FinanceApplication'
+  },
+  '/contact-us': {
+    title: 'Contact Us & Corporate Identification | SkandX',
+    description: 'Contact details, official helpline, registered address, and corporate identity of SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN).',
+    keywords: 'contact skandx, skandx support, skandx phone number, skandx email, corporate address',
+    category: 'FinanceApplication'
+  },
   '/risk-policy': {
     title: 'Risk Disclosure Document — SEBI & Derivative Risk Warning | SkandX',
     description: 'Mandatory Risk Disclosure Document for Equity, Futures & Options derivative simulation and algorithmic trading tools on SkandX.',

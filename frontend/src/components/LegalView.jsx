@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldCheck, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp, RotateCcw } from 'lucide-react';
+import { Shield, ShieldCheck, FileText, Trash2, AlertTriangle, ArrowLeft, CheckCircle2, UserCheck, Download, ArrowUp, RotateCcw, Truck, PhoneCall, Mail, MapPin } from 'lucide-react';
 import { useStore } from '../store';
 
 export default function LegalView({ initialTab = 'privacy', onBack }) {
@@ -19,6 +19,8 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         'privacy': '/privacy-policy',
         'terms': '/terms',
         'refund': '/refund-policy',
+        'shipping': '/shipping-policy',
+        'contact': '/contact',
         'data-rights': '/data-rights',
         'delete-account': '/delete-account',
         'risk': '/risk-policy',
@@ -28,6 +30,8 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         'privacy': 'Privacy Policy | SkandX',
         'terms': 'Terms of Service | SkandX',
         'refund': 'Cancellation & Refund Policy | SkandX',
+        'shipping': 'Shipping & Delivery Policy (Digital Services) | SkandX',
+        'contact': 'Contact Us & Corporate Identification | SkandX',
         'data-rights': 'Data Principal Rights Portal (DPDP Act) | SkandX',
         'delete-account': 'Request Account Deletion & Data Purge | SkandX',
         'risk': 'Risk Disclosure Document | SkandX',
@@ -258,6 +262,48 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
           </button>
 
           <button
+            onClick={() => handleSelectTab('shipping')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              backgroundColor: activeTab === 'shipping' ? '#10b981' : '#111827',
+              color: activeTab === 'shipping' ? '#000' : '#9ca3af',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Truck size={16} /> Shipping &amp; Delivery
+          </button>
+
+          <button
+            onClick={() => handleSelectTab('contact')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              backgroundColor: activeTab === 'contact' ? '#10b981' : '#111827',
+              color: activeTab === 'contact' ? '#000' : '#9ca3af',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <PhoneCall size={16} /> Contact Us
+          </button>
+
+          <button
             onClick={() => handleSelectTab('data-rights')}
             style={{
               display: 'flex',
@@ -463,18 +509,24 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '13px' }}>
                   <div>
-                    <span style={{ color: '#9ca3af' }}>Name:</span><br />
-                    <strong style={{ color: '#fff' }}>Hari Krishnan I V</strong>
+                    <span style={{ color: '#9ca3af' }}>Legal Entity / Proprietor:</span><br />
+                    <strong style={{ color: '#fff' }}>HARI KRISHNAN I VIJAYAN</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#9ca3af' }}>Official Email & Phone:</span><br />
-                    <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>skandx.in@gmail.com</a>
+                    <span style={{ color: '#9ca3af' }}>Official &amp; Support Email:</span><br />
+                    <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>h4harikrishnan2015@gmail.com</a>
                     <span style={{ color: '#6b7280' }}> • </span>
-                    <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>+919497861379</a>
+                    <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>skandx.in@gmail.com</a>
+                  </div>
+                  <div>
+                    <span style={{ color: '#9ca3af' }}>Helpline Phone:</span><br />
+                    <a href="tel:+917306587969" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>+91 7306587969</a>
+                    <span style={{ color: '#6b7280' }}> • </span>
+                    <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>+91 9497861379</a>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Office Address:</span><br />
-                    <span style={{ color: '#fff' }}>SkandX, Trivandrum, Kerala</span>
+                    <span style={{ color: '#fff' }}>SkandX, Trivandrum, Kerala - 695001, India</span>
                   </div>
                   <div>
                     <span style={{ color: '#9ca3af' }}>Statutory Response SLA:</span><br />
@@ -498,9 +550,9 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 Effective Date: October 1, 2026 | Last Updated: October 2026
               </p>
 
-              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>1. Acceptance of Terms</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>1. Acceptance of Terms &amp; Corporate Identification</h2>
               <p>
-                By accessing or using the SkandX website (https://skandx.in), our mobile applications, or software tools, you agree to be bound by these Terms of Service. If you do not agree to these terms in full, you must discontinue platform use immediately.
+                By accessing or using the SkandX website (https://skandx.in), our mobile applications, or software tools, you agree to be bound by these Terms of Service. SkandX is owned and operated by Sole Proprietor <strong>HARI KRISHNAN I VIJAYAN</strong>, having its principal registered office at SkandX, Trivandrum, Kerala - 695001, India (Official Email: <strong>h4harikrishnan2015@gmail.com</strong>, Helpline: <strong>+91 7306587969</strong> / <strong>+91 9497861379</strong>). If you do not agree to these terms in full, you must discontinue platform use immediately.
               </p>
 
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>2. Platform Nature, Regulatory Safeguards &amp; Non-Advisory Disclaimer</h2>
@@ -691,11 +743,11 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 For questions regarding billing, charge reconciliations, or cancellation assistance:
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
-                <div>🏢 <strong>Merchant & Platform:</strong> SkandX</div>
-                <div style={{ marginTop: '6px' }}>👤 <strong>Grievance & Compliance Officer:</strong> Hari Krishnan I V</div>
-                <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
-                <div style={{ marginTop: '6px' }}>📞 <strong>Support Helpline:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a> (Mon–Sat, 9:00 AM – 6:00 PM IST)</div>
-                <div style={{ marginTop: '6px' }}>📍 <strong>Registered Office:</strong> SkandX, Trivandrum, Kerala, India</div>
+                <div>🏢 <strong>Merchant &amp; Legal Entity:</strong> SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN)</div>
+                <div style={{ marginTop: '6px' }}>👤 <strong>Grievance &amp; Compliance Officer:</strong> HARI KRISHNAN I VIJAYAN</div>
+                <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a> (Support: <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a>)</div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Support Helpline:</strong> <a href="tel:+917306587969" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 9497861379</a> (Mon–Sat, 9:00 AM – 6:00 PM IST)</div>
+                <div style={{ marginTop: '6px' }}>📍 <strong>Registered Office:</strong> SkandX, Trivandrum, Kerala - 695001, India</div>
               </div>
             </div>
           )}
@@ -1100,10 +1152,135 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
                 We welcome suggestions to improve our usability. If you encounter any accessibility barrier or have questions, please reach out to our team:
               </p>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
-                <div>👤 <strong>Contact Person:</strong> Hari Krishnan I V</div>
-                <div style={{ marginTop: '6px' }}>📧 <strong>Accessibility Inquiries:</strong> <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a></div>
-                <div style={{ marginTop: '6px' }}>📞 <strong>Legal & Support Phone:</strong> <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a></div>
-                <div style={{ marginTop: '6px' }}>🏢 <strong>Office Address:</strong> SkandX, Trivandrum, Kerala</div>
+                <div>🏢 <strong>Legal Entity:</strong> SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN)</div>
+                <div style={{ marginTop: '6px' }}>👤 <strong>Contact Person:</strong> HARI KRISHNAN I VIJAYAN</div>
+                <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a> (cc: <a href="mailto:skandx.in@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none' }}>skandx.in@gmail.com</a>)</div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Legal &amp; Support Phone:</strong> <a href="tel:+917306587969" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 9497861379</a></div>
+                <div style={{ marginTop: '6px' }}>🏢 <strong>Office Address:</strong> SkandX, Trivandrum, Kerala - 695001, India</div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: SHIPPING & DELIVERY POLICY (DIGITAL SERVICES) */}
+          {activeTab === 'shipping' && (
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
+                Shipping &amp; Delivery Policy (Digital Services &amp; Fulfillment)
+              </h1>
+              <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '24px' }}>
+                Effective Date: October 1, 2026 | Last Updated: October 2026
+              </p>
+
+              <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+                <strong style={{ color: '#10b981' }}>⚡ 100% Instant Electronic Service Delivery:</strong>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#d1d5db', lineHeight: '1.6' }}>
+                  SkandX operates strictly as a cloud-hosted software-as-a-service (SaaS) and educational virtual paper trading simulation platform. Since all products and services offered on <a href="https://skandx.in" style={{ color: '#10b981' }}>https://skandx.in</a> are purely digital, <strong>no physical shipping, packaging, or courier handling is required</strong>.
+                </p>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>1. Digital Fulfillment &amp; Provisioning Process</h2>
+              <p>
+                All digital subscription plans, algorithmic terminal credits, and virtual paper trading demo margin allocations are fulfilled electronically:
+              </p>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px', lineHeight: '1.8', color: '#d1d5db' }}>
+                <li><strong>Instant Activation:</strong> Upon successful transaction authorization by our payment gateway partner (Cashfree Payments India Pvt. Ltd.), your account is provisioned instantly within <strong>1 to 5 seconds</strong>.</li>
+                <li><strong>Electronic Confirmation:</strong> An automated confirmation receipt containing the transaction reference ID, billing details, and subscription validity is immediately dispatched to your registered email address.</li>
+                <li><strong>Direct In-App Delivery:</strong> Premium features, PRO calculators, and paper trading margin allowances become active immediately inside your dashboard without any manual intervention.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>2. Shipping &amp; Handling Charges</h2>
+              <p>
+                Because delivery is executed entirely over secure electronic networks via the internet:
+              </p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '16px', marginTop: '10px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>₹0.00 Shipping Fees (Free Delivery)</div>
+                <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#d1d5db' }}>
+                  Zero (₹0) courier, freight, handling, or dispatch charges apply to any digital plan or product available on SkandX. The price displayed on the checkout page is the final all-inclusive price.
+                </p>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>3. Delivery Delays &amp; Technical Support SLA</h2>
+              <p>
+                In rare events where upstream banking network latency delays the instant Cashfree payment webhook confirmation:
+              </p>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px', lineHeight: '1.8', color: '#d1d5db' }}>
+                <li>Please allow up to <strong>15 minutes</strong> for automated bank reconciliation and server-side verification.</li>
+                <li>If your account is not upgraded within 15 minutes, please contact our support team with your Cashfree Payment Reference ID or Bank UTR.</li>
+                <li>Our engineering desk will manually reconcile and provision your digital access within <strong>2 to 4 hours</strong> of ticket submission.</li>
+              </ul>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '24px' }}>4. Corporate &amp; Delivery Support Contact</h2>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
+                <div>🏢 <strong>Merchant &amp; Legal Entity:</strong> SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN)</div>
+                <div style={{ marginTop: '6px' }}>👤 <strong>Fulfillment &amp; Compliance Officer:</strong> HARI KRISHNAN I VIJAYAN</div>
+                <div style={{ marginTop: '6px' }}>📧 <strong>Official Email:</strong> <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a> (Support: <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', textDecoration: 'none' }}>skandx.in@gmail.com</a>)</div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Support Helpline:</strong> <a href="tel:+917306587969" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 9497861379</a> (Mon–Sat, 9:00 AM – 6:00 PM IST)</div>
+                <div style={{ marginTop: '6px' }}>📍 <strong>Registered Office:</strong> SkandX, Trivandrum, Kerala - 695001, India</div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: CONTACT US & CORPORATE DETAILS */}
+          {activeTab === 'contact' && (
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
+                Contact Us &amp; Corporate Identification
+              </h1>
+              <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '24px' }}>
+                Official Merchant Identity &amp; Statutory Support Directory
+              </p>
+
+              <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+                <strong style={{ color: '#38bdf8' }}>🏢 Registered Sole Proprietorship:</strong>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#d1d5db', lineHeight: '1.6' }}>
+                  SkandX is owned and managed by <strong>HARI KRISHNAN I VIJAYAN</strong> as an individual sole proprietorship operating educational market simulation technology and financial calculator software across India.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
+                    <Mail size={18} /> Official Email Inquiries
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '4px' }}>Primary Merchant Email:</div>
+                  <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#fff', fontWeight: '600', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '10px', marginBottom: '4px' }}>Customer Support Desk:</div>
+                  <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981', fontWeight: '600', textDecoration: 'none' }}>skandx.in@gmail.com</a>
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
+                    <PhoneCall size={18} /> Phone Helpline &amp; WhatsApp
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '4px' }}>Direct KYC &amp; Onboarding Phone:</div>
+                  <a href="tel:+917306587969" style={{ color: '#fff', fontWeight: '600', textDecoration: 'none' }}>+91 7306587969</a>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '10px', marginBottom: '4px' }}>Customer Support Helpline:</div>
+                  <a href="tel:+919497861379" style={{ color: '#38bdf8', fontWeight: '600', textDecoration: 'none' }}>+91 9497861379</a>
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
+                    <MapPin size={18} /> Registered Office
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '4px' }}>Physical Address:</div>
+                  <div style={{ fontSize: '13.5px', color: '#fff', fontWeight: '600', lineHeight: '1.5' }}>
+                    SkandX, Trivandrum, Kerala - 695001, India
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
+                    Operational Hours: Monday to Saturday, 9:00 AM – 6:00 PM IST
+                  </div>
+                </div>
+              </div>
+
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', marginTop: '20px' }}>Statutory Grievance Redressal Mechanism</h2>
+              <p>
+                In compliance with the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021 and the Digital Personal Data Protection Act, 2023:
+              </p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px', borderRadius: '8px', marginTop: '10px' }}>
+                <div>👤 <strong>Grievance Officer:</strong> HARI KRISHNAN I VIJAYAN</div>
+                <div style={{ marginTop: '6px' }}>📧 <strong>Email:</strong> <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981' }}>h4harikrishnan2015@gmail.com</a> / <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a></div>
+                <div style={{ marginTop: '6px' }}>📞 <strong>Direct Phone:</strong> <a href="tel:+917306587969" style={{ color: '#38bdf8' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8' }}>+91 9497861379</a></div>
+                <div style={{ marginTop: '6px' }}>⏱️ <strong>Resolution Turnaround:</strong> Acknowledgment within 24 hours; complete dispute resolution within 30 days.</div>
               </div>
             </div>
           )}
@@ -1113,7 +1290,7 @@ export default function LegalView({ initialTab = 'privacy', onBack }) {
         {/* Footer with Grievance Contact */}
         <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '12px', lineHeight: '1.8' }}>
           <div>&copy; 2026 SkandX. All rights reserved. | <a href="https://skandx.in" style={{ color: '#10b981', textDecoration: 'none' }}>https://skandx.in</a></div>
-          <div>Grievance Redressal Officer: Hari Krishnan I V (<a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+919497861379</a>) | SkandX, Trivandrum, Kerala</div>
+          <div>Legal Entity: SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN) | Contact: <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: '#10b981' }}>h4harikrishnan2015@gmail.com</a> / <a href="mailto:skandx.in@gmail.com" style={{ color: '#10b981' }}>skandx.in@gmail.com</a> | Helpline: <a href="tel:+917306587969" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: '#38bdf8', textDecoration: 'none' }}>+91 9497861379</a> | SkandX, Trivandrum, Kerala</div>
         </div>
 
       </div>

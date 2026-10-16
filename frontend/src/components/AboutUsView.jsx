@@ -75,6 +75,18 @@ export default function AboutUsView({ setActiveTab }) {
       linkLabel: 'Request Account Deletion →'
     },
     {
+      title: 'Digital Service Delivery & Shipping Policy',
+      content: 'SkandX delivers 100% cloud-based digital financial simulation, algorithmic analysis, and market educational tools. Subscriptions and virtual capital allocations are provisioned instantly upon successful payment authorization through Cashfree Payments with zero shipping delays or physical courier charges.',
+      link: '/shipping-policy',
+      linkLabel: 'View Shipping & Delivery Policy →'
+    },
+    {
+      title: 'Contact Us & Corporate Identification',
+      content: 'SkandX is owned and operated by Sole Proprietor HARI KRISHNAN I VIJAYAN. Registered office: SkandX, Trivandrum, Kerala - 695001, India. Official correspondence: h4harikrishnan2015@gmail.com / skandx.in@gmail.com | Phone: +91 7306587969 / +91 9497861379.',
+      link: '/contact',
+      linkLabel: 'View Contact & Corporate Details →'
+    },
+    {
       title: 'Roles and Responsibilities for UPI',
       content: 'UPI transactions are subject to limits imposed by your banking institution and the NPCI. SkandX processes UPI mandates instantly for fund addition, but settlement to your trading ledger is subject to successful confirmation from your bank. Ensure your UPI ID is linked to your registered bank account.'
     }
@@ -128,9 +140,12 @@ export default function AboutUsView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <Phone size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name & Phone</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Legal Entity / Proprietor &amp; Phone</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                Hari Krishnan I V • <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+919497861379</a>
+                HARI KRISHNAN I VIJAYAN (Operating as SkandX)<br />
+                <a href="tel:+917306587969" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+91 7306587969</a>
+                <span style={{ color: 'var(--text-secondary)', margin: '0 6px' }}>•</span>
+                <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+91 9497861379</a>
               </div>
             </div>
           </div>
@@ -138,8 +153,10 @@ export default function AboutUsView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <Mail size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Official &amp; Support Email</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a>
+                <span style={{ color: 'var(--text-secondary)', margin: '0 6px' }}>•</span>
                 <a href="mailto:skandx.in@gmail.com" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>skandx.in@gmail.com</a>
               </div>
             </div>
@@ -158,9 +175,9 @@ export default function AboutUsView({ setActiveTab }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px' }}>
             <MapPin size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Address</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Registered Office Address</div>
               <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-                SkandX, Trivandrum, Kerala
+                SkandX (Sole Proprietor: HARI KRISHNAN I VIJAYAN), Trivandrum, Kerala - 695001, India
               </div>
             </div>
           </div>
@@ -345,10 +362,10 @@ export default function AboutUsView({ setActiveTab }) {
 
             <div style={{ background: 'var(--bg-hover)', padding: '14px 16px', borderRadius: '8px', borderLeft: '3px solid #f59e0b' }}>
               <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                3. Open Broker Ecosystem:
+                3. Realistic Order Matching &amp; Institutional Volume Depth:
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', fontStyle: 'italic' }}>
-                "Rather than forcing a custom execution engine, you use Angel One's official SmartAPI, which automatically applies SEBI-mandated pre-trade risk checks, kill switches, and margin blocks at the broker level."
+                "SkandX is India's best paper trading app and web platform, featuring a proprietary real-time order matching engine with live tick pacing and realistic market volume matching. All simulated trades reflect real market liquidity depth and apply automated pre-trade risk checks, kill switches, and margin discipline with zero financial risk."
               </div>
             </div>
           </div>
@@ -363,6 +380,44 @@ export default function AboutUsView({ setActiveTab }) {
                 {reg}
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Legal & Policy Compliance Footer */}
+        <div style={{
+          textAlign: 'center',
+          padding: '24px 16px 36px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          lineHeight: '1.9'
+        }}>
+          <div style={{ marginBottom: '8px', fontWeight: '600', color: 'var(--text-primary)' }}>
+            SkandX • Legal Entity: Sole Proprietor HARI KRISHNAN I VIJAYAN | Trivandrum, Kerala - 695001, India
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            Official Email: <a href="mailto:h4harikrishnan2015@gmail.com" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>h4harikrishnan2015@gmail.com</a>
+            <span style={{ margin: '0 8px' }}>•</span>
+            Support: <a href="mailto:skandx.in@gmail.com" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>skandx.in@gmail.com</a>
+            <span style={{ margin: '0 8px' }}>•</span>
+            Helpline: <a href="tel:+917306587969" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+91 7306587969</a> / <a href="tel:+919497861379" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>+91 9497861379</a>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+            <a href="/aboutus" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>About Us</a>
+            <span>•</span>
+            <a href="/contact" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Contact Us</a>
+            <span>•</span>
+            <a href="/pricing" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Pricing</a>
+            <span>•</span>
+            <a href="/terms" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Terms &amp; Conditions</a>
+            <span>•</span>
+            <a href="/privacy-policy" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Privacy Policy</a>
+            <span>•</span>
+            <a href="/refund-policy" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Cancellation &amp; Refund Policy</a>
+            <span>•</span>
+            <a href="/shipping-policy" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Shipping &amp; Delivery Policy</a>
+            <span>•</span>
+            <a href="/risk-policy" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>Risk Disclosure</a>
           </div>
         </div>
       </div>

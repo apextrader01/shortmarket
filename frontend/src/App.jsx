@@ -1232,11 +1232,13 @@ function App() {
     applyDynamicSEO(window.location.pathname);
   }, [activeTab, user, currentPath, cleanFirstSegment, isKnownRoute]);
 
-  // Public Legal & Compliance routes (Accessible without login for Google Play reviewers and search bots)
+  // Public Legal & Compliance routes (Accessible without login for Google Play reviewers, Cashfree, and search bots)
   const legalRouteSegments = new Set([
     'privacy', 'privacy-policy', 'privacypolicy',
     'terms', 'terms-of-service', 'termsofservice',
     'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
+    'shipping', 'shipping-policy', 'shippingpolicy', 'delivery', 'delivery-policy', 'deliverypolicy',
+    'contact', 'contact-us', 'contactus',
     'delete', 'delete-account', 'deleteaccount',
     'risk', 'risk-policy', 'riskpolicy', 'risk-disclosure',
     'data', 'data-rights', 'datarights',
@@ -1248,6 +1250,9 @@ function App() {
     currentPath.includes('terms') || 
     currentPath.includes('refund') || 
     currentPath.includes('cancellation') || 
+    currentPath.includes('shipping') || 
+    currentPath.includes('delivery') || 
+    currentPath.includes('contact') || 
     currentPath.includes('delete-account') || 
     currentPath.includes('deleteaccount') || 
     currentPath.includes('risk-policy') || 
@@ -1258,7 +1263,9 @@ function App() {
     currentPath.includes('accessibility') ||
     currentPath.includes('legal')
   ) {
-    const initialTab = (currentPath.includes('refund') || currentPath.includes('cancellation')) ? 'refund' :
+    const initialTab = (currentPath.includes('shipping') || currentPath.includes('delivery')) ? 'shipping' :
+                       currentPath.includes('contact') ? 'contact' :
+                       (currentPath.includes('refund') || currentPath.includes('cancellation')) ? 'refund' :
                        currentPath.includes('terms') ? 'terms' : 
                        (currentPath.includes('delete') ? 'delete-account' : 
                        (currentPath.includes('risk') ? 'risk' : 

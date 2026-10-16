@@ -378,7 +378,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   ${tablesHtml}
 
   <div class="footer">
-    This is a computer-generated official statement from SkandX, Trivandrum, Kerala. No physical signature is required. For discrepancies, contact Hari Krishnan I V at skandx.in@gmail.com | +919497861379.
+    This is a computer-generated official statement from SkandX, Trivandrum, Kerala. No physical signature is required. For discrepancies, contact Sole Proprietor HARI KRISHNAN I VIJAYAN at h4harikrishnan2015@gmail.com / skandx.in@gmail.com | +917306587969.
   </div>
 
   <script>
