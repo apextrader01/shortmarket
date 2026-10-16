@@ -1233,6 +1233,31 @@ class VolumeMatchingEngine {
               this.dequeueOrder(sibling.id, sibling.symbol);
             }
           }
+
+          // 5. Dispatch push notification & Telegram alert on order fill completion
+          try {
+            const { sendPushNotification } = require('./pushService');
+            const { sendTelegramAlert } = require('./telegramService');
+
+            const fillTitle = `✅ Order Executed: ${order.side} ${newFilled} ${order.symbol}`;
+            const fillBody = `${order.side} ${newFilled} filled @ ₹${Number(newAvgPrice).toFixed(2)} (${order.product_type || 'MIS'})`;
+
+            sendPushNotification(order.user_id, {
+              title: fillTitle,
+              body: fillBody,
+              url: '/orders',
+              tag: `fill_exec_${order.id}`
+            }).catch(() => {});
+
+            sendTelegramAlert(order.user_id, 'ORDER', {
+              symbol: order.symbol,
+              side: order.side,
+              quantity: newFilled,
+              price: newAvgPrice,
+              exit_price: newAvgPrice,
+              product_type: order.product_type
+            }).catch(() => {});
+          } catch (notifErr) {}
         }
 
         // Broadcast real-time partial fill to user socket

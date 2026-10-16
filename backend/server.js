@@ -11354,12 +11354,23 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
 
 app.post('/api/push/test', authenticateToken, async (req, res) => {
   try {
+    const webSubs = await db('push_subscriptions').where({ user_id: req.user.id });
+    const fcmSubs = await db('fcm_device_tokens').where({ user_id: req.user.id });
+    const totalSubs = (webSubs ? webSubs.length : 0) + (fcmSubs ? fcmSubs.length : 0);
+
     await sendPushNotification(req.user.id, {
-      title: '🔔 SkandX Alert',
-      body: 'Live trade alerts and order push notifications are active on this device!',
-      url: '/clientdata'
+      title: '🔔 SkandX Trade Alerts Active',
+      body: 'Live trade executions and price trigger alerts are configured for your account!',
+      url: '/orders',
+      tag: `test_push_${Date.now()}`
     });
-    res.json({ success: true, message: 'Test notification dispatched' });
+
+    res.json({ 
+      success: true, 
+      message: totalSubs > 0 
+        ? `Test alert dispatched to ${totalSubs} registered device(s)` 
+        : 'Test alert sent (make sure Push Alerts are toggled ON on your phone)' 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

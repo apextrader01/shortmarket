@@ -27,6 +27,43 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+/**
+ * Universal safe permission requester: supports both modern Promise and legacy callback APIs,
+ * with a 15-second timeout guard so UI never hangs indefinitely if the permission modal is dismissed.
+ */
+async function requestNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+
+  try {
+    const permPromise = new Promise((resolve) => {
+      let resolved = false;
+      const done = (p) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(p || Notification.permission);
+        }
+      };
+      try {
+        const res = Notification.requestPermission(done);
+        if (res && typeof res.then === 'function') {
+          res.then(done).catch(() => done(Notification.permission));
+        }
+      } catch (e) {
+        done(Notification.permission);
+      }
+    });
+
+    return await Promise.race([
+      permPromise,
+      new Promise((resolve) => setTimeout(() => resolve(Notification.permission), 15000))
+    ]);
+  } catch (e) {
+    return Notification.permission;
+  }
+}
+
 export async function registerServiceWorker() {
   if (typeof window === 'undefined') return null;
   // If running inside native Android/iOS app, service worker push is not needed
@@ -100,20 +137,10 @@ export async function getPushSubscriptionStatus(token) {
       const activeReg = readyReg || reg;
 
       if (activeReg && activeReg.pushManager) {
-        const sub = await activeReg.pushManager.getSubscription();
+        const sub = await activeReg.pushManager.getSubscription().catch(() => null);
         if (sub) {
           localStorage.setItem('web_push_enabled', 'true');
           return true;
-        }
-
-        // If localPref was true but subscription was lost, auto re-subscribe silently
-        if (localPref && token) {
-          try {
-            await subscribeUserToPush(token);
-            return true;
-          } catch (reSubErr) {
-            console.warn('[PUSH] Auto re-subscribe failed:', reSubErr);
-          }
         }
       }
     }
@@ -125,9 +152,10 @@ export async function getPushSubscriptionStatus(token) {
   if (token) {
     try {
       const res = await fetch(`${API}/api/push/status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: AbortSignal.timeout(3000)
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data && data.success && (data.hasWebPush || data.enabled)) {
         localStorage.setItem('web_push_enabled', 'true');
         return true;
@@ -161,40 +189,44 @@ export async function subscribeUserToPush(token) {
       throw new Error('Notification permission was denied. Please allow notifications in device Settings -> Apps -> SkandX -> Notifications.');
     }
 
-    // Register with FCM and wait for token
-    const fcmToken = await new Promise((resolve, reject) => {
-      let resolved = false;
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          reject(new Error('Push notification registration timed out. Ensure Google Play Services are active.'));
-        }
-      }, 12000);
+    // Check if we already have a saved FCM token
+    let fcmToken = localStorage.getItem('fcm_device_token');
+    if (!fcmToken) {
+      // Register with FCM and wait for token
+      fcmToken = await new Promise((resolve, reject) => {
+        let resolved = false;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            reject(new Error('Push notification registration timed out. Ensure Google Play Services are active.'));
+          }
+        }, 10000);
 
-      PushNotifications.addListener('registration', (tokenObj) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          resolve(tokenObj.value);
-        }
-      });
+        PushNotifications.addListener('registration', (tokenObj) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve(tokenObj.value);
+          }
+        });
 
-      PushNotifications.addListener('registrationError', (err) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          reject(new Error(err.error || 'Failed to register with Google Push service.'));
-        }
-      });
+        PushNotifications.addListener('registrationError', (err) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            reject(new Error(err.error || 'Failed to register with Google Push service.'));
+          }
+        });
 
-      PushNotifications.register().catch((err) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          reject(err);
-        }
+        PushNotifications.register().catch((err) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            reject(err);
+          }
+        });
       });
-    });
+    }
 
     if (!fcmToken) {
       throw new Error('Could not obtain push registration token from device.');
@@ -204,19 +236,21 @@ export async function subscribeUserToPush(token) {
     localStorage.setItem('fcm_device_token', fcmToken);
 
     // Register foreground & background listeners
-    PushNotifications.removeAllListeners('pushNotificationReceived').catch(() => {});
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[PUSH] Received foreground push notification:', notification);
-    });
+    try {
+      PushNotifications.removeAllListeners('pushNotificationReceived').catch(() => {});
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        console.log('[PUSH] Received foreground push notification:', notification);
+      });
 
-    PushNotifications.removeAllListeners('pushNotificationActionPerformed').catch(() => {});
-    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('[PUSH] Push action performed:', action);
-      const url = action.notification?.data?.url;
-      if (url && typeof window !== 'undefined') {
-        window.location.hash = url.startsWith('/') ? url.slice(1) : url;
-      }
-    });
+      PushNotifications.removeAllListeners('pushNotificationActionPerformed').catch(() => {});
+      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        console.log('[PUSH] Push action performed:', action);
+        const url = action.notification?.data?.url;
+        if (url && typeof window !== 'undefined') {
+          window.location.hash = url.startsWith('/') ? url.slice(1) : url;
+        }
+      });
+    } catch (_) {}
 
     // Send FCM token to backend
     const subRes = await fetch(`${API}/api/push/fcm-subscribe`, {
@@ -229,7 +263,8 @@ export async function subscribeUserToPush(token) {
         token: fcmToken,
         platform: Capacitor.getPlatform(),
         deviceName: navigator.userAgent.slice(0, 100)
-      })
+      }),
+      signal: AbortSignal.timeout(8000)
     });
 
     if (!subRes.ok) {
@@ -245,13 +280,18 @@ export async function subscribeUserToPush(token) {
     throw new Error('Push notifications are not supported in this browser.');
   }
 
+  // Check if previously blocked
+  if (Notification.permission === 'denied') {
+    throw new Error('Notifications are blocked in your browser settings. Please click the tune/lock icon in your browser address bar and enable Notifications.');
+  }
+
   // Request user permission
   let permission = Notification.permission;
   if (permission !== 'granted') {
-    permission = await Notification.requestPermission();
+    permission = await requestNotificationPermission();
   }
   if (permission !== 'granted') {
-    throw new Error('Notification permission was denied. Please allow notifications in your browser address bar.');
+    throw new Error('Notification permission was not granted. Please allow notifications when prompted.');
   }
 
   // Ensure Service Worker is registered & active
@@ -260,27 +300,60 @@ export async function subscribeUserToPush(token) {
     reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   }
 
-  // Wait with 3-second fallback timeout for activation so it NEVER hangs
-  await Promise.race([
+  // Wait with 4-second fallback timeout for activation so it NEVER hangs
+  const readyReg = await Promise.race([
     navigator.serviceWorker.ready,
-    new Promise(resolve => setTimeout(resolve, 3000))
+    new Promise(resolve => setTimeout(resolve, 4000))
   ]);
 
-  reg = (await navigator.serviceWorker.getRegistration()) || reg;
+  const activeReg = readyReg || reg || (await navigator.serviceWorker.getRegistration());
+  if (!activeReg || !activeReg.pushManager) {
+    throw new Error('Push manager is not ready on this browser. Please refresh the page and try again.');
+  }
 
-  // Fetch VAPID public key
-  const res = await fetch(`${API}/api/push/vapid-public-key`);
+  // Fetch VAPID public key with timeout
+  const res = await fetch(`${API}/api/push/vapid-public-key`, {
+    signal: AbortSignal.timeout(6000)
+  });
   const data = await res.json().catch(() => ({}));
   const publicKey = data.publicKey;
-  if (!publicKey) throw new Error('VAPID public key unavailable from server.');
+  if (!publicKey) throw new Error('Push encryption key unavailable from server.');
 
-  // Register push subscription
-  let subscription = await reg.pushManager.getSubscription();
+  // Check existing push subscription
+  let subscription = await activeReg.pushManager.getSubscription().catch(() => null);
+
+  // If a subscription already exists, check if applicationServerKey matches current server key
+  if (subscription) {
+    try {
+      const rawKey = subscription.options?.applicationServerKey;
+      if (rawKey) {
+        const existingKeyBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(rawKey)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const cleanPublicKey = publicKey.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        if (existingKeyBase64 !== cleanPublicKey) {
+          // Stale/mismatched VAPID key: cleanly unsubscribe first
+          await subscription.unsubscribe().catch(() => {});
+          subscription = null;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Register push subscription if needed
   if (!subscription) {
-    subscription = await reg.pushManager.subscribe({
+    const subscribePromise = activeReg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
+
+    subscription = await Promise.race([
+      subscribePromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Push subscription timed out. Please check your internet connection.')), 10000))
+    ]);
+  }
+
+  if (!subscription) {
+    throw new Error('Unable to generate push notification subscription.');
   }
 
   // Send subscription to backend
@@ -294,7 +367,8 @@ export async function subscribeUserToPush(token) {
     body: JSON.stringify({
       endpoint: subJson.endpoint,
       keys: subJson.keys
-    })
+    }),
+    signal: AbortSignal.timeout(8000)
   });
 
   if (!subRes.ok) {
@@ -320,7 +394,8 @@ export async function unsubscribeUserFromPush(token) {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
           },
-          body: JSON.stringify({ token: fcmToken })
+          body: JSON.stringify({ token: fcmToken }),
+          signal: AbortSignal.timeout(6000)
         }).catch(() => {});
         localStorage.removeItem('fcm_device_token');
       }
@@ -359,7 +434,8 @@ export async function unsubscribeUserFromPush(token) {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ endpoint })
+      body: JSON.stringify({ endpoint }),
+      signal: AbortSignal.timeout(6000)
     }).catch(() => {});
 
     return true;
@@ -375,8 +451,8 @@ export async function triggerTestPushNotification(token) {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    }
+    },
+    signal: AbortSignal.timeout(8000)
   });
   return res.json();
 }
-

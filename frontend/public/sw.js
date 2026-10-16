@@ -25,8 +25,7 @@ self.addEventListener('push', (event) => {
     body: data.body || 'You have a new trade update.',
     icon: data.icon || '/pwa-192x192.png',
     badge: data.badge || '/favicon.png',
-    vibrate: [200, 100, 200],
-    tag: data.tag || data.data?.tag || ('skandx-alert-' + Date.now()),
+    tag: String(data.tag || data.data?.tag || ('skandx-alert-' + Date.now())),
     renotify: true,
     data: {
       url: data.data?.url || data.url || '/orders',
@@ -34,18 +33,31 @@ self.addEventListener('push', (event) => {
     }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Only attach vibrate if supported in current environment
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    options.vibrate = [200, 100, 200];
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, options).catch(() => {
+      // Fallback to basic notification if advanced options are rejected by device
+      return self.registration.showNotification(title, {
+        body: options.body,
+        data: options.data
+      });
+    })
+  );
 });
 
 // 👆 Handle Notification Click (Focus or open tab)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = event.notification.data?.url || '/orders';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url.includes(targetUrl) && 'focus' in client) {
+        if (client.url && client.url.includes(targetUrl) && 'focus' in client) {
           return client.focus();
         }
       }

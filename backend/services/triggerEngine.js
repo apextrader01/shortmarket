@@ -946,12 +946,12 @@ class TriggerEngine {
             
             console.log(`[TRIGGER ENGINE] Executed Order ${order.id} for ${order.symbol} at ${execPrice}`);
             
+            const isSL = order.type === 'SL-M' || order.type === 'SL-L' || (order.remarks && (order.remarks.includes('SL') || order.remarks.includes('Stop Loss')));
+            const isTgt = order.remarks && (order.remarks.includes('Target') || order.remarks.includes('TGT'));
+            const alertEvent = isSL ? 'SL_HIT' : isTgt ? 'TARGET_HIT' : 'EXECUTED';
+
             if (this.io) {
                 this.io.to(order.user_id.toString()).emit('sync_user_data');
-                const isSL = order.type === 'SL-M' || order.type === 'SL-L' || (order.remarks && (order.remarks.includes('SL') || order.remarks.includes('Stop Loss')));
-                const isTgt = order.remarks && (order.remarks.includes('Target') || order.remarks.includes('TGT'));
-                const alertEvent = isSL ? 'SL_HIT' : isTgt ? 'TARGET_HIT' : 'EXECUTED';
-                
                 this.io.to(order.user_id.toString()).emit('trade_alert', {
                     event: alertEvent,
                     symbol: order.symbol,
@@ -959,18 +959,33 @@ class TriggerEngine {
                     qty: order.quantity,
                     side: order.side
                 });
-
-                // Dispatch Telegram alert asynchronously
-                const tgType = isSL ? 'STOPLOSS' : isTgt ? 'TARGET' : 'ORDER';
-                sendTelegramAlert(order.user_id, tgType, {
-                    symbol: order.symbol,
-                    side: order.side,
-                    quantity: order.quantity,
-                    price: execPrice,
-                    exit_price: execPrice,
-                    product_type: order.product_type
-                }).catch(() => {});
             }
+
+            // Dispatch Telegram alert asynchronously
+            const tgType = isSL ? 'STOPLOSS' : isTgt ? 'TARGET' : 'ORDER';
+            sendTelegramAlert(order.user_id, tgType, {
+                symbol: order.symbol,
+                side: order.side,
+                quantity: order.quantity,
+                price: execPrice,
+                exit_price: execPrice,
+                product_type: order.product_type
+            }).catch(() => {});
+
+            // Dispatch Web & Mobile Push Notification asynchronously
+            const pushTitle = isSL
+                ? `🛑 Stop Loss Hit: ${order.side} ${order.symbol}`
+                : isTgt
+                ? `🎯 Target Hit: ${order.side} ${order.symbol}`
+                : `⚡ Order Executed: ${order.side} ${order.quantity} ${order.symbol}`;
+            const pushBody = `${order.side} ${order.quantity} filled @ ₹${Number(execPrice).toFixed(2)} (${order.product_type || 'MIS'})`;
+
+            sendPushNotification(order.user_id, {
+                title: pushTitle,
+                body: pushBody,
+                url: '/orders',
+                tag: `trig_exec_${order.id}`
+            }).catch(() => {});
             
         });
         

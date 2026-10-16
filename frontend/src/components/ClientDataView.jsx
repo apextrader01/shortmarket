@@ -227,39 +227,61 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
     }
     return '';
   });
+  const [isPushLoading, setIsPushLoading] = useState(false);
   
   useEffect(() => {
+    let isMounted = true;
     const token = localStorage.getItem('token') || (user && user.token);
     getPushSubscriptionStatus(token).then((enabled) => {
+      if (!isMounted) return;
       setIsPushEnabled(enabled);
       if (enabled) {
         setPushStatusMsg('Push Notifications Active! 🔔');
+        setTimeout(() => { if (isMounted) setPushStatusMsg(''); }, 3000);
       } else {
         setPushStatusMsg('');
       }
+    }).catch(() => {
+      if (isMounted) {
+        setIsPushEnabled(false);
+        setPushStatusMsg('');
+      }
     });
+    return () => { isMounted = false; };
   }, [user]);
 
   const handleTogglePush = async () => {
+    if (isPushLoading) return;
+    setIsPushLoading(true);
     const token = localStorage.getItem('token') || (user && user.token);
     if (isPushEnabled) {
       // Turn OFF
-      setPushStatusMsg('Disabling push...');
-      await unsubscribeUserFromPush(token);
-      setIsPushEnabled(false);
-      setPushStatusMsg('Push Notifications Disabled');
-      setTimeout(() => setPushStatusMsg(''), 3000);
+      setPushStatusMsg('Disabling push alerts...');
+      try {
+        await unsubscribeUserFromPush(token);
+        setIsPushEnabled(false);
+        setPushStatusMsg('Push Notifications Disabled');
+      } catch (err) {
+        setPushStatusMsg('Failed to disable: ' + (err?.message || 'Error'));
+      } finally {
+        setIsPushLoading(false);
+        setTimeout(() => setPushStatusMsg(''), 3000);
+      }
     } else {
       // Turn ON
+      setPushStatusMsg('Activating push alerts...');
       try {
-        setPushStatusMsg('Activating push alerts...');
         await subscribeUserToPush(token);
         setIsPushEnabled(true);
         setPushStatusMsg('Push Notifications Active! 🔔');
         setTimeout(() => setPushStatusMsg(''), 4000);
       } catch (err) {
-        alert('Notification Setup: ' + err.message);
-        setPushStatusMsg('');
+        const errorMsg = err?.message || 'Could not activate push notifications.';
+        setPushStatusMsg(errorMsg);
+        setIsPushEnabled(false);
+        setTimeout(() => setPushStatusMsg(''), 6000);
+      } finally {
+        setIsPushLoading(false);
       }
     }
   };
@@ -267,11 +289,17 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
   const handleTestPush = async () => {
     try {
       const token = localStorage.getItem('token') || (user && user.token);
-      await triggerTestPushNotification(token);
-      setPushStatusMsg('Test alert sent! Check your notification center.');
+      setPushStatusMsg('Sending test alert...');
+      const res = await triggerTestPushNotification(token);
+      if (res && res.success) {
+        setPushStatusMsg('Test alert sent! Check your notification center 🔔');
+      } else {
+        setPushStatusMsg(res?.message || res?.error || 'Test alert triggered.');
+      }
       setTimeout(() => setPushStatusMsg(''), 4000);
     } catch (err) {
-      alert('Test push error: ' + err.message);
+      setPushStatusMsg('Test push error: ' + (err?.message || 'Failed'));
+      setTimeout(() => setPushStatusMsg(''), 5000);
     }
   };
 
@@ -999,7 +1027,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
                     Receive real-time phone lock-screen and desktop alerts on order executions and triggers
                   </div>
                   {pushStatusMsg && (
-                    <div style={{ fontSize: '11px', color: isPushEnabled ? 'var(--color-green-light)' : '#f87171', marginTop: '4px', fontWeight: '600' }}>
+                    <div style={{ 
+                      fontSize: '11px', 
+                      color: isPushEnabled ? 'var(--color-green-light)' : (isPushLoading ? 'var(--color-blue-light)' : '#f87171'), 
+                      marginTop: '4px', 
+                      fontWeight: '600',
+                      transition: 'color 0.2s'
+                    }}>
                       {pushStatusMsg}
                     </div>
                   )}
@@ -1016,15 +1050,16 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
                   {/* Modern Toggle Switch: Blue when ON, Gray when OFF */}
                   <div 
                     onClick={handleTogglePush} 
-                    title={isPushEnabled ? 'Click to Turn OFF' : 'Click to Turn ON'}
+                    title={isPushLoading ? 'Connecting...' : (isPushEnabled ? 'Click to Turn OFF' : 'Click to Turn ON')}
                     style={{ 
                       width: '40px', 
                       height: '22px', 
                       background: isPushEnabled ? 'var(--color-blue)' : 'var(--border-color)', 
                       borderRadius: '11px', 
                       position: 'relative', 
-                      cursor: 'pointer', 
-                      transition: 'background 0.2s',
+                      cursor: isPushLoading ? 'wait' : 'pointer', 
+                      opacity: isPushLoading ? 0.7 : 1,
+                      transition: 'all 0.2s',
                       flexShrink: 0
                     }}
                   >
