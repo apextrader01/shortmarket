@@ -1149,15 +1149,17 @@ input:checked + .slider:before {
 .btn-mini.sell { background: #dc2626; }
 .btn-mini.sell:hover { background: #b91c1c; }
 
-.bg-itm-call { background: rgba(34, 197, 94, 0.04); }
-.bg-itm-put { background: rgba(239, 68, 68, 0.04); }
+.bg-itm-call { background: rgba(245, 158, 11, 0.055); }
+.bg-itm-put { background: rgba(245, 158, 11, 0.055); }
 
 .strike-cell {
-  background: #111;
+  background: rgba(18, 24, 38, 0.95);
   font-weight: 700;
   color: var(--text-primary);
   text-align: center;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
 }
 
 
@@ -1834,11 +1836,17 @@ select option {
 }
 
 [data-theme='light'] .bg-itm-call {
-  background: rgba(34, 197, 94, 0.08) !important;
+  background: rgba(245, 158, 11, 0.09) !important;
 }
 
 [data-theme='light'] .bg-itm-put {
-  background: rgba(239, 68, 68, 0.08) !important;
+  background: rgba(245, 158, 11, 0.09) !important;
+}
+
+[data-theme='light'] .strike-cell {
+  background: #f1f5f9 !important;
+  border-left: 1px solid #e2e8f0 !important;
+  border-right: 1px solid #e2e8f0 !important;
 }
 
 /* Inputs, Selects & Modals */

@@ -29,7 +29,10 @@ const OptionChainRow = React.memo(({
   setAlertModalSymbol,
   setChartModalSymbol,
   openMarketDepthModal,
-  openDomLadderModal
+  openDomLadderModal,
+  maxCallOI,
+  maxPutOI,
+  showGreeks = true
 }) => {
   const callKey = call ? (call.symbol.includes('-') ? call.symbol : `${call.symbol}-${call.exch_seg}`) : null;
   const putKey = put ? (put.symbol.includes('-') ? put.symbol : `${put.symbol}-${put.exch_seg}`) : null;
@@ -108,17 +111,36 @@ const OptionChainRow = React.memo(({
   const pBreakPct = (pBreakeven > 0 && referencePrice > 0) ? ((pBreakeven / referencePrice) - 1) * 100 : 0;
   const atmClass = strike === atmStrike ? 'bg-blue-900/40 border-y border-blue-500/50 relative' : 'border-b border-gray-800/50 hover:bg-gray-800/50';
 
+  const cOiWidth = (maxCallOI && maxCallOI > 0) ? Math.min(100, Math.round((cOi / maxCallOI) * 100)) : 0;
+  const pOiWidth = (maxPutOI && maxPutOI > 0) ? Math.min(100, Math.round((pOi / maxPutOI) * 100)) : 0;
+
   return (
     <tr ref={strike === atmStrike ? atmRowRef : null} className={`transition-colors ${atmClass}`}>
       {/* Calls */}
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{cOi > 0 ? formatOI(cOi) : '-'}</td>
+      <td 
+        className={`center ${isCallITM ? 'bg-itm-call' : ''}`} 
+        style={{ 
+          fontWeight: '600', 
+          color: 'var(--text-primary)',
+          position: 'relative',
+          background: cOiWidth > 0 
+            ? `linear-gradient(to left, rgba(239, 68, 68, 0.18) ${cOiWidth}%, ${isCallITM ? 'rgba(245, 158, 11, 0.06)' : 'transparent'} ${cOiWidth}%)` 
+            : (isCallITM ? 'rgba(245, 158, 11, 0.06)' : 'transparent')
+        }}
+      >
+        {cOi > 0 ? formatOI(cOi) : '-'}
+      </td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontSize: '11px', color: cOiChg >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
         {cOiChg !== 0 ? `${cOiChg > 0 ? '+' : ''}${formatOI(cOiChg)}` : '-'}
       </td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(0) : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(0) : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
+      {showGreeks && (
+        <>
+          <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
+          <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(0) : '-'}</td>
+          <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(0) : '-'}</td>
+          <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
+        </>
+      )}
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} title={callPriceData?.volume ? Number(callPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(callPriceData?.volume)}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
         {callPriceData?.change ? (
@@ -175,7 +197,26 @@ const OptionChainRow = React.memo(({
       </td>
 
       {/* Strike */}
-      <td className="strike-cell">{strike}</td>
+      <td className="strike-cell" style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+          <span style={{ fontWeight: strike === atmStrike ? '800' : '700', color: strike === atmStrike ? '#60a5fa' : 'inherit' }}>
+            {strike}
+          </span>
+          {strike === atmStrike && (
+            <span style={{
+              fontSize: '8px',
+              fontWeight: '800',
+              color: '#ffffff',
+              background: '#2563eb',
+              padding: '1px 4px',
+              borderRadius: '3px',
+              letterSpacing: '0.4px'
+            }}>
+              ATM
+            </span>
+          )}
+        </div>
+      </td>
 
       {/* Puts */}
       <td className={`center border-left ${isPutITM ? 'bg-itm-put' : ''}`}>
@@ -232,14 +273,30 @@ const OptionChainRow = React.memo(({
         ) : '-'}
       </td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} title={putPriceData?.volume ? Number(putPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(putPriceData?.volume)}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(0) : '-'}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(0) : '-'}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
+      {showGreeks && (
+        <>
+          <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
+          <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(0) : '-'}</td>
+          <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(0) : '-'}</td>
+          <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
+        </>
+      )}
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontSize: '11px', color: pOiChg >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
         {pOiChg !== 0 ? `${pOiChg > 0 ? '+' : ''}${formatOI(pOiChg)}` : '-'}
       </td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{pOi > 0 ? formatOI(pOi) : '-'}</td>
+      <td 
+        className={`center ${isPutITM ? 'bg-itm-put' : ''}`} 
+        style={{ 
+          fontWeight: '600', 
+          color: 'var(--text-primary)',
+          position: 'relative',
+          background: pOiWidth > 0 
+            ? `linear-gradient(to right, rgba(16, 185, 129, 0.18) ${pOiWidth}%, ${isPutITM ? 'rgba(245, 158, 11, 0.06)' : 'transparent'} ${pOiWidth}%)` 
+            : (isPutITM ? 'rgba(245, 158, 11, 0.06)' : 'transparent')
+        }}
+      >
+        {pOi > 0 ? formatOI(pOi) : '-'}
+      </td>
     </tr>
   );
 }, (prev, next) => {
@@ -253,7 +310,10 @@ const OptionChainRow = React.memo(({
          prev.T === next.T &&
          prev.r === next.r &&
          prev.oneClickMode === next.oneClickMode &&
-         prev.oneClickMultiplier === next.oneClickMultiplier;
+         prev.oneClickMultiplier === next.oneClickMultiplier &&
+         prev.showGreeks === next.showGreeks &&
+         prev.maxCallOI === next.maxCallOI &&
+         prev.maxPutOI === next.maxPutOI;
 });
 
 export default OptionChainRow;

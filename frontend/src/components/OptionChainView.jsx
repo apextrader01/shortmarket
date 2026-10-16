@@ -4,7 +4,8 @@ import { useStore, API } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
-import { Clock, ChevronLeft } from 'lucide-react';
+import OptionChainMobile from './OptionChainMobile';
+import { Clock, ChevronLeft, SlidersHorizontal, Activity } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -207,6 +208,16 @@ const OptionChainViewInternal = () => {
   const [strategyLegs, setStrategyLegs] = useState([]);
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [showGreeks, setShowGreeks] = useState(true);
+  const [strikeRange, setStrikeRange] = useState('ALL');
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const indexCandidates = useMemo(() => getIndexCandidates(symbol), [symbol]);
   const indexKey = useMemo(() => getIndexKey(symbol), [symbol]);
   const isCommodity = useMemo(() => COMMODITIES.includes(symbol), [symbol]);
@@ -351,17 +362,92 @@ const OptionChainViewInternal = () => {
   const allStrikes = useMemo(() => Object.keys(chain).map(Number).sort((a, b) => a - b), [chain]);
   const effectiveSpotPrice = initialSpotPrice || (basePrice > 0 ? basePrice : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null));
 
-  // Memoized 31-strike window (15 ITM, 1 ATM, 15 OTM = 31 total strikes)
+  // Memoized strike window based on strikeRange (±10, ±20, or All)
   const strikes = useMemo(() => {
     if (!effectiveSpotPrice || allStrikes.length === 0) return [];
     const atmStrike = allStrikes.reduce((prev, curr) => 
       Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
-    const startIndex = Math.max(0, atmIndex - 15);
-    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
+    let span = 15;
+    if (strikeRange === '10') span = 5;
+    else if (strikeRange === '20') span = 10;
+    else if (strikeRange === 'ALL') span = 20;
+    const startIndex = Math.max(0, atmIndex - span);
+    const endIndex = Math.min(allStrikes.length - 1, atmIndex + span);
     return allStrikes.slice(startIndex, endIndex + 1);
-  }, [effectiveSpotPrice, allStrikes]);
+  }, [effectiveSpotPrice, allStrikes, strikeRange]);
+
+  // Max Pain calculation: strike minimizing cumulative option seller loss
+  const maxPain = useMemo(() => {
+    if (!allStrikes || allStrikes.length === 0 || !chain) return null;
+    const prices = useStore.getState().prices;
+    const strikeData = [];
+    for (const s of allStrikes) {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      let cOi = 0;
+      let pOi = 0;
+      if (c) {
+        const cData = prices[c.symbol] || (c.symbol?.includes(':') ? prices[c.symbol.split(':')[1]] : null);
+        cOi = Number(cData?.oi ?? c.oi ?? 0);
+      }
+      if (p) {
+        const pData = prices[p.symbol] || (p.symbol?.includes(':') ? prices[p.symbol.split(':')[1]] : null);
+        pOi = Number(pData?.oi ?? p.oi ?? 0);
+      }
+      if (cOi > 0 || pOi > 0) {
+        strikeData.push({ strike: s, cOi, pOi });
+      }
+    }
+    if (strikeData.length === 0) return null;
+
+    let minLoss = Infinity;
+    let bestStrike = null;
+
+    for (const target of strikeData) {
+      let currentLoss = 0;
+      for (const item of strikeData) {
+        if (target.strike > item.strike) {
+          currentLoss += item.cOi * (target.strike - item.strike);
+        } else if (target.strike < item.strike) {
+          currentLoss += item.pOi * (item.strike - target.strike);
+        }
+      }
+      if (currentLoss < minLoss) {
+        minLoss = currentLoss;
+        bestStrike = target.strike;
+      }
+    }
+    return bestStrike;
+  }, [allStrikes, chain, expiry]);
+
+  // Max Call & Put OI for depth bar visualization and live PCR stats
+  const { maxCallOI, maxPutOI, pcrStats } = useStore(useShallow(state => {
+    let maxC = 1;
+    let maxP = 1;
+    let callOi = 0;
+    let putOi = 0;
+    const prices = state.prices;
+    (strikes || []).forEach(s => {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      if (c) {
+        const cData = prices[c.symbol] || (c.symbol?.includes(':') ? prices[c.symbol.split(':')[1]] : null);
+        const val = Number(cData?.oi ?? c.oi ?? 0);
+        if (val > maxC) maxC = val;
+        if (val > 0) callOi += val;
+      }
+      if (p) {
+        const pData = prices[p.symbol] || (p.symbol?.includes(':') ? prices[p.symbol.split(':')[1]] : null);
+        const val = Number(pData?.oi ?? p.oi ?? 0);
+        if (val > maxP) maxP = val;
+        if (val > 0) putOi += val;
+      }
+    });
+    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
+    return { maxCallOI: maxC, maxPutOI: maxP, pcrStats: { callOi, putOi, pcr } };
+  }));
 
   const isIndex = useMemo(() => ALLOWED_INDEX_SYMBOLS.includes(symbol), [symbol]);
 
@@ -654,6 +740,52 @@ const OptionChainViewInternal = () => {
     }
   };
 
+  if (isMobile) {
+    return (
+      <div className="option-chain-container mobile-view" style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column' }}>
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain for {symbol}...</div>
+        ) : error ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--color-red)' }}>
+            Error: {error}
+          </div>
+        ) : (
+          <OptionChainMobile
+            symbol={symbol}
+            setSymbol={setSymbol}
+            expiry={expiry}
+            setExpiry={setExpiry}
+            expiries={expiries}
+            strikes={strikes}
+            chain={chain}
+            spotPrice={spotPrice}
+            spotPct={spotPct}
+            futPrice={futPrice}
+            futPct={futPct}
+            synthFutPrice={synthFutPrice}
+            vixPrice={vixPrice}
+            vixChange={vixChange}
+            atmStrike={atmStrike}
+            basePrice={basePrice}
+            pricingPrice={pricingPrice}
+            maxPain={maxPain}
+            pcr={pcrStats.pcr}
+            T={T}
+            r={r}
+            isIndex={isIndex}
+            handleTrade={handleTrade}
+            oneClickMode={oneClickMode}
+            oneClickMultiplier={oneClickMultiplier}
+            setAlertModalSymbol={setAlertModalSymbol}
+            setChartModalSymbol={setChartModalSymbol}
+            openMarketDepthModal={openMarketDepthModal}
+            addToBasket={addToBasket}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="option-chain-container glass-panel">
       {/* Header */}
@@ -753,9 +885,72 @@ const OptionChainViewInternal = () => {
         {/* Section 5: PCR (Defect 49) */}
         <PcrSummary strikes={strikes} chain={chain} />
 
+        {/* Section 5.5: Max Pain */}
+        {maxPain > 0 && (
+          <>
+            <div className="top-bar-divider"></div>
+            <div className="top-bar-section" title="Strike price where option sellers face minimal cumulative loss">
+              <span className="top-bar-label">Max Pain</span>
+              <span className="top-bar-value" style={{ fontWeight: '800', color: '#f59e0b' }}>
+                {maxPain}
+              </span>
+            </div>
+          </>
+        )}
+
         <div className="top-bar-divider"></div>
 
-        {/* Section 5: Strategy and Basket Controls */}
+        {/* Section 6: Display Controls (Greeks Toggle & Strike Range Filter) */}
+        <div className="top-bar-section" style={{ flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowGreeks(!showGreeks)}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: '700',
+              background: showGreeks ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+              border: showGreeks ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: showGreeks ? '#60a5fa' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.15s ease'
+            }}
+            title="Toggle Delta, Theta, Vega, and IV columns"
+          >
+            <SlidersHorizontal size={12} />
+            Greeks {showGreeks ? 'ON' : 'OFF'}
+          </button>
+
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '2px' }}>
+            {['10', '20', 'ALL'].map(rng => (
+              <button
+                key={rng}
+                type="button"
+                onClick={() => setStrikeRange(rng)}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontSize: '10.5px',
+                  fontWeight: strikeRange === rng ? '700' : '500',
+                  background: strikeRange === rng ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                  color: strikeRange === rng ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {rng === 'ALL' ? 'All' : `±${rng}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 7: Strategy and Basket Controls */}
         <div className="top-bar-section" style={{ flexDirection: 'row', gap: '16px', alignItems: 'center' }}>
           <div className="toggle-container" title="Clicking Buy/Sell will add to Basket instead of directly executing">
             <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Basket Mode</span>
@@ -881,18 +1076,22 @@ const OptionChainViewInternal = () => {
         <table className="option-chain-table">
           <thead>
             <tr>
-              <th className="header-call" colSpan="10">CALL</th>
+              <th className="header-call" colSpan={showGreeks ? 10 : 6}>CALL</th>
               <th className="header-strike"></th>
-              <th className="header-put" colSpan="10">PUT</th>
+              <th className="header-put" colSpan={showGreeks ? 10 : 6}>PUT</th>
             </tr>
             <tr>
               {/* Calls */}
               <th className="center">OI</th>
               <th className="center">OI Chg</th>
-              <th className="center">Delta</th>
-              <th className="center">Theta</th>
-              <th className="center">Vega</th>
-              <th className="center">IV</th>
+              {showGreeks && (
+                <>
+                  <th className="center">Delta</th>
+                  <th className="center">Theta</th>
+                  <th className="center">Vega</th>
+                  <th className="center">IV</th>
+                </>
+              )}
               <th className="center">Vol</th>
               <th className="center">Chg</th>
               <th className="center">LTP</th>
@@ -904,10 +1103,14 @@ const OptionChainViewInternal = () => {
               <th className="center">LTP</th>
               <th className="center">Chg</th>
               <th className="center">Vol</th>
-              <th className="center">IV</th>
-              <th className="center">Vega</th>
-              <th className="center">Theta</th>
-              <th className="center">Delta</th>
+              {showGreeks && (
+                <>
+                  <th className="center">IV</th>
+                  <th className="center">Vega</th>
+                  <th className="center">Theta</th>
+                  <th className="center">Delta</th>
+                </>
+              )}
               <th className="center">OI Chg</th>
               <th className="center">OI</th>
             </tr>
@@ -933,6 +1136,9 @@ const OptionChainViewInternal = () => {
                 setChartModalSymbol={setChartModalSymbol}
                 openMarketDepthModal={openMarketDepthModal}
                 openDomLadderModal={openDomLadderModal}
+                maxCallOI={maxCallOI}
+                maxPutOI={maxPutOI}
+                showGreeks={showGreeks}
               />
             ))}
           </tbody>
