@@ -780,8 +780,8 @@ export default function MobileStockOverviewModal() {
             right: 0,
             background: 'var(--bg-secondary, #0f172a)',
             borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-            padding: '12px 16px',
-            paddingBottom: 'max(14px, calc(14px + env(safe-area-inset-bottom, 0px)))',
+            padding: '10px 16px',
+            paddingBottom: 'max(10px, calc(10px + env(safe-area-inset-bottom, 0px)))',
             display: 'flex',
             gap: '12px',
             zIndex: 10
@@ -791,7 +791,7 @@ export default function MobileStockOverviewModal() {
             onClick={handleBuy}
             style={{
               flex: 1,
-              padding: '14px',
+              padding: '12px',
               background: 'var(--color-green, #10b981)',
               color: '#ffffff',
               border: 'none',
@@ -803,7 +803,8 @@ export default function MobileStockOverviewModal() {
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-              transition: 'transform 0.1s ease'
+              transition: 'transform 0.1s ease',
+              minHeight: '44px'
             }}
           >
             Buy
@@ -813,7 +814,7 @@ export default function MobileStockOverviewModal() {
             onClick={handleSell}
             style={{
               flex: 1,
-              padding: '14px',
+              padding: '12px',
               background: 'var(--color-red, #ef4444)',
               color: '#ffffff',
               border: 'none',
@@ -825,7 +826,8 @@ export default function MobileStockOverviewModal() {
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
-              transition: 'transform 0.1s ease'
+              transition: 'transform 0.1s ease',
+              minHeight: '44px'
             }}
           >
             Sell

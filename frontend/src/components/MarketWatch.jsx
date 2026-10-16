@@ -468,6 +468,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
 const MobilePinnedIndices = React.memo(() => {
   const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX'] || state.prices['NIFTY 50'] || state.prices['NIFTY50-INDEX']);
   const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX'] || state.prices['BANK NIFTY'] || state.prices['BANKNIFTY-INDEX']);
+  const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX'] || state.prices['SENSEX-BSE'] || state.prices['SENSEX-INDEX'] || state.prices['SENSEX']);
   
   const renderItem = (label, data) => {
     const ltp = data?.ltp !== undefined ? Number(data.ltp) : null;
@@ -478,32 +479,33 @@ const MobilePinnedIndices = React.memo(() => {
     return (
       <div 
         style={{
-          flex: 1,
+          flex: '1 0 100px',
+          minWidth: '100px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '7px 12px',
+          padding: '6px 8px',
           background: 'rgba(255, 255, 255, 0.03)',
           borderRadius: '8px',
           border: '1px solid rgba(255, 255, 255, 0.06)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', gap: '4px' }}>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.2px', whiteSpace: 'nowrap' }}>
             {label}
           </span>
           {pct !== null && (
-            <span style={{ fontSize: '10.5px', fontWeight: '600', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '10px', fontWeight: '600', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
               {isUp ? '+' : ''}{pct.toFixed(2)}%
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '4px' }}>
+          <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
             {ltp !== null ? ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
           </span>
           {change !== null && (
-            <span style={{ fontSize: '10.5px', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '9.5px', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
               {isUp ? '+' : ''}{change.toFixed(2)}
             </span>
           )}
@@ -513,9 +515,20 @@ const MobilePinnedIndices = React.memo(() => {
   };
 
   return (
-    <div style={{ display: 'flex', gap: '8px', padding: '10px 12px 8px', background: 'var(--bg-panel)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div 
+      style={{ 
+        display: 'flex', 
+        gap: '6px', 
+        padding: '8px 12px 6px', 
+        background: 'var(--bg-panel)', 
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        overflowX: 'auto'
+      }}
+      className="scrollbar-hide"
+    >
       {renderItem('NIFTY 50', nifty)}
       {renderItem('BANK NIFTY', banknifty)}
+      {renderItem('SENSEX', sensex)}
     </div>
   );
 });
@@ -546,11 +559,12 @@ export default function MarketWatch({ className = '', onStockSelect }) {
     const subscribeBatch = useStore.getState().subscribeToOptionBatch;
     const topIndices = [
       { symbol: 'NSE:NIFTY50-INDEX', token: 'NIFTY50-INDEX', exchange: 'NSE', name: 'NIFTY 50' },
-      { symbol: 'NSE:NIFTYBANK-INDEX', token: 'NIFTYBANK-INDEX', exchange: 'NSE', name: 'BANK NIFTY' }
+      { symbol: 'NSE:NIFTYBANK-INDEX', token: 'NIFTYBANK-INDEX', exchange: 'NSE', name: 'BANK NIFTY' },
+      { symbol: 'BSE:SENSEX-INDEX', token: 'SENSEX-INDEX', exchange: 'BSE', name: 'SENSEX' }
     ];
     if (typeof subscribeBatch === 'function') subscribeBatch(topIndices);
     if (typeof useStore.getState().fetchBatchPrices === 'function') {
-      useStore.getState().fetchBatchPrices(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX']);
+      useStore.getState().fetchBatchPrices(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
     }
   }, [isMobile]);
 

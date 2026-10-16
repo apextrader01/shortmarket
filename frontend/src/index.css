@@ -608,14 +608,14 @@ tbody tr:hover {
     padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom, 0px))) !important;
   }
 
-  /* Ensure mobile stock sheets and modal drawers clear floating 3-button & gesture bars (Samsung, Xiaomi, Pixel, OnePlus) */
+  /* Ensure mobile stock sheets and modal drawers clear floating 3-button & gesture bars without excessive blank space */
   .mobile-stock-footer,
   .order-modal-footer {
-    padding-bottom: max(34px, calc(16px + env(safe-area-inset-bottom, 18px))) !important;
+    padding-bottom: max(12px, calc(10px + env(safe-area-inset-bottom, 0px))) !important;
   }
 
   .mobile-stock-sheet {
-    padding-bottom: max(32px, env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: 0 !important;
   }
 
   /* Prevent third-party gateway popups (like Cashfree) from falling behind floating 3-button navigation bars */
