@@ -850,10 +850,12 @@ function startLiveWebSocket() {
                         totSellQuan: tick.tot_sell_qty !== undefined ? tick.tot_sell_qty : (oldPriceObj.totSellQuan || 0),
                         upper_circuit: tick.upper_ckt !== undefined ? Number(tick.upper_ckt) : (oldPriceObj.upper_circuit || null),
                         lower_circuit: tick.lower_ckt !== undefined ? Number(tick.lower_ckt) : (oldPriceObj.lower_circuit || null),
-                        oi: tick.oi !== undefined ? Number(tick.oi) : (tick.open_interest !== undefined ? Number(tick.open_interest) : (oldPriceObj.oi || 0)),
-                        pOI: tick.pOI !== undefined ? Number(tick.pOI) : (tick.prev_oi !== undefined ? Number(tick.prev_oi) : (oldPriceObj.pOI || 0)),
-                        prev_oi: tick.pOI !== undefined ? Number(tick.pOI) : (tick.prev_oi !== undefined ? Number(tick.prev_oi) : (oldPriceObj.prev_oi || 0)),
-                        oi_change: (tick.oi !== undefined && tick.pOI !== undefined) ? (Number(tick.oi) - Number(tick.pOI)) : (tick.oi_change !== undefined ? Number(tick.oi_change) : (oldPriceObj.oi_change || 0))
+                        oi: (tick.oi !== undefined && Number(tick.oi) > 0) ? Number(tick.oi) : (tick.open_interest !== undefined && Number(tick.open_interest) > 0 ? Number(tick.open_interest) : (oldPriceObj.oi || 0)),
+                        pOI: (tick.pOI !== undefined && Number(tick.pOI) > 0) ? Number(tick.pOI) : (tick.prev_oi !== undefined && Number(tick.prev_oi) > 0 ? Number(tick.prev_oi) : (oldPriceObj.pOI || oldPriceObj.prev_oi || 0)),
+                        prev_oi: (tick.pOI !== undefined && Number(tick.pOI) > 0) ? Number(tick.pOI) : (tick.prev_oi !== undefined && Number(tick.prev_oi) > 0 ? Number(tick.prev_oi) : (oldPriceObj.prev_oi || oldPriceObj.pOI || 0)),
+                        oi_change: (tick.oi !== undefined && tick.pOI !== undefined && Number(tick.oi) > 0 && Number(tick.pOI) > 0)
+                            ? (Number(tick.oi) - Number(tick.pOI))
+                            : (tick.oi_change !== undefined && Number(tick.oi_change) !== 0 ? Number(tick.oi_change) : (oldPriceObj.oi_change || 0))
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
@@ -1289,6 +1291,20 @@ async function fetchBatchLTPs(symbols) {
                                             change = ltp - close;
                                             pct = (change / close) * 100;
                                         }
+                                        const oldObj = (sharedPriceCache && (sharedPriceCache[uniqueSymbol] || (uniqueSymbol.includes(':') && sharedPriceCache[uniqueSymbol.split(':')[1]]))) || {};
+                                        const rawIncomingOi = item.v.open_interest !== undefined ? Number(item.v.open_interest) : (item.v.oi !== undefined ? Number(item.v.oi) : (item.v.total_oi !== undefined ? Number(item.v.total_oi) : 0));
+                                        const finalOi = rawIncomingOi > 0 ? rawIncomingOi : (oldObj.oi > 0 ? oldObj.oi : 0);
+
+                                        const rawIncomingPrevOi = item.v.prev_oi !== undefined ? Number(item.v.prev_oi) : (item.v.pOI !== undefined ? Number(item.v.pOI) : 0);
+                                        const finalPrevOi = rawIncomingPrevOi > 0 ? rawIncomingPrevOi : (oldObj.prev_oi > 0 ? oldObj.prev_oi : (oldObj.pOI > 0 ? oldObj.pOI : 0));
+
+                                        let finalOiChange = (rawIncomingOi > 0 && rawIncomingPrevOi > 0)
+                                            ? (rawIncomingOi - rawIncomingPrevOi)
+                                            : (item.v.oi_change !== undefined && Number(item.v.oi_change) !== 0 ? Number(item.v.oi_change) : (oldObj.oi_change || 0));
+                                        if (finalOiChange === 0 && finalOi > 0 && finalPrevOi > 0) {
+                                            finalOiChange = finalOi - finalPrevOi;
+                                        }
+
                                         const priceObj = {
                                             symbol: uniqueSymbol,
                                             timestamp: Date.now(),
@@ -1302,10 +1318,10 @@ async function fetchBatchLTPs(symbols) {
                                             pct: pct,
                                             upper_circuit: Number(item.v.upper_ckt) || Number(item.v.upper_circuit) || null,
                                             lower_circuit: Number(item.v.lower_ckt) || Number(item.v.lower_circuit) || null,
-                                            oi: item.v.open_interest !== undefined ? Number(item.v.open_interest) : (item.v.oi !== undefined ? Number(item.v.oi) : (item.v.total_oi !== undefined ? Number(item.v.total_oi) : 0)),
-                                            pOI: item.v.prev_oi !== undefined ? Number(item.v.prev_oi) : (item.v.pOI !== undefined ? Number(item.v.pOI) : 0),
-                                            prev_oi: item.v.prev_oi !== undefined ? Number(item.v.prev_oi) : (item.v.pOI !== undefined ? Number(item.v.pOI) : 0),
-                                            oi_change: (item.v.open_interest !== undefined && item.v.prev_oi !== undefined) ? (Number(item.v.open_interest) - Number(item.v.prev_oi)) : (item.v.oi_change !== undefined ? Number(item.v.oi_change) : 0)
+                                            oi: finalOi,
+                                            pOI: finalPrevOi,
+                                            prev_oi: finalPrevOi,
+                                            oi_change: finalOiChange
                                         };
                                         results[uniqueSymbol] = priceObj;
                                         if (sharedPriceCache) {

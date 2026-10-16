@@ -17,6 +17,8 @@ const OptionChainRow = React.memo(({
   call,
   put,
   basePrice,
+  pricingPrice,
+  isIndex,
   atmStrike,
   atmRowRef,
   T,
@@ -51,24 +53,44 @@ const OptionChainRow = React.memo(({
   const isCommodity = Boolean((callKey && (callKey.includes('MCX') || callKey.includes('COMMODITY'))) || 
                               (putKey && (putKey.includes('MCX') || putKey.includes('COMMODITY'))) || 
                               (call?.exch_seg === 'MCX') || (put?.exch_seg === 'MCX'));
+  const isModelForward = Boolean(isCommodity || isIndex);
+  const modelPrice = (pricingPrice && pricingPrice > 0) ? pricingPrice : (basePrice > 0 ? basePrice : 0);
 
-  // Calculate IV (using Black-76 for commodities) & Greeks with memoization
+  // Calculate IV & Greeks with memoization (Black-76 forward model for European Index & Commodity options)
   const { cIV, pIV, cGreeks, pGreeks } = React.useMemo(() => {
-    let callIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r, isCommodity) : 0;
-    let putIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r, isCommodity) : 0;
+    if (modelPrice <= 0) {
+      return { cIV: 0, pIV: 0, cGreeks: { delta: 0, theta: 0, vega: 0 }, pGreeks: { delta: 0, theta: 0, vega: 0 } };
+    }
 
-    // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
+    let callIV = cLtp > 0 ? calculateIV('CE', cLtp, modelPrice, strike, T, r, isModelForward) : 0;
+    let putIV = pLtp > 0 ? calculateIV('PE', pLtp, modelPrice, strike, T, r, isModelForward) : 0;
+
+    // Put-Call Parity Fallback: Deep ITM options often violate strict intrinsic bounds due to synthetic forward
     if (callIV === 0 && putIV > 0) callIV = putIV;
     if (putIV === 0 && callIV > 0) putIV = callIV;
 
-    const callGreeks = (callIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, callIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
-    const putGreeks = (putIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, putIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
+    // Unify strike IV when both are present so Delta and Vega are symmetric (matching institutional / Sensibull standard)
+    let unifiedCallIV = callIV;
+    let unifiedPutIV = putIV;
+    if (isModelForward && callIV > 0 && putIV > 0) {
+      const midIV = (callIV + putIV) / 2;
+      unifiedCallIV = midIV;
+      unifiedPutIV = midIV;
+    }
 
-    return { cIV: callIV, pIV: putIV, cGreeks: callGreeks, pGreeks: putGreeks };
-  }, [cLtp, pLtp, basePrice, strike, T, r, isCommodity]);
+    const callGreeks = (unifiedCallIV > 0)
+      ? calculateGreeks('CE', modelPrice, strike, T, r, unifiedCallIV, isModelForward)
+      : { delta: 0, theta: 0, vega: 0 };
+    const putGreeks = (unifiedPutIV > 0)
+      ? calculateGreeks('PE', modelPrice, strike, T, r, unifiedPutIV, isModelForward)
+      : { delta: 0, theta: 0, vega: 0 };
 
-  const isCallITM = basePrice > 0 && strike < basePrice;
-  const isPutITM = basePrice > 0 && strike > basePrice;
+    return { cIV: unifiedCallIV, pIV: unifiedPutIV, cGreeks: callGreeks, pGreeks: putGreeks };
+  }, [cLtp, pLtp, modelPrice, strike, T, r, isModelForward]);
+
+  const referencePrice = modelPrice > 0 ? modelPrice : basePrice;
+  const isCallITM = referencePrice > 0 && strike < referencePrice;
+  const isPutITM = referencePrice > 0 && strike > referencePrice;
 
   // Open Interest calculations (Defect 49)
   const cOi = Number(callPriceData?.oi ?? call?.oi ?? 0);
@@ -82,8 +104,8 @@ const OptionChainRow = React.memo(({
   const cBreakeven = cLtp > 0 ? strike + cLtp : 0;
   const pBreakeven = pLtp > 0 ? strike - pLtp : 0;
   
-  const cBreakPct = (cBreakeven > 0 && basePrice > 0) ? ((cBreakeven / basePrice) - 1) * 100 : 0;
-  const pBreakPct = (pBreakeven > 0 && basePrice > 0) ? ((pBreakeven / basePrice) - 1) * 100 : 0;
+  const cBreakPct = (cBreakeven > 0 && referencePrice > 0) ? ((cBreakeven / referencePrice) - 1) * 100 : 0;
+  const pBreakPct = (pBreakeven > 0 && referencePrice > 0) ? ((pBreakeven / referencePrice) - 1) * 100 : 0;
   const atmClass = strike === atmStrike ? 'bg-blue-900/40 border-y border-blue-500/50 relative' : 'border-b border-gray-800/50 hover:bg-gray-800/50';
 
   return (
@@ -94,8 +116,8 @@ const OptionChainRow = React.memo(({
         {cOiChg !== 0 ? `${cOiChg > 0 ? '+' : ''}${formatOI(cOiChg)}` : '-'}
       </td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
-      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(2) : '-'}</td>
+      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(0) : '-'}</td>
+      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(0) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} title={callPriceData?.volume ? Number(callPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(callPriceData?.volume)}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
@@ -211,8 +233,8 @@ const OptionChainRow = React.memo(({
       </td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} title={putPriceData?.volume ? Number(putPriceData.volume).toLocaleString('en-IN') : undefined}>{formatOI(putPriceData?.volume)}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(2) : '-'}</td>
-      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(2) : '-'}</td>
+      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(0) : '-'}</td>
+      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(0) : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontSize: '11px', color: pOiChg >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
         {pOiChg !== 0 ? `${pOiChg > 0 ? '+' : ''}${formatOI(pOiChg)}` : '-'}
@@ -225,6 +247,8 @@ const OptionChainRow = React.memo(({
          prev.call?.symbol === next.call?.symbol &&
          prev.put?.symbol === next.put?.symbol &&
          prev.basePrice === next.basePrice &&
+         prev.pricingPrice === next.pricingPrice &&
+         prev.isIndex === next.isIndex &&
          prev.atmStrike === next.atmStrike &&
          prev.T === next.T &&
          prev.r === next.r &&

@@ -355,6 +355,48 @@ const OptionChainViewInternal = () => {
     return allStrikes.slice(startIndex, endIndex + 1);
   }, [effectiveSpotPrice, allStrikes]);
 
+  const isIndex = useMemo(() => ALLOWED_INDEX_SYMBOLS.includes(symbol), [symbol]);
+
+  // Compute Synthetic Futures Price from Put-Call Parity (F = K + C - P) across ATM strikes
+  const synthFutPrice = useStore(useCallback(state => {
+    if (!strikes || strikes.length === 0 || !chain) return 0;
+    const target = spotPrice > 0 ? spotPrice : effectiveSpotPrice;
+    if (!target) return 0;
+
+    const sorted = [...strikes].sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
+    let sumF = 0;
+    let count = 0;
+
+    for (const s of sorted) {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      if (!c || !p) continue;
+
+      const cData = state.prices[c.symbol] || (c.symbol?.includes(':') ? state.prices[c.symbol.split(':')[1]] : null);
+      const pData = state.prices[p.symbol] || (p.symbol?.includes(':') ? state.prices[p.symbol.split(':')[1]] : null);
+
+      const cLtp = Number(cData?.ltp ?? c.ltp ?? 0);
+      const pLtp = Number(pData?.ltp ?? p.ltp ?? 0);
+
+      if (cLtp > 0 && pLtp > 0) {
+        sumF += (s + cLtp - pLtp);
+        count++;
+        if (count >= 3) break;
+      }
+    }
+
+    if (count > 0) {
+      return Number((sumF / count).toFixed(2));
+    }
+    return 0;
+  }, [strikes, chain, spotPrice, effectiveSpotPrice]));
+
+  const pricingPrice = useMemo(() => {
+    if (synthFutPrice > 0) return synthFutPrice;
+    if (futPrice > 0) return futPrice;
+    return basePrice;
+  }, [synthFutPrice, futPrice, basePrice]);
+
   useEffect(() => {
     if (!expiry || !optionsData[expiry]) return;
 
@@ -677,6 +719,16 @@ const OptionChainViewInternal = () => {
 
         <div className="top-bar-divider"></div>
 
+        {/* Section 3.5: Synthetic Futures Price (Put-Call Parity) */}
+        <div className="top-bar-section" title="Synthetic Futures Price derived via Put-Call Parity from ATM options">
+          <span className="top-bar-label">Synth Fut</span>
+          <span className="top-bar-value" style={{ fontWeight: '700', color: '#60a5fa' }}>
+            {synthFutPrice > 0 ? synthFutPrice.toFixed(2) : '-'}
+          </span>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
         {/* Section 4: INDIAVIX */}
         <div className="top-bar-section">
           <span className="top-bar-label">INDIAVIX</span>
@@ -860,6 +912,8 @@ const OptionChainViewInternal = () => {
                 call={chain[strike]?.CE}
                 put={chain[strike]?.PE}
                 basePrice={basePrice}
+                pricingPrice={pricingPrice}
+                isIndex={isIndex}
                 atmStrike={atmStrike}
                 atmRowRef={atmRowRef}
                 T={T}

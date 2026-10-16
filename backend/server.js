@@ -10631,6 +10631,15 @@ app.post('/api/ltp-batch', async (req, res) => {
           // Write results into priceCache for future requests
           for (const [sym, ltpData] of Object.entries(data)) {
             if (ltpData && ltpData.ltp > 0) {
+              const old = priceCache[sym];
+              if (old) {
+                if ((!ltpData.oi || ltpData.oi === 0) && old.oi > 0) ltpData.oi = old.oi;
+                if ((!ltpData.prev_oi || ltpData.prev_oi === 0) && (old.prev_oi > 0 || old.pOI > 0)) {
+                  ltpData.prev_oi = old.prev_oi || old.pOI;
+                  ltpData.pOI = ltpData.prev_oi;
+                }
+                if ((!ltpData.oi_change || ltpData.oi_change === 0) && old.oi_change) ltpData.oi_change = old.oi_change;
+              }
               priceCache[sym] = ltpData;
               const rSym = sym.includes(':') ? sym.split(':')[1] : null;
               if (rSym) {

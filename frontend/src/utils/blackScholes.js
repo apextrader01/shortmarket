@@ -64,12 +64,12 @@ export function calculateBlack76Greeks(type, F, K, T, r, sigma) {
     price = discount * (F * N(d1) - K * N(d2));
     delta = discount * N(d1);
     const thetaDecay = sqrtT > 1e-7 ? -(F * discount * N_prime(d1) * sigma) / (2 * sqrtT) : 0;
-    theta = (thetaDecay - r * price) / 252; // 252 trading days
+    theta = (thetaDecay - r * price) / 365; // 365 calendar days (Sensibull / Black-76 standard)
   } else {
     price = discount * (K * N(-d2) - F * N(-d1));
     delta = -discount * N(-d1);
     const thetaDecay = sqrtT > 1e-7 ? -(F * discount * N_prime(d1) * sigma) / (2 * sqrtT) : 0;
-    theta = (thetaDecay - r * price) / 252; // 252 trading days
+    theta = (thetaDecay - r * price) / 365; // 365 calendar days (Sensibull / Black-76 standard)
   }
 
   return {
@@ -145,13 +145,13 @@ export function calculateGreeks(type, S, K, T, r, sigma, isCommodity = false) {
   if (optType === 'CE') {
     price = S * N(d1) - K * Math.exp(-r * T) * N(d2);
     delta = N(d1);
-    // Scale by standard 252 trading days per SEBI convention
-    theta = (thetaTerm1 - r * K * Math.exp(-r * T) * N(d2)) / 252;
+    // Scale by standard 365 calendar days per Sensibull / market convention
+    theta = (thetaTerm1 - r * K * Math.exp(-r * T) * N(d2)) / 365;
   } else {
     price = K * Math.exp(-r * T) * N(-d2) - S * N(-d1);
     delta = N(d1) - 1;
     // Cap put theta so interest cash-carry doesn't create misleading positive theta on long puts
-    const rawPutTheta = (thetaTerm1 + r * K * Math.exp(-r * T) * N(-d2)) / 252;
+    const rawPutTheta = (thetaTerm1 + r * K * Math.exp(-r * T) * N(-d2)) / 365;
     theta = Math.min(0, rawPutTheta);
   }
 

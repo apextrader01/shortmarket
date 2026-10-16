@@ -203,6 +203,18 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
 
     const old = (newPrices || state.prices)[symbol];
     
+    // Preserve non-zero Open Interest if incoming snapshot has zero/undefined (e.g. post-market quote polling)
+    if ((!data.oi || Number(data.oi) === 0) && old && old.oi > 0) {
+      data.oi = old.oi;
+    }
+    if ((!data.prev_oi || Number(data.prev_oi) === 0) && old && (old.prev_oi > 0 || old.pOI > 0)) {
+      data.prev_oi = old.prev_oi || old.pOI;
+      data.pOI = data.prev_oi;
+    }
+    if ((!data.oi_change || Number(data.oi_change) === 0) && old && old.oi_change) {
+      data.oi_change = old.oi_change;
+    }
+    
     // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 4 seconds.
     if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 4000)) {
         continue;
