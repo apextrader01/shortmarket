@@ -12,6 +12,7 @@ import {
   Activity
 } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { formatInstrument } from '../utils/symbolFormatter';
 
 const TIMEFRAMES = [
   { label: '1D', value: 'FIVE_MINUTE', days: 1 },
@@ -73,6 +74,12 @@ export default function MobileStockOverviewModal() {
     const cleanName = stockMeta?.name || stockMeta?.description || raw.split('-')[0];
     return { exchange: ex, rawSymbol: raw, displayName: cleanName };
   }, [symbol, stockMeta]);
+
+  // Institutional instrument formatting (Zerodha Kite & Fyers standard)
+  const formattedInst = useMemo(() => {
+    if (!symbol) return null;
+    return formatInstrument(symbol, stockMeta?.description || stockMeta?.name, exchange);
+  }, [symbol, stockMeta, exchange]);
 
   // Live price object from store — fine-grained selector eliminates hundreds of re-renders per second
   const livePrice = useStore(state => {
@@ -321,24 +328,48 @@ export default function MobileStockOverviewModal() {
             </button>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '15px', fontWeight: '700', letterSpacing: '0.2px' }}>
-                  {rawSymbol}
+                <span style={{ fontSize: '15px', fontWeight: '800', letterSpacing: '0.2px' }}>
+                  {formattedInst?.name || rawSymbol}
                 </span>
+                {formattedInst?.tag && formattedInst.tag !== 'EQ' && (
+                  <span style={{
+                    fontSize: '9.5px',
+                    fontWeight: '700',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                    background: formattedInst.tag === 'CE' ? 'rgba(16, 185, 129, 0.15)' : 
+                                formattedInst.tag === 'PE' ? 'rgba(239, 68, 68, 0.15)' : 
+                                formattedInst.tag === 'FUT' ? 'rgba(59, 130, 246, 0.15)' : 
+                                'rgba(168, 85, 247, 0.15)',
+                    color: formattedInst.tag === 'CE' ? '#10b981' : 
+                           formattedInst.tag === 'PE' ? '#ef4444' : 
+                           formattedInst.tag === 'FUT' ? '#60a5fa' : 
+                           '#c084fc',
+                    border: `1px solid ${
+                      formattedInst.tag === 'CE' ? 'rgba(16, 185, 129, 0.3)' : 
+                      formattedInst.tag === 'PE' ? 'rgba(239, 68, 68, 0.3)' : 
+                      formattedInst.tag === 'FUT' ? 'rgba(59, 130, 246, 0.3)' : 
+                      'rgba(168, 85, 247, 0.3)'
+                    }`
+                  }}>
+                    {formattedInst.tag}
+                  </span>
+                )}
                 <span className={`badge-${exchange.toLowerCase()}`} style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px' }}>
                   {exchange}
                 </span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>
-                {displayName}
+                {formattedInst?.subtitle || displayName}
               </div>
             </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '16px', fontWeight: '800', color: isUp ? 'var(--color-green-light, #10b981)' : 'var(--color-red-light, #ef4444)' }}>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: isUp ? 'var(--color-green-light, #10b981)' : 'var(--color-red-light, #ef4444)', fontVariantNumeric: 'tabular-nums' }}>
               {currentLtp ? currentLtp.toFixed(2) : '--'}
             </div>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: isUp ? 'var(--color-green-light, #10b981)' : 'var(--color-red-light, #ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: isUp ? 'var(--color-green-light, #10b981)' : 'var(--color-red-light, #ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px', fontVariantNumeric: 'tabular-nums' }}>
               {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
               {pct > 0 ? '+' : ''}{change.toFixed(2)} ({pct > 0 ? '+' : ''}{pct.toFixed(2)}%)
             </div>

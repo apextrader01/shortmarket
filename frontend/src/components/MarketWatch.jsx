@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useRef } from 'react';
 import { useStore, API } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell, SlidersHorizontal, ArrowDownUp, RotateCcw } from 'lucide-react';
+import { formatInstrument } from '../utils/symbolFormatter';
 import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
 
 const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect, swipedSymbol, setSwipedSymbol, isMobile }) => {
@@ -82,6 +83,12 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
     return rawDesc || sym;
   }, [stock.symbol, stock.uniqueSymbol, rawDesc]);
 
+  // Clean formatted instrument for modern mobile display (Zerodha Kite / Fyers standard)
+  const inst = React.useMemo(() => {
+    return formatInstrument(stock.symbol || stock.uniqueSymbol, readableSubtitle, stock.exchange);
+  }, [stock.symbol, stock.uniqueSymbol, readableSubtitle, stock.exchange]);
+
+  // Desktop row content: preserved 100% untouched
   const rowContent = (
     <>
       <div 
@@ -192,6 +199,165 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
     </>
   );
 
+  // Modern Mobile Row Content (Zerodha Kite / Fyers standard)
+  const mobileRowContent = (
+    <>
+      <div 
+        style={{ minWidth: 0, flex: 1, paddingRight: '10px', overflow: 'hidden' }}
+        onClick={() => {
+          if (isSearchMode) handleSelect();
+        }}
+        title={stock.symbol}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          <span style={{ 
+            fontWeight: isSelected ? '700' : '600', 
+            fontSize: '13px', 
+            color: 'var(--text-primary)', 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.1px' 
+          }}>
+            {inst.name}
+          </span>
+
+          {inst.tag && inst.tag !== 'EQ' && (
+            <span style={{
+              fontSize: '9px',
+              fontWeight: '700',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              flexShrink: 0,
+              background: inst.tag === 'CE' ? 'rgba(16, 185, 129, 0.15)' : 
+                          inst.tag === 'PE' ? 'rgba(239, 68, 68, 0.15)' : 
+                          inst.tag === 'FUT' ? 'rgba(59, 130, 246, 0.15)' : 
+                          'rgba(168, 85, 247, 0.15)',
+              color: inst.tag === 'CE' ? '#10b981' : 
+                     inst.tag === 'PE' ? '#ef4444' : 
+                     inst.tag === 'FUT' ? '#60a5fa' : 
+                     '#c084fc',
+              border: `1px solid ${
+                inst.tag === 'CE' ? 'rgba(16, 185, 129, 0.3)' : 
+                inst.tag === 'PE' ? 'rgba(239, 68, 68, 0.3)' : 
+                inst.tag === 'FUT' ? 'rgba(59, 130, 246, 0.3)' : 
+                'rgba(168, 85, 247, 0.3)'
+              }`
+            }}>
+              {inst.tag}
+            </span>
+          )}
+
+          <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '8.5px', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>
+            {stock.exchange || 'NSE'}
+          </span>
+
+          {isSearchMode && isInWatchlist && (
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.15)', color: 'var(--color-green-light)', fontWeight: '600', flexShrink: 0 }}>
+              ✓ Added
+            </span>
+          )}
+        </div>
+
+        <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', marginTop: '3px' }}>
+          {inst.subtitle || readableSubtitle}
+        </div>
+      </div>
+
+      {isSearchMode ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {isInWatchlist ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 10px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '6px',
+                color: 'var(--color-red-light)',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+              title="Remove from Watchlist"
+            >
+              <Minus size={12} />
+              <span>Remove</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 12px',
+                background: 'var(--color-blue)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(37,99,235,0.3)'
+              }}
+              title="Add to Watchlist"
+            >
+              <Plus size={12} />
+              <span>Add</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ textAlign: 'right', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {data && data.ltp !== undefined ? (
+            <>
+              <div 
+                className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} 
+                style={{ 
+                  fontWeight: '700', 
+                  fontSize: '13px', 
+                  color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)',
+                  fontVariantNumeric: 'tabular-nums',
+                  letterSpacing: '-0.2px'
+                }}
+              >
+                {data.ltp.toFixed(2)}
+              </div>
+              <div style={{ 
+                fontSize: '10.5px', 
+                fontWeight: '500',
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '3px', 
+                justifyContent: 'flex-end', 
+                color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)',
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: '2px'
+              }}>
+                {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
+                {data.change !== undefined && data.pct !== undefined ? `${data.pct > 0 ? '+' : ''}${Number(data.change).toFixed(2)} (${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%)` : '—'}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</div>
+          )}
+        </div>
+      )}
+    </>
+  );
+
   // Desktop View: clean, original background with NO swipe container or swipe actions
   if (!isMobile) {
     return (
@@ -262,7 +428,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
         </div>
       )}
 
-      {/* Main Row Content - Old Clean Background Restored */}
+      {/* Main Row Content - Enhanced for Mobile with humanized tokens & 56px touch target */}
       <div
         onClick={() => {
           if (isSwiped) {
@@ -281,19 +447,75 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
         className={`watchlist-item watchlist-swipe-row ${isSelected ? 'selected' : ''}`}
         style={{
           transform: isSwiped ? 'translateX(-165px)' : 'none',
-          padding: '7px 12px',
-          borderBottom: '1px solid var(--border-color)',
+          padding: '10px 14px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
           cursor: 'pointer',
           background: isSelected ? 'rgba(37,99,235,0.08)' : (isSwiped ? 'var(--bg-card, #131722)' : 'transparent'),
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           position: 'relative',
-          minHeight: '44px'
+          minHeight: '56px'
         }}
       >
-        {rowContent}
+        {mobileRowContent}
       </div>
+    </div>
+  );
+});
+
+// ⚡ Top Pinned Market Index Bar for Mobile (Zerodha Kite & Fyers Standard)
+const MobilePinnedIndices = React.memo(() => {
+  const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX'] || state.prices['NIFTY 50'] || state.prices['NIFTY50-INDEX']);
+  const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX'] || state.prices['BANK NIFTY'] || state.prices['BANKNIFTY-INDEX']);
+  
+  const renderItem = (label, data) => {
+    const ltp = data?.ltp !== undefined ? Number(data.ltp) : null;
+    const change = data?.change !== undefined ? Number(data.change) : null;
+    const pct = data?.pct !== undefined ? Number(data.pct) : null;
+    const isUp = (pct ?? 0) >= 0;
+    
+    return (
+      <div 
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '7px 12px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.06)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>
+            {label}
+          </span>
+          {pct !== null && (
+            <span style={{ fontSize: '10.5px', fontWeight: '600', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums' }}>
+              {isUp ? '+' : ''}{pct.toFixed(2)}%
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+            {ltp !== null ? ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+          </span>
+          {change !== null && (
+            <span style={{ fontSize: '10.5px', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontVariantNumeric: 'tabular-nums' }}>
+              {isUp ? '+' : ''}{change.toFixed(2)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '8px', padding: '10px 12px 8px', background: 'var(--bg-panel)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {renderItem('NIFTY 50', nifty)}
+      {renderItem('BANK NIFTY', banknifty)}
     </div>
   );
 });
@@ -317,6 +539,20 @@ export default function MarketWatch({ className = '', onStockSelect }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // On Mobile: subscribe to top benchmark indices for live pulse ticker
+  React.useEffect(() => {
+    if (!isMobile) return;
+    const subscribeBatch = useStore.getState().subscribeToOptionBatch;
+    const topIndices = [
+      { symbol: 'NSE:NIFTY50-INDEX', token: 'NIFTY50-INDEX', exchange: 'NSE', name: 'NIFTY 50' },
+      { symbol: 'NSE:NIFTYBANK-INDEX', token: 'NIFTYBANK-INDEX', exchange: 'NSE', name: 'BANK NIFTY' }
+    ];
+    if (typeof subscribeBatch === 'function') subscribeBatch(topIndices);
+    if (typeof useStore.getState().fetchBatchPrices === 'function') {
+      useStore.getState().fetchBatchPrices(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX']);
+    }
+  }, [isMobile]);
 
   const activeWatchlist = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
   const isSearchMode = searchQuery.trim().length > 0;
@@ -485,47 +721,131 @@ export default function MarketWatch({ className = '', onStockSelect }) {
 
   return (
     <div className={`sidebar glass-panel ${className}`}>
-      {/* Watchlist Tabs */}
-      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', padding: '0 8px', background: 'var(--bg-panel)' }} className="scrollbar-hide">
-        {watchlists.map(w => (
-          <div
-            key={w.id}
-            onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); setSearchResults([]); }}
-            onDoubleClick={() => { 
-              const newName = prompt('Rename watchlist:', w.name); 
-              if (newName && newName.trim()) renameWatchlist(w.id, newName.trim()); 
-            }}
-            title="Double-click to rename"
-            style={{
-              padding: '12px 14px',
-              fontSize: '12px',
-              fontWeight: String(activeWatchlistId) === String(w.id) ? '600' : '500',
-              color: String(activeWatchlistId) === String(w.id) ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: String(activeWatchlistId) === String(w.id) ? '2px solid var(--color-blue)' : '2px solid transparent',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              userSelect: 'none'
-            }}
-          >
-            {w.name}
-            {watchlists.length > 1 && String(activeWatchlistId) === String(w.id) && (
-               <X size={12} onClick={(e) => { e.stopPropagation(); deleteWatchlist(w.id); }} style={{ opacity: 0.5, cursor: 'pointer' }} />
-            )}
-          </div>
-        ))}
+      {/* Top Pinned Market Index Bar (Mobile Only) */}
+      {isMobile && <MobilePinnedIndices />}
+
+      {/* Watchlist Tabs (Mobile Segmented Pills vs Desktop Tabs) */}
+      {isMobile ? (
         <div 
-          onClick={() => { const name = prompt('Enter watchlist name:'); if (name && name.trim()) createWatchlist(name.trim()); }}
-          style={{ padding: '12px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}
-          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+          style={{ 
+            display: 'flex', 
+            overflowX: 'auto', 
+            gap: '6px',
+            padding: '8px 12px', 
+            background: 'var(--bg-panel)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            alignItems: 'center'
+          }} 
+          className="scrollbar-hide"
         >
-          <Plus size={14} />
+          {watchlists.map(w => {
+            const isActive = String(activeWatchlistId) === String(w.id);
+            const count = (w.symbols || []).length;
+            return (
+              <div
+                key={w.id}
+                onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); setSearchResults([]); }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: isActive ? '700' : '500',
+                  color: isActive ? '#fff' : 'var(--text-secondary)',
+                  background: isActive ? 'var(--color-blue)' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${isActive ? 'var(--color-blue)' : 'rgba(255, 255, 255, 0.08)'}`,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{w.name}</span>
+                <span 
+                  style={{
+                    fontSize: '10px',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    color: isActive ? '#fff' : 'var(--text-secondary)',
+                    fontWeight: '600'
+                  }}
+                >
+                  {count}
+                </span>
+                {watchlists.length > 1 && isActive && (
+                  <X 
+                    size={11} 
+                    onClick={(e) => { e.stopPropagation(); deleteWatchlist(w.id); }} 
+                    style={{ marginLeft: '2px', opacity: 0.8, cursor: 'pointer' }} 
+                  />
+                )}
+              </div>
+            );
+          })}
+          <div 
+            onClick={() => { const name = prompt('Enter watchlist name:'); if (name && name.trim()) createWatchlist(name.trim()); }}
+            style={{ 
+              padding: '6px 10px', 
+              borderRadius: '20px', 
+              background: 'rgba(255, 255, 255, 0.04)', 
+              border: '1px solid rgba(255, 255, 255, 0.08)', 
+              color: 'var(--text-secondary)', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center',
+              flexShrink: 0
+            }}
+            title="Create Watchlist"
+          >
+            <Plus size={13} />
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Desktop Watchlist Tabs (100% UNTOUCHED) */
+        <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', padding: '0 8px', background: 'var(--bg-panel)' }} className="scrollbar-hide">
+          {watchlists.map(w => (
+            <div
+              key={w.id}
+              onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); setSearchResults([]); }}
+              onDoubleClick={() => { 
+                const newName = prompt('Rename watchlist:', w.name); 
+                if (newName && newName.trim()) renameWatchlist(w.id, newName.trim()); 
+              }}
+              title="Double-click to rename"
+              style={{
+                padding: '12px 14px',
+                fontSize: '12px',
+                fontWeight: String(activeWatchlistId) === String(w.id) ? '600' : '500',
+                color: String(activeWatchlistId) === String(w.id) ? 'var(--color-blue)' : 'var(--text-secondary)',
+                borderBottom: String(activeWatchlistId) === String(w.id) ? '2px solid var(--color-blue)' : '2px solid transparent',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                userSelect: 'none'
+              }}
+            >
+              {w.name}
+              {watchlists.length > 1 && String(activeWatchlistId) === String(w.id) && (
+                 <X size={12} onClick={(e) => { e.stopPropagation(); deleteWatchlist(w.id); }} style={{ opacity: 0.5, cursor: 'pointer' }} />
+              )}
+            </div>
+          ))}
+          <div 
+            onClick={() => { const name = prompt('Enter watchlist name:'); if (name && name.trim()) createWatchlist(name.trim()); }}
+            style={{ padding: '12px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+          >
+            <Plus size={14} />
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter Header */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', position: 'relative', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -580,6 +900,41 @@ export default function MarketWatch({ className = '', onStockSelect }) {
           </button>
         </div>
       </div>
+
+      {/* Quick Segment Filter Chips (Mobile Only - Like Fyers & INDmoney) */}
+      {isMobile && !isSearchMode && (
+        <div style={{ display: 'flex', overflowX: 'auto', gap: '6px', padding: '6px 12px 8px', background: 'var(--bg-panel)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }} className="scrollbar-hide">
+          {[
+            { label: 'All', value: 'ALL' },
+            { label: 'NSE', value: 'NSE' },
+            { label: 'BSE', value: 'BSE' },
+            { label: 'MCX', value: 'MCX' },
+            { label: 'F&O', value: 'FNO' }
+          ].map(seg => {
+            const isSel = filterSegment === seg.value;
+            return (
+              <button
+                key={seg.value}
+                type="button"
+                onClick={() => setFilterSegment(seg.value)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: isSel ? '700' : '500',
+                  color: isSel ? '#38bdf8' : 'var(--text-secondary)',
+                  background: isSel ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                  border: `1px solid ${isSel ? 'rgba(56, 189, 248, 0.35)' : 'rgba(255, 255, 255, 0.06)'}`,
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                {seg.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Filter & Sort Dropdown Menu */}
       {showFilterMenu && (
