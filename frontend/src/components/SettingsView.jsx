@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import QRCode from 'qrcode';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Tablet, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy, ChevronDown, ChevronUp, Layers, Cpu, History, Sparkles, CheckCheck } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Tablet, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy, ChevronDown, ChevronUp, Layers, Cpu, History, Sparkles, CheckCheck, BarChart3, LineChart, Target } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -129,6 +129,45 @@ export default function SettingsView({ initialTab = 'all', onBack }) {
   });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
+
+  const [defaultLandingTab, setDefaultLandingTab] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('skandx_default_landing')) || user?.default_landing_tab || 'Home';
+  });
+  const [landingTabLoading, setLandingTabLoading] = useState(false);
+  const [landingTabMsg, setLandingTabMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (user?.default_landing_tab) {
+      setDefaultLandingTab(user.default_landing_tab);
+    }
+  }, [user?.default_landing_tab]);
+
+  const handleLandingTabChange = async (tabName) => {
+    const cleanTab = tabName === 'Markets' ? 'Markets' : 'Home';
+    setDefaultLandingTab(cleanTab);
+    try {
+      localStorage.setItem('skandx_default_landing', cleanTab);
+    } catch (_) {}
+    setLandingTabLoading(true);
+    setLandingTabMsg({ type: '', text: '' });
+    try {
+      const res = await updateUserDetails({ default_landing_tab: cleanTab });
+      if (res && res.success) {
+        setLandingTabMsg({
+          type: 'success',
+          text: cleanTab === 'Markets' 
+            ? 'Default launch screen set to Paper Trading Terminal!' 
+            : 'Default launch screen set to Stock Market Data Hub!'
+        });
+        setTimeout(() => setLandingTabMsg({ type: '', text: '' }), 3500);
+      } else {
+        setLandingTabMsg({ type: 'error', text: res?.error || 'Failed to sync with server' });
+      }
+    } catch (e) {
+      setLandingTabMsg({ type: 'error', text: e.message || 'Failed to update' });
+    }
+    setLandingTabLoading(false);
+  };
 
   useEffect(() => {
     if (user) {
@@ -485,6 +524,191 @@ export default function SettingsView({ initialTab = 'all', onBack }) {
             )}
           </div>
         </div>
+        )}
+
+        {/* Default Launch Screen Preference Card */}
+        {(activeTab === 'all' || activeTab === 'profile') && (
+          <div style={{
+            background: 'var(--bg-panel)',
+            padding: isMobile ? '18px' : '24px',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gridColumn: activeTab === 'profile' ? '1 / -1' : 'auto'
+          }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '16px', flexDirection: isMobile ? 'column' : 'row', gap: '8px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <Target size={18} color="var(--color-blue)" /> Default Launch Screen
+                </h3>
+                <span style={{
+                  fontSize: '11px',
+                  color: 'var(--text-secondary)',
+                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  App Launch Destination
+                </span>
+              </div>
+
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: '1.45' }}>
+                Choose which section opens immediately when you launch SkandX or open the root address.
+              </p>
+
+              {landingTabMsg.text && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                  background: landingTabMsg.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: landingTabMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)',
+                  border: `1px solid ${landingTabMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <CheckCheck size={16} /> {landingTabMsg.text}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Option 1: Paper Trading Terminal */}
+                <div
+                  onClick={() => handleLandingTabChange('Markets')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    cursor: landingTabLoading ? 'wait' : 'pointer',
+                    background: defaultLandingTab === 'Markets'
+                      ? (isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56, 189, 248, 0.08)')
+                      : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)'),
+                    border: defaultLandingTab === 'Markets'
+                      ? '2px solid var(--color-blue)'
+                      : '1px solid var(--border-color)',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: defaultLandingTab === 'Markets' ? 'rgba(56, 189, 248, 0.2)' : (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <LineChart size={18} color={defaultLandingTab === 'Markets' ? 'var(--color-blue)' : 'var(--text-secondary)'} />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        Paper Trading Terminal
+                      </div>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(56, 189, 248, 0.15)',
+                        color: '#38bdf8'
+                      }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                      Opens straight into the trading workspace, live matching watchlist, order books, and TradingView charts.
+                    </p>
+                  </div>
+
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: defaultLandingTab === 'Markets' ? '5px solid var(--color-blue)' : '2px solid var(--border-color)',
+                    background: defaultLandingTab === 'Markets' ? '#ffffff' : 'transparent',
+                    flexShrink: 0,
+                    marginTop: '4px'
+                  }} />
+                </div>
+
+                {/* Option 2: Stock Market Data Hub */}
+                <div
+                  onClick={() => handleLandingTabChange('Home')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    cursor: landingTabLoading ? 'wait' : 'pointer',
+                    background: defaultLandingTab === 'Home'
+                      ? (isLight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(52, 211, 153, 0.08)')
+                      : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)'),
+                    border: defaultLandingTab === 'Home'
+                      ? '2px solid #10b981'
+                      : '1px solid var(--border-color)',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: defaultLandingTab === 'Home' ? 'rgba(52, 211, 153, 0.2)' : (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <BarChart3 size={18} color={defaultLandingTab === 'Home' ? '#10b981' : 'var(--text-secondary)'} />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        Stock Market Data & Analytics Hub
+                      </div>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(52, 211, 153, 0.15)',
+                        color: '#10b981'
+                      }}>
+                        Overview
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                      Opens to the market overview dashboard, live indices, Option Chain with Greeks, Bhavcopy, and financial calculators.
+                    </p>
+                  </div>
+
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: defaultLandingTab === 'Home' ? '5px solid #10b981' : '2px solid var(--border-color)',
+                    background: defaultLandingTab === 'Home' ? '#ffffff' : 'transparent',
+                    flexShrink: 0,
+                    marginTop: '4px'
+                  }} />
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Bank Details Card (For Withdrawals) */}

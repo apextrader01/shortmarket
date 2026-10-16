@@ -339,6 +339,9 @@ export const useStore = create(persist((set, get) => ({
       if (data.success) {
         if (data.trusted && data.token && data.user) {
           localStorage.setItem('token', data.token);
+          if (data.user?.default_landing_tab) {
+            try { localStorage.setItem('skandx_default_landing', data.user.default_landing_tab); } catch (_) {}
+          }
           if (data.user?.id) {
             setAppLocked(false, data.user.id);
             socket.emit('register_user', data.user.id);
@@ -444,6 +447,9 @@ export const useStore = create(persist((set, get) => ({
         if (data.token) localStorage.setItem('token', data.token);
         if (data.trusted_device_token) {
           localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
+        }
+        if (data.user?.default_landing_tab) {
+          try { localStorage.setItem('skandx_default_landing', data.user.default_landing_tab); } catch (_) {}
         }
         if (data.user?.id) {
           setAppLocked(false, data.user.id);
@@ -1661,6 +1667,12 @@ export const useStore = create(persist((set, get) => ({
           user: finalUser
         });
 
+        if (finalUser?.default_landing_tab && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('skandx_default_landing', finalUser.default_landing_tab);
+          } catch (_) {}
+        }
+
         // 2. Isolate watchlist merging, WebSocket subscriptions, and price fetching in a separate try/catch
         try {
           const now = Date.now();
@@ -1903,8 +1915,17 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) { 
+        if (profileData.default_landing_tab) {
+          try {
+            localStorage.setItem('skandx_default_landing', profileData.default_landing_tab);
+          } catch (_) {}
+        }
         set(state => ({
-          user: state.user ? { ...state.user, is_onboarded: true } : state.user
+          user: state.user ? { 
+            ...state.user, 
+            is_onboarded: true,
+            default_landing_tab: profileData.default_landing_tab || state.user.default_landing_tab || 'Home'
+          } : state.user
         }));
         get().fetchUserData(); 
         return { success: true }; 

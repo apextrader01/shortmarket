@@ -427,7 +427,8 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
-    if (!rawPath || rawPath === 'home') return 'Home';
+    const preferredLanding = (typeof window !== 'undefined' && localStorage.getItem('skandx_default_landing')) || 'Home';
+    if (!rawPath) return preferredLanding;
     const firstSeg = rawPath.split('/')[0].toLowerCase();
     
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
@@ -445,11 +446,11 @@ function App() {
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
       'leaderboard': 'Leaderboard',
       'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
-      'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
+      'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'profile': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
       'aboutus': 'AboutUs', 'about': 'AboutUs', 'about-us': 'AboutUs'
     };
-    return tabsMap[rawPath.toLowerCase()] || tabsMap[firstSeg] || 'Home';
+    return tabsMap[rawPath.toLowerCase()] || tabsMap[firstSeg] || preferredLanding;
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -483,7 +484,20 @@ function App() {
   const userRef = useRef(user);
   useEffect(() => {
     userRef.current = user;
+    if (user?.default_landing_tab && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('skandx_default_landing', user.default_landing_tab);
+      } catch (_) {}
+    }
   }, [user]);
+
+  useEffect(() => {
+    const handleSetTab = (e) => {
+      if (e?.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener('skandx_set_active_tab', handleSetTab);
+    return () => window.removeEventListener('skandx_set_active_tab', handleSetTab);
+  }, []);
 
   const modalHistoryPushedRef = useRef(false);
   const isClosingFromPopstateRef = useRef(false);
@@ -515,7 +529,8 @@ function App() {
   const handleBackNavigation = useCallback(() => {
     const currentUser = userRef.current;
     const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    const rootTab = currentUser ? (isMobileScreen ? 'Watchlist' : 'Markets') : 'Home';
+    const preferredLanding = (typeof window !== 'undefined' && localStorage.getItem('skandx_default_landing')) || currentUser?.default_landing_tab || 'Home';
+    const rootTab = currentUser ? (preferredLanding === 'Markets' ? (isMobileScreen ? 'Watchlist' : 'Markets') : 'Home') : 'Home';
     const currentTab = activeTabRef.current || rootTab;
     let nextTab = rootTab;
 
@@ -873,7 +888,12 @@ function App() {
       // --- DESKTOP WEB BROWSER ONLY (Screen > 768px) ---
       // 4. Standard path parsing for deep-links and desktop forward/backward buttons
       const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
-      if (!rawPath || rawPath === 'home') {
+      if (!rawPath) {
+        const preferredLanding = (typeof window !== 'undefined' && localStorage.getItem('skandx_default_landing')) || userRef.current?.default_landing_tab || 'Home';
+        setActiveTab(preferredLanding);
+        return;
+      }
+      if (rawPath === 'home') {
         setActiveTab('Home');
         return;
       }
@@ -1698,7 +1718,16 @@ function App() {
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '4px' }}>
                   <div 
-                    onClick={() => setActiveTab(user ? (window.innerWidth <= 768 ? 'Watchlist' : 'Markets') : 'Home')}
+                    onClick={() => {
+                      const preferredLanding = (typeof window !== 'undefined' && localStorage.getItem('skandx_default_landing')) || user?.default_landing_tab || 'Home';
+                      if (!user) {
+                        setActiveTab('Home');
+                      } else if (preferredLanding === 'Markets') {
+                        setActiveTab(window.innerWidth <= 768 ? 'Watchlist' : 'Markets');
+                      } else {
+                        setActiveTab('Home');
+                      }
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}
                     title="SkandX Trading Platform"
                   >

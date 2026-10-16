@@ -1367,6 +1367,7 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
     await db('user_profiles').where({ user_id: req.user.id }).del();
 
     // Insert profile data
+    const landingTab = (data.default_landing_tab === 'Markets' || data.default_landing_tab === 'Home') ? data.default_landing_tab : 'Home';
     await db('user_profiles').insert({
       user_id: req.user.id,
       dob: data.dob,
@@ -1380,11 +1381,15 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
       preferred_segment: data.preferred_segment,
       trading_style: data.trading_style,
       primary_strategy: data.primary_strategy,
-      hear_about_us: data.hear_about_us
+      hear_about_us: data.hear_about_us,
+      default_landing_tab: landingTab
     });
 
-    // Update users table to set is_onboarded
-    await db('users').where({ id: req.user.id }).update({ is_onboarded: true });
+    // Update users table to set is_onboarded and default_landing_tab
+    await db('users').where({ id: req.user.id }).update({ 
+      is_onboarded: true,
+      default_landing_tab: landingTab
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -1489,7 +1494,8 @@ function formatUserForClient(user, profile = null) {
     financial_goal: profile?.financial_goal || user.financial_goal || null,
     trading_experience: profile?.trading_experience || user.trading_experience || null,
     preferred_segment: profile?.preferred_segment || user.preferred_segment || null,
-    trading_style: profile?.trading_style || user.trading_style || null
+    trading_style: profile?.trading_style || user.trading_style || null,
+    default_landing_tab: user.default_landing_tab || profile?.default_landing_tab || 'Home'
   };
 }
 
@@ -5310,13 +5316,21 @@ const handleUpdateUserDetails = async (req, res) => {
     if (upi_id !== undefined) updates.upi_id = String(upi_id).trim();
     if (bank_account_no !== undefined) updates.bank_account_no = String(bank_account_no).trim();
     if (bank_ifsc !== undefined) updates.bank_ifsc = String(bank_ifsc).trim().toUpperCase();
+    if (req.body.default_landing_tab !== undefined) {
+      const cleanLanding = req.body.default_landing_tab === 'Markets' ? 'Markets' : 'Home';
+      updates.default_landing_tab = cleanLanding;
+    }
 
     // Support updating Onboarding / Profile fields in user_profiles
-    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style'];
+    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style', 'default_landing_tab'];
     const profileUpdates = {};
     for (const f of profileFields) {
       if (req.body && req.body[f] !== undefined && req.body[f] !== null) {
-        profileUpdates[f] = String(req.body[f]).trim();
+        if (f === 'default_landing_tab') {
+          profileUpdates[f] = req.body[f] === 'Markets' ? 'Markets' : 'Home';
+        } else {
+          profileUpdates[f] = String(req.body[f]).trim();
+        }
       }
     }
 
@@ -5345,6 +5359,7 @@ const handleUpdateUserDetails = async (req, res) => {
       delete updatedUser.reset_otp;
       delete updatedUser.reset_otp_expires;
       delete updatedUser.two_factor_secret;
+      updatedUser.default_landing_tab = updatedUser.default_landing_tab || updatedProfile?.default_landing_tab || 'Home';
       if (updatedProfile) {
         updatedUser.dob = updatedProfile.dob || null;
         updatedUser.gender = updatedProfile.gender || null;
@@ -6350,17 +6365,24 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
     if (upi_id !== undefined) updates.upi_id = upi_id ? String(upi_id).trim() : null;
     if (bank_account_no !== undefined) updates.bank_account_no = bank_account_no ? String(bank_account_no).trim() : null;
     if (bank_ifsc !== undefined) updates.bank_ifsc = bank_ifsc ? String(bank_ifsc).trim().toUpperCase() : null;
+    if (req.body.default_landing_tab !== undefined) {
+      updates.default_landing_tab = req.body.default_landing_tab === 'Markets' ? 'Markets' : 'Home';
+    }
     if (password && typeof password === 'string' && password.trim().length > 0) {
       const bcrypt = require('bcryptjs');
       updates.password_hash = await bcrypt.hash(password.trim(), 10);
     }
 
     // Support updating Onboarding / Profile fields in user_profiles
-    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style'];
+    const profileFields = ['dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style', 'default_landing_tab'];
     const profileUpdates = {};
     for (const f of profileFields) {
       if (req.body && req.body[f] !== undefined && req.body[f] !== null) {
-        profileUpdates[f] = String(req.body[f]).trim();
+        if (f === 'default_landing_tab') {
+          profileUpdates[f] = req.body[f] === 'Markets' ? 'Markets' : 'Home';
+        } else {
+          profileUpdates[f] = String(req.body[f]).trim();
+        }
       }
     }
 

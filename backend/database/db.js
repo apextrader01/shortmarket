@@ -527,7 +527,22 @@ async function initSchema() {
         table.boolean('is_onboarded').defaultTo(false);
       });
       console.log('Added is_onboarded to users table');
+    }
 
+    const hasDefaultLandingTab = await db.schema.hasColumn('users', 'default_landing_tab');
+    if (!hasDefaultLandingTab) {
+      await db.schema.alterTable('users', table => {
+        table.string('default_landing_tab', 32).defaultTo('Home');
+      });
+      console.log('Added default_landing_tab to users table');
+    }
+
+    const hasProfileDefaultLandingTab = await db.schema.hasColumn('user_profiles', 'default_landing_tab');
+    if (!hasProfileDefaultLandingTab) {
+      await db.schema.alterTable('user_profiles', table => {
+        table.string('default_landing_tab', 32).defaultTo('Home');
+      });
+      console.log('Added default_landing_tab to user_profiles table');
     }
       // 10. Referrals Table
       const hasReferrals = await db.schema.hasTable('referrals');
@@ -746,6 +761,8 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS browser_name VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS default_landing_tab VARCHAR(50) DEFAULT 'Home'`).catch(()=>null);
+    await db.raw(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS default_landing_tab VARCHAR(50) DEFAULT 'Home'`).catch(()=>null);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     
     // Ensure banned_entities table exists

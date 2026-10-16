@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Briefcase, TrendingUp, CheckCircle, ChevronRight, ChevronLeft, Upload } from 'lucide-react';
+import { User, Briefcase, TrendingUp, CheckCircle, ChevronRight, ChevronLeft, Upload, Target, LineChart, BarChart3, Sparkles } from 'lucide-react';
 import indianStatesData from '../data/indianStates.json';
 
 export default function OnboardingWizard() {
@@ -30,7 +30,8 @@ export default function OnboardingWizard() {
     preferred_segment: '',
     trading_style: '',
     primary_strategy: '',
-    hear_about_us: ''
+    hear_about_us: '',
+    default_landing_tab: 'Markets'
   });
 
   const maxBirthYear = new Date().getFullYear() - 18;
@@ -120,6 +121,10 @@ export default function OnboardingWizard() {
       if (!formData.occupation || !formData.annual_income || !formData.financial_goal) {
         return setError('Please fill all fields to continue.');
       }
+    } else if (step === 3) {
+      if (!formData.trading_experience || !formData.preferred_segment || !formData.trading_style || !formData.primary_strategy || !formData.hear_about_us) {
+        return setError('Please complete all selections to continue.');
+      }
     }
     setError('');
     setStep(s => s + 1);
@@ -132,13 +137,20 @@ export default function OnboardingWizard() {
 
   const handleSubmit = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    if (!formData.trading_experience || !formData.preferred_segment || !formData.trading_style || !formData.primary_strategy || !formData.hear_about_us) {
-      return setError('Please complete all selections.');
-    }
+    const landingChoice = formData.default_landing_tab === 'Home' ? 'Home' : 'Markets';
     
     setLoading(true);
     setError('');
-    const res = await saveProfile(formData);
+
+    try {
+      localStorage.setItem('skandx_default_landing', landingChoice);
+    } catch (_) {}
+
+    const res = await saveProfile({
+      ...formData,
+      default_landing_tab: landingChoice
+    });
+
     if (!res.success) {
       setError(res.error || 'Failed to save profile. Please try again.');
       setLoading(false);
@@ -147,13 +159,17 @@ export default function OnboardingWizard() {
         skipOnboarding();
       }
       setLoading(false);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('skandx_set_active_tab', { detail: landingChoice }));
+      }
     }
   };
 
   const steps = [
     { id: 1, title: 'Personal Details', icon: User },
     { id: 2, title: 'Financial Background', icon: Briefcase },
-    { id: 3, title: 'Trading Profile', icon: TrendingUp }
+    { id: 3, title: 'Trading Profile', icon: TrendingUp },
+    { id: 4, title: 'Primary Focus', icon: Target }
   ];
 
   const selectStyle = {
@@ -196,15 +212,19 @@ export default function OnboardingWizard() {
       }}>
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '6px', color: '#ffffff' }}>Complete Your Profile</h1>
-          <p style={{ color: '#94a3b8', fontSize: '13px' }}>Help us customize your trading experience.</p>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '6px', color: '#ffffff' }}>
+            {step === 4 ? 'Tailor Your Experience' : 'Complete Your Profile'}
+          </h1>
+          <p style={{ color: '#94a3b8', fontSize: '13px' }}>
+            {step === 4 ? 'What is your primary focus on SkandX? (Sets your default launch screen)' : 'Help us customize your trading experience.'}
+          </p>
         </div>
 
         {/* Progress Stepper */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: '21px', left: '16%', right: '16%', height: '2px', background: 'rgba(255, 255, 255, 0.12)', zIndex: 0 }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg, #38bdf8, #0284c7)', width: `${((step - 1) / 2) * 100}%`, transition: 'width 0.3s ease' }} />
+          <div style={{ position: 'absolute', top: '21px', left: '12%', right: '12%', height: '2px', background: 'rgba(255, 255, 255, 0.12)', zIndex: 0 }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg, #38bdf8, #0284c7)', width: `${((step - 1) / (steps.length - 1)) * 100}%`, transition: 'width 0.3s ease' }} />
           </div>
           
           {steps.map((s) => {
@@ -220,11 +240,11 @@ export default function OnboardingWizard() {
                 alignItems: 'center',
                 zIndex: 1,
                 textAlign: 'center',
-                padding: '0 4px'
+                padding: '0 2px'
               }}>
                 <div style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '38px',
+                  height: '38px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -236,16 +256,16 @@ export default function OnboardingWizard() {
                   transition: 'all 0.3s ease',
                   marginBottom: '8px'
                 }}>
-                  {isCompleted ? <CheckCircle size={20} /> : <Icon size={20} />}
+                  {isCompleted ? <CheckCircle size={18} /> : <Icon size={18} />}
                 </div>
                 <span style={{
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: isCurrent ? '700' : '500',
                   color: isCurrent ? '#ffffff' : (isCompleted ? '#e2e8f0' : '#64748b'),
                   lineHeight: '1.25',
                   display: 'block',
                   textAlign: 'center',
-                  maxWidth: '96px'
+                  maxWidth: '85px'
                 }}>
                   {s.title}
                 </span>
@@ -260,7 +280,7 @@ export default function OnboardingWizard() {
           </div>
         )}
 
-        <form onSubmit={step === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
+        <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
         {/* Step 1: Personal Details */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', animation: 'fadeIn 0.3s ease' }}>
@@ -492,6 +512,193 @@ export default function OnboardingWizard() {
           </div>
         )}
 
+        {/* Step 4: Primary Purpose / Default Landing Choice */}
+        {step === 4 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                borderRadius: '999px',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                color: '#38bdf8',
+                fontSize: '11px',
+                fontWeight: '700',
+                marginBottom: '8px'
+              }}>
+                <Sparkles size={12} /> Personalized Launch Setup
+              </div>
+              <h2 style={{ fontSize: '17px', fontWeight: '800', color: '#ffffff', margin: '0 0 6px 0' }}>
+                What purpose are you installing SkandX for?
+              </h2>
+              <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, lineHeight: '1.45' }}>
+                Select your primary interest. SkandX will launch straight into this screen every time you open the app or website.
+              </p>
+            </div>
+
+            {/* Option 1: Paper Trading */}
+            <div 
+              onClick={() => setFormData(prev => ({ ...prev, default_landing_tab: 'Markets' }))}
+              style={{
+                padding: '16px 16px',
+                borderRadius: '14px',
+                cursor: 'pointer',
+                background: formData.default_landing_tab === 'Markets' ? 'rgba(56, 189, 248, 0.08)' : '#1e293b',
+                border: formData.default_landing_tab === 'Markets' ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: formData.default_landing_tab === 'Markets' ? '0 0 20px rgba(56, 189, 248, 0.22)' : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '14px',
+                userSelect: 'none'
+              }}
+            >
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: formData.default_landing_tab === 'Markets' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                marginTop: '2px',
+                border: formData.default_landing_tab === 'Markets' ? '1px solid rgba(56, 189, 248, 0.4)' : 'none'
+              }}>
+                <LineChart size={22} color={formData.default_landing_tab === 'Markets' ? '#38bdf8' : '#94a3b8'} />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.2px' }}>
+                    Paper Trading
+                  </div>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: '800',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: 'rgba(56, 189, 248, 0.18)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    whiteSpace: 'nowrap',
+                    textTransform: 'uppercase'
+                  }}>
+                    Recommended
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0', lineHeight: '1.45' }}>
+                  India's best paper trading platform with ₹10 Lakh virtual demo capital, realistic matching engine, live charts & zero financial risk.
+                </p>
+                <div style={{
+                  fontSize: '11px',
+                  color: formData.default_landing_tab === 'Markets' ? '#38bdf8' : '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: '600'
+                }}>
+                  <CheckCircle size={13} />
+                  <span>Default Landing: <strong>Paper Trading Terminal & Watchlist</strong></span>
+                </div>
+              </div>
+
+              <div style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                border: formData.default_landing_tab === 'Markets' ? '6px solid #38bdf8' : '2px solid rgba(255, 255, 255, 0.3)',
+                background: formData.default_landing_tab === 'Markets' ? '#ffffff' : 'transparent',
+                flexShrink: 0,
+                marginTop: '4px',
+                transition: 'all 0.2s ease'
+              }} />
+            </div>
+
+            {/* Option 2: Stock Market Data */}
+            <div 
+              onClick={() => setFormData(prev => ({ ...prev, default_landing_tab: 'Home' }))}
+              style={{
+                padding: '16px 16px',
+                borderRadius: '14px',
+                cursor: 'pointer',
+                background: formData.default_landing_tab === 'Home' ? 'rgba(52, 211, 153, 0.08)' : '#1e293b',
+                border: formData.default_landing_tab === 'Home' ? '2px solid #34d399' : '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: formData.default_landing_tab === 'Home' ? '0 0 20px rgba(52, 211, 153, 0.22)' : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '14px',
+                userSelect: 'none'
+              }}
+            >
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: formData.default_landing_tab === 'Home' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                marginTop: '2px',
+                border: formData.default_landing_tab === 'Home' ? '1px solid rgba(52, 211, 153, 0.4)' : 'none'
+              }}>
+                <BarChart3 size={22} color={formData.default_landing_tab === 'Home' ? '#34d399' : '#94a3b8'} />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.2px' }}>
+                    Stock Market Data
+                  </div>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: '800',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: 'rgba(52, 211, 153, 0.18)',
+                    color: '#34d399',
+                    border: '1px solid rgba(52, 211, 153, 0.35)',
+                    whiteSpace: 'nowrap',
+                    textTransform: 'uppercase'
+                  }}>
+                    Overview Hub
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0', lineHeight: '1.45' }}>
+                  Live NSE/BSE indices, real-time Option Chain with Greeks, Bhavcopy screeners, and complete financial calculators.
+                </p>
+                <div style={{
+                  fontSize: '11px',
+                  color: formData.default_landing_tab === 'Home' ? '#34d399' : '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: '600'
+                }}>
+                  <CheckCircle size={13} />
+                  <span>Default Landing: <strong>Market Overview Hub</strong></span>
+                </div>
+              </div>
+
+              <div style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                border: formData.default_landing_tab === 'Home' ? '6px solid #34d399' : '2px solid rgba(255, 255, 255, 0.3)',
+                background: formData.default_landing_tab === 'Home' ? '#ffffff' : 'transparent',
+                flexShrink: 0,
+                marginTop: '4px',
+                transition: 'all 0.2s ease'
+              }} />
+            </div>
+          </div>
+        )}
+
         {/* Footer Buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
           {step > 1 ? (
@@ -518,7 +725,7 @@ export default function OnboardingWizard() {
             <div />
           )}
           
-          {step < 3 ? (
+          {step < 4 ? (
             <button
               type="submit"
               style={{
@@ -544,7 +751,9 @@ export default function OnboardingWizard() {
               disabled={loading}
               style={{
                 padding: '12px 28px',
-                background: 'linear-gradient(135deg, #38bdf8, #0284c7)',
+                background: formData.default_landing_tab === 'Markets'
+                  ? 'linear-gradient(135deg, #38bdf8, #0284c7)'
+                  : 'linear-gradient(135deg, #34d399, #059669)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
@@ -555,10 +764,15 @@ export default function OnboardingWizard() {
                 fontWeight: '700',
                 fontSize: '14px',
                 opacity: loading ? 0.7 : 1,
-                boxShadow: '0 4px 16px rgba(56, 189, 248, 0.35)'
+                boxShadow: formData.default_landing_tab === 'Markets'
+                  ? '0 4px 16px rgba(56, 189, 248, 0.35)'
+                  : '0 4px 16px rgba(52, 211, 153, 0.35)'
               }}
             >
-              {loading ? 'Saving...' : 'Start Trading'} <CheckCircle size={16} />
+              {loading 
+                ? 'Setting Up...' 
+                : (formData.default_landing_tab === 'Markets' ? 'Start Paper Trading' : 'Explore Market Data')} 
+              <CheckCircle size={16} />
             </button>
           )}
         </div>
