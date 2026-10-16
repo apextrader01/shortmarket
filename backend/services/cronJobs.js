@@ -74,6 +74,9 @@ function isIntradayBlocked(symbol) {
         const cutoff = isWinter ? 2330 : 2250;
         return isCommodityIntradayBlocked || (timeVal >= cutoff) || (timeVal < 900);
     }
+    if (sub === 'INDEX') {
+        return (timeVal >= 1515) || (timeVal < 915);
+    }
     if (sub === 'DERIVATIVE') {
         return isDerivativesIntradayBlocked || (timeVal >= 1525) || (timeVal < 915);
     }
@@ -650,7 +653,7 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
                         const isCom = isCommoditySymbol(pos.symbol);
                         const sub = getAssetSubsegment(pos.symbol);
                         if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
-                        if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
+                        if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ' && sub !== 'INDEX') continue;
                         if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
                         if (assetType === 'COM' && !isCom) continue;
                         if (assetType === 'EQ' && isCom) continue;
@@ -851,7 +854,8 @@ function initCronJobs(priceCache, triggerEngine, isTradingDayOpenFn = null, isSe
                     .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
                     .whereNot({ quantity: 0 });
 
-                const cashEquityPositions = openCashIntraday.filter(p => !isCommoditySymbol(p.symbol) && !isDerivativeSymbol(p.symbol));
+                const { isIndexContract } = require('./instrumentsCache');
+                const cashEquityPositions = openCashIntraday.filter(p => !isCommoditySymbol(p.symbol) && !isDerivativeSymbol(p.symbol) && !isIndexContract(p.symbol));
                 if (cashEquityPositions.length === 0) return;
 
                 const affectedUserIds = new Set();

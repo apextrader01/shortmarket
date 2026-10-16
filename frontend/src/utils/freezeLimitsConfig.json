@@ -1,6 +1,7 @@
 {
   "INDEX_MAX_LOTS": {
     "BANKNIFTY": 48,
+    "NIFTYBANK": 48,
     "NIFTY": 54,
     "FINNIFTY": 54,
     "MIDCPNIFTY": 48,
@@ -13,6 +14,7 @@
   "STOCK_MAX_LOTS": 40,
   "SYMBOL_FREEZE_LOTS": {
     "BANKNIFTY": 48,
+    "NIFTYBANK": 48,
     "FINNIFTY": 54,
     "MIDCPNIFTY": 48,
     "NIFTY": 54,
@@ -234,6 +236,7 @@
   },
   "SYMBOL_FREEZE_QTY": {
     "BANKNIFTY": 1440,
+    "NIFTYBANK": 1440,
     "FINNIFTY": 3240,
     "MIDCPNIFTY": 5760,
     "NIFTY": 3510,

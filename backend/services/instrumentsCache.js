@@ -153,7 +153,17 @@ initializeCache();
 
 function resolveSingleLotSize(sym) {
     if (!sym) return 1;
-    const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase().trim();
+
+    // Check pure benchmark and spot indices first
+    if (cleanSym.startsWith('NIFTYBANK') || cleanSym.startsWith('BANKNIFTY')) return 30;
+    if (cleanSym.startsWith('SENSEX')) return 20;
+    if (cleanSym.startsWith('FINNIFTY')) return 60;
+    if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 120;
+    if (cleanSym.startsWith('NIFTYNXT50')) return 25;
+    if (cleanSym.startsWith('BANKEX')) return 30;
+    if (cleanSym === 'NIFTY' || cleanSym === 'NIFTY50' || cleanSym.startsWith('NIFTY50') || cleanSym.startsWith('NIFTY-') || cleanSym.startsWith('NIFTY ')) return 65;
+
     const direct = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym];
     if (direct && direct > 1) return direct;
 
@@ -330,6 +340,7 @@ function getAssetSubsegment(sym) {
     if (clean.endsWith('-MF') || clean.includes('MUTUALFUND')) return 'MUTUAL_FUND';
     if (isCommodityContract(sym)) return 'COMMODITY';
     if (isDerivativeContract(sym)) return 'DERIVATIVE';
+    if (isIndexContract(sym)) return 'INDEX';
     if (isFnoEligibleStock(sym)) return 'FNO_EQ';
     return 'NON_FNO_EQ';
 }

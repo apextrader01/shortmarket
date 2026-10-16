@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Maximize2, Info, AlertTriangle } from 'lucide-react';
 import { getFreezeLimit } from '../utils/freezeLimits';
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isIndexContract } from '../utils/lotsizeHelper';
 
 export default function EditOrderModal() {
   const editOrderModal = useStore(state => state.editOrderModal);
@@ -22,6 +22,16 @@ export default function EditOrderModal() {
   const symbol = order ? order.symbol : null;
   const exchange = symbol ? (symbol.startsWith('MCX:') ? 'MCX' : symbol.startsWith('BSE:') ? 'BSE' : 'NSE') : 'NSE';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+  const isIndex = isIndexContract(symbol);
+  const instantLot = getInstantLotsize(symbol);
+  const orderLotSize = isIndex
+    ? (instantLot > 1 ? instantLot : 1)
+    : ((order?.lotsize && Number(order.lotsize) > 1) 
+      ? Number(order.lotsize) 
+      : (order?.lot_size && Number(order.lot_size) > 1)
+        ? Number(order.lot_size)
+        : instantLot);
+
   const priceData = useStore(state => {
     if (!symbol) return null;
     return state.prices[symbol] || state.prices[cleanSym] || state.prices[`NSE:${cleanSym}`] || state.prices[`BSE:${cleanSym}`] || state.prices[`MCX:${cleanSym}`] || null;
@@ -42,7 +52,14 @@ export default function EditOrderModal() {
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
       const rawQty = Number(order.quantity);
-      setQuantity(isNaN(rawQty) ? 1 : Math.round(rawQty));
+      let initialQty = isNaN(rawQty) ? 1 : Math.round(rawQty);
+      if (orderLotSize > 1) {
+        if (initialQty % orderLotSize !== 0) {
+          // Auto-heal legacy orders that had qty=1 or not a multiple of lot size
+          initialQty = Math.max(orderLotSize, Math.round(initialQty / orderLotSize) * orderLotSize);
+        }
+      }
+      setQuantity(initialQty);
 
       const trg = order.trigger_price ?? order.triggerPrice;
       const prc = order.price ?? order.limitPrice;
@@ -56,12 +73,14 @@ export default function EditOrderModal() {
       } else {
         setPrice(prc ? parseFloat(prc).toFixed(2) : (livePrice > 0 ? livePrice.toFixed(2) : ''));
       }
-      const prod = order.productType || order.product_type || 'INT';
+      const rawProd = order.productType || order.product_type || 'INT';
+      // Indices are strictly Intraday only (auto-heal DEL/CNC to INT)
+      const prod = isIndex ? 'INT' : rawProd;
       setProductType(prod);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
     }
-  }, [editOrderModal.isOpen, order]);
+  }, [editOrderModal.isOpen, order, orderLotSize, isIndex]);
 
   if (!editOrderModal.isOpen || !order) return null;
 
@@ -93,12 +112,6 @@ export default function EditOrderModal() {
   }
   
   const isBuy = order.side === 'BUY';
-  const orderLotSize = (order?.lotsize && Number(order.lotsize) > 1) 
-    ? Number(order.lotsize) 
-    : (order?.lot_size && Number(order.lot_size) > 1)
-      ? Number(order.lot_size)
-      : getInstantLotsize(symbol);
-
   const freezeLimit = symbol ? getFreezeLimit(symbol, orderLotSize) : 100000;
   const maxAllowedLots = (orderLotSize > 1) ? Math.floor(freezeLimit / orderLotSize) : freezeLimit;
   const numQty = Number(quantity) || 0;
@@ -110,6 +123,24 @@ export default function EditOrderModal() {
     if (!numQty || numQty <= 0 || isNaN(numQty)) {
       alert('Please enter a valid quantity greater than 0.');
       return;
+    }
+
+    if (orderLotSize > 1 && numQty % orderLotSize !== 0) {
+      alert(`Quantity must be a multiple of lot size (${orderLotSize}). Currently: ${numQty}`);
+      return;
+    }
+
+    // Index trading timing constraint: 09:15 AM - 03:15 PM IST
+    if (isIndex) {
+      const now = new Date();
+      const istString = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+      const istDate = new Date(istString);
+      const day = istDate.getDay();
+      const timeVal = istDate.getHours() * 100 + istDate.getMinutes();
+      if (day === 0 || day === 6 || timeVal < 915 || timeVal >= 1515) {
+        alert('Index trading is only permitted during regular market hours: 09:15 AM to 03:15 PM IST (Monday - Friday).');
+        return;
+      }
     }
 
     if (isExceedingFreezeLimit) {
@@ -196,6 +227,25 @@ export default function EditOrderModal() {
 
           <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
         </div>
+
+        {/* Index Rules Banner */}
+        {isIndex && (
+          <div style={{
+            margin: '12px 20px 0 20px',
+            padding: '8px 12px',
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '11.5px',
+            color: '#38bdf8'
+          }}>
+            <Info size={14} style={{ flexShrink: 0 }} />
+            <span>Index Intraday Only: 09:15 AM – 03:15 PM IST · BO & CO Allowed · Lot Size: {orderLotSize}</span>
+          </div>
+        )}
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
@@ -322,16 +372,24 @@ export default function EditOrderModal() {
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
                   <div style={{ padding: '8px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: 'var(--color-blue-light)' }}>
-                    {order.product_type || order.productType || 'INT'}
+                    {isIndex ? 'INT' : (order.product_type || order.productType || 'INT')}
                   </div>
                 </div>
 
                 {/* Quantity */}
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Quantity</span>
+                    {orderLotSize > 1 && (
+                      <span style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600' }}>
+                        {numQty > 0 ? `${Math.round(numQty / orderLotSize)} Lots` : `Lot: ${orderLotSize}`}
+                      </span>
+                    )}
+                  </div>
                   <input 
                     type="number" 
-                    min={1} 
+                    min={orderLotSize > 1 ? orderLotSize : 1} 
+                    step={orderLotSize > 1 ? orderLotSize : 1}
                     max={10000000} 
                     value={quantity} 
                     onChange={e => {
@@ -341,11 +399,21 @@ export default function EditOrderModal() {
                       if (!isNaN(n)) setQuantity(Math.min(10000000, Math.max(1, n)));
                     }} 
                     onBlur={e => {
-                      const n = parseInt(e.target.value, 10);
-                      setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
+                      let n = parseInt(e.target.value, 10);
+                      if (isNaN(n) || n <= 0) {
+                        n = orderLotSize > 1 ? orderLotSize : 1;
+                      } else if (orderLotSize > 1 && n % orderLotSize !== 0) {
+                        n = Math.max(orderLotSize, Math.round(n / orderLotSize) * orderLotSize);
+                      }
+                      setQuantity(Math.min(10000000, Math.max(1, n)));
                     }} 
                     style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                   />
+                  {orderLotSize > 1 && (
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      Lot Size: {orderLotSize} · Must be multiple of {orderLotSize}
+                    </div>
+                  )}
                 </div>
 
                 {/* Price */}

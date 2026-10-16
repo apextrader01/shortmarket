@@ -49,7 +49,16 @@ function calculateRequiredMargin(symbol, product_type, side, quantity, price, as
 
 function getLotSize(symbol) {
     if (!symbol) return 1;
-    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase().trim();
+
+    // 0. Immediate Index Check (guarantees NIFTYBANK is never confused with NIFTY prefix)
+    if (cleanSym.startsWith('NIFTYBANK') || cleanSym.startsWith('BANKNIFTY')) return 30;
+    if (cleanSym.startsWith('SENSEX')) return 20;
+    if (cleanSym.startsWith('FINNIFTY')) return 60;
+    if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 120;
+    if (cleanSym.startsWith('NIFTYNXT50')) return 25;
+    if (cleanSym.startsWith('BANKEX') || cleanSym.startsWith('BSE')) return 30;
+    if (cleanSym === 'NIFTY' || cleanSym === 'NIFTY50' || cleanSym.startsWith('NIFTY50') || cleanSym.startsWith('NIFTY-') || cleanSym.startsWith('NIFTY ')) return 65;
 
     // 1. Live lookup from in-memory instrumentsCache (contract-exact + reloaded lotsizeMap)
     const cachedLot = resolveSingleLotSize(symbol);
@@ -72,12 +81,13 @@ function getLotSize(symbol) {
     }
 
     // 4. Fallback estimates for indices
+    if (cleanSym.startsWith('NIFTYBANK') || cleanSym.startsWith('BANKNIFTY')) return 30;
     if (cleanSym.startsWith('SENSEX')) return 20;
-    if (cleanSym.startsWith('BANKNIFTY')) return 30;
-    if (cleanSym.startsWith('NIFTY')) return 65;
     if (cleanSym.startsWith('FINNIFTY')) return 60;
     if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 120;
-    if (cleanSym.startsWith('BSE') || cleanSym.startsWith('BANKEX')) return 30;
+    if (cleanSym.startsWith('NIFTYNXT50')) return 25;
+    if (cleanSym.startsWith('BANKEX') || cleanSym.startsWith('BSE')) return 30;
+    if (cleanSym.startsWith('NIFTY')) return 65;
     return 1;
 }
 

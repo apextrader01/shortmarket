@@ -65,12 +65,57 @@ export function isCommodityContract(sym) {
   return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 }
 
+export function isIndexContract(sym) {
+  if (!sym || typeof sym !== 'string') return false;
+  const upper = sym.trim().toUpperCase();
+  const clean = upper.replace(/^(NSE:|BSE:|NFO:|BFO:|MCX:|CDS:)/i, '').trim();
+
+  // 1. Exclude ALL derivatives (Options, Futures, NFO/BFO contracts)
+  if (upper.startsWith('NFO:') || upper.startsWith('BFO:') || upper.startsWith('MCX:') || upper.startsWith('CDS:')) {
+    return false;
+  }
+  if (clean.endsWith('CE') || clean.endsWith('PE') || clean.endsWith('FUT') || clean.endsWith('-FUT')) {
+    return false;
+  }
+  if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean)) {
+    return false;
+  }
+  if (/\d+.*?(CE|PE)$/i.test(clean)) {
+    return false;
+  }
+
+  // 2. Identify pure benchmark/spot indices (e.g. NSE:NIFTY50-INDEX, NIFTY, BANKNIFTY, SENSEX)
+  if (clean.includes('INDEX') || clean.endsWith('-INDEX')) {
+    return true;
+  }
+
+  const SPOT_INDICES = [
+    'NIFTY',
+    'NIFTY50',
+    'NIFTY 50',
+    'BANKNIFTY',
+    'NIFTYBANK',
+    'FINNIFTY',
+    'MIDCPNIFTY',
+    'MIDCAPNIFTY',
+    'NIFTYNXT50',
+    'NIFTY NEXT 50',
+    'NIFTYFPI',
+    'SENSEX',
+    'BANKEX'
+  ];
+
+  const normalizedClean = clean.replace(/[^A-Z0-9]/g, '');
+  return SPOT_INDICES.some(idx => normalizedClean === idx.replace(/[^A-Z0-9]/g, ''));
+}
+
 export function getInstantLotsize(sym) {
   if (!sym || typeof sym !== 'string') return 1;
   const isDeriv = isDerivativeContract(sym);
   const isComm = isCommodityContract(sym);
+  const isIdx = isIndexContract(sym);
   
-  if (!isDeriv && !isComm) {
+  if (!isDeriv && !isComm && !isIdx) {
     return 1; // Cash Equity / ETF / MF is always lotsize 1
   }
 
@@ -81,6 +126,15 @@ export function getInstantLotsize(sym) {
   if (contractLotsizeCache[upper] && contractLotsizeCache[upper] > 1) return contractLotsizeCache[upper];
   if (contractLotsizeCache[clean] && contractLotsizeCache[clean] > 1) return contractLotsizeCache[clean];
   
+  // Specific Index Fallbacks / Direct Map
+  if (clean === 'BANKNIFTY' || clean === 'NIFTYBANK' || clean.startsWith('BANKNIFTY') || clean.startsWith('NIFTYBANK')) return 30;
+  if (clean === 'SENSEX' || clean.startsWith('SENSEX')) return 20;
+  if (clean === 'FINNIFTY' || clean.startsWith('FINNIFTY')) return 60;
+  if (clean === 'MIDCPNIFTY' || clean === 'MIDCAPNIFTY' || clean.startsWith('MIDCPNIFTY') || clean.startsWith('MIDCAPNIFTY')) return 120;
+  if (clean === 'NIFTYNXT50' || clean.startsWith('NIFTYNXT50')) return 25;
+  if (clean === 'BANKEX' || clean.startsWith('BANKEX')) return 30;
+  if (clean === 'NIFTY' || clean === 'NIFTY50' || clean.startsWith('NIFTY')) return 65;
+
   // Direct match
   if (lotsizeMap[clean]) return lotsizeMap[clean];
   
@@ -114,6 +168,7 @@ export function getAssetSubsegment(sym) {
   if (clean.endsWith('-MF') || clean.includes('MUTUALFUND')) return 'MUTUAL_FUND';
   if (isCommodityContract(sym)) return 'COMMODITY';
   if (isDerivativeContract(sym)) return 'DERIVATIVE';
+  if (isIndexContract(sym)) return 'INDEX';
   if (isFnoEligibleStock(sym)) return 'FNO_EQ';
   return 'NON_FNO_EQ';
 }
@@ -167,6 +222,9 @@ export function checkPositionConversionAllowed(symbol, targetProductTypeOrDate =
   const sub = getAssetSubsegment(symbol);
   if (sub === 'MUTUAL_FUND') {
     return { allowed: false, reason: 'Mutual fund units cannot be converted.' };
+  }
+  if (sub === 'INDEX' && !isTargetingIntraday) {
+    return { allowed: false, reason: 'Index positions cannot be converted to Delivery (CNC). Indices are intraday cash-settled only.' };
   }
 
   // Evaluate in Indian Standard Time (IST)

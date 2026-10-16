@@ -86,9 +86,19 @@ export default function OrderModal() {
     if (orderModal.isOpen) {
       setValidationError(null);
       setSide(orderModal.type);
+      const isIdx = isIndexContract(orderModal.symbol);
       const incomingProd = String(orderModal.productType || 'INT').toUpperCase();
-      const initialProd = (incomingProd === 'MIS' || incomingProd === 'INTRADAY') ? 'INT' : (incomingProd === 'CNC' || incomingProd === 'DELIVERY') ? 'DEL' : (orderModal.productType || 'INT');
+      const initialProd = isIdx
+        ? 'INT'
+        : (incomingProd === 'MIS' || incomingProd === 'INTRADAY')
+          ? 'INT'
+          : (incomingProd === 'CNC' || incomingProd === 'DELIVERY')
+            ? 'DEL'
+            : (orderModal.productType || 'INT');
       setProductType(initialProd);
+      if (isIdx) {
+        setIsAmo(false);
+      }
       
       const effectiveLotsize = (orderModal.lotsize && Number(orderModal.lotsize) > 1) 
         ? Number(orderModal.lotsize) 
@@ -389,6 +399,47 @@ export default function OrderModal() {
     const isIntraday = (productType === 'INT' || productType === 'MIS' || isBO || isCO);
     const isDelivery = (productType === 'DEL' || productType === 'CNC' || !productType);
 
+    // 2b. Index Segment (Spot & Benchmark Indices: NIFTY, BANKNIFTY/NIFTYBANK, FINNIFTY, SENSEX, etc.)
+    if (subsegment === 'INDEX' || isTargetIndex) {
+      if (isDelivery) {
+        return {
+          open: false,
+          mode: 'CLOSED',
+          session: 'INDEX_NO_DELIVERY',
+          isAmoWindow: false,
+          reason: 'Delivery (CNC) orders are not permitted for Index trading. Only Intraday (MIS), Bracket Order (BO), and Cover Order (CO) are allowed.'
+        };
+      }
+      if ((day === 0 || day === 6) && status !== 'OPEN') {
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'WEEKEND',
+          isAmoWindow: false,
+          reason: 'Index trading is closed on weekends (Saturday & Sunday). Index orders are only allowed on trading days between 09:15 AM and 03:15 PM IST.'
+        };
+      }
+      if (curMins < 555) {
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'BEFORE_OPEN',
+          isAmoWindow: false,
+          reason: 'Index intraday trading begins at 09:15 AM IST. AMO and pre-market orders are not allowed for index contracts.'
+        };
+      }
+      if (curMins >= 915) {
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'INTRADAY_CUTOFF',
+          isAmoWindow: false,
+          reason: 'Index intraday trading is closed for today. Index orders are only allowed between 09:15 AM and 03:15 PM IST.'
+        };
+      }
+      return { open: true, mode: 'AUTO', session: 'NORMAL' };
+    }
+
     // 3. Commodity Segment (MCX)
     if (subsegment === 'COMMODITY' || isCommodity) {
       if (hours < 9 || hours > 23 || (hours === 23 && minutes >= 30)) {
@@ -671,6 +722,22 @@ export default function OrderModal() {
     if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
       failValidation("Please enter a valid quantity greater than 0.");
       return;
+    }
+
+    if (isTargetIndex) {
+      if (productType === 'DEL' || productType === 'CNC') {
+        failValidation("Delivery (CNC) orders are not permitted for Index trading. Only Intraday (MIS), Bracket Orders (BO), and Cover Orders (CO) are allowed.");
+        return;
+      }
+      if (isAmo) {
+        failValidation("AMO (After Market Orders) is not permitted for Index trading. Indices can only be traded live between 09:15 AM and 03:15 PM IST.");
+        return;
+      }
+      const ls = orderModal.lotsize || 1;
+      if (ls > 1 && effectiveQuantity % ls !== 0) {
+        failValidation(`Quantity (${effectiveQuantity}) must be a multiple of lot size (${ls}).`);
+        return;
+      }
     }
     if (isExceedingFreezeLimit) {
       failValidation(orderModal.lotsize > 1
@@ -975,82 +1042,109 @@ export default function OrderModal() {
             >
               Intraday
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setProductType('DEL');
-                setIsCO(false);
-                setIsBO(false);
-              }} 
-              style={{ 
-                padding: '6px 14px', 
-                borderRadius: '4px',
-                border: 'none',
-                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
-                background: productType === 'DEL' ? '#2563eb' : 'transparent',
-                color: productType === 'DEL' ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '12.5px', fontWeight: '600',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {isOption || isFuture ? 'Overnight' : 'Delivery'}
-            </button>
+            {!isTargetIndex && (
+              <button
+                type="button"
+                onClick={() => {
+                  setProductType('DEL');
+                  setIsCO(false);
+                  setIsBO(false);
+                }} 
+                style={{ 
+                  padding: '6px 14px', 
+                  borderRadius: '4px',
+                  border: 'none',
+                  display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                  background: productType === 'DEL' ? '#2563eb' : 'transparent',
+                  color: productType === 'DEL' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '12.5px', fontWeight: '600',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {isOption || isFuture ? 'Overnight' : 'Delivery'}
+              </button>
+            )}
           </div>
 
-          {/* Order Variety: Regular vs AMO */}
-          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
-            <button
-              type="button"
-              onClick={() => setIsAmo(false)} 
-              style={{ 
-                padding: '6px 14px', 
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer',
-                background: !isAmo ? '#2563eb' : 'transparent',
-                color: !isAmo ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '12.5px', fontWeight: '600',
-                transition: 'all 0.15s ease'
-              }}
-              title={!marketSession.open ? `Market is closed. Regular orders can only be placed during trading hours (${isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM"})` : "Regular Order"}
-            >
-              Regular
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!marketSession.isAmoWindow) {
-                  const amoTimingMsg = isCommodity
-                    ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
-                    : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.";
-                  alert(amoTimingMsg);
-                  return;
-                }
-                setIsAmo(true);
-                setIsBO(false);
-                setIsCO(false);
-                setSlPrice('');
-                setTgtPrice('');
-              }} 
-              style={{ 
-                padding: '6px 14px', 
-                borderRadius: '4px',
-                border: 'none',
-                display: 'flex', alignItems: 'center', gap: '5px',
-                cursor: !marketSession.isAmoWindow ? 'not-allowed' : 'pointer',
-                opacity: !marketSession.isAmoWindow ? 0.5 : 1,
-                background: isAmo ? '#f59e0b' : 'transparent',
-                color: isAmo ? '#000000' : 'var(--text-secondary)',
-                fontSize: '12.5px', fontWeight: '700',
-                transition: 'all 0.15s ease',
-                boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
-              }}
-              title={!marketSession.isAmoWindow ? (isCommodity ? "AMO for MCX is only open between 11:30 PM and 08:57 AM" : "AMO is only open between 03:45 PM and 08:57 AM") : "After Market Order (Queued for execution at market open)"}
-            >
-              🌙 AMO
-            </button>
-          </div>
+          {/* Order Variety: Regular vs AMO (Not permitted for Indices) */}
+          {!isTargetIndex && (
+            <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => setIsAmo(false)} 
+                style={{ 
+                  padding: '6px 14px', 
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: !isAmo ? '#2563eb' : 'transparent',
+                  color: !isAmo ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '12.5px', fontWeight: '600',
+                  transition: 'all 0.15s ease'
+                }}
+                title={!marketSession.open ? `Market is closed. Regular orders can only be placed during trading hours (${isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM"})` : "Regular Order"}
+              >
+                Regular
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!marketSession.isAmoWindow) {
+                    const amoTimingMsg = isCommodity
+                      ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+                      : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.";
+                    alert(amoTimingMsg);
+                    return;
+                  }
+                  setIsAmo(true);
+                  setIsBO(false);
+                  setIsCO(false);
+                  setSlPrice('');
+                  setTgtPrice('');
+                }} 
+                style={{ 
+                  padding: '6px 14px', 
+                  borderRadius: '4px',
+                  border: 'none',
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  cursor: !marketSession.isAmoWindow ? 'not-allowed' : 'pointer',
+                  opacity: !marketSession.isAmoWindow ? 0.5 : 1,
+                  background: isAmo ? '#f59e0b' : 'transparent',
+                  color: isAmo ? '#000000' : 'var(--text-secondary)',
+                  fontSize: '12.5px', fontWeight: '700',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
+                }}
+                title={!marketSession.isAmoWindow ? (isCommodity ? "AMO for MCX is only open between 11:30 PM and 08:57 AM" : "AMO is only open between 03:45 PM and 08:57 AM") : "After Market Order (Queued for execution at market open)"}
+              >
+                🌙 AMO
+              </button>
+            </div>
+          )}
         </div>
+        )}
+
+        {/* Index Specific Banner */}
+        {isTargetIndex && !isTrueExit && (
+          <div style={{ 
+            fontSize: '11.5px', 
+            color: '#38bdf8', 
+            background: 'rgba(56, 189, 248, 0.1)', 
+            border: '1px solid rgba(56, 189, 248, 0.25)', 
+            borderRadius: '6px', 
+            padding: '7px 12px', 
+            margin: '10px 20px 0 20px',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            gap: '8px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⚡</span>
+              <span><strong>Index Intraday Only:</strong> 09:15 AM – 03:15 PM IST · BO &amp; CO Allowed (No Delivery, No AMO)</span>
+            </div>
+            <span style={{ fontWeight: '700', color: '#67e8f9' }}>Lot Size: {orderModal.lotsize || 30}</span>
+          </div>
         )}
 
         {/* Preventative Filter Warning Badge */}

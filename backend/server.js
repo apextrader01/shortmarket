@@ -415,6 +415,50 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
   const isIntraday = (product_type === 'INT' || product_type === 'MIS' || product_type === 'INTRADAY' || product_type === 'BO' || product_type === 'CO');
   const isDelivery = (product_type === 'DEL' || product_type === 'CNC' || product_type === 'DELIVERY' || !product_type);
 
+  // 2b. Index Segment (Benchmark & Spot Indices: NIFTY, BANKNIFTY/NIFTYBANK, FINNIFTY, SENSEX, etc.)
+  if (subsegment === 'INDEX' || isIndexContract(symbol)) {
+    if (isDelivery) {
+      return {
+        open: false,
+        isTotalBlock: true,
+        reason: 'Delivery (CNC) orders are not permitted for Index trading. Only Intraday (MIS), Bracket Order (BO), and Cover Order (CO) are allowed.'
+      };
+    }
+    // Weekends (Saturday & Sunday)
+    if ((day === 0 || day === 6) && globalStatus !== 'OPEN') {
+      return {
+        open: false,
+        isTotalBlock: false,
+        isAmoWindow: false,
+        session: 'WEEKEND',
+        reason: 'Index trading is closed on weekends (Saturday & Sunday). Index orders are only allowed on trading days between 09:15 AM and 03:15 PM IST.'
+      };
+    }
+    // Strict Intraday Timing: 09:15 AM (555m) to 03:15 PM (915m) IST
+    if (currentMinutes < 555) {
+      return {
+        open: false,
+        isTotalBlock: false,
+        isAmoWindow: false,
+        session: 'BEFORE_OPEN',
+        reason: 'Index intraday trading opens at 09:15 AM IST. AMO and pre-market orders are not permitted for index contracts.'
+      };
+    }
+    if (currentMinutes >= 915) {
+      if (isClosingOrder && currentMinutes <= 920) {
+        return { open: true, session: 'INTRADAY_CLOSING' };
+      }
+      return {
+        open: false,
+        isTotalBlock: false,
+        isAmoWindow: false,
+        session: 'INTRADAY_CUTOFF',
+        reason: 'Index intraday trading is closed for today. Index orders are only allowed between 09:15 AM and 03:15 PM IST.'
+      };
+    }
+    return { open: true, session: 'NORMAL' };
+  }
+
   // 3. Commodity Segment (MCX)
   if (subsegment === 'COMMODITY' || isCommodity) {
     const isBeforeOpen = hours < 9;
@@ -9271,6 +9315,47 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Real-Time Position Clamping for Explicit Exit Orders (Prevents over-exiting / position reversals)
   const isExplicitExit = Boolean(req.body.is_exit || req.body.is_system_close || (req.body.remarks && /exit|square-off|close/i.test(req.body.remarks)));
 
+  // ── Index Trading Rules (Intraday MIS/BO/CO only, No Delivery, No AMO, 09:15-15:15 IST) ──
+  const isTargetIndex = isIndexContract(symbol);
+  if (isTargetIndex) {
+    // 1. Delivery is strictly prohibited
+    if (effectiveProductType === 'DEL' || product_type === 'CNC' || product_type === 'DELIVERY') {
+      return res.status(400).json({
+        error: 'Delivery (CNC) orders are not allowed for Index trading. Only Intraday (MIS), Bracket Order (BO), and Cover Order (CO) are allowed.'
+      });
+    }
+
+    // 2. AMO is strictly prohibited
+    const isAmoOrder = rawVariety === 'AMO' || Boolean(req.body.is_amo);
+    if (isAmoOrder) {
+      return res.status(400).json({
+        error: 'AMO (After Market Orders) is not allowed for Index trading. Indices can only be traded live between 09:15 AM and 03:15 PM IST.'
+      });
+    }
+
+    // 3. Timing: strictly 09:15 AM to 03:15 PM IST on trading days
+    const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const day = istTime.getUTCDay();
+    const curMins = istTime.getUTCHours() * 60 + istTime.getUTCMinutes();
+    const globalStatus = marketStatusCache.equity;
+
+    if (globalStatus !== 'OPEN') {
+      if (day === 0 || day === 6) {
+        return res.status(400).json({
+          error: 'Index trading is closed on weekends (Saturday & Sunday). Index orders are only accepted on trading days between 09:15 AM and 03:15 PM IST.'
+        });
+      }
+      if (curMins < 555 || curMins >= 915) {
+        if (!isExplicitExit || curMins > 920) {
+          return res.status(400).json({
+            error: 'Index orders are only allowed during intraday market hours between 09:15 AM and 03:15 PM IST.'
+          });
+        }
+      }
+    }
+  }
+
   // ── Monthly Trade Quota Enforcement for Free / Basic Plan ──────────────────
   // Free Plan allows max 25 trades per month (25 Buy + 25 Sell total in a calendar month)
   // Exits and square-off orders are NEVER blocked so traders can always close open positions.
@@ -9311,7 +9396,6 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // 2. Only ONE active index trade is allowed at a time across all index contracts.
   // Exits and square-off orders (closing existing short positions) are NEVER blocked.
   const isOrderBuy = String(side).toUpperCase() === 'BUY';
-  const isTargetIndex = isIndexContract(symbol);
 
   if (isOrderBuy && isTargetIndex && !isExplicitExit) {
     const cleanSymForIndex = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
@@ -9429,8 +9513,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Stop Loss orders require a valid trigger price greater than 0.' });
   }
 
-  // Validate Quantity is a multiple of Lot Size for Options/Futures and MCX Commodities
-  if (isDerivativeContract(symbol) || isCommodityContract(symbol)) {
+  // Validate Quantity is a multiple of Lot Size for Options/Futures, MCX Commodities, and Indices
+  if (isDerivativeContract(symbol) || isCommodityContract(symbol) || isIndexContract(symbol)) {
     const { getLotSizes } = require('./services/instrumentsCache');
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
     const lotSizes = getLotSizes([symbol, cleanSym]);
@@ -12265,6 +12349,12 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
             throw Object.assign(new Error('Mutual Fund orders cannot be modified once placed as per AMC guidelines.'), { statusCode: 400 });
           }
           if (!isMF) {
+            // Auto-heal legacy index orders that were mistakenly saved with DEL/CNC
+            if (isIndexContract(order.symbol) && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+              await trx('orders').where({ id: order.id }).update({ product_type: 'INT' });
+              order.product_type = 'INT';
+            }
+
             const isCommodity = isCommodityContract(order.symbol);
             const isLoadTestTrader = Boolean(req.user?.email && String(req.user.email).startsWith('loadtest_trader_'));
             const marketCheck = isLoadTestTrader ? { open: true, session: 'OPEN' } : isSegmentMarketOpen(isCommodity, order.symbol, order.product_type, Boolean(order.is_exit));
