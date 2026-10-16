@@ -259,34 +259,36 @@ function isIndexContract(sym) {
 }
 
 
+const { getSymbolAliases, cleanSymbol, isCommoditySymbol, isBseSymbol } = require('./services/symbolUtils');
+
 function getLtpFromPriceCache(sym) {
   if (!sym || typeof sym !== 'string') return 0;
   if (priceCache[sym]?.ltp && Number(priceCache[sym].ltp) > 0) return Number(priceCache[sym].ltp);
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
-  if (priceCache[clean]?.ltp && Number(priceCache[clean].ltp) > 0) return Number(priceCache[clean].ltp);
-  if (priceCache[`NSE:${clean}`]?.ltp && Number(priceCache[`NSE:${clean}`].ltp) > 0) return Number(priceCache[`NSE:${clean}`].ltp);
-  if (priceCache[`NSE:${clean}-EQ`]?.ltp && Number(priceCache[`NSE:${clean}-EQ`].ltp) > 0) return Number(priceCache[`NSE:${clean}-EQ`].ltp);
-  if (priceCache[`BSE:${clean}`]?.ltp && Number(priceCache[`BSE:${clean}`].ltp) > 0) return Number(priceCache[`BSE:${clean}`].ltp);
-  if (priceCache[`BSE:${clean}-A`]?.ltp && Number(priceCache[`BSE:${clean}-A`].ltp) > 0) return Number(priceCache[`BSE:${clean}-A`].ltp);
-  if (priceCache[`BSE:${clean}-B`]?.ltp && Number(priceCache[`BSE:${clean}-B`].ltp) > 0) return Number(priceCache[`BSE:${clean}-B`].ltp);
-  if (priceCache[`MCX:${clean}`]?.ltp && Number(priceCache[`MCX:${clean}`].ltp) > 0) return Number(priceCache[`MCX:${clean}`].ltp);
+  const aliases = getSymbolAliases(sym);
+  for (const alias of aliases) {
+    if (priceCache[alias]?.ltp && Number(priceCache[alias].ltp) > 0) {
+      return Number(priceCache[alias].ltp);
+    }
+  }
   if (priceCache[sym]?.close && Number(priceCache[sym].close) > 0) return Number(priceCache[sym].close);
-  if (priceCache[clean]?.close && Number(priceCache[clean].close) > 0) return Number(priceCache[clean].close);
+  for (const alias of aliases) {
+    if (priceCache[alias]?.close && Number(priceCache[alias].close) > 0) {
+      return Number(priceCache[alias].close);
+    }
+  }
   return 0;
 }
 
 function getPriceDataFromCache(sym) {
   if (!sym || typeof sym !== 'string') return {};
-  if (priceCache[sym]) return priceCache[sym];
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
-  if (priceCache[clean]) return priceCache[clean];
-  if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
-  if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
-  if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
-  if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
-  if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
-  if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
-  return {};
+  if (priceCache[sym] && priceCache[sym].ltp !== undefined) return priceCache[sym];
+  const aliases = getSymbolAliases(sym);
+  for (const alias of aliases) {
+    if (priceCache[alias] && priceCache[alias].ltp !== undefined) {
+      return priceCache[alias];
+    }
+  }
+  return priceCache[sym] || {};
 }
 
 // Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
@@ -784,35 +786,42 @@ if (!isFyersMaster) {
           const priceObj = batchUpdate[symbol];
           if (symbol && priceObj) {
             priceCache[symbol] = priceObj;
-            if (symbol.includes(':')) {
-              const parts = symbol.split(':');
-              const ex = parts[0];
-              const raw = parts[1];
-              priceCache[raw] = priceObj;
-              const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
-              priceCache[clean] = priceObj;
-              priceCache[`${ex}:${clean}`] = priceObj;
-            }
-            const room = io.sockets?.adapter?.rooms?.get(symbol);
-            if (room && room.size > 0) {
-              (io.local || io).to(symbol).emit('price_snapshot', {
-                [symbol]: [
-                  priceObj.ltp,
-                  priceObj.change,
-                  priceObj.pct,
-                  priceObj.timestamp,
-                  priceObj.open,
-                  priceObj.high,
-                  priceObj.low,
-                  priceObj.close,
-                  priceObj.volume,
-                  priceObj.totBuyQuan,
-                  priceObj.totSellQuan,
-                  priceObj.upper_circuit || 0,
-                  priceObj.lower_circuit || 0
-                ]
-              });
-            }
+            const aliases = getSymbolAliases(symbol);
+            aliases.forEach(alias => {
+              priceCache[alias] = priceObj;
+            });
+
+            const workerPayload = {
+              [symbol]: [
+                priceObj.ltp,
+                priceObj.change,
+                priceObj.pct,
+                priceObj.timestamp,
+                priceObj.open,
+                priceObj.high,
+                priceObj.low,
+                priceObj.close,
+                priceObj.volume,
+                priceObj.totBuyQuan,
+                priceObj.totSellQuan,
+                priceObj.upper_circuit || 0,
+                priceObj.lower_circuit || 0,
+                priceObj.oi || 0,
+                priceObj.pOI || priceObj.prev_oi || 0,
+                priceObj.oi_change || 0
+              ]
+            };
+            aliases.forEach(alias => {
+              workerPayload[alias] = workerPayload[symbol];
+            });
+
+            const allCandidateRooms = new Set([symbol, ...aliases]);
+            allCandidateRooms.forEach(roomName => {
+              const room = io.sockets?.adapter?.rooms?.get(roomName);
+              if (room && room.size > 0) {
+                (io.local || io).to(roomName).emit('price_snapshot', workerPayload);
+              }
+            });
             // If this is the Staging master process, also evaluate Staging's resting orders/triggers against live ticks
             if (isStagingInstance && isMaster && Number(priceObj.ltp) > 0 && (!isAnyTradingSessionOpen || isAnyTradingSessionOpen(symbol))) {
               if (triggerEngine) triggerEngine.evaluateTick(symbol, Number(priceObj.ltp)).catch(() => {});
@@ -13390,37 +13399,6 @@ io.on('connection', (socket) => {
       activeSocketUsers.get(uid).add(socket.id);
     }
   });
-
-  const getSymbolAliases = (sym) => {
-    if (!sym || typeof sym !== 'string') return [];
-    const aliases = new Set([sym]);
-    if (sym.includes(':')) {
-      const parts = sym.split(':');
-      const ex = parts[0];
-      const raw = parts[1];
-      aliases.add(raw);
-      const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
-      if (clean !== raw) {
-        aliases.add(clean);
-        aliases.add(`${ex}:${clean}`);
-      }
-    } else {
-      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => sym.startsWith(c)) || sym.includes('-MCX');
-      if (isCommodity) {
-        aliases.add(`MCX:${sym}`);
-      } else {
-        aliases.add(`NSE:${sym}`);
-        aliases.add(`BSE:${sym}`);
-        const clean = sym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
-        if (clean !== sym) {
-          aliases.add(clean);
-          aliases.add(`NSE:${clean}`);
-          aliases.add(`BSE:${clean}`);
-        }
-      }
-    }
-    return Array.from(aliases);
-  };
 
   const emitCachedPricesForNewRooms = (symbolsList) => {
     const requestedCache = {};

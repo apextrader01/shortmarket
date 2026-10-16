@@ -242,73 +242,21 @@ try { volumeMatchingEngine = require('./volumeMatchingEngine'); } catch(e) {}
 let gcInterval = null;
 
 
+// ── Universal Symbol Engine Integration (symbolUtils) ──
+const {
+    COMMODITY_PREFIXES,
+    INDEX_ALIAS_MAP,
+    isCommoditySymbol,
+    isBseSymbol,
+    isDerivativeSymbol,
+    cleanSymbol,
+    getSymbolAliases,
+    toCanonicalFyersSymbol
+} = require('./symbolUtils');
+
 // Convert our platform's unique symbols to Fyers Symbols (guaranteeing valid exchange prefix)
 function toFyersSymbol(symbol) {
-    if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
-    if (!symbol) return null;
-
-    const trimmed = String(symbol).trim();
-    const upperNoPrefix = trimmed.replace(/^(NSE:|BSE:)/i, '').trim().toUpperCase();
-    const INDEX_ALIAS_MAP = {
-        'NIFTY': 'NSE:NIFTY50-INDEX',
-        'NIFTY 50': 'NSE:NIFTY50-INDEX',
-        'NIFTY50': 'NSE:NIFTY50-INDEX',
-        'NIFTY50-INDEX': 'NSE:NIFTY50-INDEX',
-        'BANKNIFTY': 'NSE:NIFTYBANK-INDEX',
-        'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
-        'NIFTY BANK': 'NSE:NIFTYBANK-INDEX',
-        'NIFTYBANK': 'NSE:NIFTYBANK-INDEX',
-        'NIFTYBANK-INDEX': 'NSE:NIFTYBANK-INDEX',
-        'FINNIFTY': 'NSE:FINNIFTY-INDEX',
-        'FIN NIFTY': 'NSE:FINNIFTY-INDEX',
-        'NIFTY FIN SERVICE': 'NSE:FINNIFTY-INDEX',
-        'FINNIFTY-INDEX': 'NSE:FINNIFTY-INDEX',
-        'MIDCPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
-        'MIDCAP NIFTY': 'NSE:MIDCPNIFTY-INDEX',
-        'MIDCAPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
-        'NIFTY MID SELECT': 'NSE:MIDCPNIFTY-INDEX',
-        'MIDCPNIFTY-INDEX': 'NSE:MIDCPNIFTY-INDEX',
-        'NIFTYNXT50': 'NSE:NIFTYNXT50-INDEX',
-        'NIFTY NEXT 50': 'NSE:NIFTYNXT50-INDEX',
-        'NIFTYNXT50-INDEX': 'NSE:NIFTYNXT50-INDEX',
-        'INDIAVIX': 'NSE:INDIAVIX-INDEX',
-        'INDIA VIX': 'NSE:INDIAVIX-INDEX',
-        'INDIAVIX-INDEX': 'NSE:INDIAVIX-INDEX',
-        'SENSEX': 'BSE:SENSEX-INDEX',
-        'BSE SENSEX': 'BSE:SENSEX-INDEX',
-        'SENSEX-INDEX': 'BSE:SENSEX-INDEX',
-        'BANKEX': 'BSE:BANKEX-INDEX',
-        'BSE BANKEX': 'BSE:BANKEX-INDEX',
-        'BANKEX-INDEX': 'BSE:BANKEX-INDEX'
-    };
-    if (INDEX_ALIAS_MAP[upperNoPrefix]) {
-        return INDEX_ALIAS_MAP[upperNoPrefix];
-    }
-
-    // 1. If symbol has an exchange prefix (e.g. BSE:KITEX, NSE:KITEX, MCX:CRUDEOIL),
-    // check canonicalStockMap first to respect the specified exchange
-    if (symbol.includes(':')) {
-        if (canonicalStockMap.has(symbol)) return canonicalStockMap.get(symbol);
-        const [ex, symPart] = symbol.split(':');
-        const clean = symPart.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
-        if (canonicalStockMap.has(`${ex}:${clean}`)) return canonicalStockMap.get(`${ex}:${clean}`);
-        if (nameToFyers[symbol]) return nameToFyers[symbol];
-        return symbol;
-    }
-
-    // 2. Unprefixed symbol: check nameToFyers or canonical maps
-    if (nameToFyers[symbol]) return nameToFyers[symbol];
-    if (canonicalStockMap.has(`NSE:${symbol}`)) return canonicalStockMap.get(`NSE:${symbol}`);
-    if (canonicalStockMap.has(`BSE:${symbol}`)) return canonicalStockMap.get(`BSE:${symbol}`);
-
-    // Auto-resolve exchange prefix for derivatives/equities passed without prefix
-    if (/(GOLD|SILVER|CRUDEOIL|NATURALGAS|COPPER|ZINC|NICKEL|ALUMINIUM|LEAD|COTTON|MENTHAOIL|STEELREBAR)/i.test(symbol)) {
-        return `MCX:${symbol}`;
-    }
-    if (/^(SENSEX|BANKEX)/i.test(symbol) || symbol.endsWith('-BSE') || symbol.endsWith('-A') || symbol.endsWith('-B')) {
-        return `BSE:${symbol}`;
-    }
-    return `NSE:${symbol}`;
+    return toCanonicalFyersSymbol(symbol, canonicalStockMap, nameToFyers);
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols — O(1) Map lookup
@@ -547,60 +495,53 @@ async function initFyers(io, pc, isMaster = true) {
                 // Send targeted updates to specific symbol rooms on Master locally, and also via adapter if active viewer pinged
                 const now = Date.now();
                 for (const sym of Object.keys(batchUpdate)) {
-                    const room = global_io.sockets?.adapter?.rooms?.get(sym);
-                    const lastPingTime = clientViewerLastSeen.get(sym) || 0;
-                    const rawSym = sym.includes(':') ? sym.split(':')[1] : null;
-                    const rawLastPing = rawSym ? (clientViewerLastSeen.get(rawSym) || 0) : 0;
-                    const rawRoom = rawSym ? global_io.sockets?.adapter?.rooms?.get(rawSym) : null;
-                    const isCom = !sym.includes(':') && (['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => sym.startsWith(c)) || sym.includes('-MCX'));
-                    const pref = !sym.includes(':') ? (isCom ? `MCX:${sym}` : `NSE:${sym}`) : null;
-                    const prefLastPing = pref ? (clientViewerLastSeen.get(pref) || 0) : 0;
-                    const prefRoom = pref ? global_io.sockets?.adapter?.rooms?.get(pref) : null;
+                    const p = batchUpdate[sym];
+                    const basePayload = [
+                        p.ltp,
+                        p.change,
+                        p.pct,
+                        p.timestamp,
+                        p.open,
+                        p.high,
+                        p.low,
+                        p.close,
+                        p.volume,
+                        p.totBuyQuan,
+                        p.totSellQuan,
+                        p.upper_circuit || 0,
+                        p.lower_circuit || 0,
+                        p.oi || 0,
+                        p.pOI || p.prev_oi || 0,
+                        p.oi_change || 0
+                    ];
 
-                    const hasActiveViewers = (now - lastPingTime <= 60000) || 
-                                             (rawSym && (now - rawLastPing <= 60000)) || 
-                                             (pref && (now - prefLastPing <= 60000)) || 
-                                             (room && room.size > 0) || 
-                                             (rawRoom && rawRoom.size > 0) || 
-                                             (prefRoom && prefRoom.size > 0);
-                    if (hasActiveViewers) {
-                        const p = batchUpdate[sym];
-                        const snapshotPayload = {
-                            [sym]: [
-                                p.ltp,
-                                p.change,
-                                p.pct,
-                                p.timestamp,
-                                p.open,
-                                p.high,
-                                p.low,
-                                p.close,
-                                p.volume,
-                                p.totBuyQuan,
-                                p.totSellQuan,
-                                p.upper_circuit || 0,
-                                p.lower_circuit || 0,
-                                p.oi || 0,
-                                p.pOI || p.prev_oi || 0,
-                                p.oi_change || 0
-                            ]
-                        };
-                        if (rawSym) {
-                            snapshotPayload[rawSym] = snapshotPayload[sym];
-                        }
-                        if (pref) {
-                            snapshotPayload[pref] = snapshotPayload[sym];
-                        }
+                    const aliases = getSymbolAliases(sym);
+                    const snapshotPayload = { [sym]: basePayload };
+                    aliases.forEach(alias => {
+                        snapshotPayload[alias] = basePayload;
+                    });
 
-                        if (room && room.size > 0) {
-                            (global_io.local || global_io).to(sym).emit('price_snapshot', snapshotPayload);
+                    // Check if any alias has active ping or room listeners
+                    let hasActiveViewers = false;
+                    const activeRoomsToEmit = [];
+                    const allCandidateRooms = new Set([sym, ...aliases]);
+
+                    allCandidateRooms.forEach(roomName => {
+                        const pingTime = clientViewerLastSeen.get(roomName) || 0;
+                        if (now - pingTime <= 60000) {
+                            hasActiveViewers = true;
                         }
-                        if (rawRoom && rawRoom.size > 0) {
-                            (global_io.local || global_io).to(rawSym).emit('price_snapshot', snapshotPayload);
+                        const roomObj = global_io.sockets?.adapter?.rooms?.get(roomName);
+                        if (roomObj && roomObj.size > 0) {
+                            hasActiveViewers = true;
+                            activeRoomsToEmit.push(roomName);
                         }
-                        if (prefRoom && prefRoom.size > 0) {
-                            (global_io.local || global_io).to(pref).emit('price_snapshot', snapshotPayload);
-                        }
+                    });
+
+                    if (hasActiveViewers && activeRoomsToEmit.length > 0) {
+                        activeRoomsToEmit.forEach(roomName => {
+                            (global_io.local || global_io).to(roomName).emit('price_snapshot', snapshotPayload);
+                        });
                     }
                 }
 
@@ -916,15 +857,10 @@ function startLiveWebSocket() {
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
-                    if (uniqueSymbol.includes(':')) {
-                        const parts = uniqueSymbol.split(':');
-                        const ex = parts[0];
-                        const raw = parts[1];
-                        sharedPriceCache[raw] = priceObj;
-                        const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
-                        sharedPriceCache[clean] = priceObj;
-                        sharedPriceCache[`${ex}:${clean}`] = priceObj;
-                    }
+                    const aliases = getSymbolAliases(uniqueSymbol);
+                    aliases.forEach(alias => {
+                        sharedPriceCache[alias] = priceObj;
+                    });
                     dirtySymbols.add(uniqueSymbol); // Broadcast canonical uniqueSymbol (cuts duplicate emissions)
                     
                     // Only evaluate triggers and volume matching when the symbol's market session is actually open
@@ -1037,14 +973,22 @@ function addSubscriptionBatch(symbols) {
         if (isExpiredContract(s)) return;
         
         // FIX: Update symbolLastSeen so GC doesn't kill manually subscribed symbols.
-        // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
-        // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
+        const aliases = getSymbolAliases(s);
+        aliases.forEach(alias => {
+            symbolLastSeen.set(alias, now);
+            clientViewerLastSeen.set(alias, now);
+        });
         
         const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
+        if (fSym) {
+            symbolLastSeen.set(fSym, now);
+            clientViewerLastSeen.set(fSym, now);
+            clientSubscriptions.add(fSym);
+        }
         const cached = sharedPriceCache[s] || (fSym ? sharedPriceCache[fSym] : null);
         if (cached) {
             sharedPriceCache[s] = cached;
@@ -1053,6 +997,10 @@ function addSubscriptionBatch(symbols) {
                 sharedPriceCache[fSym] = cached;
                 dirtySymbols.add(fSym);
             }
+            aliases.forEach(alias => {
+                sharedPriceCache[alias] = cached;
+                dirtySymbols.add(alias);
+            });
         }
         if (fSym) {
             if (!alreadySubscribed && !subQueue.includes(fSym)) {
@@ -1084,20 +1032,17 @@ function handlePingSubscriptions(symbols) {
         
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
+
+        const aliases = getSymbolAliases(s);
+        aliases.forEach(alias => {
+            symbolLastSeen.set(alias, now);
+            clientViewerLastSeen.set(alias, now);
+        });
+
         const fSym = toFyersSymbol(s);
-        if (fSym && fSym !== s) {
+        if (fSym) {
             symbolLastSeen.set(fSym, now);
             clientViewerLastSeen.set(fSym, now);
-        }
-        if (s.includes(':')) {
-            const raw = s.split(':')[1];
-            symbolLastSeen.set(raw, now);
-            clientViewerLastSeen.set(raw, now);
-        } else {
-            const isCom = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
-            const pref = isCom ? `MCX:${s}` : `NSE:${s}`;
-            symbolLastSeen.set(pref, now);
-            clientViewerLastSeen.set(pref, now);
         }
 
         const cached = sharedPriceCache[s] || (fSym ? sharedPriceCache[fSym] : null);
@@ -1108,16 +1053,18 @@ function handlePingSubscriptions(symbols) {
                 sharedPriceCache[fSym] = cached;
                 dirtySymbols.add(fSym);
             }
-            if (s.includes(':')) {
-                const raw = s.split(':')[1];
-                sharedPriceCache[raw] = cached;
-                dirtySymbols.add(raw);
-            }
+            aliases.forEach(alias => {
+                sharedPriceCache[alias] = cached;
+                dirtySymbols.add(alias);
+            });
         }
         
         if (!clientSubscriptions.has(s)) {
             clientSubscriptions.add(s);
             newSymbols.push(s);
+        }
+        if (fSym && !clientSubscriptions.has(fSym)) {
+            clientSubscriptions.add(fSym);
         }
     });
     
@@ -1157,6 +1104,9 @@ async function garbageCollectSubscriptions() {
         const protectSymbol = (sym) => {
             if (sym && !sym.endsWith('-MF')) {
                 symbolLastSeen.set(sym, now); // Prevent GC
+                const aliases = getSymbolAliases(sym);
+                aliases.forEach(alias => symbolLastSeen.set(alias, now));
+
                 if (!clientSubscriptions.has(sym)) {
                     clientSubscriptions.add(sym);
                     const fSym = toFyersSymbol(sym);
@@ -1199,6 +1149,17 @@ async function garbageCollectSubscriptions() {
     for (const [symbol, lastSeen] of symbolLastSeen.entries()) {
         // If a symbol hasn't been pinged in 60 seconds by ANY user, unsubscribe it
         if (now - lastSeen > 60000) {
+            // Verify no alias was recently seen
+            const aliases = getSymbolAliases(symbol);
+            const isAnyAliasActive = aliases.some(alias => {
+                const aliasLastSeen = symbolLastSeen.get(alias) || 0;
+                return (now - aliasLastSeen <= 60000);
+            });
+            if (isAnyAliasActive) {
+                symbolLastSeen.set(symbol, now);
+                continue;
+            }
+
             clientSubscriptions.delete(symbol);
             symbolLastSeen.delete(symbol);
             clientViewerLastSeen.delete(symbol);
@@ -1206,7 +1167,7 @@ async function garbageCollectSubscriptions() {
             const fSym = toFyersSymbol(symbol);
             if (fSym) {
                 if (globalFyersToRequested[fSym]) {
-                    globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== symbol);
+                    globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== symbol && !aliases.includes(item));
                     if (globalFyersToRequested[fSym].length === 0) {
                         delete globalFyersToRequested[fSym];
                         staleFyersSymbols.push(fSym);

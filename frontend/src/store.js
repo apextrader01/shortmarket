@@ -243,35 +243,66 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     }
     newPrices[symbol] = tickObj;
 
-    // ⚡ Dual-key prices with and without exchange prefix so watchlists and modals always find the price
+    // ⚡ Universal multi-keying across Stocks, NFO, BFO, MCX, and Indices
     // Re-use tickObj reference directly to eliminate redundant heap allocations per tick
+    const COMMODITY_KEYS = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'NATGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'ALUMINI', 'NICKEL', 'MENTHAOIL', 'COTTON', 'STEELREBAR', 'MCX'];
+    const isCom = symbol.startsWith('MCX:') || COMMODITY_KEYS.some(c => symbol.includes(c)) || symbol.endsWith('-MCX');
+    const isBse = symbol.startsWith('BSE:') || symbol.startsWith('BFO:') || symbol.startsWith('SENSEX') || symbol.startsWith('BANKEX') || symbol.endsWith('-BSE');
+    
+    let raw = symbol;
     if (symbol.includes(':')) {
-        const rawSym = symbol.split(':')[1];
-        newPrices[rawSym] = tickObj;
-        const base = rawSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
-        if (base !== rawSym) {
-            newPrices[base] = tickObj;
-            newPrices[`NSE:${base}`] = tickObj;
-            newPrices[`BSE:${base}`] = tickObj;
-        } else {
-            newPrices[`NSE:${base}-EQ`] = tickObj;
+        raw = symbol.split(':')[1];
+        newPrices[raw] = tickObj;
+    }
+    const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX|MCX|BSE)$/i, '');
+    if (clean && clean !== raw) {
+        newPrices[clean] = tickObj;
+    }
+
+    if (isCom) {
+        newPrices[`MCX:${raw}`] = tickObj;
+        newPrices[`MCX:${clean}`] = tickObj;
+        newPrices[`${clean}-MCX`] = tickObj;
+    } else if (isBse) {
+        newPrices[`BSE:${raw}`] = tickObj;
+        newPrices[`BSE:${clean}`] = tickObj;
+        newPrices[`BFO:${raw}`] = tickObj;
+        newPrices[`BFO:${clean}`] = tickObj;
+        if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+            newPrices[`BSE:${clean}-A`] = tickObj;
+            newPrices[`NSE:${clean}`] = tickObj;
+            newPrices[`NSE:${clean}-EQ`] = tickObj;
         }
     } else {
-        const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => symbol.startsWith(c)) || symbol.includes('-MCX');
-        if (isCommodity) {
-            newPrices[`MCX:${symbol}`] = tickObj;
-        } else {
-            newPrices[`NSE:${symbol}`] = tickObj;
-            newPrices[`BSE:${symbol}`] = tickObj;
-            const base = symbol.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
-            if (base !== symbol) {
-                newPrices[base] = tickObj;
-                newPrices[`NSE:${base}`] = tickObj;
-                newPrices[`BSE:${base}`] = tickObj;
-            } else {
-                newPrices[`NSE:${base}-EQ`] = tickObj;
-            }
+        newPrices[`NSE:${raw}`] = tickObj;
+        newPrices[`NSE:${clean}`] = tickObj;
+        newPrices[`NFO:${raw}`] = tickObj;
+        newPrices[`NFO:${clean}`] = tickObj;
+        if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+            newPrices[`NSE:${clean}-EQ`] = tickObj;
+            newPrices[`BSE:${clean}`] = tickObj;
+            newPrices[`BSE:${clean}-A`] = tickObj;
         }
+    }
+
+    // Index mapping
+    if (clean === 'NIFTY' || clean === 'NIFTY50' || raw === 'NIFTY50-INDEX' || symbol === 'NSE:NIFTY50-INDEX') {
+        newPrices['NIFTY'] = tickObj;
+        newPrices['NIFTY 50'] = tickObj;
+        newPrices['NIFTY50'] = tickObj;
+        newPrices['NSE:NIFTY50-INDEX'] = tickObj;
+    } else if (clean === 'BANKNIFTY' || raw === 'NIFTYBANK-INDEX' || symbol === 'NSE:NIFTYBANK-INDEX') {
+        newPrices['BANKNIFTY'] = tickObj;
+        newPrices['BANK NIFTY'] = tickObj;
+        newPrices['NSE:NIFTYBANK-INDEX'] = tickObj;
+    } else if (clean === 'SENSEX' || raw === 'SENSEX-INDEX' || symbol === 'BSE:SENSEX-INDEX') {
+        newPrices['SENSEX'] = tickObj;
+        newPrices['BSE SENSEX'] = tickObj;
+        newPrices['BSE:SENSEX-INDEX'] = tickObj;
+    } else if (clean === 'INDIAVIX' || raw === 'INDIAVIX-INDEX' || symbol === 'NSE:INDIAVIX-INDEX') {
+        newPrices['INDIAVIX'] = tickObj;
+        newPrices['INDIA VIX'] = tickObj;
+        newPrices['NSE:INDIAVIX-INDEX'] = tickObj;
     }
   }
 
@@ -960,19 +991,40 @@ export const useStore = create(persist((set, get) => ({
     const activeWl = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
     
     const symbols = new Set();
+    const COMMODITY_KEYS = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'NATGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'ALUMINI', 'NICKEL', 'MENTHAOIL', 'COTTON', 'STEELREBAR', 'MCX'];
     const addWithAliases = (s) => {
       if (!s || typeof s !== 'string') return;
       symbols.add(s);
+      let raw = s;
       if (s.includes(':')) {
-        const raw = s.split(':')[1];
+        raw = s.split(':')[1];
         symbols.add(raw);
+      }
+      const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX|MCX|BSE)$/i, '');
+      if (clean) symbols.add(clean);
+
+      const isCom = s.startsWith('MCX:') || COMMODITY_KEYS.some(c => s.includes(c)) || s.endsWith('-MCX');
+      const isBse = s.startsWith('BSE:') || s.startsWith('BFO:') || s.startsWith('SENSEX') || s.startsWith('BANKEX') || s.endsWith('-BSE');
+
+      if (isCom) {
+        symbols.add(`MCX:${raw}`);
+        symbols.add(`MCX:${clean}`);
+      } else if (isBse) {
+        symbols.add(`BSE:${raw}`);
+        symbols.add(`BSE:${clean}`);
+        symbols.add(`BFO:${raw}`);
+        if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+          symbols.add(`BSE:${clean}-A`);
+          symbols.add(`NSE:${clean}`);
+          symbols.add(`NSE:${clean}-EQ`);
+        }
       } else {
-        const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
-        if (isCommodity) {
-          symbols.add(`MCX:${s}`);
-        } else {
-          symbols.add(`NSE:${s}`);
-          symbols.add(`BSE:${s}`);
+        symbols.add(`NSE:${raw}`);
+        symbols.add(`NSE:${clean}`);
+        symbols.add(`NFO:${raw}`);
+        if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+          symbols.add(`NSE:${clean}-EQ`);
+          symbols.add(`BSE:${clean}`);
         }
       }
     };
@@ -1725,14 +1777,41 @@ export const useStore = create(persist((set, get) => ({
           const alertSymbols = (get().alerts || []).filter(a => !a.triggered && a.symbol).map(a => a.symbol);
           const rawList = [...wlSymbols, ...posSymbols, ...holdSymbols, ...alertSymbols];
           const expandedUserSyms = [];
+          const COMMODITY_KEYS = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'NATGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'ALUMINI', 'NICKEL', 'MENTHAOIL', 'COTTON', 'STEELREBAR', 'MCX'];
           rawList.forEach(s => {
             if (!s || typeof s !== 'string') return;
             expandedUserSyms.push(s);
+            let raw = s;
             if (s.includes(':')) {
-              expandedUserSyms.push(s.split(':')[1]);
+              raw = s.split(':')[1];
+              expandedUserSyms.push(raw);
+            }
+            const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX|MCX|BSE)$/i, '');
+            if (clean) expandedUserSyms.push(clean);
+
+            const isCom = s.startsWith('MCX:') || COMMODITY_KEYS.some(c => s.includes(c)) || s.endsWith('-MCX');
+            const isBse = s.startsWith('BSE:') || s.startsWith('BFO:') || s.startsWith('SENSEX') || s.startsWith('BANKEX') || s.endsWith('-BSE');
+
+            if (isCom) {
+              expandedUserSyms.push(`MCX:${raw}`);
+              expandedUserSyms.push(`MCX:${clean}`);
+            } else if (isBse) {
+              expandedUserSyms.push(`BSE:${raw}`);
+              expandedUserSyms.push(`BSE:${clean}`);
+              expandedUserSyms.push(`BFO:${raw}`);
+              if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+                expandedUserSyms.push(`BSE:${clean}-A`);
+                expandedUserSyms.push(`NSE:${clean}`);
+                expandedUserSyms.push(`NSE:${clean}-EQ`);
+              }
             } else {
-              const isCom = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => s.startsWith(c)) || s.includes('-MCX');
-              expandedUserSyms.push(isCom ? `MCX:${s}` : `NSE:${s}`);
+              expandedUserSyms.push(`NSE:${raw}`);
+              expandedUserSyms.push(`NSE:${clean}`);
+              expandedUserSyms.push(`NFO:${raw}`);
+              if (!/\d+(CE|PE)$/i.test(raw) && !/FUT$/i.test(raw)) {
+                expandedUserSyms.push(`NSE:${clean}-EQ`);
+                expandedUserSyms.push(`BSE:${clean}`);
+              }
             }
           });
           const allSymbolsToSubscribe = [...new Set(expandedUserSyms)];
