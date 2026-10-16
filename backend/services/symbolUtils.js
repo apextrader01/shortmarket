@@ -93,10 +93,10 @@ function getSymbolAliases(sym) {
   const trimmed = sym.trim();
   if (!trimmed) return [];
   const upper = trimmed.toUpperCase();
-  const aliases = new Set([trimmed]);
+  const aliases = new Set([trimmed, upper]);
 
   // 1. Check Index Alias Map
-  const upperNoPrefix = upper.replace(/^(NSE:|BSE:|MCX:|NFO:|BFO:)/i, '').trim();
+  const upperNoPrefix = upper.replace(/^(NSE:|BSE:|MCX:|NFO:|BFO:|COM:|COMM:)/i, '').trim();
   if (INDEX_ALIAS_MAP[upperNoPrefix]) {
     const canonicalIndex = INDEX_ALIAS_MAP[upperNoPrefix];
     aliases.add(canonicalIndex);
@@ -110,13 +110,16 @@ function getSymbolAliases(sym) {
   }
 
   // 2. Extract prefix and raw body
-  let raw = trimmed;
+  let raw = upper;
   let ex = null;
-  if (trimmed.includes(':')) {
-    const colonIdx = trimmed.indexOf(':');
-    let rawEx = trimmed.substring(0, colonIdx).toUpperCase();
-    raw = trimmed.substring(colonIdx + 1);
+  if (upper.includes(':')) {
+    const colonIdx = upper.indexOf(':');
+    let rawEx = upper.substring(0, colonIdx);
+    raw = upper.substring(colonIdx + 1);
     aliases.add(raw);
+    if (trimmed.includes(':')) {
+      aliases.add(trimmed.substring(trimmed.indexOf(':') + 1));
+    }
 
     if (rawEx === 'NFO') ex = 'NSE';
     else if (rawEx === 'BFO') ex = 'BSE';
@@ -128,19 +131,20 @@ function getSymbolAliases(sym) {
   if (clean) aliases.add(clean);
 
   // 3. Segment Resolution
-  if (isCommoditySymbol(trimmed) || isCommoditySymbol(raw)) {
+  if (isCommoditySymbol(upper) || isCommoditySymbol(raw)) {
     // === MCX COMMODITIES ===
     aliases.add(`MCX:${raw}`);
     aliases.add(`MCX:${clean}`);
     aliases.add(`${clean}-MCX`);
     aliases.add(`${raw}-MCX`);
-  } else if (isBseSymbol(trimmed) || isBseSymbol(raw) || ex === 'BSE') {
+  } else if (isBseSymbol(upper) || isBseSymbol(raw) || ex === 'BSE') {
     // === BSE EQUITIES & BFO (SENSEX & BANKEX DERIVATIVES) ===
     aliases.add(`BSE:${raw}`);
     aliases.add(`BSE:${clean}`);
-    aliases.add(`BFO:${raw}`);
-    aliases.add(`BFO:${clean}`);
-    if (!isDerivativeSymbol(raw)) {
+    if (isDerivativeSymbol(raw)) {
+      aliases.add(`BFO:${raw}`);
+      aliases.add(`BFO:${clean}`);
+    } else {
       aliases.add(`BSE:${clean}-A`);
       aliases.add(`BSE:${clean}-B`);
       aliases.add(`NSE:${clean}`);
@@ -150,9 +154,10 @@ function getSymbolAliases(sym) {
     // === NSE EQUITIES & NFO (NSE DERIVATIVES) ===
     aliases.add(`NSE:${raw}`);
     aliases.add(`NSE:${clean}`);
-    aliases.add(`NFO:${raw}`);
-    aliases.add(`NFO:${clean}`);
-    if (!isDerivativeSymbol(raw)) {
+    if (isDerivativeSymbol(raw)) {
+      aliases.add(`NFO:${raw}`);
+      aliases.add(`NFO:${clean}`);
+    } else {
       aliases.add(`NSE:${clean}-EQ`);
       aliases.add(`BSE:${clean}`);
       aliases.add(`BSE:${clean}-A`);
@@ -183,7 +188,7 @@ function toCanonicalFyersSymbol(symbol, canonicalStockMap = null, nameToFyers = 
   if (trimmed.includes(':')) {
     const colonIdx = trimmed.indexOf(':');
     let ex = trimmed.substring(0, colonIdx).toUpperCase();
-    const symPart = trimmed.substring(colonIdx + 1);
+    const symPart = trimmed.substring(colonIdx + 1).toUpperCase();
 
     if (ex === 'NFO') ex = 'NSE';
     if (ex === 'BFO') ex = 'BSE';
@@ -196,30 +201,40 @@ function toCanonicalFyersSymbol(symbol, canonicalStockMap = null, nameToFyers = 
     if (canonicalStockMap && canonicalStockMap.has(`${ex}:${clean}`)) return canonicalStockMap.get(`${ex}:${clean}`);
 
     if (nameToFyers && nameToFyers[normalized]) return nameToFyers[normalized];
-    if (nameToFyers && nameToFyers[symbol]) return nameToFyers[symbol];
+    if (nameToFyers && nameToFyers[upper]) return nameToFyers[upper];
+
+    // For NSE equities without suffix, append -EQ
+    if (ex === 'NSE' && !symPart.includes('-') && !isDerivativeSymbol(symPart)) {
+      return `NSE:${clean}-EQ`;
+    }
 
     return normalized;
   }
 
   // 3. Unprefixed Symbol
-  if (nameToFyers && nameToFyers[trimmed]) return nameToFyers[trimmed];
-  if (canonicalStockMap && canonicalStockMap.has(`NSE:${trimmed}`)) return canonicalStockMap.get(`NSE:${trimmed}`);
-  if (canonicalStockMap && canonicalStockMap.has(`BSE:${trimmed}`)) return canonicalStockMap.get(`BSE:${trimmed}`);
+  if (nameToFyers && nameToFyers[upper]) return nameToFyers[upper];
+  if (canonicalStockMap && canonicalStockMap.has(`NSE:${upper}`)) return canonicalStockMap.get(`NSE:${upper}`);
+  if (canonicalStockMap && canonicalStockMap.has(`BSE:${upper}`)) return canonicalStockMap.get(`BSE:${upper}`);
 
   // Commodity
-  if (isCommoditySymbol(trimmed)) {
-    const cleanCom = trimmed.replace(/-MCX$/i, '');
+  if (isCommoditySymbol(upper)) {
+    const cleanCom = upper.replace(/-MCX$/i, '');
     return `MCX:${cleanCom}`;
   }
 
   // BSE / BFO
-  if (isBseSymbol(trimmed)) {
-    const cleanBse = trimmed.replace(/-BSE$/i, '');
+  if (isBseSymbol(upper)) {
+    const cleanBse = upper.replace(/-BSE$/i, '');
     return `BSE:${cleanBse}`;
   }
 
-  // Default NSE
-  return `NSE:${trimmed}`;
+  // Default NSE: if equity without suffix, add -EQ
+  const cleanNse = upper.replace(/-EQ$/i, '');
+  if (!upper.includes('-') && !isDerivativeSymbol(upper)) {
+    return `NSE:${cleanNse}-EQ`;
+  }
+
+  return `NSE:${upper}`;
 }
 
 module.exports = {

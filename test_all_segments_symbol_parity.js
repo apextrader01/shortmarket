@@ -44,6 +44,20 @@ assert(bseStockAliases.includes('BSE:TCS'), 'BSE:TCS-A includes BSE:TCS');
 assert(bseStockAliases.includes('BSE:TCS-A'), 'BSE:TCS-A includes BSE:TCS-A');
 assert(bseStockAliases.includes('NSE:TCS-EQ'), 'BSE:TCS-A includes NSE:TCS-EQ');
 
+// Lowercase & new equity resolution
+const lowerStock = getSymbolAliases('reliance');
+assert(lowerStock.includes('RELIANCE'), 'lowercase reliance generates uppercase RELIANCE alias');
+assert(lowerStock.includes('NSE:RELIANCE-EQ'), 'lowercase reliance generates NSE:RELIANCE-EQ alias');
+
+const unmappedStock = toCanonicalFyersSymbol('SWIGGY');
+assert(unmappedStock === 'NSE:SWIGGY-EQ', 'Unmapped equity SWIGGY defaults to NSE:SWIGGY-EQ');
+
+const unmappedPrefixed = toCanonicalFyersSymbol('NSE:SWIGGY');
+assert(unmappedPrefixed === 'NSE:SWIGGY-EQ', 'Unmapped prefixed NSE:SWIGGY resolves to NSE:SWIGGY-EQ');
+
+const lowercaseStockFyers = toCanonicalFyersSymbol('swiggy');
+assert(lowercaseStockFyers === 'NSE:SWIGGY-EQ', 'Lowercase swiggy resolves to NSE:SWIGGY-EQ');
+
 // 2. NFO (NSE Futures & Options)
 console.log('\n▶ 2. NFO (NSE Futures & Options)');
 const nfoOptionAliases = getSymbolAliases('NIFTY26O1923200CE');
@@ -54,6 +68,17 @@ assert(!nfoOptionAliases.includes('NSE:NIFTY26O1923200CE-EQ'), 'Option does NOT 
 
 const nfoPrefixed = toCanonicalFyersSymbol('NFO:NIFTY26O1923200CE');
 assert(nfoPrefixed === 'NSE:NIFTY26O1923200CE', 'NFO: prefix normalizes to NSE: for Fyers');
+
+// Stock Futures and Options
+const stockFut = getSymbolAliases('RELIANCE26OCTFUT');
+assert(stockFut.includes('NSE:RELIANCE26OCTFUT'), 'Stock future includes NSE: prefix');
+assert(stockFut.includes('NFO:RELIANCE26OCTFUT'), 'Stock future includes NFO: prefix');
+assert(!stockFut.includes('NSE:RELIANCE26OCTFUT-EQ'), 'Stock future does not add -EQ');
+
+const stockOpt = getSymbolAliases('RELIANCE26OCT2600CE');
+assert(stockOpt.includes('NSE:RELIANCE26OCT2600CE'), 'Stock option includes NSE: prefix');
+assert(stockOpt.includes('NFO:RELIANCE26OCT2600CE'), 'Stock option includes NFO: prefix');
+assert(!stockOpt.includes('NSE:RELIANCE26OCT2600CE-EQ'), 'Stock option does not add -EQ');
 
 // 3. BFO (BSE Futures & Options - SENSEX & BANKEX)
 console.log('\n▶ 3. BFO (BSE Futures & Options)');
@@ -68,6 +93,9 @@ assert(bfoNormalized === 'BSE:SENSEX26O1675000CE', 'BFO: prefix normalizes to BS
 
 const bfoUnprefixed = toCanonicalFyersSymbol('SENSEX26O1675000CE');
 assert(bfoUnprefixed === 'BSE:SENSEX26O1675000CE', 'Unprefixed SENSEX option auto-resolves to BSE: prefix');
+
+const bfoFut = toCanonicalFyersSymbol('SENSEX26OCTFUT');
+assert(bfoFut === 'BSE:SENSEX26OCTFUT', 'SENSEX future auto-resolves to BSE: prefix');
 
 // 4. MCX COMMODITIES & COMMODITY DERIVATIVES
 console.log('\n▶ 4. MCX Commodities & Derivatives');
@@ -87,6 +115,9 @@ assert(goldPetalAliases.includes('MCX:GOLDPETAL26OCTFUT'), 'GOLDPETAL correctly 
 const mcxOption = toCanonicalFyersSymbol('CRUDEOIL26O206000CE');
 assert(mcxOption === 'MCX:CRUDEOIL26O206000CE', 'MCX Option resolves to MCX: prefix');
 
+const goldOption = toCanonicalFyersSymbol('GOLD26D0575000PE');
+assert(goldOption === 'MCX:GOLD26D0575000PE', 'GOLD option resolves to MCX: prefix');
+
 // 5. INDICES
 console.log('\n▶ 5. Indices');
 const niftyAliases = getSymbolAliases('NIFTY');
@@ -99,6 +130,9 @@ assert(sensexAliases.includes('BSE SENSEX'), 'SENSEX includes BSE SENSEX');
 
 const vixAliases = getSymbolAliases('INDIAVIX');
 assert(vixAliases.includes('NSE:INDIAVIX-INDEX'), 'INDIAVIX includes NSE:INDIAVIX-INDEX');
+
+const bankniftyAliases = getSymbolAliases('BANKNIFTY');
+assert(bankniftyAliases.includes('NSE:NIFTYBANK-INDEX'), 'BANKNIFTY includes NSE:NIFTYBANK-INDEX');
 
 console.log('\n================================================================');
 console.log(`🏁 RESULTS: ${passed} PASSED, ${failed} FAILED`);
