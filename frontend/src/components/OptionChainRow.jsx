@@ -31,9 +31,19 @@ const OptionChainRow = React.memo(({
 }) => {
   const callKey = call ? (call.symbol.includes('-') ? call.symbol : `${call.symbol}-${call.exch_seg}`) : null;
   const putKey = put ? (put.symbol.includes('-') ? put.symbol : `${put.symbol}-${put.exch_seg}`) : null;
+  const callRaw = call?.symbol ? call.symbol.replace(/^[A-Z]+:/, '') : null;
+  const putRaw = put?.symbol ? put.symbol.replace(/^[A-Z]+:/, '') : null;
+  const callPref = call?.symbol && !call.symbol.includes(':') ? `${call.exch_seg || 'NSE'}:${call.symbol}` : call?.symbol;
+  const putPref = put?.symbol && !put.symbol.includes(':') ? `${put.exch_seg || 'NSE'}:${put.symbol}` : put?.symbol;
 
-  const callPriceData = useStore(state => callKey ? state.prices[callKey] : null);
-  const putPriceData = useStore(state => putKey ? state.prices[putKey] : null);
+  const callPriceData = useStore(state => {
+    if (!call) return null;
+    return state.prices[call.symbol] || (callRaw ? state.prices[callRaw] : null) || (callPref ? state.prices[callPref] : null) || (callKey ? state.prices[callKey] : null);
+  });
+  const putPriceData = useStore(state => {
+    if (!put) return null;
+    return state.prices[put.symbol] || (putRaw ? state.prices[putRaw] : null) || (putPref ? state.prices[putPref] : null) || (putKey ? state.prices[putKey] : null);
+  });
 
   const cLtp = callPriceData?.ltp || 0;
   const pLtp = putPriceData?.ltp || 0;

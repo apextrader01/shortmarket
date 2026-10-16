@@ -179,9 +179,12 @@ const OptionChainViewInternal = () => {
         setOptionsData(data);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const expList = Object.keys(data)
+        let expList = Object.keys(data)
           .filter(exp => new Date(exp) >= today)
           .sort((a, b) => new Date(a) - new Date(b));
+        if (expList.length === 0) {
+          expList = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+        }
         setExpiries(expList);
         if (expList.length > 0) {
           setExpiry(expList[0]);
@@ -423,11 +426,12 @@ const OptionChainViewInternal = () => {
 
   const r = 0.10; // 10% risk-free rate (NSE Standard for IV calculations)
 
-  // Find ATM strike (closest to spotPrice)
+  // Find ATM strike (closest to spotPrice or effectiveSpotPrice fallback)
   let atmStrike = null;
-  if (basePrice > 0 && strikes.length > 0) {
+  const targetSpot = basePrice > 0 ? basePrice : effectiveSpotPrice;
+  if (targetSpot > 0 && strikes.length > 0) {
     atmStrike = strikes.reduce((prev, curr) => 
-      Math.abs(curr - basePrice) < Math.abs(prev - basePrice) ? curr : prev
+      Math.abs(curr - targetSpot) < Math.abs(prev - targetSpot) ? curr : prev
     );
   }
 
@@ -535,13 +539,14 @@ const OptionChainViewInternal = () => {
   const { totalCallOI, totalPutOI, pcrRatio } = useMemo(() => {
     let callOi = 0;
     let putOi = 0;
+    const currentPrices = useStore.getState().prices || {};
     (strikes || []).forEach(s => {
       const c = chain[s]?.CE;
       const p = chain[s]?.PE;
       const cKey = c ? (c.symbol.includes('-') ? c.symbol : `${c.symbol}-${c.exch_seg}`) : null;
       const pKey = p ? (p.symbol.includes('-') ? p.symbol : `${p.symbol}-${p.exch_seg}`) : null;
-      const cData = cKey ? prices[cKey] : null;
-      const pData = pKey ? prices[pKey] : null;
+      const cData = cKey ? currentPrices[cKey] : null;
+      const pData = pKey ? currentPrices[pKey] : null;
       const cVal = Number(cData?.oi ?? c?.oi ?? 0);
       const pVal = Number(pData?.oi ?? p?.oi ?? 0);
       if (cVal > 0) callOi += cVal;
@@ -549,7 +554,7 @@ const OptionChainViewInternal = () => {
     });
     const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
     return { totalCallOI: callOi, totalPutOI: putOi, pcrRatio: pcr };
-  }, [strikes, chain, prices]);
+  }, [strikes, chain]);
 
   return (
     <div className="option-chain-container glass-panel">
@@ -836,32 +841,7 @@ const OptionChainViewInternal = () => {
   );
 };
 
-const OPTIONS_ENABLED = false;
-
-const ComingSoonScreen = ({ setActiveTab }) => (
-  <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4 bg-[#0b0e14]">
-    <div className="bg-[#111620] p-8 rounded-2xl border border-slate-800 shadow-xl max-w-md w-full">
-      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#E2E8F0', padding: '20px 0', alignSelf: 'flex-start', width: '100%', maxWidth: '800px', margin: '0 auto' }} onClick={() => setActiveTab('ClientData')}><ChevronLeft size={20} style={{ marginRight: '8px' }} /><span style={{ fontSize: '16px', fontWeight: '600' }}>Back to Account</span></div>
-        <div className="flex justify-center mb-6">
-        <div className="p-4 bg-blue-500/10 rounded-full">
-          <Clock className="w-12 h-12 text-blue-400" />
-        </div>
-      </div>
-      <h2 className="text-2xl font-bold text-white mb-3">Options Trading</h2>
-      <p className="text-slate-400 text-lg mb-6">
-        This feature is currently under development and will be coming soon.
-      </p>
-      <div className="text-sm text-slate-500">
-        We're working hard to bring you a seamless options trading experience.
-      </div>
-    </div>
-  </div>
-);
-
 const OptionChainView = (props) => {
-  if (!OPTIONS_ENABLED) {
-    return <ComingSoonScreen setActiveTab={props.setActiveTab} />;
-  }
   return <OptionChainViewInternal {...props} />;
 };
 
