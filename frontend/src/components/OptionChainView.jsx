@@ -116,6 +116,36 @@ const PcrSummary = React.memo(({ strikes, chain }) => {
   );
 });
 
+const COMMODITIES = [
+  'CRUDEOIL', 'CRUDEOILM', 
+  'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 
+  'SILVER', 'SILVERM', 'SILVERMIC', 
+  'NATURALGAS', 'NATURALGASM', 
+  'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
+];
+
+const getIndexCandidates = (sym) => {
+  switch (sym) {
+    case 'NIFTY': return ['NSE:NIFTY50-INDEX', 'NIFTY50-INDEX', 'NIFTY-NSE', 'NIFTY 50', 'NIFTY'];
+    case 'BANKNIFTY': return ['NSE:NIFTYBANK-INDEX', 'NIFTYBANK-INDEX', 'BANKNIFTY-NSE', 'NIFTY BANK', 'BANKNIFTY'];
+    case 'FINNIFTY': return ['NSE:FINNIFTY-INDEX', 'FINNIFTY-INDEX', 'FINNIFTY-NSE', 'NIFTY FIN SERVICE', 'FINNIFTY'];
+    case 'SENSEX': return ['BSE:SENSEX-INDEX', 'SENSEX-INDEX', 'SENSEX-BSE', 'SENSEX'];
+    case 'BANKEX': return ['BSE:BANKEX-INDEX', 'BANKEX-INDEX', 'BANKEX-BSE', 'BANKEX'];
+    default: return [`NSE:${sym}-INDEX`, `${sym}-NSE`];
+  }
+};
+
+const getIndexKey = (sym) => {
+  switch (sym) {
+    case 'NIFTY': return 'NSE:NIFTY50-INDEX';
+    case 'BANKNIFTY': return 'NSE:NIFTYBANK-INDEX';
+    case 'FINNIFTY': return 'NSE:FINNIFTY-INDEX';
+    case 'SENSEX': return 'BSE:SENSEX-INDEX';
+    case 'BANKEX': return 'BSE:BANKEX-INDEX';
+    default: return `NSE:${sym}-INDEX`;
+  }
+};
+
 const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState(ALLOWED_INDEX_SYMBOLS);
@@ -164,22 +194,23 @@ const OptionChainViewInternal = () => {
   const openDomLadderModal = useStore((state) => state.openDomLadderModal);
 
   const atmRowRef = useRef(null);
-  const [hasScrolled, setHasScrolled] = useState(false);
+  const hasScrolledRef = useRef(false);
   const [strategyMode, setStrategyMode] = useState(false);
   const [strategyLegs, setStrategyLegs] = useState([]);
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
 
+  const indexCandidates = useMemo(() => getIndexCandidates(symbol), [symbol]);
+  const indexKey = useMemo(() => getIndexKey(symbol), [symbol]);
+  const isCommodity = useMemo(() => COMMODITIES.includes(symbol), [symbol]);
+
   useEffect(() => {
+    let isCancelled = false;
     const fetchChainAndFuture = async () => {
       setLoading(true);
       setError(null);
       setOptionsData({}); // Clear old chain data
       try {
-        const idxCandidates = getIndexCandidates(symbol);
-        const idxKey = getIndexKey(symbol);
-        const isCommodity = commodities.includes(symbol);
-
-        const initialToFetch = ['NSE:INDIAVIX-INDEX', 'INDIAVIX-INDEX', ...idxCandidates];
+        const initialToFetch = ['NSE:INDIAVIX-INDEX', 'INDIAVIX-INDEX', ...indexCandidates];
 
         // Fire ALL requests in parallel — don't wait for one before starting the next
         const [futRes, chainRes, _] = await Promise.all([
@@ -188,27 +219,31 @@ const OptionChainViewInternal = () => {
           useStore.getState().fetchBatchPrices(initialToFetch)
         ]);
 
+        if (isCancelled) return;
+
         // Process futures result
         let futDataResult = null;
         if (futRes.ok) {
           futDataResult = await futRes.json();
-          setFutureData(futDataResult);
-          const futKey = futDataResult.symbol;
-          setFutureTokenKey(futKey);
-          
-          // For commodities, now that we have the futures symbol/exchange, fetch its price
-          if (isCommodity) {
-            await useStore.getState().fetchBatchPrices([futKey]);
+          if (!isCancelled) {
+            setFutureData(futDataResult);
+            const futKey = futDataResult.symbol;
+            setFutureTokenKey(futKey);
+            
+            // For commodities, fetch its price
+            if (isCommodity) {
+              await useStore.getState().fetchBatchPrices([futKey]);
+            }
           }
-        } else {
+        } else if (!isCancelled) {
           setFutureData(null);
           setFutureTokenKey(null);
         }
 
-        // Set initialSpotPrice immediately from the store (don't wait for React re-render)
+        // Set initialSpotPrice immediately from the store
         const storeState = useStore.getState().prices;
         let resolvedSpotPrice = null;
-        for (const k of idxCandidates) {
+        for (const k of indexCandidates) {
           if (storeState[k]?.ltp > 0) {
             resolvedSpotPrice = storeState[k].ltp;
             break;
@@ -220,7 +255,7 @@ const OptionChainViewInternal = () => {
             resolvedSpotPrice = storeState[futKey].ltp;
           }
         }
-        if (resolvedSpotPrice !== null) {
+        if (resolvedSpotPrice !== null && !isCancelled) {
           setInitialSpotPrice(resolvedSpotPrice);
         }
 
@@ -231,103 +266,99 @@ const OptionChainViewInternal = () => {
         }
         const data = await chainRes.json();
         
-        setOptionsData(data);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        let expList = Object.keys(data)
-          .filter(exp => new Date(exp) >= today)
-          .sort((a, b) => new Date(a) - new Date(b));
-        if (expList.length === 0) {
-          expList = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
-        }
-        setExpiries(expList);
-        if (expList.length > 0) {
-          setExpiry(expList[0]);
+        if (!isCancelled) {
+          setOptionsData(data);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          let expList = Object.keys(data)
+            .filter(exp => new Date(exp) >= today)
+            .sort((a, b) => new Date(a) - new Date(b));
+          if (expList.length === 0) {
+            expList = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+          }
+          setExpiries(expList);
+          if (expList.length > 0) {
+            setExpiry(expList[0]);
+          }
         }
 
       } catch (err) {
-        console.error(err);
-        setError(err.message);
-        setOptionsData({});
-        setExpiries([]);
-        setExpiry('');
+        if (!isCancelled) {
+          console.error(err);
+          setError(err.message);
+          setOptionsData({});
+          setExpiries([]);
+          setExpiry('');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
     fetchChainAndFuture();
-    setHasScrolled(false); // Reset scroll on symbol change
+    hasScrolledRef.current = false; // Reset scroll on symbol change
     setInitialSpotPrice(null); // Reset spot price anchor
-    setFutureData(null); // Clear old future data so it doesn't anchor to previous symbol's price
-  }, [symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
+    setFutureData(null);
+    return () => { isCancelled = true; };
+  }, [symbol, isCommodity, indexCandidates]);
 
-  const commodities = [
-    'CRUDEOIL', 'CRUDEOILM', 
-    'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 
-    'SILVER', 'SILVERM', 'SILVERMIC', 
-    'NATURALGAS', 'NATURALGASM', 
-    'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
-  ];
-
-  const getIndexCandidates = (sym) => {
-    switch (sym) {
-      case 'NIFTY': return ['NSE:NIFTY50-INDEX', 'NIFTY50-INDEX', 'NIFTY-NSE', 'NIFTY 50', 'NIFTY'];
-      case 'BANKNIFTY': return ['NSE:NIFTYBANK-INDEX', 'NIFTYBANK-INDEX', 'BANKNIFTY-NSE', 'NIFTY BANK', 'BANKNIFTY'];
-      case 'FINNIFTY': return ['NSE:FINNIFTY-INDEX', 'FINNIFTY-INDEX', 'FINNIFTY-NSE', 'NIFTY FIN SERVICE', 'FINNIFTY'];
-      case 'SENSEX': return ['BSE:SENSEX-INDEX', 'SENSEX-INDEX', 'SENSEX-BSE', 'SENSEX'];
-      case 'BANKEX': return ['BSE:BANKEX-INDEX', 'BANKEX-INDEX', 'BANKEX-BSE', 'BANKEX'];
-      default: return [`NSE:${sym}-INDEX`, `${sym}-NSE`];
-    }
-  };
-
-  const getIndexKey = (sym) => {
-    switch (sym) {
-      case 'NIFTY': return 'NSE:NIFTY50-INDEX';
-      case 'BANKNIFTY': return 'NSE:NIFTYBANK-INDEX';
-      case 'FINNIFTY': return 'NSE:FINNIFTY-INDEX';
-      case 'SENSEX': return 'BSE:SENSEX-INDEX';
-      case 'BANKEX': return 'BSE:BANKEX-INDEX';
-      default: return `NSE:${sym}-INDEX`;
-    }
-  };
-
-  const indexKey = getIndexKey(symbol);
-  const indexCandidates = getIndexCandidates(symbol);
-  const spotPriceData = useStore(state => {
+  // Read primitive numbers directly from store: NO inline object allocation, ZERO infinite re-renders!
+  const spotPrice = useStore(useCallback(state => {
     for (const k of indexCandidates) {
-      if (state.prices[k]?.ltp > 0) return state.prices[k];
+      const p = state.prices[k];
+      if (p?.ltp > 0) return p.ltp;
     }
-    return {};
-  });
-  const spotPrice = spotPriceData.ltp || 0;
-  const spotPct = spotPriceData.pct || 0;
-  
-  const futPriceData = useStore(state => futureTokenKey ? state.prices[futureTokenKey] : undefined);
-  const futPrice = futPriceData?.ltp || 0;
-  const futPct = futPriceData?.pct || 0;
+    return 0;
+  }, [indexCandidates]));
 
-  const vixData = useStore(state => {
-    return state.prices['NSE:INDIAVIX-INDEX'] || 
-           state.prices['INDIAVIX-INDEX'] || 
-           state.prices['INDIAVIX'] || 
-           state.prices['INDIA VIX-NSE'] || {};
-  });
-  const vixPrice = vixData.ltp || 0;
-  const vixPct = vixData.pct || 0;
-  const vixChange = vixData.change || 0;
+  const spotPct = useStore(useCallback(state => {
+    for (const k of indexCandidates) {
+      const p = state.prices[k];
+      if (p?.ltp > 0) return p.pct || 0;
+    }
+    return 0;
+  }, [indexCandidates]));
+  
+  const futPrice = useStore(useCallback(state => futureTokenKey ? (state.prices[futureTokenKey]?.ltp || 0) : 0, [futureTokenKey]));
+  const futPct = useStore(useCallback(state => futureTokenKey ? (state.prices[futureTokenKey]?.pct || 0) : 0, [futureTokenKey]));
+
+  const vixPrice = useStore(useCallback(state => {
+    return state.prices['NSE:INDIAVIX-INDEX']?.ltp || 
+           state.prices['INDIAVIX-INDEX']?.ltp || 
+           state.prices['INDIAVIX']?.ltp || 
+           state.prices['INDIA VIX-NSE']?.ltp || 0;
+  }, []));
+
+  const vixChange = useStore(useCallback(state => {
+    return state.prices['NSE:INDIAVIX-INDEX']?.change || 
+           state.prices['INDIAVIX-INDEX']?.change || 
+           state.prices['INDIAVIX']?.change || 
+           state.prices['INDIA VIX-NSE']?.change || 0;
+  }, []));
 
   const basePrice = spotPrice > 0 ? spotPrice : (futPrice > 0 ? futPrice : null);
 
-  useEffect(() => {
-    if (basePrice !== null && initialSpotPrice === null) {
-      setInitialSpotPrice(basePrice);
-    }
-  }, [basePrice, initialSpotPrice]);
+  const chain = optionsData[expiry] || {};
+  const allStrikes = useMemo(() => Object.keys(chain).map(Number).sort((a, b) => a - b), [chain]);
+  const effectiveSpotPrice = initialSpotPrice || (basePrice > 0 ? basePrice : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null));
+
+  // Memoized 31-strike window (15 ITM, 1 ATM, 15 OTM = 31 total strikes)
+  const strikes = useMemo(() => {
+    if (!effectiveSpotPrice || allStrikes.length === 0) return [];
+    const atmStrike = allStrikes.reduce((prev, curr) => 
+      Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
+    );
+    const atmIndex = allStrikes.indexOf(atmStrike);
+    const startIndex = Math.max(0, atmIndex - 15);
+    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
+    return allStrikes.slice(startIndex, endIndex + 1);
+  }, [effectiveSpotPrice, allStrikes]);
 
   useEffect(() => {
     if (!expiry || !optionsData[expiry]) return;
 
-    // Also subscribe to all underlying index aliases for Spot Price and VIX
+    // Subscribe to all underlying index aliases for Spot Price and VIX
     indexCandidates.forEach(sym => subscribeToSymbol(sym));
     subscribeToSymbol('NSE:INDIAVIX-INDEX');
     subscribeToSymbol('INDIAVIX-INDEX');
@@ -337,50 +368,33 @@ const OptionChainViewInternal = () => {
     }
 
     const tokensToSub = [];
+    if (strikes.length > 0) {
+      strikes.forEach((strike) => {
+        const data = optionsData[expiry]?.[strike];
+        if (data?.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
+        if (data?.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
+      });
 
-    const allStrikes = optionsData[expiry] ? Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b) : [];
-    const effectiveSpotPrice = initialSpotPrice !== null 
-      ? initialSpotPrice 
-      : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
-
-    if (effectiveSpotPrice !== null && allStrikes.length > 0) {
-        let atmStrike = allStrikes.reduce((prev, curr) => 
-          Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
-        );
+      if (tokensToSub.length > 0) {
+        subscribeToOptionBatch(tokensToSub);
         
-        const atmIndex = allStrikes.indexOf(atmStrike);
-        // Take 15 strikes below and 15 strikes above ATM (31 total strikes: 15 ITM, 1 ATM, 15 OTM)
-        const startIndex = Math.max(0, atmIndex - 15);
-        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
-        
-        const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
+        // Instantly fetch snapshot of the visible options so they load immediately
+        const uniqueSymbolsToFetch = [...indexCandidates, 'NSE:INDIAVIX-INDEX'];
+        if (futureData) uniqueSymbolsToFetch.push(futureData.symbol);
 
-        visibleStrikes.forEach((strike) => {
+        strikes.forEach((strike) => {
           const data = optionsData[expiry]?.[strike];
-          if (data?.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
-          if (data?.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
+          if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
+          if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
         });
 
-        if (tokensToSub.length > 0) {
-          subscribeToOptionBatch(tokensToSub);
-          
-          // Instantly fetch snapshot of the visible options so they load immediately
-          const uniqueSymbolsToFetch = [...indexCandidates, 'NSE:INDIAVIX-INDEX'];
-          if (futureData) uniqueSymbolsToFetch.push(futureData.symbol);
-
-          visibleStrikes.forEach((strike) => {
-            const data = optionsData[expiry]?.[strike];
-            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
-            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
-          });
-
-          if (uniqueSymbolsToFetch.length > 0) {
-            useStore.getState().fetchBatchPrices(uniqueSymbolsToFetch);
-          }
+        if (uniqueSymbolsToFetch.length > 0) {
+          useStore.getState().fetchBatchPrices(uniqueSymbolsToFetch);
         }
+      }
     }
 
-    setHasScrolled(false); // Reset scroll on expiry change
+    hasScrolledRef.current = false; // Reset scroll on expiry change without causing re-render
 
     return () => {
       indexCandidates.forEach(sym => unsubscribeFromSymbol(sym));
@@ -393,29 +407,12 @@ const OptionChainViewInternal = () => {
         unsubscribeFromOptionBatch(tokensToSub);
       }
     };
-  }, [expiry, optionsData, symbol, futureData, initialSpotPrice, indexKey, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
-
-  const chain = optionsData[expiry] || {};
-  const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
-  const effectiveSpotPrice = initialSpotPrice !== null 
-    ? initialSpotPrice 
-    : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
-  
-  let strikes = [];
-  if (effectiveSpotPrice !== null && allStrikes.length > 0) {
-    let atmStrike = allStrikes.reduce((prev, curr) => 
-      Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
-    );
-    const atmIndex = allStrikes.indexOf(atmStrike);
-    const startIndex = Math.max(0, atmIndex - 15);
-    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
-    strikes = allStrikes.slice(startIndex, endIndex + 1);
-  }
+  }, [expiry, optionsData, symbol, futureData, strikes, indexCandidates, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   // Auto-scroll to ATM strike when data is available
   useEffect(() => {
-    if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
-      setTimeout(() => {
+    if (!hasScrolledRef.current && atmRowRef.current && (spotPrice > 0 || effectiveSpotPrice > 0)) {
+      const timer = setTimeout(() => {
         if (atmRowRef.current) {
           const container = document.querySelector('.option-chain-table-container');
           if (container) {
@@ -425,12 +422,13 @@ const OptionChainViewInternal = () => {
               top: (rowRect.top - containerRect.top) - (containerRect.height / 2) + (rowRect.height / 2),
               behavior: 'smooth'
             });
+            hasScrolledRef.current = true;
           }
         }
-      }, 100);
-      setHasScrolled(true);
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [spotPrice, hasScrolled, strikes]);
+  }, [spotPrice, effectiveSpotPrice, strikes]);
 
   const handleTrade = (opt, type, optionType, iv) => {
     if (!opt) return;
