@@ -159,6 +159,14 @@ const OptionChainViewInternal = () => {
   const [initialSpotPrice, setInitialSpotPrice] = useState(null);
 
   useEffect(() => {
+    const handleSetSymbol = (e) => {
+      if (e?.detail) setSymbol(e.detail);
+    };
+    window.addEventListener('skandx_set_option_symbol', handleSetSymbol);
+    return () => window.removeEventListener('skandx_set_option_symbol', handleSetSymbol);
+  }, []);
+
+  useEffect(() => {
     const fetchSymbols = async () => {
       try {
         const res = await fetch(`${API}/api/options/symbols`);

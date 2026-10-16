@@ -1257,7 +1257,7 @@ app.get('/api/stocks', async (req, res) => {
 
     try {
       const { generalClient } = require('./services/redisClient');
-      const cacheKey = `api:search:v7:${qLower}`;
+      const cacheKey = `api:search:v8:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
@@ -1277,43 +1277,61 @@ app.get('/api/stocks', async (req, res) => {
       const dbResults = searchInstruments(qLower);
 
       const qClean = qLower.replace(/[-_\s]/g, '');
+      const qNorm = qClean.replace(/^(nse|bse|mcx)/i, '');
       const isMajorIndex = (item) => {
         const sym = item.symbol || '';
         return sym.includes('-INDEX') || (item.name && item.name.includes('INDEX'));
       };
 
+      const checkIndexMatch = (symClean, isMajor) => isMajor && (
+        symClean === qClean || 
+        symClean === qNorm || 
+        (qNorm === 'nifty' && symClean === 'nifty50') || 
+        (qNorm === 'nifty50' && symClean === 'nifty50') || 
+        ((qNorm === 'banknifty' || qNorm === 'niftybank') && (symClean === 'niftybank' || symClean === 'banknifty')) || 
+        (qNorm === 'sensex' && symClean === 'sensex') || 
+        ((qNorm === 'midcap' || qNorm === 'midcpnifty' || qNorm === 'midcapnifty') && (symClean === 'midcpnifty' || symClean === 'midcapnifty')) || 
+        ((qNorm === 'finnifty' || qNorm === 'niftyfin') && (symClean === 'finnifty')) || 
+        (qNorm === 'bankex' && symClean === 'bankex') || 
+        ((qNorm === 'vix' || qNorm === 'indiavix') && (symClean === 'indiavix'))
+      );
+
       dbResults.sort((a, b) => {
-        const aSymClean = a.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
-        const bSymClean = b.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
+        const aSym = a.symbol || '';
+        const bSym = b.symbol || '';
+        const aName = a.name || '';
+        const bName = b.name || '';
+        const aSymClean = aSym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
+        const bSymClean = bSym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').replace(/[-_\s]/g, '').toLowerCase();
         
         // Priority 1: Benchmark Spot Indices when user searches index names (e.g. Nifty 50, Bank Nifty, Sensex)
-        const aIsMajor = isMajorIndex(a);
-        const bIsMajor = isMajorIndex(b);
-        const aIndexMatch = aIsMajor && (aSymClean === qClean || (qClean === 'nifty50' && aSymClean === 'nifty50') || (qClean === 'nifty' && (aSymClean === 'nifty50' || aSymClean === 'nifty')) || (qClean === 'banknifty' && (aSymClean === 'niftybank' || aSymClean === 'banknifty')) || (qClean === 'sensex' && aSymClean === 'sensex'));
-        const bIndexMatch = bIsMajor && (bSymClean === qClean || (qClean === 'nifty50' && bSymClean === 'nifty50') || (qClean === 'nifty' && (bSymClean === 'nifty50' || bSymClean === 'nifty')) || (qClean === 'banknifty' && (bSymClean === 'niftybank' || bSymClean === 'banknifty')) || (qClean === 'sensex' && bSymClean === 'sensex'));
+        const aIndexMatch = checkIndexMatch(aSymClean, isMajorIndex(a));
+        const bIndexMatch = checkIndexMatch(bSymClean, isMajorIndex(b));
         
         if (aIndexMatch && !bIndexMatch) return -1;
         if (!aIndexMatch && bIndexMatch) return 1;
 
         // Priority 2: Exact matches on symbol, name, or clean symbol
-        const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower) || aSymClean === qClean;
-        const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower) || bSymClean === qClean;
+        const aExact = aSym.toLowerCase() === qLower || aName.toLowerCase() === qLower || aSymClean === qClean || aSymClean === qNorm;
+        const bExact = bSym.toLowerCase() === qLower || bName.toLowerCase() === qLower || bSymClean === qClean || bSymClean === qNorm;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         
         // Priority 3: Cash equities & Benchmark Indices prioritized over derivatives
+        const aIsMajor = isMajorIndex(a);
+        const bIsMajor = isMajorIndex(b);
         const aIsCashOrIndex = aIsMajor || (a.exchange === 'NSE' || a.exchange === 'BSE');
         const bIsCashOrIndex = bIsMajor || (b.exchange === 'NSE' || b.exchange === 'BSE');
         if (aIsCashOrIndex && !bIsCashOrIndex) return -1;
         if (!aIsCashOrIndex && bIsCashOrIndex) return 1;
         
-        const aIsFut = a.symbol.includes('FUT');
-        const bIsFut = b.symbol.includes('FUT');
+        const aIsFut = aSym.includes('FUT');
+        const bIsFut = bSym.includes('FUT');
         if (aIsFut && !bIsFut) return -1;
         if (!aIsFut && bIsFut) return 1;
         
         // Sorting by length handles "prioritize shorter symbols"
-        if (a.symbol.length !== b.symbol.length) return a.symbol.length - b.symbol.length;
+        if (aSym.length !== bSym.length) return aSym.length - bSym.length;
         
         return 0;
       });

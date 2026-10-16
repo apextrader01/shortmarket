@@ -249,6 +249,21 @@ export default function MobileStockOverviewModal() {
     setAlertModalSymbol(symbol);
   };
 
+  const handleOpenOptionChain = () => {
+    handleClose();
+    let targetUnderlying = 'NIFTY';
+    const cleanUpper = (formattedInst?.underlying || rawSymbol || symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(INDEX|EQ|A|B)$/i, '').toUpperCase();
+    if (cleanUpper.includes('BANKNIFTY') || cleanUpper.includes('NIFTYBANK')) targetUnderlying = 'BANKNIFTY';
+    else if (cleanUpper.includes('SENSEX')) targetUnderlying = 'SENSEX';
+    else if (cleanUpper.includes('FINNIFTY')) targetUnderlying = 'FINNIFTY';
+    else if (cleanUpper.includes('BANKEX')) targetUnderlying = 'BANKEX';
+    else if (cleanUpper.includes('NIFTY')) targetUnderlying = 'NIFTY';
+    else targetUnderlying = cleanUpper;
+
+    window.dispatchEvent(new CustomEvent('skandx_set_option_symbol', { detail: targetUnderlying }));
+    window.dispatchEvent(new CustomEvent('skandx_set_active_tab', { detail: 'Options' }));
+  };
+
   // Depth Data for Depth Tab
   const bids = livePrice.bids || [];
   const asks = livePrice.asks || [];
@@ -584,12 +599,12 @@ export default function MobileStockOverviewModal() {
               </div>
 
               {/* Quick Action Pills Row */}
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }} className="scrollbar-hide">
                 <button
                   onClick={handleOpenFullChart}
                   style={{
-                    flex: 1,
-                    padding: '10px 8px',
+                    flex: '1 0 auto',
+                    padding: '10px 10px',
                     background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
@@ -599,17 +614,18 @@ export default function MobileStockOverviewModal() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   <BarChart2 size={14} color="var(--color-blue)" /> Charts
                 </button>
                 <button
-                  onClick={() => setActiveTab('Market Depth')}
+                  onClick={handleOpenOptionChain}
                   style={{
-                    flex: 1,
-                    padding: '10px 8px',
+                    flex: '1 0 auto',
+                    padding: '10px 10px',
                     background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
@@ -619,17 +635,39 @@ export default function MobileStockOverviewModal() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <Layers size={14} color="#8b5cf6" /> Depth
+                  <Layers size={14} color="#38bdf8" /> Options
+                </button>
+                <button
+                  onClick={() => setActiveTab('Market Depth')}
+                  style={{
+                    flex: '1 0 auto',
+                    padding: '10px 10px',
+                    background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Activity size={14} color="#8b5cf6" /> Depth
                 </button>
                 <button
                   onClick={handleSetAlert}
                   style={{
-                    flex: 1,
-                    padding: '10px 8px',
+                    flex: '1 0 auto',
+                    padding: '10px 10px',
                     background: isLight ? 'var(--bg-hover)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
                     borderRadius: '8px',
@@ -639,8 +677,9 @@ export default function MobileStockOverviewModal() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
+                    gap: '5px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   <Bell size={14} color="#eab308" /> Alert

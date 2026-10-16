@@ -56,7 +56,7 @@ function initializeCache() {
             name: 'NIFTY 50',
             description: 'NIFTY 50 Index',
             exchange: 'NSE',
-            lotsize: 75,
+            lotsize: 65,
             token: '26000',
             expiryTimestamp: null,
             search_string: 'nse:nifty50-index nifty 50 nifty50 nifty-50 nifty index benchmark nse'
@@ -89,7 +89,7 @@ function initializeCache() {
             name: 'FIN NIFTY',
             description: 'NIFTY Financial Services Index',
             exchange: 'NSE',
-            lotsize: 65,
+            lotsize: 60,
             token: '26037',
             expiryTimestamp: null,
             search_string: 'nse:finnifty-index fin nifty finnifty nifty finance index benchmark nse'

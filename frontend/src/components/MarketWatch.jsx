@@ -466,9 +466,9 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
 
 // ⚡ Top Pinned Market Index Bar for Mobile (Zerodha Kite & Fyers Standard)
 const MobilePinnedIndices = React.memo(() => {
-  const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX'] || state.prices['NIFTY 50'] || state.prices['NIFTY50-INDEX']);
-  const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX'] || state.prices['BANK NIFTY'] || state.prices['BANKNIFTY-INDEX']);
-  const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX'] || state.prices['SENSEX-BSE'] || state.prices['SENSEX-INDEX'] || state.prices['SENSEX']);
+  const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX'] || state.prices['NIFTY 50'] || state.prices['NIFTY50-INDEX'] || state.prices['NIFTY-NSE'] || state.prices['NIFTY']);
+  const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX'] || state.prices['BANK NIFTY'] || state.prices['BANKNIFTY-INDEX'] || state.prices['BANKNIFTY-NSE'] || state.prices['BANKNIFTY']);
+  const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX'] || state.prices['SENSEX-BSE'] || state.prices['SENSEX-INDEX'] || state.prices['SENSEX'] || state.prices['BSE:SENSEX']);
   
   const renderItem = (label, data) => {
     const ltp = data?.ltp !== undefined ? Number(data.ltp) : null;
