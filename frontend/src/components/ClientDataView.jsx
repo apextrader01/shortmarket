@@ -41,6 +41,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
   const { 
     user, orders, logout, updateProfilePicture, theme, setTheme, resetAccount, 
     fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode,
+    reconfirmOrder, setReconfirmOrder,
     telegramSettings, fetchTelegramSettings, updateUserDetails
   } = useStore(useShallow(state => ({ 
     user: state.user,
@@ -56,6 +57,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
     setAccessibilityMode: state.setAccessibilityMode,
     oneClickMode: state.oneClickMode,
     setOneClickMode: state.setOneClickMode,
+    reconfirmOrder: state.reconfirmOrder,
+    setReconfirmOrder: state.setReconfirmOrder,
     telegramSettings: state.telegramSettings,
     fetchTelegramSettings: state.fetchTelegramSettings,
     updateUserDetails: state.updateUserDetails
@@ -1311,8 +1314,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab, activeTab
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
               </div>
-              <div onClick={() => setOneClickMode(!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
-                <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
+              <div 
+                onClick={() => {
+                  const currentVal = typeof reconfirmOrder === 'boolean' ? reconfirmOrder : !oneClickMode;
+                  setReconfirmOrder(!currentVal);
+                }} 
+                style={{ width: '36px', height: '20px', background: (typeof reconfirmOrder === 'boolean' ? reconfirmOrder : !oneClickMode) ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}
+              >
+                <div style={{ width: '16px', height: '16px', background: (typeof reconfirmOrder === 'boolean' ? reconfirmOrder : !oneClickMode) ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: (typeof reconfirmOrder === 'boolean' ? reconfirmOrder : !oneClickMode) ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
             </div>
           </div>

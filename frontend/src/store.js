@@ -3076,10 +3076,12 @@ export const useStore = create(persist((set, get) => ({
     return { theme: newTheme };
   }),
 
-  // ── One-Click Scalper Mode ──────────────────────────────────────────────────
+  // ── One-Click Scalper Mode & Re-Confirm Order Preview ───────────────────────
   oneClickMode: false,
+  reconfirmOrder: true,
   oneClickMultiplier: 1,
-  setOneClickMode: (val) => set({ oneClickMode: val }),
+  setOneClickMode: (val) => set({ oneClickMode: Boolean(val), reconfirmOrder: !val }),
+  setReconfirmOrder: (val) => set({ reconfirmOrder: Boolean(val), oneClickMode: !val }),
   setOneClickMultiplier: (val) => set({ oneClickMultiplier: val }),
 
   // ── Leaderboard ─────────────────────────────────────────────────────────────
@@ -3980,6 +3982,7 @@ export const useStore = create(persist((set, get) => ({
     accessibilityMode:  state.accessibilityMode,
     pendingTriggers:    state.pendingTriggers,
     oneClickMode:       state.oneClickMode,
+    reconfirmOrder:     state.reconfirmOrder,
     oneClickMultiplier: state.oneClickMultiplier,
     alerts:             state.alerts,
   }),

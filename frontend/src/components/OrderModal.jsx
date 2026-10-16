@@ -8,7 +8,7 @@ import { calculateOrderMargin } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions, oneClickMode } = useStore(useShallow(state => ({ 
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions, oneClickMode, reconfirmOrder } = useStore(useShallow(state => ({ 
     orderModal: state.orderModal, 
     closeOrderModal: state.closeOrderModal, 
     user: state.user, 
@@ -20,7 +20,8 @@ export default function OrderModal() {
     marketCalendar: state.marketCalendar,
     holdings: state.holdings,
     positions: state.positions,
-    oneClickMode: state.oneClickMode
+    oneClickMode: state.oneClickMode,
+    reconfirmOrder: state.reconfirmOrder
   })));
   const rawModalSymbol = orderModal?.symbol;
   const livePriceData = useStore(state => {
@@ -827,7 +828,8 @@ export default function OrderModal() {
     };
 
     // Re-Confirm Order (Order Preview) check
-    if (!oneClickMode && !bypassReconfirm) {
+    const shouldReconfirm = typeof reconfirmOrder === 'boolean' ? reconfirmOrder : !oneClickMode;
+    if (shouldReconfirm && !bypassReconfirm) {
       setShowReconfirmPreview(true);
       return;
     }
