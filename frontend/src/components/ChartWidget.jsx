@@ -313,12 +313,12 @@ export default function ChartWidget({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && mountedRef.current && candleSeriesRef.current && price) {
-        updateLiveCandle(price);
+        applyLiveTickToCandle(price);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [price, updateLiveCandle]);
+  }, [price, applyLiveTickToCandle]);
 
   // Push candle and indicator data into chart
   useEffect(() => {
