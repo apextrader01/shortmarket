@@ -13850,7 +13850,7 @@ app.post('/api/admin/ads/config', authenticateToken, requireAdmin, async (req, r
     res.json({
       success: true,
       config: adConfigCache,
-      message: 'Ad Monetization & Rewarded Video settings saved and activated immediately!'
+      message: `Google Ads are now ${adConfigCache.enabled ? 'ON (Live for Basic users)' : 'OFF (Paused site-wide)'}!`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

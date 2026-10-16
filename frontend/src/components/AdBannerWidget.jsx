@@ -54,6 +54,7 @@ function isNoAdsUtilityPath() {
 
 function injectAdSenseScript(clientId) {
   if (!clientId || typeof document === 'undefined') return;
+  if (cachedAdConfig && cachedAdConfig.enabled === false) return;
   if (isNoAdsUtilityPath()) return;
   if (isUserAdFreeTier(useStore.getState()?.user)) return;
   const cleanId = String(clientId).trim();
@@ -81,7 +82,12 @@ function injectAdSenseScript(clientId) {
 export function updateCachedAdConfig(newConfig) {
   if (!newConfig) return;
   cachedAdConfig = { ...(cachedAdConfig || {}), ...newConfig };
-  if (cachedAdConfig.adsense_client_id) {
+  if (cachedAdConfig.enabled === false) {
+    syncAdFreeBodyStyle(true);
+  } else if (!isUserAdFreeTier(useStore.getState()?.user)) {
+    syncAdFreeBodyStyle(false);
+  }
+  if (cachedAdConfig.enabled && cachedAdConfig.adsense_client_id) {
     injectAdSenseScript(cachedAdConfig.adsense_client_id);
   }
   if (typeof window !== 'undefined') {
@@ -170,6 +176,11 @@ function syncAdFreeBodyStyle(isAdFree) {
 }
 
 export function isUserAdFreeTier(user) {
+  // If master Google Ads toggle is OFF, treat everyone as 100% ad-free
+  if (cachedAdConfig && cachedAdConfig.enabled === false) {
+    syncAdFreeBodyStyle(true);
+    return true;
+  }
   if (!user) {
     syncAdFreeBodyStyle(false);
     return false;

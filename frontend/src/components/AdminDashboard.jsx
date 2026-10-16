@@ -5109,6 +5109,36 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
+                  disabled={adSaving}
+                  onClick={() => handleSaveAdConfig(null, false, { enabled: !adConfig.enabled })}
+                  style={{
+                    background: adConfig.enabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(239, 68, 68, 0.16)',
+                    border: adConfig.enabled ? '1px solid rgba(16, 185, 129, 0.6)' : '1px solid rgba(239, 68, 68, 0.45)',
+                    color: adConfig.enabled ? '#ffffff' : '#f87171',
+                    borderRadius: '8px',
+                    padding: '8px 15px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: adSaving ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    boxShadow: adConfig.enabled ? '0 0 16px rgba(16, 185, 129, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={adConfig.enabled ? 'Click to immediately turn Google Ads OFF site-wide' : 'Click to immediately turn Google Ads ON site-wide'}
+                >
+                  <span style={{
+                    width: '9px',
+                    height: '9px',
+                    borderRadius: '50%',
+                    background: adConfig.enabled ? '#ffffff' : '#ef4444',
+                    boxShadow: adConfig.enabled ? '0 0 8px #ffffff' : 'none'
+                  }} />
+                  {adConfig.enabled ? '🟢 Google Ads: ON (Live)' : '⏸ Google Ads: OFF (Paused)'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleSaveAdConfig(null, false, { internal_counter_enabled: !adConfig.internal_counter_enabled })}
                   style={{
                     background: adConfig.internal_counter_enabled ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.05)',
@@ -5418,14 +5448,44 @@ export default function AdminDashboard() {
                   1. Google AdSense & 30-Sec Rewarded Video Setup
                 </h3>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#fff', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!adConfig.enabled}
-                    onChange={(e) => setAdConfig({ ...adConfig, enabled: e.target.checked })}
-                    style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
-                  />
-                  <span>Enable Ads for All Free (BASIC) Users</span>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#fff',
+                  background: adConfig.enabled ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: adConfig.enabled ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(239, 68, 68, 0.3)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!adConfig.enabled}
+                      onChange={(e) => handleSaveAdConfig(null, false, { enabled: e.target.checked })}
+                      style={{ width: '18px', height: '18px', accentColor: '#10b981', cursor: 'pointer' }}
+                    />
+                    <div>
+                      <div>Master Google Ads Switch: {adConfig.enabled ? '🟢 ON (Live)' : '⏸ OFF (Paused)'}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '400' }}>
+                        When OFF, all Google ads and banner widgets are completely disabled site-wide.
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    color: adConfig.enabled ? '#34d399' : '#f87171',
+                    background: adConfig.enabled ? 'rgba(16, 185, 129, 0.16)' : 'rgba(239, 68, 68, 0.16)',
+                    padding: '3px 10px',
+                    borderRadius: '20px'
+                  }}>
+                    {adConfig.enabled ? 'ON' : 'OFF'}
+                  </span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#38bdf8', background: 'rgba(56,189,248,0.06)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.25)' }}>

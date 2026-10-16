@@ -5,14 +5,17 @@ Disallow: /adminpanel
 Disallow: /login
 Disallow: /delete-account
 Disallow: /delete
+Disallow: /cdn-cgi/
 
 User-agent: AdsBot-Google
 Allow: /
 Disallow: /adminpanel
+Disallow: /cdn-cgi/
 
 User-agent: AdsBot-Google-Mobile
 Allow: /
 Disallow: /adminpanel
+Disallow: /cdn-cgi/
 
 User-agent: *
 Allow: /
@@ -20,6 +23,7 @@ Disallow: /adminpanel
 Disallow: /login
 Disallow: /delete-account
 Disallow: /delete
+Disallow: /cdn-cgi/
 
 # Google Gemini & Search Generative AI Crawler
 User-agent: Google-Extended
