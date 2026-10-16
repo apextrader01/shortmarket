@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore, API } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
