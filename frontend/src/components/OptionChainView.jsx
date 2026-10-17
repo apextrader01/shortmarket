@@ -1268,23 +1268,74 @@ const OptionChainViewInternal = () => {
                 }]);
               }}
               onClose={() => setStrategyModalOpen(false)}
-              onExecute={() => {
-                if (strategyLegs.length === 0) return;
-                strategyLegs.forEach(leg => {
+              onExecute={async (currentLegs, legMultiplier = 1) => {
+                const legsToExecute = (currentLegs && currentLegs.length > 0) ? currentLegs : strategyLegs;
+                if (!legsToExecute || legsToExecute.length === 0) {
+                  useStore.getState().showToast("No legs in Strategy Builder to execute.", "warning", "Empty Strategy");
+                  return;
+                }
+
+                const showToast = useStore.getState().showToast;
+                const results = [];
+
+                for (let i = 0; i < legsToExecute.length; i++) {
+                  const leg = legsToExecute[i];
                   const effectiveLotsize = leg.lotsize || getInstantLotsize(leg.symbol) || 1;
-                  placeOrder({
+                  const totalQty = (Number(leg.quantity) || 1) * (Number(legMultiplier) || 1) * effectiveLotsize;
+                  const hasCustomPrice = leg.customPrice !== undefined && leg.customPrice !== null && leg.customPrice !== '' && Number(leg.customPrice) > 0;
+                  const orderType = hasCustomPrice ? 'LIMIT' : 'MARKET';
+                  const orderPrice = hasCustomPrice ? Number(leg.customPrice) : (leg.price || '');
+
+                  const payload = {
                     symbol: leg.symbol,
                     side: leg.side,
-                    quantity: (Number(leg.quantity) || 1) * effectiveLotsize,
-                    type: 'MARKET',
-                    orderType: 'MARKET',
+                    quantity: totalQty,
+                    type: orderType,
+                    orderType: orderType,
                     product_type: 'INT',
-                    price: ''
-                  });
-                });
-                setStrategyLegs([]); // Clear after execution
-                setStrategyModalOpen(false); // Close modal
-                setStrategyMode(false); // Disable strategy mode
+                    price: orderPrice
+                  };
+
+                  try {
+                    let res = await placeOrder(payload);
+                    
+                    // If regular order was rejected because market is closed, automatically try placing as AMO (After Market Order)
+                    if (!res?.success && res?.error && (res.error.toLowerCase().includes('select amo') || res.error.toLowerCase().includes('closed'))) {
+                      const amoPayload = { ...payload, is_amo: true, order_variety: 'AMO' };
+                      res = await placeOrder(amoPayload);
+                    }
+
+                    results.push({ leg, res });
+                  } catch (err) {
+                    results.push({ leg, res: { success: false, error: err.message || 'Execution failed' } });
+                  }
+                }
+
+                const failed = results.filter(r => !r.res?.success);
+                const succeeded = results.filter(r => r.res?.success);
+
+                if (failed.length === 0) {
+                  // All legs placed successfully!
+                  const amoCount = succeeded.filter(r => r.res?.status === 'AMO_PENDING').length;
+                  if (amoCount > 0) {
+                    showToast(`Strategy Queued! All ${succeeded.length} legs placed as AMO for market open.`, 'info', 'AMO Orders Queued');
+                  } else {
+                    showToast(`Strategy Executed! All ${succeeded.length} legs placed successfully.`, 'success', 'Strategy Filled');
+                  }
+                  setStrategyLegs([]); // Clear after execution
+                  setStrategyModalOpen(false); // Close modal
+                  setStrategyMode(false); // Disable strategy mode
+                } else if (succeeded.length > 0) {
+                  // Partial execution
+                  const firstErr = failed[0].res?.error || 'Order rejected';
+                  showToast(`Partial Fill: ${succeeded.length} legs placed, ${failed.length} failed. Error: ${firstErr}`, 'warning', 'Partial Fill');
+                  // Keep only failed legs so user can retry or adjust
+                  setStrategyLegs(failed.map(f => f.leg));
+                } else {
+                  // All failed - DO NOT close modal or clear legs, show the exact rejection error!
+                  const firstErr = failed[0].res?.error || 'Order rejected by risk management.';
+                  showToast(`Execution Failed: ${firstErr}`, 'error', 'Order Rejected');
+                }
               }}
             />
           </div>

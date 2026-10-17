@@ -63,6 +63,7 @@ export default function OptionsStrategyBuilder({
   const [targetPriceOffset, setTargetPriceOffset] = useState(0); // Offset in Rupees from spot
   const [targetDteOffset, setTargetDteOffset] = useState(0); // Days forward from Today (0 = Today, diffDays = Expiry)
   const [multiplier, setMultiplier] = useState(1); // Multiplier for all lots
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const prices = useStore(state => state.prices);
 
@@ -1006,11 +1007,46 @@ export default function OptionsStrategyBuilder({
           {/* Primary Action Button: Execute Strategy */}
           <button 
             type="button"
-            onClick={onExecute}
+            disabled={isExecuting || legs.length === 0}
+            onClick={async () => {
+              if (isExecuting) return;
+              setIsExecuting(true);
+              try {
+                await onExecute?.(legs, multiplier);
+              } finally {
+                setIsExecuting(false);
+              }
+            }}
             className="btn-primary"
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', fontSize: '15px', fontWeight: '800', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: 'var(--color-blue, #2563eb)', cursor: 'pointer', border: 'none', color: '#fff' }}
+            style={{ 
+              width: '100%', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              fontSize: '15px', 
+              fontWeight: '800', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              gap: '8px', 
+              background: isExecuting ? 'rgba(37, 99, 235, 0.7)' : 'var(--color-blue, #2563eb)', 
+              cursor: isExecuting ? 'not-allowed' : 'pointer', 
+              border: 'none', 
+              color: '#fff',
+              opacity: isExecuting ? 0.8 : 1,
+              transition: 'all 0.15s ease'
+            }}
           >
-            <Zap size={16} /> Execute Strategy ({legs.length} Legs)
+            {isExecuting ? (
+              <>
+                <RefreshCw size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Executing Strategy...</span>
+              </>
+            ) : (
+              <>
+                <Zap size={16} />
+                <span>Execute Strategy ({legs.length} Legs{multiplier > 1 ? ` • ${multiplier}x` : ''})</span>
+              </>
+            )}
           </button>
         </div>
 
