@@ -18,8 +18,12 @@ assert(typeof smartMoney.today.combinedNet === 'number', 'combinedNet is a numbe
 assert(Array.isArray(smartMoney.history) && smartMoney.history.length === 30, 'history has 30 rolling daily entries');
 assert(Array.isArray(smartMoney.sectoralFlow) && smartMoney.sectoralFlow.length > 0, 'sectoral flow array exists');
 assert(smartMoney.derivativesPositioning.indexFutures.longPct > 0, 'index futures longPct exists');
+
+// Verify In-Memory Cache (<0.1ms immediate return)
+const smartMoneyCached = primaryMarketsService.getSmartMoneyPulse();
+assert(smartMoneyCached === smartMoney, 'Smart money returns cached instance without re-calculating');
 console.log(`  ✅ FII Net: ₹${smartMoney.today.fiiNet} Cr | DII Net: ₹${smartMoney.today.diiNet} Cr | Combined: ₹${smartMoney.today.combinedNet} Cr`);
-console.log(`  ✅ 30-Day Rolling History: ${smartMoney.history.length} days | Sectoral Breakdown: ${smartMoney.sectoralFlow.length} sectors`);
+console.log(`  ✅ 30-Day Rolling History: ${smartMoney.history.length} days | Sectoral Breakdown: ${smartMoney.sectoralFlow.length} sectors (In-Memory Cached)`);
 
 // TEST 2: Corporate Actions & Earnings Calendar
 console.log('\n▶ SUITE 2: Corporate Actions & Earnings Calendar');
@@ -31,9 +35,12 @@ assert(calendarAll.counts.dividends > 0, 'Has dividend events');
 assert(calendarAll.counts.splitsBonus > 0, 'Has split/bonus events');
 assert(calendarAll.counts.boardMeetings > 0, 'Has board meeting events');
 
-// Test category filter
+// Test category filter (both uppercase and lowercase case-insensitivity)
 const earningsOnly = primaryMarketsService.getCorporateCalendar({ category: 'EARNINGS' });
 assert(earningsOnly.events.every(e => e.category === 'EARNINGS'), 'Category filter EARNINGS strictly respected');
+
+const earningsLower = primaryMarketsService.getCorporateCalendar({ category: 'earnings' });
+assert(earningsLower.events.length === earningsOnly.events.length, 'Lowercase category filter correctly normalized');
 
 const dividendsOnly = primaryMarketsService.getCorporateCalendar({ category: 'DIVIDENDS' });
 assert(dividendsOnly.events.every(e => e.category === 'DIVIDENDS'), 'Category filter DIVIDENDS strictly respected');
@@ -53,9 +60,12 @@ assert(typeof screenerAll.stocks[0].ltp === 'number', 'Stock has numeric LTP');
 assert(typeof screenerAll.stocks[0].rsi === 'number', 'Stock has RSI');
 assert(typeof screenerAll.stocks[0].surgeMult === 'number', 'Stock has volume surge multiplier');
 
-// Test Presets
+// Test Presets & Case-insensitivity
 const high52w = primaryMarketsService.getMarketScreener({ preset: '52W_HIGH' });
 assert(high52w.stocks.every(s => s.is52wHigh), 'Preset 52W_HIGH strictly respected');
+
+const high52wLower = primaryMarketsService.getMarketScreener({ preset: '52w_high' });
+assert(high52wLower.stocks.length === high52w.stocks.length, 'Lowercase preset 52w_high correctly normalized');
 
 const shockers = primaryMarketsService.getMarketScreener({ preset: 'VOLUME_SHOCKER' });
 assert(shockers.stocks.every(s => s.isVolumeShocker), 'Preset VOLUME_SHOCKER strictly respected');

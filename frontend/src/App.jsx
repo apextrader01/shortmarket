@@ -727,8 +727,8 @@ function App() {
         'algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge',
         'markets', 'paper-trading', 'papertrading', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
         'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
-        'pricing', 'referrals', 'leaderboard', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
-        'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
+        'pricing', 'referrals', 'leaderboard', 'tournaments', 'arena', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
+        'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos', 'screener', 'market-screener', 'smart-money', 'smartmoney', 'fii-dii', 'fiidii', 'calendar', 'corporate-calendar', 'earnings', 'corporate-actions', 'deals',
         'adminpanel', 'clientdata', 'profile', 'account', 'settings',
         'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
         'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
@@ -748,7 +748,7 @@ function App() {
       else if (activeTab === 'WealthOS') newPath = ['wealth', 'wealth-hub', 'wealth-os', 'wealthos', 'tax-hub'].includes(seg0) ? `/${seg0}` : '/wealth-hub';
       else if (activeTab === 'Algo') newPath = ['algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge'].includes(seg0) ? `/${seg0}` : '/algo';
       else if (activeTab === 'TradeDiary') newPath = ['tradediary', 'trade-diary'].includes(seg0) ? `/${seg0}` : '/trade-diary';
-      else if (activeTab === 'PrimaryMarkets') newPath = ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos'].includes(seg0) ? `/${seg0}` : '/primary-markets';
+      else if (activeTab === 'PrimaryMarkets') newPath = ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos', 'screener', 'market-screener', 'smart-money', 'smartmoney', 'fii-dii', 'fiidii', 'calendar', 'corporate-calendar', 'earnings', 'corporate-actions', 'deals'].includes(seg0) ? `/${seg0}` : '/primary-markets';
       else if (activeTab === 'Markets' || activeTab === 'Watchlist') newPath = ['markets', 'paper-trading', 'papertrading', 'watchlist'].includes(seg0) ? `/${seg0}` : '/markets';
       else if (activeTab === 'Journal') newPath = ['journal', 'tradingjournal', 'trading-journal'].includes(seg0) ? `/${seg0}` : '/journal';
       else if (activeTab === 'Community') newPath = '/community';
@@ -933,12 +933,13 @@ function App() {
         'algo': 'Algo', 'algo-trading': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
         'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
         'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
+        'screener': 'PrimaryMarkets', 'market-screener': 'PrimaryMarkets', 'fii-dii': 'PrimaryMarkets', 'fiidii': 'PrimaryMarkets', 'smart-money': 'PrimaryMarkets', 'smartmoney': 'PrimaryMarkets', 'calendar': 'PrimaryMarkets', 'corporate-calendar': 'PrimaryMarkets', 'earnings': 'PrimaryMarkets', 'corporate-actions': 'PrimaryMarkets', 'deals': 'PrimaryMarkets',
         'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
         'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
         'options': 'Options', 'optionchain': 'Options', 'option-chain': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-        'leaderboard': 'Leaderboard',
+        'leaderboard': 'Leaderboard', 'tournaments': 'Leaderboard', 'arena': 'Leaderboard',
         'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'profile': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
@@ -1207,8 +1208,8 @@ function App() {
     'algo', 'algo-trading', 'skandx-algo', 'skandxalgo', 'bridge',
     'markets', 'paper-trading', 'papertrading', 'watchlist', 'chart', 'options', 'optionchain', 'option-chain',
     'positions', 'orders', 'portfolio', 'alerts', 'analytics', 'mutualfunds', 'mutual-funds',
-    'pricing', 'referrals', 'leaderboard', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
-    'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos',
+    'pricing', 'referrals', 'leaderboard', 'tournaments', 'arena', 'community', 'clubs', 'feed', 'journal', 'tradingjournal', 'trading-journal',
+    'tradediary', 'trade-diary', 'primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos', 'screener', 'market-screener', 'smart-money', 'smartmoney', 'fii-dii', 'fiidii', 'calendar', 'corporate-calendar', 'earnings', 'corporate-actions', 'deals',
     'adminpanel', 'clientdata', 'profile', 'account', 'settings',
     'reports', 'aboutus', 'about', 'terms', 'terms-of-service', 'termsofservice', 'privacy', 'privacy-policy', 'privacypolicy',
     'refund', 'refund-policy', 'refundpolicy', 'refunds', 'cancellation', 'cancellation-policy',
@@ -1429,14 +1430,23 @@ function App() {
     );
   }
 
-  if (!user && ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos'].includes(cleanFirstSegment)) {
+  if (!user && ['primarymarkets', 'primary-markets', 'bhavcopy', 'ipo', 'ipos', 'screener', 'market-screener', 'smart-money', 'smartmoney', 'fii-dii', 'fiidii', 'calendar', 'corporate-calendar', 'earnings', 'corporate-actions', 'deals'].includes(cleanFirstSegment)) {
+    const resolveGuestTab = (seg) => {
+      if (seg.includes('screener')) return 'SCREENER';
+      if (seg.includes('fii') || seg.includes('smart-money') || seg.includes('smartmoney')) return 'FII_DII';
+      if (seg.includes('calendar') || seg.includes('earnings') || seg.includes('corporate-actions')) return 'CALENDAR';
+      if (seg.includes('ipo')) return 'IPOS';
+      if (seg.includes('deals') || seg.includes('bulk')) return 'DEALS';
+      return 'BHAVCOPY';
+    };
     return (
       <Suspense fallback={<TabLoader />}>
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #0a0b0d)' }}>
           <PrimaryMarketsView
-            initialTab={cleanFirstSegment.includes('ipo') ? 'IPOS' : 'BHAVCOPY'}
+            initialTab={resolveGuestTab(cleanFirstSegment)}
             onBack={() => { window.location.href = '/'; }}
             onOpenPaperTrading={() => { window.location.href = '/login'; }}
+            onOpenLeaderboard={() => { window.location.href = '/leaderboard'; }}
           />
           <Suspense fallback={null}>
             <ConsentBanner />

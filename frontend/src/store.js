@@ -906,6 +906,22 @@ export const useStore = create(persist((set, get) => ({
 
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null, initialQty: 1, initialAmo: false, initialOrderType: null },
   openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null, initialQty = 1, initialAmo = false, initialOrderType = null) => {
+    if (symbol && typeof symbol === 'object') {
+      const obj = symbol;
+      symbol = obj.symbol;
+      type = obj.type || obj.initialSide || 'BUY';
+      lotsize = obj.lotsize || 1;
+      productType = obj.productType || obj.product_type || 'INT';
+      isExit = Boolean(obj.isExit || obj.is_exit);
+      totalExitQty = Number(obj.totalExitQty || obj.total_exit_qty || 0);
+      initialPrice = obj.initialPrice || obj.price || null;
+      target = obj.target || null;
+      stopLoss = obj.stopLoss || null;
+      initialQty = Number(obj.initialQty || obj.quantity || obj.qty || lotsize || 1);
+      initialAmo = Boolean(obj.initialAmo || obj.isAmo || obj.is_amo);
+      initialOrderType = obj.initialOrderType || obj.orderType || obj.order_type || null;
+    }
+
     if (lotsize && Number(lotsize) > 1 && symbol) {
       setContractLotsize(symbol, Number(lotsize));
     }

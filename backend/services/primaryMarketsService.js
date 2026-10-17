@@ -35,6 +35,12 @@ let marketDealsSummaryStats = {
 let ipoListCache = [];
 let sharedPriceCacheRef = null;
 
+// High-speed In-Memory caches for Smart Money & Screener Universe (0 CPU on concurrent hits)
+let cachedSmartMoneyPulse = null;
+let lastSmartMoneyPulseTime = 0;
+let cachedScreenerUniverse = null;
+let lastScreenerUniverseTime = 0;
+
 function setPriceCacheRef(priceCache) {
   sharedPriceCacheRef = priceCache;
 }
@@ -452,6 +458,7 @@ function buildMasterEquityUniverse(nseCsvMap = new Map(), asOfDateStr = '') {
   });
 
   bhavcopyDeliveryCache = results;
+  cachedScreenerUniverse = null;
   bhavcopySummaryStats = {
     totalStocks: results.length,
     nseCount,
@@ -1342,6 +1349,11 @@ function getIpoList(category = 'ALL', status = 'ALL') {
 
 // ─── 🏦 OPTION B: SMART MONEY (FII / DII INSTITUTIONAL FLOW ENGINE) ─────────────
 function getSmartMoneyPulse() {
+  const now = Date.now();
+  if (cachedSmartMoneyPulse && (now - lastSmartMoneyPulseTime < 300000)) {
+    return cachedSmartMoneyPulse;
+  }
+
   const dates = [];
   for (let i = 0; i < 30; i++) {
     dates.push(getIstDateInfo(i));
@@ -1410,7 +1422,7 @@ function getSmartMoneyPulse() {
     { sector: 'Information Tech', netCr: -680.0, sentiment: 'BEARISH', flowPct: -14 }
   ];
 
-  return {
+  const result = {
     latestDate: latest.displayDate,
     isoDate: latest.date,
     today: {
@@ -1455,6 +1467,10 @@ function getSmartMoneyPulse() {
     sectoralFlow,
     history
   };
+
+  cachedSmartMoneyPulse = result;
+  lastSmartMoneyPulseTime = now;
+  return result;
 }
 
 // ─── 📅 OPTION C: CORPORATE ACTIONS & EARNINGS CALENDAR ────────────────────────
@@ -1540,16 +1556,18 @@ function getCorporateCalendar(opts = {}) {
   });
 
   // Filters
+  const normCategory = String(category || 'ALL').trim().toUpperCase();
+  const normTimeframe = String(timeframe || 'ALL').trim().toUpperCase();
   let filtered = processed;
-  if (category && category !== 'ALL') {
-    filtered = filtered.filter(e => e.category === category);
+  if (normCategory && normCategory !== 'ALL') {
+    filtered = filtered.filter(e => e.category === normCategory);
   }
-  if (timeframe && timeframe !== 'ALL') {
-    if (timeframe === 'TODAY') filtered = filtered.filter(e => e.diffDays === 0);
-    else if (timeframe === 'TOMORROW') filtered = filtered.filter(e => e.diffDays === 1);
-    else if (timeframe === 'THIS_WEEK') filtered = filtered.filter(e => e.diffDays >= 0 && e.diffDays <= 7);
-    else if (timeframe === 'NEXT_WEEK') filtered = filtered.filter(e => e.diffDays > 7 && e.diffDays <= 14);
-    else if (timeframe === 'THIS_MONTH') filtered = filtered.filter(e => e.diffDays >= 0 && e.diffDays <= 30);
+  if (normTimeframe && normTimeframe !== 'ALL') {
+    if (normTimeframe === 'TODAY') filtered = filtered.filter(e => e.diffDays === 0);
+    else if (normTimeframe === 'TOMORROW') filtered = filtered.filter(e => e.diffDays === 1);
+    else if (normTimeframe === 'THIS_WEEK') filtered = filtered.filter(e => e.diffDays >= 0 && e.diffDays <= 7);
+    else if (normTimeframe === 'NEXT_WEEK') filtered = filtered.filter(e => e.diffDays > 7 && e.diffDays <= 14);
+    else if (normTimeframe === 'THIS_MONTH') filtered = filtered.filter(e => e.diffDays >= 0 && e.diffDays <= 30);
   }
   if (search && search.trim()) {
     const q = search.trim().toLowerCase();
@@ -1574,130 +1592,144 @@ function getCorporateCalendar(opts = {}) {
 // ─── ⚡ OPTION A: LIVE TECHNICAL & MULTI-FACTOR MARKET SCREENER ─────────────────
 function getMarketScreener(opts = {}) {
   const { preset = 'ALL', segment = 'ALL', priceRange = 'ALL', search = '', sortBy = 'SURGE_DESC', page = 1, limit = 50 } = opts;
+  const normPreset = String(preset || 'ALL').trim().toUpperCase();
+  const normSegment = String(segment || 'ALL').trim().toUpperCase();
+  const normPriceRange = String(priceRange || 'ALL').trim().toUpperCase();
+  const normSortBy = String(sortBy || 'SURGE_DESC').trim().toUpperCase();
 
-  let pool = bhavcopyDeliveryCache;
-  if (!pool || pool.length === 0) {
-    // Generate high-quality fallback pool using FNO_SYMBOLS
-    pool = Array.from(FNO_SYMBOLS).map((sym, i) => {
-      const seed = hashSymbol(sym);
-      const basePrice = (seed % 3500) + 120;
-      const chg = Math.round((((seed % 120) - 55) / 10) * 100) / 100;
-      const surge = Math.round((1.0 + ((seed % 40) / 10)) * 10) / 10;
-      const deliv = Math.round((45 + (seed % 50)) * 10) / 10;
-      const rsi = Math.round((25 + (seed % 55)) * 10) / 10;
-      const is52wHigh = chg > 1.8 && surge > 2.0;
-      const is52wLow = chg < -1.8 && deliv > 60;
-      return {
-        symbol: sym,
-        name: sym + ' Limited',
-        exchange: 'NSE',
-        sector: CURATED_SECTORS[sym] || 'Diversified',
-        ltp: basePrice,
-        change: chg,
-        volume: (seed % 5000000) + 250000,
-        surgeMult: surge,
-        delivPct: deliv,
-        is52wHigh,
-        is52wLow,
-        closeNearHigh: is52wHigh,
-        closeNearLow: is52wLow,
-        rsi,
-        lotsize: (sym.startsWith('NIFTY') ? 25 : (sym.startsWith('BANK') ? 15 : ((seed % 10 + 1) * 250)))
-      };
-    });
-  }
+  const now = Date.now();
+  let items = null;
 
-  // Inject live LTP from shared priceCache if available
-  const items = pool.map(stock => {
-    let currentLtp = stock.ltp;
-    let currentChange = stock.change;
-    if (sharedPriceCacheRef) {
-      const tick = sharedPriceCacheRef[stock.symbol] || sharedPriceCacheRef[`NSE:${stock.symbol}`];
-      if (tick && tick.ltp > 0) {
-        currentLtp = Number(tick.ltp);
-        if (tick.change !== undefined && !isNaN(tick.change)) {
-          currentChange = Number(tick.pct || tick.changePct || stock.change);
-        }
-      }
+  if (cachedScreenerUniverse && (now - lastScreenerUniverseTime < 30000)) {
+    items = cachedScreenerUniverse;
+  } else {
+    let pool = bhavcopyDeliveryCache;
+    if (!pool || pool.length === 0) {
+      // Generate high-quality fallback pool using FNO_SYMBOLS
+      pool = Array.from(FNO_SYMBOLS).map((sym, i) => {
+        const seed = hashSymbol(sym);
+        const basePrice = (seed % 3500) + 120;
+        const chg = Math.round((((seed % 120) - 55) / 10) * 100) / 100;
+        const surge = Math.round((1.0 + ((seed % 40) / 10)) * 10) / 10;
+        const deliv = Math.round((45 + (seed % 50)) * 10) / 10;
+        const rsi = Math.round((25 + (seed % 55)) * 10) / 10;
+        const is52wHigh = chg > 1.8 && surge > 2.0;
+        const is52wLow = chg < -1.8 && deliv > 60;
+        return {
+          symbol: sym,
+          name: sym + ' Limited',
+          exchange: 'NSE',
+          sector: CURATED_SECTORS[sym] || 'Diversified',
+          ltp: basePrice,
+          change: chg,
+          volume: (seed % 5000000) + 250000,
+          surgeMult: surge,
+          delivPct: deliv,
+          is52wHigh,
+          is52wLow,
+          closeNearHigh: is52wHigh,
+          closeNearLow: is52wLow,
+          rsi,
+          lotsize: (sym.startsWith('NIFTY') ? 25 : (sym.startsWith('BANK') ? 15 : ((seed % 10 + 1) * 250)))
+        };
+      });
     }
 
-    const seed = hashSymbol(stock.symbol);
-    const calculatedRsi = stock.rsi || (Math.round((28 + (seed % 52) + (currentChange * 1.8)) * 10) / 10);
-    const boundedRsi = Math.min(92, Math.max(15, calculatedRsi));
-    const high52 = Math.round((stock.high52w || (currentLtp * (1 + ((seed % 25) / 100)))) * 100) / 100;
-    const low52 = Math.round((stock.low52w || (currentLtp * (1 - ((seed % 35) / 100)))) * 100) / 100;
-    const proximity52wHigh = Math.round(((high52 - currentLtp) / high52) * 1000) / 10;
-    const proximity52wLow = Math.round(((currentLtp - low52) / currentLtp) * 1000) / 10;
+    // Inject live LTP from shared priceCache if available
+    items = pool.map(stock => {
+      let currentLtp = stock.ltp;
+      let currentChange = stock.change;
+      if (sharedPriceCacheRef) {
+        const tick = sharedPriceCacheRef[stock.symbol] || sharedPriceCacheRef[`NSE:${stock.symbol}`];
+        if (tick && tick.ltp > 0) {
+          currentLtp = Number(tick.ltp);
+          if (tick.change !== undefined && !isNaN(tick.change)) {
+            currentChange = Number(tick.pct || tick.changePct || stock.change);
+          }
+        }
+      }
 
-    const is52wHigh = stock.is52wHigh || proximity52wHigh <= 2.5;
-    const is52wLow = stock.is52wLow || proximity52wLow <= 2.5;
-    const isVolumeShocker = stock.surgeMult >= 2.2;
-    const isRsiOversold = boundedRsi <= 32;
-    const isRsiOverbought = boundedRsi >= 68;
-    const isTopGainer = currentChange >= 2.5;
-    const isTopLoser = currentChange <= -2.0;
-    const isGapUp = currentChange >= 1.5 && stock.surgeMult >= 1.5;
-    const isHighDelivery = (stock.delivPct || 0) >= 65;
+      const seed = hashSymbol(stock.symbol);
+      const calculatedRsi = stock.rsi || (Math.round((28 + (seed % 52) + (currentChange * 1.8)) * 10) / 10);
+      const boundedRsi = Math.min(92, Math.max(15, calculatedRsi));
+      const high52 = Math.round((stock.high52w || (currentLtp * (1 + ((seed % 25) / 100)))) * 100) / 100;
+      const low52 = Math.round((stock.low52w || (currentLtp * (1 - ((seed % 35) / 100)))) * 100) / 100;
+      const proximity52wHigh = Math.round(((high52 - currentLtp) / high52) * 1000) / 10;
+      const proximity52wLow = Math.round(((currentLtp - low52) / currentLtp) * 1000) / 10;
 
-    return {
-      symbol: stock.symbol,
-      name: stock.name || stock.symbol,
-      exchange: stock.exchange || 'NSE',
-      sector: stock.sector || CURATED_SECTORS[stock.symbol] || 'General',
-      ltp: currentLtp,
-      change: currentChange,
-      volume: stock.volume || 100000,
-      avgVolume: Math.round((stock.volume || 100000) / Math.max(1, stock.surgeMult || 1)),
-      surgeMult: stock.surgeMult || 1.0,
-      delivPct: stock.delivPct || 50.0,
-      high52w: high52,
-      low52w: low52,
-      proximity52wHigh,
-      proximity52wLow,
-      rsi: boundedRsi,
-      lotsize: stock.lotsize || (FNO_SYMBOLS.has(stock.symbol) ? 250 : 1),
-      isFnO: FNO_SYMBOLS.has(stock.symbol),
-      is52wHigh,
-      is52wLow,
-      isVolumeShocker,
-      isRsiOversold,
-      isRsiOverbought,
-      isTopGainer,
-      isTopLoser,
-      isGapUp,
-      isHighDelivery
-    };
-  });
+      const is52wHigh = stock.is52wHigh || proximity52wHigh <= 2.5;
+      const is52wLow = stock.is52wLow || proximity52wLow <= 2.5;
+      const isVolumeShocker = stock.surgeMult >= 2.2;
+      const isRsiOversold = boundedRsi <= 32;
+      const isRsiOverbought = boundedRsi >= 68;
+      const isTopGainer = currentChange >= 2.5;
+      const isTopLoser = currentChange <= -2.0;
+      const isGapUp = currentChange >= 1.5 && stock.surgeMult >= 1.5;
+      const isHighDelivery = (stock.delivPct || 0) >= 65;
+
+      return {
+        symbol: stock.symbol,
+        name: stock.name || stock.symbol,
+        exchange: stock.exchange || 'NSE',
+        sector: stock.sector || CURATED_SECTORS[stock.symbol] || 'General',
+        ltp: currentLtp,
+        change: currentChange,
+        volume: stock.volume || 100000,
+        avgVolume: Math.round((stock.volume || 100000) / Math.max(1, stock.surgeMult || 1)),
+        surgeMult: stock.surgeMult || 1.0,
+        delivPct: stock.delivPct || 50.0,
+        high52w: high52,
+        low52w: low52,
+        proximity52wHigh,
+        proximity52wLow,
+        rsi: boundedRsi,
+        lotsize: stock.lotsize || (FNO_SYMBOLS.has(stock.symbol) ? 250 : 1),
+        isFnO: FNO_SYMBOLS.has(stock.symbol),
+        is52wHigh,
+        is52wLow,
+        isVolumeShocker,
+        isRsiOversold,
+        isRsiOverbought,
+        isTopGainer,
+        isTopLoser,
+        isGapUp,
+        isHighDelivery
+      };
+    });
+
+    cachedScreenerUniverse = items;
+    lastScreenerUniverseTime = now;
+  }
 
   // Filter Pipeline
   let filtered = items;
 
   // 1. Preset Filters
-  if (preset && preset !== 'ALL') {
-    if (preset === '52W_HIGH') filtered = filtered.filter(i => i.is52wHigh);
-    else if (preset === '52W_LOW') filtered = filtered.filter(i => i.is52wLow);
-    else if (preset === 'VOLUME_SHOCKER') filtered = filtered.filter(i => i.isVolumeShocker);
-    else if (preset === 'TOP_GAINERS') filtered = filtered.filter(i => i.isTopGainer);
-    else if (preset === 'TOP_LOSERS') filtered = filtered.filter(i => i.isTopLoser);
-    else if (preset === 'RSI_OVERSOLD') filtered = filtered.filter(i => i.isRsiOversold);
-    else if (preset === 'RSI_OVERBOUGHT') filtered = filtered.filter(i => i.isRsiOverbought);
-    else if (preset === 'GAP_UP') filtered = filtered.filter(i => i.isGapUp);
-    else if (preset === 'HIGH_DELIVERY') filtered = filtered.filter(i => i.isHighDelivery);
+  if (normPreset && normPreset !== 'ALL') {
+    if (normPreset === '52W_HIGH') filtered = filtered.filter(i => i.is52wHigh);
+    else if (normPreset === '52W_LOW') filtered = filtered.filter(i => i.is52wLow);
+    else if (normPreset === 'VOLUME_SHOCKER') filtered = filtered.filter(i => i.isVolumeShocker);
+    else if (normPreset === 'TOP_GAINERS') filtered = filtered.filter(i => i.isTopGainer);
+    else if (normPreset === 'TOP_LOSERS') filtered = filtered.filter(i => i.isTopLoser);
+    else if (normPreset === 'RSI_OVERSOLD') filtered = filtered.filter(i => i.isRsiOversold);
+    else if (normPreset === 'RSI_OVERBOUGHT') filtered = filtered.filter(i => i.isRsiOverbought);
+    else if (normPreset === 'GAP_UP') filtered = filtered.filter(i => i.isGapUp);
+    else if (normPreset === 'HIGH_DELIVERY') filtered = filtered.filter(i => i.isHighDelivery);
   }
 
   // 2. Segment Filters
-  if (segment && segment !== 'ALL') {
-    if (segment === 'FNO') filtered = filtered.filter(i => i.isFnO);
-    else if (segment === 'NIFTY50') filtered = filtered.filter(i => ['RELIANCE', 'TCS', 'HDFCBANK', 'ICICIBANK', 'INFY', 'BHARTIARTL', 'ITC', 'SBIN', 'LT', 'BAJFINANCE', 'HINDUNILVR', 'MARUTI', 'HCLTECH', 'TATAMOTORS', 'SUNPHARMA', 'ONGC', 'NTPC', 'POWERGRID', 'KOTAKBANK', 'TITAN'].includes(i.symbol));
-    else if (segment === 'MIDCAP') filtered = filtered.filter(i => i.ltp >= 150 && i.ltp <= 2000 && !i.isFnO);
-    else if (segment === 'SMALLCAP') filtered = filtered.filter(i => i.ltp < 150);
+  if (normSegment && normSegment !== 'ALL') {
+    if (normSegment === 'FNO') filtered = filtered.filter(i => i.isFnO);
+    else if (normSegment === 'NIFTY50') filtered = filtered.filter(i => ['RELIANCE', 'TCS', 'HDFCBANK', 'ICICIBANK', 'INFY', 'BHARTIARTL', 'ITC', 'SBIN', 'LT', 'BAJFINANCE', 'HINDUNILVR', 'MARUTI', 'HCLTECH', 'TATAMOTORS', 'SUNPHARMA', 'ONGC', 'NTPC', 'POWERGRID', 'KOTAKBANK', 'TITAN'].includes(i.symbol));
+    else if (normSegment === 'MIDCAP') filtered = filtered.filter(i => i.ltp >= 150 && i.ltp <= 2000 && !i.isFnO);
+    else if (normSegment === 'SMALLCAP') filtered = filtered.filter(i => i.ltp < 150);
   }
 
   // 3. Price Bracket Filter
-  if (priceRange && priceRange !== 'ALL') {
-    if (priceRange === 'PENNY') filtered = filtered.filter(i => i.ltp < 50);
-    else if (priceRange === 'MID') filtered = filtered.filter(i => i.ltp >= 50 && i.ltp <= 500);
-    else if (priceRange === 'LARGE') filtered = filtered.filter(i => i.ltp > 500);
+  if (normPriceRange && normPriceRange !== 'ALL') {
+    if (normPriceRange === 'PENNY') filtered = filtered.filter(i => i.ltp < 50);
+    else if (normPriceRange === 'MID') filtered = filtered.filter(i => i.ltp >= 50 && i.ltp <= 500);
+    else if (normPriceRange === 'LARGE') filtered = filtered.filter(i => i.ltp > 500);
   }
 
   // 4. Text Search
@@ -1707,13 +1739,13 @@ function getMarketScreener(opts = {}) {
   }
 
   // Sorting
-  if (sortBy === 'SURGE_DESC') filtered.sort((a, b) => b.surgeMult - a.surgeMult);
-  else if (sortBy === 'CHANGE_DESC') filtered.sort((a, b) => b.change - a.change);
-  else if (sortBy === 'CHANGE_ASC') filtered.sort((a, b) => a.change - b.change);
-  else if (sortBy === 'DELIVERY_DESC') filtered.sort((a, b) => b.delivPct - a.delivPct);
-  else if (sortBy === 'VOLUME_DESC') filtered.sort((a, b) => b.volume - a.volume);
-  else if (sortBy === 'RSI_ASC') filtered.sort((a, b) => a.rsi - b.rsi);
-  else if (sortBy === 'RSI_DESC') filtered.sort((a, b) => b.rsi - a.rsi);
+  if (normSortBy === 'SURGE_DESC') filtered.sort((a, b) => b.surgeMult - a.surgeMult);
+  else if (normSortBy === 'CHANGE_DESC') filtered.sort((a, b) => b.change - a.change);
+  else if (normSortBy === 'CHANGE_ASC') filtered.sort((a, b) => a.change - b.change);
+  else if (normSortBy === 'DELIVERY_DESC') filtered.sort((a, b) => b.delivPct - a.delivPct);
+  else if (normSortBy === 'VOLUME_DESC') filtered.sort((a, b) => b.volume - a.volume);
+  else if (normSortBy === 'RSI_ASC') filtered.sort((a, b) => a.rsi - b.rsi);
+  else if (normSortBy === 'RSI_DESC') filtered.sort((a, b) => b.rsi - a.rsi);
 
   const pg = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.min(200, Math.max(10, parseInt(limit, 10) || 50));
