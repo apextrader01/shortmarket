@@ -1,7 +1,8 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore, API } from '../store';
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isIndexContract } from '../utils/lotsizeHelper';
+import { getMarketSession } from '../utils/marketTiming';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
@@ -801,25 +802,53 @@ const OptionChainViewInternal = () => {
       });
     } else if (oneClickMode) {
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
+      const token = localStorage.getItem('token') || useStore.getState().token;
+      if (!token) {
+        useStore.getState().showToast('Please login to place paper trades.', 'error', 'Authentication Required');
+        return;
+      }
+
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
       const finalQuantity = lotsize * (oneClickMultiplier || 1);
       const currentPrices = useStore.getState().prices;
       const livePrice = currentPrices[optKey]?.ltp || 0;
+
+      const isIndex = isIndexContract(optKey);
+      const marketStatus = useStore.getState().marketStatus;
+      const marketCalendar = useStore.getState().marketCalendar;
+      const session = getMarketSession({ symbol: optKey, productType: 'INT', isCommodity: false, marketStatus, marketCalendar });
+
+      if (isIndex && !session.open) {
+        useStore.getState().showToast('Index options (Nifty, BankNifty, Sensex) can only be traded live between 09:15 AM and 03:15 PM IST.', 'error', 'Index Trading Closed');
+        return;
+      }
       
       const payload = {
         symbol: optKey,
         type: 'MARKET',
         side: type === 'BUY' ? 'BUY' : 'SELL',
         quantity: finalQuantity,
-        price: livePrice,
+        price: livePrice > 0 ? livePrice : 0,
+        quoted_price: livePrice > 0 ? livePrice : null,
         trigger_price: null,
         sl_price: null,
         tgt_price: null,
-        margin: 0, // Backend enforces balance anyway
-        product_type: 'INT' // Intraday by default for scalping
+        margin: 0,
+        product_type: 'INT',
+        order_variety: 'REGULAR',
+        variety: 'REGULAR',
+        is_amo: false
       };
       
-      placeOrder(payload); // Async, but we don't need to block UI
+      placeOrder(payload).then(res => {
+        if (res && res.success) {
+          useStore.getState().showToast(`Instant ${type} order filled for ${finalQuantity} qty of ${optKey}!`, 'success', 'Order Filled');
+        } else {
+          useStore.getState().showToast(res?.error || 'Failed to place instant order.', 'error', 'Order Failed');
+        }
+      }).catch(err => {
+        useStore.getState().showToast(err.message || 'Failed to place instant order.', 'error', 'Order Failed');
+      });
     } else {
       openOrderModal(optKey, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
     }

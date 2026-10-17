@@ -1,8 +1,9 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore, socket } from '../store';
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, isIndexContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { getMarketSession } from '../utils/marketTiming';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
@@ -115,42 +116,78 @@ export default function DOMLadderModal() {
     }
   }
 
-  const handleOrder = (price, side) => {
+  const handleOrder = async (price, side) => {
     if (oneClickMode) {
+      const token = localStorage.getItem('token') || useStore.getState().token;
+      if (!token) {
+        useStore.getState().showToast('Please login to place paper trades.', 'error', 'Authentication Required');
+        return;
+      }
+
       const totalQty = lotsize * (oneClickMultiplier || 1);
       const freezeLimit = getFreezeLimit(symbol, lotsize);
-      const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotsize) * lotsize : totalQty;
+      const cleanSym = symbol ? symbol.replace(/^(NSE:|BSE:|MCX:)/i, '') : '';
+      const isCommodity = isCommodityContract(symbol);
+      const isIndex = isIndexContract(symbol);
+      const isDerivative = isDerivativeContract(symbol);
 
-      if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
-        // Auto-slice into compliant chunks
-        const slices = calculateOrderSlices(symbol, totalQty, lotsize);
-        for (const sliceQty of slices) {
-          placeOrder({
-            symbol,
-            type: 'LIMIT',
-            side,
-            quantity: sliceQty,
-            price: parseFloat(price),
-            trigger_price: null,
-            sl_price: null,
-            tgt_price: null,
-            margin: 0,
-            product_type: 'INT'
-          });
+      if (freezeLimit > 0 && totalQty > freezeLimit) {
+        const maxLots = lotsize > 1 ? Math.floor(freezeLimit / lotsize) : freezeLimit;
+        useStore.getState().showToast(`Order quantity (${totalQty.toLocaleString('en-IN')}) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} (${maxLots} lots max).`, 'error', 'Freeze Limit Exceeded');
+        return;
+      }
+
+      const marketStatus = useStore.getState().marketStatus;
+      const marketCalendar = useStore.getState().marketCalendar;
+      const session = getMarketSession({ symbol, productType: 'INT', isCommodity, marketStatus, marketCalendar });
+
+      if (isIndex && !session.open) {
+        useStore.getState().showToast('Index trading is closed. Index contracts can only be traded live between 09:15 AM and 03:15 PM IST.', 'error', 'Index Trading Closed');
+        return;
+      }
+
+      let isAmo = false;
+      let effectiveProductType = 'INT';
+      if (!session.open) {
+        if (session.isAmoWindow) {
+          if (isIndex) {
+            useStore.getState().showToast('AMO is not permitted for Index trading.', 'error', 'AMO Prohibited');
+            return;
+          }
+          isAmo = true;
+          effectiveProductType = (!isDerivative && !isCommodity && !isIndex) ? 'DEL' : 'INT';
+        } else {
+          useStore.getState().showToast(session.reason || session.closedMessage || 'Market is closed.', 'error', 'Market Closed');
+          return;
         }
-      } else {
-        placeOrder({
-          symbol,
-          type: 'LIMIT',
-          side,
-          quantity: totalQty,
-          price: parseFloat(price),
-          trigger_price: null,
-          sl_price: null,
-          tgt_price: null,
-          margin: 0,
-          product_type: 'INT'
-        });
+      }
+
+      const payload = {
+        symbol,
+        type: 'LIMIT',
+        side,
+        quantity: totalQty,
+        price: parseFloat(price),
+        trigger_price: null,
+        sl_price: null,
+        tgt_price: null,
+        margin: 0,
+        product_type: effectiveProductType,
+        lotsize: lotsize || 1,
+        order_variety: isAmo ? 'AMO' : 'REGULAR',
+        variety: isAmo ? 'AMO' : 'REGULAR',
+        is_amo: isAmo
+      };
+
+      try {
+        const result = await placeOrder(payload);
+        if (result && result.success) {
+          useStore.getState().showToast(result.message || `Limit ${side} order placed for ${totalQty} ${lotsize > 1 ? 'qty' : 'shares'} @ ₹${parseFloat(price).toFixed(2)}`, 'success', 'Order Placed');
+        } else {
+          useStore.getState().showToast(result?.error || 'Failed to place limit order', 'error', 'Order Failed');
+        }
+      } catch (err) {
+        useStore.getState().showToast(err.message || 'Failed to place limit order', 'error', 'Order Failed');
       }
     } else {
       closeDomLadderModal();

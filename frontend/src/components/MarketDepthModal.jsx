@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X } from 'lucide-react';
 import { socket } from '../store'; // Import socket to emit subscribe events
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, isIndexContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { getMarketSession } from '../utils/marketTiming';
 
 export default function MarketDepthModal() {
   const marketDepthModal = useStore(state => state.marketDepthModal);
@@ -15,6 +16,7 @@ export default function MarketDepthModal() {
   const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
   const orderModal = useStore(state => state.orderModal);
   const { closeMarketDepthModal, placeOrder, openOrderModal } = useStore.getState();
+  const [isPlacing, setIsPlacing] = useState(false);
 
   const lotSize = (marketDepthModal.lotsize && Number(marketDepthModal.lotsize) > 1) ? Number(marketDepthModal.lotsize) : (basicData.lotsize && Number(basicData.lotsize) > 1) ? Number(basicData.lotsize) : getInstantLotsize(symbol);
 
@@ -48,32 +50,150 @@ export default function MarketDepthModal() {
   const bidRatio = totalVol ? (totalBidQty / totalVol) * 100 : 50;
   const askRatio = totalVol ? (totalAskQty / totalVol) * 100 : 50;
 
-  const handleOneClickOrder = (side) => {
-    const totalQty = lotSize * (oneClickMultiplier || 1);
-    const currentPrice = (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0;
-    const freezeLimit = getFreezeLimit(symbol, lotSize);
-    const maxAllowedLots = freezeLimit > 0 ? Math.floor(freezeLimit / lotSize) * lotSize : totalQty;
+  const handleOneClickOrder = async (side) => {
+    if (isPlacing) return;
 
-    const buildPayload = (qty) => ({
+    const token = localStorage.getItem('token') || useStore.getState().token;
+    if (!token) {
+      useStore.getState().showToast('Please login to place paper trades.', 'error', 'Authentication Required');
+      return;
+    }
+
+    const cleanSym = symbol ? symbol.replace(/^(NSE:|BSE:|MCX:)/i, '') : '';
+    const baseSym = cleanSym.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
+    const isCommodity = isCommodityContract(symbol);
+    const isIndex = isIndexContract(symbol);
+    const isDerivative = isDerivativeContract(symbol);
+
+    const effectiveLotSize = (marketDepthModal.lotsize && Number(marketDepthModal.lotsize) > 0)
+      ? Number(marketDepthModal.lotsize)
+      : (basicData.lotsize && Number(basicData.lotsize) > 0)
+        ? Number(basicData.lotsize)
+        : getInstantLotsize(symbol);
+
+    const multiplier = Math.max(1, parseInt(oneClickMultiplier, 10) || 1);
+    const totalQty = Math.max(1, Math.round(effectiveLotSize * multiplier));
+
+    // Strict Exchange Freeze Limit Validation
+    const freezeLimit = getFreezeLimit(symbol, effectiveLotSize);
+    if (freezeLimit > 0 && totalQty > freezeLimit) {
+      const maxLots = effectiveLotSize > 1 ? Math.floor(freezeLimit / effectiveLotSize) : freezeLimit;
+      const err = effectiveLotSize > 1
+        ? `Order quantity (${totalQty.toLocaleString('en-IN')} qty / ${multiplier} lots) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} (${maxLots} lots max) for ${symbol}.`
+        : `Order quantity (${totalQty.toLocaleString('en-IN')} shares) exceeds exchange freeze limit of ${freezeLimit.toLocaleString('en-IN')} shares for ${symbol}.`;
+      useStore.getState().showToast(err, 'error', 'Freeze Limit Exceeded');
+      return;
+    }
+
+    // Comprehensive Live Price Resolution
+    const allPrices = useStore.getState().prices || {};
+    const resolvedLtp = Number(
+      (marketDepthData?.symbol === symbol && Number(marketDepthData.ltp) > 0) ? marketDepthData.ltp :
+      (Number(basicData.ltp) > 0) ? basicData.ltp :
+      allPrices[symbol]?.ltp ||
+      allPrices[cleanSym]?.ltp ||
+      allPrices[baseSym]?.ltp ||
+      allPrices[`NSE:${cleanSym}`]?.ltp ||
+      allPrices[`BSE:${cleanSym}`]?.ltp ||
+      allPrices[`MCX:${cleanSym}`]?.ltp ||
+      basicData.close ||
+      basicData.prev_close ||
+      basicData.open ||
+      0
+    );
+
+    // Evaluate Real-Time Market Session & Timing
+    const marketStatus = useStore.getState().marketStatus;
+    const marketCalendar = useStore.getState().marketCalendar;
+    const session = getMarketSession({
+      symbol,
+      productType: 'INT',
+      isCommodity,
+      marketStatus,
+      marketCalendar
+    });
+
+    // 1. Index trading validation (No AMO, No Delivery, Pro Tier required)
+    if (isIndex) {
+      if (!session.open) {
+        useStore.getState().showToast('Index contracts (NIFTY, BANKNIFTY, SENSEX) can only be traded live between 09:15 AM and 03:15 PM IST on trading days.', 'error', 'Index Trading Closed');
+        return;
+      }
+      const currentUser = useStore.getState().user;
+      const isAdmin = Boolean(currentUser?.is_admin);
+      const tier = (currentUser?.subscription_tier || 'BASIC').toUpperCase();
+      const isExpired = currentUser?.subscription_expires && new Date(currentUser.subscription_expires).getTime() <= Date.now();
+      const activeTier = isExpired ? 'BASIC' : tier;
+      const isPaidTier = isAdmin || ['PRO', 'MONTHLY', 'YEARLY', 'HIGHEST', 'FEATURE', 'VIP', 'LIFETIME'].includes(activeTier);
+      if (!isPaidTier && side === 'BUY') {
+        useStore.getState().showToast('Index trading is an exclusive Pro feature. Please upgrade your subscription to trade index options and futures.', 'error', 'Subscription Required');
+        return;
+      }
+    }
+
+    // 2. Regular vs AMO Window
+    let isAmo = false;
+    let effectiveProductType = 'INT';
+
+    if (!session.open) {
+      if (session.isAmoWindow) {
+        if (isIndex) {
+          useStore.getState().showToast('AMO (After Market Orders) is not permitted for Index contracts. Indices can only be traded live between 09:15 AM and 03:15 PM IST.', 'error', 'AMO Prohibited for Indices');
+          return;
+        }
+        isAmo = true;
+        // For cash equities outside market hours, Intraday (MIS) is blocked after cutoff by SEBI regulations, so default to Delivery (CNC / DEL)
+        effectiveProductType = (!isDerivative && !isCommodity && !isIndex) ? 'DEL' : 'INT';
+      } else {
+        useStore.getState().showToast(session.reason || session.closedMessage || 'Market is closed. Orders cannot be placed at this time.', 'error', 'Market Closed');
+        return;
+      }
+    } else {
+      // Session is open
+      isAmo = false;
+      effectiveProductType = 'INT';
+    }
+
+    const payload = {
       symbol,
       type: 'MARKET',
       side,
-      quantity: qty,
-      price: currentPrice,
+      quantity: totalQty,
+      price: resolvedLtp > 0 ? resolvedLtp : 0,
+      quoted_price: resolvedLtp > 0 ? resolvedLtp : null,
       trigger_price: null,
       sl_price: null,
       tgt_price: null,
       margin: 0,
-      product_type: 'INT'
-    });
+      product_type: effectiveProductType,
+      lotsize: effectiveLotSize,
+      order_variety: isAmo ? 'AMO' : 'REGULAR',
+      variety: isAmo ? 'AMO' : 'REGULAR',
+      is_amo: isAmo
+    };
 
-    if (totalQty > maxAllowedLots && maxAllowedLots > 0) {
-      const slices = calculateOrderSlices(symbol, totalQty, lotSize);
-      for (const sliceQty of slices) {
-        placeOrder(buildPayload(sliceQty));
+    setIsPlacing(true);
+    try {
+      const result = await placeOrder(payload);
+      setIsPlacing(false);
+      if (result && result.success) {
+        closeMarketDepthModal();
+        if (result.status === 'EXECUTED' || result.status === 'COMPLETE' || result.status === 'COMPLETED') {
+          useStore.getState().showToast(`Instant ${side} order executed for ${totalQty} ${effectiveLotSize > 1 ? 'qty' : 'shares'} of ${cleanSym}!`, 'success', 'Order Filled');
+        } else if (result.status === 'AMO_PENDING') {
+          useStore.getState().showToast(result.message || `After Market Order (AMO) placed for ${cleanSym}! Queued for market open.`, 'info', 'AMO Queued');
+        } else if (result.status === 'REJECTED') {
+          useStore.getState().showToast(`Order rejected: ${result.message || result.error || 'Risk check failed'}`, 'error', 'Order Rejected');
+        } else {
+          useStore.getState().showToast(`Instant ${side} order placed (${result.status || 'Pending'})`, 'info', 'Order Placed');
+        }
+      } else {
+        const errorMsg = result?.error || 'Failed to place instant order. Please try again.';
+        useStore.getState().showToast(errorMsg, 'error', 'Order Failed');
       }
-    } else {
-      placeOrder(buildPayload(totalQty));
+    } catch (err) {
+      setIsPlacing(false);
+      useStore.getState().showToast(err.message || 'Network error occurred while placing order.', 'error', 'Order Failed');
     }
   };
 
@@ -85,7 +205,9 @@ export default function MarketDepthModal() {
       pointerEvents: orderModal?.isOpen ? 'none' : 'auto'
     }}>
       <div className={orderModal?.isOpen ? 'order-modal-companion' : ''} style={{
-        width: '500px', background: 'var(--bg-dark)', borderRadius: '8px',
+        width: 'min(500px, 96vw)',
+        maxWidth: '96vw',
+        background: 'var(--bg-dark)', borderRadius: '8px',
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
         transform: orderModal?.isOpen ? 'translateX(260px)' : 'none',
@@ -94,12 +216,14 @@ export default function MarketDepthModal() {
       }}>
         
         {/* Header */}
-        <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-             <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Market Depth</h2>
-             <span style={{ fontSize: '12px', background: 'var(--bg-panel)', padding: '4px 8px', borderRadius: '4px', fontWeight: '600' }}>{symbol.split('-')[0]}</span>
+        <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflow: 'hidden' }}>
+             <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, whiteSpace: 'nowrap', flexShrink: 0 }}>Market Depth</h2>
+             <span style={{ fontSize: '12px', background: 'var(--bg-panel)', padding: '4px 8px', borderRadius: '4px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }} title={symbol}>
+               {symbol.split('-')[0]}
+             </span>
           </div>
-          <button onClick={closeMarketDepthModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
+          <button onClick={closeMarketDepthModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}><X size={16} /></button>
         </div>
 
         {/* Content */}
@@ -228,6 +352,8 @@ export default function MarketDepthModal() {
           {/* Action Buttons */}
           <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
              <button 
+                type="button"
+                disabled={isPlacing}
                 onClick={() => {
                   if (oneClickMode) {
                     handleOneClickOrder('BUY');
@@ -237,12 +363,20 @@ export default function MarketDepthModal() {
                   }
                 }}
                 className={`btn btn-primary ${oneClickMode ? 'one-click-active' : ''}`}
-                style={{ flex: 1, background: 'var(--color-blue)', border: 'none' }}
+                style={{ 
+                  flex: 1, 
+                  background: 'var(--color-blue)', 
+                  border: 'none',
+                  opacity: isPlacing ? 0.65 : 1,
+                  cursor: isPlacing ? 'not-allowed' : 'pointer'
+                }}
                 title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
              >
-                {oneClickMode ? `INSTANT BUY (${oneClickMultiplier}x)` : 'BUY'}
+                {isPlacing ? 'PLACING...' : (oneClickMode ? `INSTANT BUY (${oneClickMultiplier}x)` : 'BUY')}
              </button>
              <button 
+                type="button"
+                disabled={isPlacing}
                 onClick={() => {
                   if (oneClickMode) {
                     handleOneClickOrder('SELL');
@@ -252,10 +386,17 @@ export default function MarketDepthModal() {
                   }
                 }}
                 className={`btn btn-secondary ${oneClickMode ? 'one-click-active' : ''}`}
-                style={{ flex: 1, background: 'var(--color-red)', border: 'none', color: '#fff' }}
+                style={{ 
+                  flex: 1, 
+                  background: 'var(--color-red)', 
+                  border: 'none', 
+                  color: '#fff',
+                  opacity: isPlacing ? 0.65 : 1,
+                  cursor: isPlacing ? 'not-allowed' : 'pointer'
+                }}
                 title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
              >
-                {oneClickMode ? `INSTANT SELL (${oneClickMultiplier}x)` : 'SELL'}
+                {isPlacing ? 'PLACING...' : (oneClickMode ? `INSTANT SELL (${oneClickMultiplier}x)` : 'SELL')}
              </button>
           </div>
 

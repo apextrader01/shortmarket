@@ -911,47 +911,75 @@ export default function OrderModal() {
         {/* Fyers-Style Vibrant Header */}
         <div style={{ 
           background: isBuy ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'linear-gradient(135deg, #dc2626, #b91c1c)', 
-          padding: '14px 18px', 
+          padding: isMobile ? '12px 14px' : '14px 18px', 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          color: '#ffffff'
+          gap: isMobile ? '8px' : '12px',
+          color: '#ffffff',
+          overflow: 'hidden'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#ffffff', letterSpacing: '0.3px' }}>
-                {isBuy ? 'Buy' : 'Sell'} {symbol ? (symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0]) : ''}
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+              <span style={{ fontSize: isMobile ? '13px' : '14px', fontWeight: '800', opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
+                {isBuy ? 'Buy' : 'Sell'}
+              </span>
+              <h2 
+                style={{ 
+                  fontSize: isMobile ? '14px' : '15px', 
+                  fontWeight: '700', 
+                  margin: 0, 
+                  color: '#ffffff', 
+                  letterSpacing: '0.2px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  minWidth: 0,
+                  flexShrink: 1
+                }}
+                title={symbol ? symbol.replace(/^(NSE:|BSE:|MCX:)/i, '') : ''}
+              >
+                {symbol ? (symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0]) : ''}
               </h2>
-              <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
+              <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.22)', padding: '1px 5px', borderRadius: '4px', fontWeight: '700', flexShrink: 0 }}>
                 {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}
               </span>
-              <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.3)', border: '1px solid rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                Simulated Paper Order
-              </span>
+              {!isMobile && (
+                <span style={{ fontSize: '9.5px', background: 'rgba(16, 185, 129, 0.3)', border: '1px solid rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700', letterSpacing: '0.3px', textTransform: 'uppercase', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  Simulated Paper Order
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginTop: '3px', fontWeight: '500' }}>
-              {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice > 0 ? livePrice.toFixed(2) : (orderModal.initialPrice && Number(orderModal.initialPrice) > 0 ? Number(orderModal.initialPrice).toFixed(2) : (price && parseFloat(price) > 0 ? Number(price).toFixed(2) : '0.00'))}
+            <div style={{ fontSize: isMobile ? '12px' : '13px', color: 'rgba(255,255,255,0.92)', marginTop: '3px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <span>
+                {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice > 0 ? livePrice.toFixed(2) : (orderModal.initialPrice && Number(orderModal.initialPrice) > 0 ? Number(orderModal.initialPrice).toFixed(2) : (price && parseFloat(price) > 0 ? Number(price).toFixed(2) : '0.00'))}
+              </span>
               {livePriceData?.pct !== undefined && (
-                <span style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.85 }}>
+                <span style={{ fontSize: isMobile ? '11px' : '12px', opacity: 0.9, fontWeight: '600' }}>
                   {isUp ? '▲' : '▼'} {`${livePriceData.pct >= 0 ? '+' : ''}${livePriceData.pct.toFixed(2)}%`}
+                </span>
+              )}
+              {isMobile && (
+                <span style={{ fontSize: '9px', background: 'rgba(16, 185, 129, 0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '0px 4px', borderRadius: '3px', fontWeight: '700', letterSpacing: '0.2px', textTransform: 'uppercase', color: '#d1fae5', flexShrink: 0, marginLeft: 'auto' }}>
+                  Paper
                 </span>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexShrink: 0 }}>
             {/* Smooth B / S Toggle */}
-            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '20px', padding: '2px', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.35)', borderRadius: '20px', padding: '2px', border: '1px solid rgba(255,255,255,0.25)', flexShrink: 0 }}>
               <button 
                 type="button"
                 onClick={() => setSide('BUY')}
                 style={{ 
                   background: isBuy ? '#ffffff' : 'transparent', 
-                  color: isBuy ? '#1d4ed8' : 'rgba(255,255,255,0.8)',
+                  color: isBuy ? '#1d4ed8' : 'rgba(255,255,255,0.85)',
                   border: 'none', 
                   borderRadius: '16px', 
-                  width: '28px', 
-                  height: '22px', 
+                  width: isMobile ? '26px' : '28px', 
+                  height: isMobile ? '21px' : '22px', 
                   fontSize: '11px', 
                   fontWeight: '800', 
                   cursor: 'pointer',
@@ -962,11 +990,11 @@ export default function OrderModal() {
                 onClick={() => setSide('SELL')}
                 style={{ 
                   background: !isBuy ? '#ffffff' : 'transparent', 
-                  color: !isBuy ? '#b91c1c' : 'rgba(255,255,255,0.8)',
+                  color: !isBuy ? '#b91c1c' : 'rgba(255,255,255,0.85)',
                   border: 'none', 
                   borderRadius: '16px', 
-                  width: '28px', 
-                  height: '22px', 
+                  width: isMobile ? '26px' : '28px', 
+                  height: isMobile ? '21px' : '22px', 
                   fontSize: '11px', 
                   fontWeight: '800', 
                   cursor: 'pointer',
@@ -977,17 +1005,17 @@ export default function OrderModal() {
               type="button"
               onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
               title="Market Depth"
-              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+              style={{ background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: '50%', width: isMobile ? '26px' : '28px', height: isMobile ? '26px' : '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff', flexShrink: 0 }}
             >
-              <Maximize2 size={13} />
+              <Maximize2 size={isMobile ? 12 : 13} />
             </button>
             <button 
               type="button"
               onClick={closeOrderModal} 
               title="Close"
-              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+              style={{ background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: '50%', width: isMobile ? '26px' : '28px', height: isMobile ? '26px' : '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff', flexShrink: 0 }}
             >
-              <X size={15} />
+              <X size={isMobile ? 14 : 15} />
             </button>
           </div>
         </div>
