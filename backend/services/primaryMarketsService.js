@@ -1226,7 +1226,7 @@ function getMarketDeals(query = {}) {
   // If filtered pool is small for a specific historical year, synthesize authentic on-demand historical deals
   if (scopeBase.length === 0 && (dateRange.startsWith('YEAR_') || /^\d{4}$/.test(dateRange) || dateRange === 'ARCHIVE' || dateRange === '3Y' || dateRange === '5Y' || dateRange === '10Y')) {
     const yr = dateRange.startsWith('YEAR_') ? dateRange.replace('YEAR_', '') : (/^\d{4}$/.test(dateRange) ? dateRange : 2024);
-    const hist = generateHistoricalDeals({ year: yr, page: 1, limit: 120, type: filterType, search });
+    const hist = generateHistoricalDeals({ year: yr, page: 1, limit: 300 });
     scopeBase = hist.deals;
   }
 

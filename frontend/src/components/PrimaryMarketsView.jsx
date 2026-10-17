@@ -2329,7 +2329,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     type="button"
                     onClick={() => {
                       setIpoEraFilter(era.id);
-                      fetchIposList(false, era.id);
+                      if (era.id !== 'ALL' && era.id !== 'ACTIVE' && (ipoStatusFilter === 'OPEN' || ipoStatusFilter === 'UPCOMING')) {
+                        setIpoStatusFilter('ALL');
+                      }
                     }}
                     style={{
                       padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
