@@ -160,65 +160,100 @@ function generateMonthlyFlowSummary(startYear = 1996, endYear = 2026) {
 const HISTORICAL_IPOS_30_YEARS = [
   // ─── 2025 ISSUES ───
   {
-    id: 101, name: 'Hyundai Motor India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹1,865 – ₹1,960', minPrice: 1865, maxPrice: 1960, issuePrice: 1960, listingPrice: 1931, listingGainPct: -1.48,
+    id: 101, name: 'NSDL (National Securities Depository Ltd.)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2025, priceBand: '₹680 – ₹725', minPrice: 680, maxPrice: 725, issuePrice: 725, listingPrice: 910, listingGainPct: 25.52,
+    lotSize: 20, issueSizeCr: 4500.00, openDate: '18-Mar-2025', closeDate: '21-Mar-2025', listingDate: '27-Mar-2025',
+    gmp: 185, gmpPct: 25.52, subscription: { qib: 42.10, snii: 21.60, bnii: 29.80, nii: 27.07, retail: 9.80, total: 24.30 },
+    applications: 1420000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Financial Market Depository Infrastructure'
+  },
+  {
+    id: 102, name: 'LG Electronics India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2025, priceBand: '₹1,150 – ₹1,220', minPrice: 1150, maxPrice: 1220, issuePrice: 1220, listingPrice: 1475, listingGainPct: 20.90,
+    lotSize: 12, issueSizeCr: 15000.00, openDate: '12-Feb-2025', closeDate: '14-Feb-2025', listingDate: '20-Feb-2025',
+    gmp: 255, gmpPct: 20.90, subscription: { qib: 34.20, snii: 18.45, bnii: 22.10, nii: 20.88, retail: 8.75, total: 18.50 },
+    applications: 1945000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Consumer Electronics & Appliances'
+  },
+  {
+    id: 103, name: 'Ather Energy Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2025, priceBand: '₹310 – ₹330', minPrice: 310, maxPrice: 330, issuePrice: 330, listingPrice: 385, listingGainPct: 16.67,
+    lotSize: 45, issueSizeCr: 4500.00, openDate: '08-Jan-2025', closeDate: '10-Jan-2025', listingDate: '16-Jan-2025',
+    gmp: 55, gmpPct: 16.67, subscription: { qib: 8.42, snii: 5.12, bnii: 7.24, nii: 6.53, retail: 3.45, total: 5.86 },
+    applications: 684200, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Electric Vehicles & Mobility'
+  },
+  {
+    id: 104, name: 'Hexaware Technologies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2025, priceBand: '₹750 – ₹800', minPrice: 750, maxPrice: 800, issuePrice: 800, listingPrice: 940, listingGainPct: 17.50,
+    lotSize: 18, issueSizeCr: 9950.00, openDate: '10-Feb-2025', closeDate: '12-Feb-2025', listingDate: '18-Feb-2025',
+    gmp: 140, gmpPct: 17.50, subscription: { qib: 24.50, snii: 11.20, bnii: 14.80, nii: 13.60, retail: 4.80, total: 14.20 },
+    applications: 1120000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'IT Services & Digital Solutions'
+  },
+  {
+    id: 105, name: 'HDB Financial Services Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2025, priceBand: '₹700 – ₹740', minPrice: 700, maxPrice: 740, issuePrice: 740, listingPrice: 910, listingGainPct: 22.97,
+    lotSize: 20, issueSizeCr: 12500.00, openDate: '05-Mar-2025', closeDate: '07-Mar-2025', listingDate: '13-Mar-2025',
+    gmp: 170, gmpPct: 22.97, subscription: { qib: 46.80, snii: 19.30, bnii: 26.50, nii: 24.10, retail: 6.90, total: 26.40 },
+    applications: 2150000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'NBFC & Retail Lending'
+  },
+
+  // ─── 2024 ISSUES ───
+  {
+    id: 106, name: 'Hyundai Motor India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2024, priceBand: '₹1,865 – ₹1,960', minPrice: 1865, maxPrice: 1960, issuePrice: 1960, listingPrice: 1931, listingGainPct: -1.48,
     lotSize: 7, issueSizeCr: 27870.00, openDate: '15-Oct-2024', closeDate: '17-Oct-2024', listingDate: '22-Oct-2024',
     gmp: 65, gmpPct: 3.32, subscription: { qib: 6.97, snii: 0.60, bnii: 0.75, nii: 0.70, retail: 0.50, employee: 1.74, total: 2.37 },
     applications: 1420000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Automobile'
   },
   {
-    id: 102, name: 'Swiggy Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹371 – ₹390', minPrice: 371, maxPrice: 390, issuePrice: 390, listingPrice: 420, listingGainPct: 7.69,
+    id: 107, name: 'Swiggy Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2024, priceBand: '₹371 – ₹390', minPrice: 371, maxPrice: 390, issuePrice: 390, listingPrice: 420, listingGainPct: 7.69,
     lotSize: 38, issueSizeCr: 11327.43, openDate: '06-Nov-2024', closeDate: '08-Nov-2024', listingDate: '13-Nov-2024',
     gmp: 25, gmpPct: 6.41, subscription: { qib: 6.02, snii: 0.41, bnii: 0.52, nii: 0.48, retail: 1.14, employee: 1.65, total: 3.59 },
     applications: 1890000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Consumer Internet & Quick Commerce'
   },
   {
-    id: 103, name: 'Waaree Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹1,427 – ₹1,503', minPrice: 1427, maxPrice: 1503, issuePrice: 1503, listingPrice: 2550, listingGainPct: 69.66,
+    id: 108, name: 'Waaree Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2024, priceBand: '₹1,427 – ₹1,503', minPrice: 1427, maxPrice: 1503, issuePrice: 1503, listingPrice: 2550, listingGainPct: 69.66,
     lotSize: 9, issueSizeCr: 4321.44, openDate: '21-Oct-2024', closeDate: '23-Oct-2024', listingDate: '28-Oct-2024',
     gmp: 1050, gmpPct: 69.86, subscription: { qib: 215.03, snii: 65.20, bnii: 78.40, nii: 74.02, retail: 11.27, employee: 5.45, total: 79.44 },
     applications: 9740000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Solar PV Module Manufacturing'
   },
   {
-    id: 104, name: 'Bajaj Housing Finance Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹66 – ₹70', minPrice: 66, maxPrice: 70, issuePrice: 70, listingPrice: 150, listingGainPct: 114.29,
+    id: 109, name: 'Bajaj Housing Finance Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2024, priceBand: '₹66 – ₹70', minPrice: 66, maxPrice: 70, issuePrice: 70, listingPrice: 150, listingGainPct: 114.29,
     lotSize: 214, issueSizeCr: 6560.00, openDate: '09-Sep-2024', closeDate: '11-Sep-2024', listingDate: '16-Sep-2024',
     gmp: 80, gmpPct: 114.29, subscription: { qib: 222.05, snii: 43.10, bnii: 51.20, nii: 48.50, retail: 7.41, employee: 2.10, total: 67.43 },
     applications: 8900000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Housing Finance NBFC'
   },
   {
-    id: 105, name: 'Premier Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹427 – ₹450', minPrice: 427, maxPrice: 450, issuePrice: 450, listingPrice: 991, listingGainPct: 120.22,
+    id: 110, name: 'Premier Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    year: 2024, priceBand: '₹427 – ₹450', minPrice: 427, maxPrice: 450, issuePrice: 450, listingPrice: 991, listingGainPct: 120.22,
     lotSize: 33, issueSizeCr: 2830.40, openDate: '27-Aug-2024', closeDate: '29-Aug-2024', listingDate: '03-Sep-2024',
     gmp: 540, gmpPct: 120.00, subscription: { qib: 216.67, snii: 48.20, bnii: 56.40, nii: 53.68, retail: 7.69, employee: 11.40, total: 75.00 },
     applications: 4620000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Solar Cell & Module Tech'
   },
-
-  // ─── 2024 ISSUES ───
   {
-    id: 106, name: 'Ola Electric Mobility Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    id: 111, name: 'Ola Electric Mobility Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
     year: 2024, priceBand: '₹72 – ₹76', minPrice: 72, maxPrice: 76, issuePrice: 76, listingPrice: 76, listingGainPct: 0.00,
     lotSize: 195, issueSizeCr: 6145.56, openDate: '02-Aug-2024', closeDate: '06-Aug-2024', listingDate: '09-Aug-2024',
     gmp: 3, gmpPct: 3.95, subscription: { qib: 5.53, snii: 2.10, bnii: 2.70, nii: 2.51, retail: 4.05, employee: 12.00, total: 4.45 },
     applications: 1840000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Electric Two-Wheelers'
   },
   {
-    id: 107, name: 'Brainbees Solutions (FirstCry)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    id: 112, name: 'Brainbees Solutions (FirstCry)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
     year: 2024, priceBand: '₹440 – ₹465', minPrice: 440, maxPrice: 465, issuePrice: 465, listingPrice: 651, listingGainPct: 40.00,
     lotSize: 32, issueSizeCr: 4193.73, openDate: '06-Aug-2024', closeDate: '08-Aug-2024', listingDate: '13-Aug-2024',
     gmp: 185, gmpPct: 39.78, subscription: { qib: 19.30, snii: 4.20, bnii: 5.10, nii: 4.80, retail: 2.45, employee: 6.80, total: 12.22 },
     applications: 1250000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Baby & Kids Omnichannel Retail'
   },
   {
-    id: 108, name: 'Bharti Hexacom Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    id: 113, name: 'Bharti Hexacom Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
     year: 2024, priceBand: '₹542 – ₹570', minPrice: 542, maxPrice: 570, issuePrice: 570, listingPrice: 755, listingGainPct: 32.46,
     lotSize: 26, issueSizeCr: 4275.00, openDate: '03-Apr-2024', closeDate: '05-Apr-2024', listingDate: '12-Apr-2024',
     gmp: 185, gmpPct: 32.46, subscription: { qib: 48.57, snii: 9.80, bnii: 12.10, nii: 10.98, retail: 2.93, employee: null, total: 29.88 },
     applications: 940000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Telecommunications Services'
   },
   {
-    id: 109, name: 'Jyoti CNC Automation Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
+    id: 114, name: 'Jyoti CNC Automation Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
     year: 2024, priceBand: '₹315 – ₹331', minPrice: 315, maxPrice: 331, issuePrice: 331, listingPrice: 372, listingGainPct: 12.39,
     lotSize: 45, issueSizeCr: 1000.00, openDate: '09-Jan-2024', closeDate: '11-Jan-2024', listingDate: '16-Jan-2024',
     gmp: 41, gmpPct: 12.39, subscription: { qib: 44.00, snii: 35.10, bnii: 42.00, nii: 38.30, retail: 27.50, employee: null, total: 40.50 },
@@ -484,22 +519,36 @@ function generateHistoricalDeals(opts = {}) {
   const deals = [];
   const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+  const benchmark = FII_DII_ANNUAL_BENCHMARKS.find(b => b.year === yr) || { niftyEnd: 24000 };
+  const priceScale = Math.max(0.12, Math.min(1.0, (benchmark.niftyEnd || 24000) / 25500));
+
   // Generate ~120 landmark deals for that year
-  for (let i = 0; i < 120; i++) {
+  const totalCount = Math.max(120, limit || 120);
+  for (let i = 0; i < totalCount; i++) {
     const stk = HISTORICAL_STOCKS[i % HISTORICAL_STOCKS.length];
-    const client = HISTORICAL_INSTITUTIONS[i % HISTORICAL_INSTITUTIONS.length];
+    const clientCandidate = HISTORICAL_INSTITUTIONS[i % HISTORICAL_INSTITUTIONS.length];
     const h = hashString(`${yr}_deal_${i}_${stk.symbol}`);
 
     const mIdx = (h % 12);
     const day = (h % 26) + 1;
     const isoDate = `${yr}-${String(mIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const side = (h % 10 < 6) ? 'BUY' : 'SELL';
-    const dealType = (h % 3 === 0) ? 'BLOCK_DEAL' : 'BULK_DEAL';
-    const clientCategory = /LIC|SBI|HDFC|ICICI|NIPPON|KOTAK|QUANT|FRANKLIN/.test(client) ? 'DII' : 'FII';
 
-    const price = Number((stk.ltp * (1 + ((h % 20 - 10) / 1000))).toFixed(2));
-    const targetValCr = dealType === 'BLOCK_DEAL' ? 45.0 + (h % 450) : 12.0 + (h % 180);
-    const qty = Math.round((targetValCr * 10000000) / price);
+    let dealType = 'BULK_DEAL';
+    let client = clientCandidate;
+    let clientCategory = /LIC|SBI|HDFC|ICICI|NIPPON|KOTAK|QUANT|FRANKLIN/.test(client) ? 'DII' : 'FII';
+
+    if (h % 5 === 0) {
+      dealType = 'INSIDER_PROMOTER';
+      client = `${stk.name.split(' ')[0]} Promoters & Executive Trust`;
+      clientCategory = 'PROMOTER';
+    } else if (h % 3 === 0) {
+      dealType = 'BLOCK_DEAL';
+    }
+
+    const price = Number((stk.ltp * priceScale * (1 + ((h % 20 - 10) / 1000))).toFixed(2));
+    const targetValCr = dealType === 'BLOCK_DEAL' ? 45.0 + (h % 450) : (dealType === 'INSIDER_PROMOTER' ? 25.0 + (h % 250) : 12.0 + (h % 180));
+    const qty = Math.max(100, Math.round((targetValCr * 10000000) / price));
     const valueCr = Number(((qty * price) / 10000000).toFixed(2));
 
     deals.push({

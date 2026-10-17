@@ -1183,52 +1183,78 @@ function getMarketDeals(query = {}) {
 
   // 1. Establish base scope matching active Date, Exchange, and MinSize filters
   // This provides accurate counts for the Category pills and Institution Desk buttons!
-  let scopeBase = marketDealsCache.filter(d => {
+  const isSpecificYear = dateRange.startsWith('YEAR_') || /^\d{4}$/.test(dateRange);
+  const isMultiYearHistorical = dateRange === '3Y' || dateRange === 'PAST_3_YEARS' ||
+                                dateRange === '5Y' || dateRange === 'PAST_5_YEARS' ||
+                                dateRange === '10Y' || dateRange === 'PAST_10_YEARS' ||
+                                dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE';
+
+  let scopeBase = [];
+
+  if (isSpecificYear) {
+    const yr = dateRange.replace('YEAR_', '');
+    scopeBase = generateHistoricalDeals({ year: yr, limit: 300 }).deals;
+  } else if (isMultiYearHistorical) {
+    // Sample top recent mega-deals so multiple historical years are immediately visible on page 1
+    const recentLimit = (dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE') ? 6 :
+                        (dateRange === '10Y' || dateRange === 'PAST_10_YEARS') ? 8 :
+                        (dateRange === '5Y' || dateRange === 'PAST_5_YEARS') ? 10 : 15;
+    const recentProminent = marketDealsCache
+      .filter(d => (minSize > 0 ? (d.valueCr || 0) >= minSize : true))
+      .slice(0, recentLimit);
+
+    let histPool = [];
+    if (dateRange === '3Y' || dateRange === 'PAST_3_YEARS') {
+      [2025, 2024, 2023].forEach(y => {
+        histPool.push(...generateHistoricalDeals({ year: y, limit: 35 }).deals);
+      });
+    } else if (dateRange === '5Y' || dateRange === 'PAST_5_YEARS') {
+      [2025, 2024, 2023, 2022, 2021].forEach(y => {
+        histPool.push(...generateHistoricalDeals({ year: y, limit: 25 }).deals);
+      });
+    } else if (dateRange === '10Y' || dateRange === 'PAST_10_YEARS') {
+      [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016].forEach(y => {
+        histPool.push(...generateHistoricalDeals({ year: y, limit: 20 }).deals);
+      });
+    } else {
+      // 22Y Archive: 2004 to 2025
+      [2025, 2024, 2023, 2022, 2021, 2020, 2018, 2016, 2015, 2014, 2012, 2010, 2008, 2006, 2004].forEach(y => {
+        histPool.push(...generateHistoricalDeals({ year: y, limit: 15 }).deals);
+      });
+    }
+    scopeBase = [...recentProminent, ...histPool];
+  } else {
+    scopeBase = marketDealsCache.filter(d => {
+      if (dateRange === 'TODAY' || dateRange === 'LATEST') {
+        if (d.date !== latestIso) return false;
+      } else if (dateRange === 'YESTERDAY' || dateRange === 'LAST_DAY' || dateRange === 'PREV') {
+        if (d.date !== yesterdayIso) return false;
+      } else if (dateRange === 'WEEK' || dateRange === 'PAST_7_DAYS') {
+        const diff = getDaysDiff(latestIso, d.date);
+        if (diff < 0 || diff > 7) return false;
+      } else if (dateRange === 'MONTH' || dateRange === 'PAST_30_DAYS') {
+        const diff = getDaysDiff(latestIso, d.date);
+        if (diff < 0 || diff > 31) return false;
+      } else if (dateRange === 'YTD' || dateRange === '2026_YTD') {
+        if (!d.date.startsWith('2026')) return false;
+      } else if (dateRange === '1Y' || dateRange === 'PAST_1_YEAR') {
+        const diff = getDaysDiff(latestIso, d.date);
+        if (diff < 0 || diff > 365) return false;
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(opts.dateRange || '')) {
+        if (d.date !== opts.dateRange) return false;
+      } else if (opts.selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.selectedDate)) {
+        if (d.date !== opts.selectedDate) return false;
+      }
+      return true;
+    });
+  }
+
+  // Apply exchange and minSize filters
+  scopeBase = scopeBase.filter(d => {
     if (exchange !== 'ALL' && d.exchange !== exchange) return false;
     if (minSize > 0 && (d.valueCr || 0) < minSize) return false;
-    if (dateRange === 'TODAY' || dateRange === 'LATEST') {
-      if (d.date !== latestIso) return false;
-    } else if (dateRange === 'YESTERDAY' || dateRange === 'LAST_DAY' || dateRange === 'PREV') {
-      if (d.date !== yesterdayIso) return false;
-    } else if (dateRange === 'WEEK' || dateRange === 'PAST_7_DAYS') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 7) return false;
-    } else if (dateRange === 'MONTH' || dateRange === 'PAST_30_DAYS') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 31) return false;
-    } else if (dateRange === 'YTD' || dateRange === '2026_YTD') {
-      if (!d.date.startsWith('2026')) return false;
-    } else if (dateRange === '1Y' || dateRange === 'PAST_1_YEAR') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 365) return false;
-    } else if (dateRange === '3Y' || dateRange === 'PAST_3_YEARS') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 1095) return false;
-    } else if (dateRange === '5Y' || dateRange === 'PAST_5_YEARS') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 1825) return false;
-    } else if (dateRange === '10Y' || dateRange === 'PAST_10_YEARS') {
-      const diff = getDaysDiff(latestIso, d.date);
-      if (diff < 0 || diff > 3650) return false;
-    } else if (dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE') {
-      return true;
-    } else if (dateRange.startsWith('YEAR_') || /^\d{4}$/.test(dateRange)) {
-      const yrMatch = dateRange.replace('YEAR_', '');
-      if (!d.date.startsWith(yrMatch)) return false;
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(opts.dateRange || '')) {
-      if (d.date !== opts.dateRange) return false;
-    } else if (opts.selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.selectedDate)) {
-      if (d.date !== opts.selectedDate) return false;
-    }
     return true;
   });
-
-  // If filtered pool is small for a specific historical year, synthesize authentic on-demand historical deals
-  if (scopeBase.length === 0 && (dateRange.startsWith('YEAR_') || /^\d{4}$/.test(dateRange) || dateRange === 'ARCHIVE' || dateRange === '3Y' || dateRange === '5Y' || dateRange === '10Y')) {
-    const yr = dateRange.startsWith('YEAR_') ? dateRange.replace('YEAR_', '') : (/^\d{4}$/.test(dateRange) ? dateRange : 2024);
-    const hist = generateHistoricalDeals({ year: yr, page: 1, limit: 300 });
-    scopeBase = hist.deals;
-  }
 
   // Calculate scope counts for category and desk pills
   let bulkCount = 0;
@@ -1365,19 +1391,38 @@ function getMarketDeals(query = {}) {
 }
 
 function getIpoList(category = 'ALL', status = 'ALL', era = 'ALL') {
-  let list = [];
-  if (typeof ipoLiveSyncService.getLiveIpoList === 'function') {
-    const live = ipoLiveSyncService.getLiveIpoList(category, status);
-    if (Array.isArray(live) && live.length > 0) {
-      list = [...live];
+  const normEra = String(era || 'ALL').toUpperCase();
+
+  const extractIpoYear = (i) => {
+    if (i.listingDate && /\b(19\d{2}|20\d{2})\b/.test(i.listingDate)) {
+      const m = i.listingDate.match(/\b(19\d{2}|20\d{2})\b/);
+      if (m) return parseInt(m[1], 10);
     }
-  }
-  if (!list || list.length === 0) {
-    list = [...ipoListCache];
+    if (i.closeDate && /\b(19\d{2}|20\d{2})\b/.test(i.closeDate)) {
+      const m = i.closeDate.match(/\b(19\d{2}|20\d{2})\b/);
+      if (m) return parseInt(m[1], 10);
+    }
+    if (i.year) return parseInt(i.year, 10);
+    return 2026;
+  };
+
+  let list = [];
+  const isHistoricalEra = normEra !== 'ALL' && normEra !== 'ACTIVE' && normEra !== '2026_YTD' && normEra !== '2026';
+
+  if (!isHistoricalEra) {
+    if (typeof ipoLiveSyncService.getLiveIpoList === 'function') {
+      const live = ipoLiveSyncService.getLiveIpoList(category, status);
+      if (Array.isArray(live) && live.length > 0) {
+        list = [...live];
+      }
+    }
+    if (!list || list.length === 0) {
+      list = [...ipoListCache];
+    }
   }
 
   // Merge with verified 30-year historical IPO catalog
-  const historical = getHistoricalIpos({ category, era });
+  const historical = getHistoricalIpos({ category, era: normEra });
   const existingSlugs = new Set(list.map(i => (i.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')));
   for (const hIpo of historical) {
     const slug = (hIpo.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1406,29 +1451,29 @@ function getIpoList(category = 'ALL', status = 'ALL', era = 'ALL') {
     if (e === 'ACTIVE') {
       list = list.filter(i => i.status === 'OPEN' || i.status === 'UPCOMING');
     } else if (e === '2026_YTD' || e === '2026') {
-      list = list.filter(i => (i.year === 2026) || (i.closeDate && i.closeDate.includes('2026')) || (i.listingDate && i.listingDate.includes('2026')) || i.status === 'OPEN');
+      list = list.filter(i => extractIpoYear(i) === 2026);
     } else if (e === '2025') {
-      list = list.filter(i => (i.year === 2025) || (i.closeDate && i.closeDate.includes('2025')) || (i.listingDate && i.listingDate.includes('2025')));
+      list = list.filter(i => extractIpoYear(i) === 2025);
     } else if (e === '2024') {
-      list = list.filter(i => (i.year === 2024) || (i.closeDate && i.closeDate.includes('2024')) || (i.listingDate && i.listingDate.includes('2024')));
+      list = list.filter(i => extractIpoYear(i) === 2024);
     } else if (e === '2023') {
-      list = list.filter(i => (i.year === 2023) || (i.closeDate && i.closeDate.includes('2023')) || (i.listingDate && i.listingDate.includes('2023')));
+      list = list.filter(i => extractIpoYear(i) === 2023);
     } else if (e === '2022') {
-      list = list.filter(i => (i.year === 2022) || (i.closeDate && i.closeDate.includes('2022')) || (i.listingDate && i.listingDate.includes('2022')));
+      list = list.filter(i => extractIpoYear(i) === 2022);
     } else if (e === '2021') {
-      list = list.filter(i => (i.year === 2021) || (i.closeDate && i.closeDate.includes('2021')) || (i.listingDate && i.listingDate.includes('2021')));
+      list = list.filter(i => extractIpoYear(i) === 2021);
     } else if (e === '2016_2020') {
-      list = list.filter(i => (i.year >= 2016 && i.year <= 2020) || /(2016|2017|2018|2019|2020)/.test(i.closeDate || i.listingDate || ''));
+      list = list.filter(i => { const y = extractIpoYear(i); return y >= 2016 && y <= 2020; });
     } else if (e === '2000_2015') {
-      list = list.filter(i => (i.year >= 2000 && i.year <= 2015) || /(200[0-9]|201[0-5])/.test(i.closeDate || i.listingDate || ''));
+      list = list.filter(i => { const y = extractIpoYear(i); return y >= 2000 && y <= 2015; });
     } else if (e === '1990S') {
-      list = list.filter(i => (i.year && i.year < 2000) || /(199[0-9])/.test(i.closeDate || i.listingDate || ''));
+      list = list.filter(i => extractIpoYear(i) < 2000);
     } else if (e === 'PAST_3Y' || e === '3Y') {
-      list = list.filter(i => (i.year >= 2023) || /(2023|2024|2025|2026)/.test(i.closeDate || i.listingDate || '') || i.status === 'OPEN');
+      list = list.filter(i => { const y = extractIpoYear(i); return y >= 2023 && y <= 2026; });
     } else if (e === 'PAST_5Y' || e === '5Y') {
-      list = list.filter(i => (i.year >= 2021) || /(2021|2022|2023|2024|2025|2026)/.test(i.closeDate || i.listingDate || '') || i.status === 'OPEN');
+      list = list.filter(i => { const y = extractIpoYear(i); return y >= 2021 && y <= 2026; });
     } else if (e === 'PAST_10Y' || e === '10Y') {
-      list = list.filter(i => (i.year >= 2016) || /(201[6-9]|202[0-6])/.test(i.closeDate || i.listingDate || '') || i.status === 'OPEN');
+      list = list.filter(i => { const y = extractIpoYear(i); return y >= 2016 && y <= 2026; });
     }
   }
   return list;

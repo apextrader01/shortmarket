@@ -319,6 +319,39 @@ function formatSubVal(val) {
   return num.toFixed(2);
 }
 
+function parseIpoTimestamp(ipo) {
+  if (!ipo) return 0;
+  const dStr = ipo.closeDate || ipo.listingDate || ipo.openDate || '';
+  if (!dStr) return 0;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dStr)) return new Date(dStr).getTime();
+  const parts = String(dStr).trim().split(/[- /]/);
+  if (parts.length === 3) {
+    const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const day = parseInt(parts[0], 10);
+    const m = months[parts[1].toLowerCase().slice(0, 3)];
+    let yr = parseInt(parts[2], 10);
+    if (yr < 100) yr += 2000;
+    if (!isNaN(day) && m !== undefined && !isNaN(yr)) {
+      return new Date(Date.UTC(yr, m, day)).getTime();
+    }
+  }
+  const parsed = Date.parse(dStr);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function getSafeListingGain(ipo) {
+  let g = ipo.listingGainPct;
+  if (g === null || g === undefined || isNaN(g)) {
+    if (ipo.listingPrice && (ipo.issuePrice || ipo.maxPrice)) {
+      const base = Number(ipo.issuePrice || ipo.maxPrice);
+      if (base > 0) {
+        g = Number((((ipo.listingPrice - base) / base) * 100).toFixed(2));
+      }
+    }
+  }
+  return (g === null || g === undefined || isNaN(g)) ? 0 : Number(g);
+}
+
 export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrading, onOpenLeaderboard }) {
   const [activeTab, setActiveTab] = useState(() => resolvePrimaryMarketTab(initialTab));
   const [bhavcopyData, setBhavcopyData] = useState(SEED_BHAVCOPY_DATA);
@@ -764,7 +797,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     list.sort((a, b) => {
       const dir = ipoSortDir === 'ASC' ? 1 : -1;
       if (ipoSortCol === 'name') return a.name.localeCompare(b.name) * dir;
-      if (ipoSortCol === 'closeDate') return String(a.closeDate || '').localeCompare(String(b.closeDate || '')) * dir;
+      if (ipoSortCol === 'closeDate' || ipoSortCol === 'date') return (parseIpoTimestamp(a) - parseIpoTimestamp(b)) * dir;
       if (ipoSortCol === 'issueSizeCr') return ((a.issueSizeCr || 0) - (b.issueSizeCr || 0)) * dir;
       if (ipoSortCol === 'applications') return ((a.applications || 0) - (b.applications || 0)) * dir;
       if (ipoSortCol === 'gmpPct') return ((a.gmpPct || 0) - (b.gmpPct || 0)) * dir;
@@ -2648,14 +2681,20 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
                           <td style={{ padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
                             {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
-                              <>
-                                <div style={{ fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
-                                  {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} Gain
-                                </div>
-                                <div style={{ fontSize: '10px', color: t.textMuted }}>
-                                  List: ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
-                                </div>
-                              </>
+                              (() => {
+                                const gain = getSafeListingGain(ipo);
+                                const isPos = gain >= 0;
+                                return (
+                                  <>
+                                    <div style={{ fontWeight: '800', color: isPos ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
+                                      {gain > 0 ? `+${gain.toFixed(2)}%` : `${gain.toFixed(2)}%`} Gain
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: t.textMuted }}>
+                                      List: ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
+                                    </div>
+                                  </>
+                                );
+                              })()
                             ) : (
                               <>
                                 <div style={{ fontWeight: '800', color: isLight ? '#15803d' : '#22c55e' }}>+₹{ipo.gmp} ({ipo.gmpPct}%)</div>
@@ -2732,22 +2771,28 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                       </div>
 
                       {(ipo.status === 'LISTED' || ipo.status === 'CLOSED') ? (
-                        <div style={{
-                          background: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.09)') : (isLight ? '#fef2f2' : 'rgba(239,68,68,0.09)'),
-                          border: `1px solid ${(ipo.listingGainPct || 0) >= 0 ? (isLight ? '#bbf7d0' : 'rgba(34,197,94,0.28)') : (isLight ? '#fecaca' : 'rgba(239,68,68,0.28)')}`,
-                          padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                        }}>
-                          <div>
-                            <div style={{ fontSize: '11px', color: t.textMuted }}>Official Listing Gain &amp; Price</div>
-                            <div style={{ fontSize: '15px', fontWeight: '800', color: (ipo.listingGainPct || 0) >= 0 ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
-                              {(ipo.listingGainPct || 0) >= 0 ? `+${ipo.listingGainPct}%` : `${ipo.listingGainPct}%`} • Listed at ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
+                        (() => {
+                          const gain = getSafeListingGain(ipo);
+                          const isPos = gain >= 0;
+                          return (
+                            <div style={{
+                              background: isPos ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.09)') : (isLight ? '#fef2f2' : 'rgba(239,68,68,0.09)'),
+                              border: `1px solid ${isPos ? (isLight ? '#bbf7d0' : 'rgba(34,197,94,0.28)') : (isLight ? '#fecaca' : 'rgba(239,68,68,0.28)')}`,
+                              padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                            }}>
+                              <div>
+                                <div style={{ fontSize: '11px', color: t.textMuted }}>Official Listing Gain &amp; Price</div>
+                                <div style={{ fontSize: '15px', fontWeight: '800', color: isPos ? (isLight ? '#15803d' : '#22c55e') : '#ef4444' }}>
+                                  {gain > 0 ? `+${gain.toFixed(2)}%` : `${gain.toFixed(2)}%`} • Listed at ₹{ipo.listingPrice || ipo.estListingPrice || ipo.maxPrice}
+                                </div>
+                                <div style={{ fontSize: '10.5px', color: t.textSecondary, marginTop: '2px' }}>
+                                  Issue Price: ₹{ipo.issuePrice || ipo.maxPrice} • Lot Gain: ₹{Math.round(((ipo.listingPrice || ipo.maxPrice) - (ipo.issuePrice || ipo.maxPrice)) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                              <Award size={22} color={isPos ? '#22c55e' : '#ef4444'} />
                             </div>
-                            <div style={{ fontSize: '10.5px', color: t.textSecondary, marginTop: '2px' }}>
-                              Issue Price: ₹{ipo.issuePrice || ipo.maxPrice} • Lot Gain: ₹{Math.round(((ipo.listingPrice || ipo.maxPrice) - (ipo.issuePrice || ipo.maxPrice)) * (ipo.lotSize || 1)).toLocaleString('en-IN')}
-                            </div>
-                          </div>
-                          <Award size={22} color={(ipo.listingGainPct || 0) >= 0 ? '#22c55e' : '#ef4444'} />
-                        </div>
+                          );
+                        })()
                       ) : (
                         <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.08)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.25)', padding: '10px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div>

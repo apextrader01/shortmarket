@@ -1014,7 +1014,7 @@
       "allotmentDate": "05-Oct-2026",
       "listingDate": "07-Oct-2026",
       "listingPrice": 89,
-      "listingGainPct": null,
+      "listingGainPct": 0.0,
       "gmp": 0,
       "gmpPct": 0,
       "subscription": {
