@@ -8,7 +8,7 @@ import {
   ExternalLink, Search, Filter, ShieldCheck, Sparkles, BarChart2,
   Calendar, Layers, CheckCircle2, ChevronRight, RefreshCw, Award,
   Flame, Snowflake, Zap, AlertTriangle, Copy, Check, SlidersHorizontal,
-  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown, Trophy, Moon, Sun
+  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown, Trophy, Moon, Sun, Clock
 } from 'lucide-react';
 import { API, useStore } from '../store';
 import logoImg from '../assets/logo.png';
@@ -501,6 +501,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [ipoViewMode, setIpoViewMode] = useState('SUBSCRIPTION_TABLE');
   const [ipoCategory, setIpoCategory] = useState('ALL');
   const [ipoStatusFilter, setIpoStatusFilter] = useState('ALL');
+  const [ipoEraFilter, setIpoEraFilter] = useState('ALL');
   const [ipoSearch, setIpoSearch] = useState('');
   const [ipoSortCol, setIpoSortCol] = useState('closeDate');
   const [ipoSortDir, setIpoSortDir] = useState('DESC');
@@ -638,10 +639,13 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     dealsSortBy, dealsSortDir, dealsColFilter
   ]);
 
-  const fetchIposList = useCallback(async (manual = false) => {
+  const fetchIposList = useCallback(async (manual = false, era = ipoEraFilter) => {
     if (manual) setIsRefreshingIpo(true);
     try {
-      const res = await fetch(`${API}/api/ipos`).then(r => r.ok ? r.json() : null).catch(() => null);
+      const params = new URLSearchParams();
+      if (era && era !== 'ALL') params.append('era', era);
+      const url = `${API}/api/ipos${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
       if (res?.ipos && Array.isArray(res.ipos) && res.ipos.length > 0) {
         setIpoData(res.ipos);
         if (res.lastUpdated) setIpoLastUpdated(res.lastUpdated);
@@ -651,7 +655,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     } finally {
       if (manual) setTimeout(() => setIsRefreshingIpo(false), 500);
     }
-  }, []);
+  }, [ipoEraFilter]);
 
   const fetchPrimaryMarketData = async () => {
     setLoading(true);
@@ -918,11 +922,18 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
     : DEFAULT_RECENT_TRADING_DAYS;
 
   const activeDateHeaderLabel = useMemo(() => {
-    if (dealsDateRange === 'ALL') return 'All Rolling 30 Days';
+    if (dealsDateRange === 'ALL') return 'Recent 30 Days';
     if (dealsDateRange === 'TODAY') return `Today (${latestDealBadge} EOD)`;
     if (dealsDateRange === 'YESTERDAY') return `Yesterday (${yesterdayDealBadge} EOD)`;
     if (dealsDateRange === 'WEEK') return 'Past 7 Days';
     if (dealsDateRange === 'MONTH') return 'Past 30 Days';
+    if (dealsDateRange === 'YTD') return '2026 Year-to-Date';
+    if (dealsDateRange === '1Y') return 'Past 1 Year';
+    if (dealsDateRange === '3Y') return 'Past 3 Years';
+    if (dealsDateRange === '5Y') return 'Past 5 Years';
+    if (dealsDateRange === '10Y') return 'Past 10 Years';
+    if (dealsDateRange === 'ALL_TIME') return '22-Year Deals Archive (2004–2026)';
+    if (dealsDateRange.startsWith('YEAR_')) return `Year ${dealsDateRange.replace('YEAR_', '')} Archive`;
     if (/^\d{4}-\d{2}-\d{2}$/.test(dealsDateRange)) {
       return `${formatDateBadge(dealsDateRange)} EOD`;
     }
@@ -1805,11 +1816,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Date:</span>
                 {[
-                  { id: 'ALL', label: 'All Dates' },
+                  { id: 'ALL', label: 'Recent (30D)' },
                   { id: 'TODAY', label: `Today (${latestDealBadge})` },
                   { id: 'YESTERDAY', label: `Yesterday (${yesterdayDealBadge})` },
-                  { id: 'WEEK', label: 'Past 7 Days' },
-                  { id: 'MONTH', label: 'Past 30 Days' }
+                  { id: 'WEEK', label: 'Past 7D' },
+                  { id: 'YTD', label: '2026 YTD' },
+                  { id: '1Y', label: '1 Year' },
+                  { id: '3Y', label: '3 Years' },
+                  { id: '5Y', label: '5 Years' },
+                  { id: '10Y', label: '10 Years' },
+                  { id: 'ALL_TIME', label: '22Y Archive' }
                 ].map(dt => (
                   <button
                     key={dt.id}
@@ -1825,6 +1841,24 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                     {dt.label}
                   </button>
                 ))}
+
+                <select
+                  value={dealsDateRange.startsWith('YEAR_') ? dealsDateRange.replace('YEAR_', '') : ''}
+                  onChange={(e) => {
+                    if (e.target.value) setDealsDateRange(`YEAR_${e.target.value}`);
+                    else setDealsDateRange('ALL');
+                  }}
+                  style={{
+                    padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '600',
+                    background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.text,
+                    cursor: 'pointer', outline: 'none'
+                  }}
+                >
+                  <option value="">Year...</option>
+                  {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2012, 2010, 2008, 2005, 2004].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -2269,6 +2303,47 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   <LayoutGrid size={14} /> 🗂️ GMP &amp; Allotment Cards
                 </button>
               </div>
+            </div>
+
+            {/* 🧭 Era & 30-Year Historical Timeline Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
+              <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={12} color="#3b82f6" /> Timeline:
+              </span>
+              {[
+                { id: 'ALL', label: 'All Issues' },
+                { id: 'ACTIVE', label: '🟢 Live / Pipeline' },
+                { id: '2026_YTD', label: '2026 YTD' },
+                { id: '2025', label: '2025' },
+                { id: '2024', label: '2024' },
+                { id: '2023', label: '2023' },
+                { id: '3Y', label: '3 Years' },
+                { id: '5Y', label: '5 Years' },
+                { id: '10Y', label: '10 Years' },
+                { id: 'ARCHIVE_30Y', label: '30Y Archive (1996-2026)' }
+              ].map(era => {
+                const isSel = ipoEraFilter === era.id;
+                return (
+                  <button
+                    key={era.id}
+                    type="button"
+                    onClick={() => {
+                      setIpoEraFilter(era.id);
+                      fetchIposList(false, era.id);
+                    }}
+                    style={{
+                      padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                      background: isSel ? '#3b82f6' : t.pillInactiveBg,
+                      color: isSel ? '#ffffff' : t.textSecondary,
+                      border: isSel ? '1px solid #2563eb' : `1px solid ${t.cardBorder}`,
+                      boxShadow: isSel ? '0 2px 5px rgba(59,130,246,0.3)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {era.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>

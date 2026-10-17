@@ -7541,7 +7541,7 @@ app.get('/api/market-deals', apiLimiter, (req, res) => {
 app.get('/api/primary-markets/smart-money', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200');
-    const data = primaryMarketsService.getSmartMoneyPulse();
+    const data = primaryMarketsService.getSmartMoneyPulse(req.query);
     res.json({ success: true, ...data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -7571,7 +7571,11 @@ app.get('/api/primary-markets/screener', apiLimiter, (req, res) => {
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
-    const list = primaryMarketsService.getIpoList(req.query.category || 'ALL', req.query.status || 'ALL');
+    const list = primaryMarketsService.getIpoList(
+      req.query.category || 'ALL',
+      req.query.status || 'ALL',
+      req.query.era || req.query.year || req.query.timeline || 'ALL'
+    );
     const lastUpdated = typeof primaryMarketsService.getIpoLastUpdatedDisplay === 'function'
       ? primaryMarketsService.getIpoLastUpdatedDisplay()
       : 'Live Market Synced';
