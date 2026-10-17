@@ -10,7 +10,7 @@ import {
   Copy, Check, Landmark, Building, Info, FileText, Zap, Award, BarChart3, ShieldCheck, Scale, Calendar,
   Moon, Sun
 } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 
 export default function WealthPersonalFinanceModal({
   isOpen = true,

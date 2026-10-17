@@ -13,7 +13,7 @@ import {
   Sliders, Target, Play, Sun, Moon
 } from 'lucide-react';
 import { useSocialLinks } from '../utils/socialLinks';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 import FeatureTourModal from './FeatureTourModal';
 
 export default function LandingHomeView({

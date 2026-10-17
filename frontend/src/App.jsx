@@ -1,13 +1,12 @@
 import { registerServiceWorker } from './services/pushManager';
 import React, { useEffect, useState, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
-import MarketWatch from './components/MarketWatch';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { playTargetHitSound } from './utils/soundManager';
 import { applyDynamicSEO } from './utils/seoEngine';
 import { useSocialLinks } from './utils/socialLinks';
-import logoImg from './assets/logo.png';
+import logoImg from './assets/logo.webp';
 
 // ⚡ Resilient Lazy Loader: Auto-reloads on deployment chunk hash changes
 const lazyWithRetry = (importFn) => lazy(async () => {
@@ -32,6 +31,7 @@ const lazyWithRetry = (importFn) => lazy(async () => {
 });
 
 // ⚡ Lazy Loaded Dashboard Views for Sub-2s Mobile LCP & Fast Initial Paint
+const MarketWatch = lazyWithRetry(() => import('./components/MarketWatch'));
 const ChartWidget = lazyWithRetry(() => import('./components/ChartWidget'));
 const PositionsView = lazyWithRetry(() => import('./components/PositionsView'));
 const OrdersView = lazyWithRetry(() => import('./components/OrdersView'));
@@ -1999,14 +1999,16 @@ function App() {
 
           <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
             {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'Community', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal', 'Options'].includes(activeTab) && (
-              <MarketWatch 
-                className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
-                onStockSelect={(sym) => {
-                  if (window.innerWidth <= 768) {
-                    useStore.getState().setMobileStockOverviewSymbol(sym || selectedSymbol);
-                  }
-                }}
-              />
+              <Suspense fallback={<TabLoader />}>
+                <MarketWatch 
+                  className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
+                  onStockSelect={(sym) => {
+                    if (window.innerWidth <= 768) {
+                      useStore.getState().setMobileStockOverviewSymbol(sym || selectedSymbol);
+                    }
+                  }}
+                />
+              </Suspense>
             )}
             <div className={`main-content ${(activeTab === 'Watchlist' || activeTab === 'Markets') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
               <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>

@@ -62,7 +62,7 @@ import {
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import { triggerPreExitAd } from './AdBannerWidget';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 
 // Helper: Calculate approx binary size in KB of a data URL
 export const getImageSizeKb = (dataUrl) => {

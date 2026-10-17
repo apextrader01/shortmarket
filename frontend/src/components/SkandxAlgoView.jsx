@@ -6,7 +6,7 @@ import { useStore, API } from '../store';
 import AlgoPaymentGatewayModal from './AlgoPaymentGatewayModal';
 import DeployAlgoModal from './DeployAlgoModal';
 import { useSocialLinks } from '../utils/socialLinks';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 import {
   X, Layers, ShieldCheck, Zap, Copy, RefreshCw, Send, CheckCircle2,
   AlertTriangle, Users, Cpu, Server, Wifi, Globe,

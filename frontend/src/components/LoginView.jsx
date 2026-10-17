@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Eye, EyeOff } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 import { safeParseJsonResponse, formatAuthErrorMessage } from '../utils/apiHelper';
 
 const googleProvider = new GoogleAuthProvider();
@@ -1261,7 +1261,7 @@ export default function LoginView() {
         <div className="login-visual-bg"></div>
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="logo-text-premium" style={{ marginBottom: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src={logoImg} alt="SkandX" style={{ width: '38px', height: '38px', borderRadius: '10px', boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)' }} />
+            <img src={logoImg} alt="SkandX" width="38" height="38" style={{ width: '38px', height: '38px', borderRadius: '10px', boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)' }} />
             <span>Skand<span>X</span></span>
           </div>
           <div>
@@ -1315,7 +1315,7 @@ export default function LoginView() {
       <div className="login-form-panel">
         <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
-            <img src={logoImg} alt="SkandX" style={{ width: '36px', height: '36px', borderRadius: '9px', boxShadow: '0 0 14px rgba(56, 189, 248, 0.45)' }} />
+            <img src={logoImg} alt="SkandX" width="36" height="36" fetchpriority="high" style={{ width: '36px', height: '36px', borderRadius: '9px', boxShadow: '0 0 14px rgba(56, 189, 248, 0.45)' }} />
             <span>Skand<span>X</span></span>
           </div>
           <div style={{ fontSize: '13px', fontWeight: '600', color: '#38bdf8' }}>

@@ -12,7 +12,7 @@ import {
   Plus, ShoppingCart
 } from 'lucide-react';
 import { API, useStore } from '../store';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 import MarketScreenerTab from './MarketScreenerTab';
 import SmartMoneyTab from './SmartMoneyTab';
 import CorporateCalendarTab from './CorporateCalendarTab';

@@ -10,7 +10,7 @@ import {
   BarChart2, Award, Clock, ChevronRight, Search, Sliders, ExternalLink, Share2, Printer,
   Moon, Sun
 } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 
 // ============================================================================
 // CALCULATOR DEFINITIONS & CATALOG DATA (Matching Fyers Directory)

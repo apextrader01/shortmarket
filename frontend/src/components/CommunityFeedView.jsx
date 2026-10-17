@@ -9,7 +9,7 @@ import {
   Send, ArrowLeft, Layers, RefreshCw, Infinity as InfinityIcon,
   Bookmark, Copy
 } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp';
 
 /**
  * ⚡ Browser-Side Adaptive 50MB -> ~40KB WebP Compressor
