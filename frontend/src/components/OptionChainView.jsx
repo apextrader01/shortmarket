@@ -212,7 +212,7 @@ const OptionChainViewInternal = () => {
 
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
   const [showGreeks, setShowGreeks] = useState(true);
-  const [strikeRange, setStrikeRange] = useState('ALL');
+  const [strikeRange, setStrikeRange] = useState('15');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -372,9 +372,10 @@ const OptionChainViewInternal = () => {
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
     let span = 15;
-    if (strikeRange === '10') span = 5;
-    else if (strikeRange === '20') span = 10;
-    else if (strikeRange === 'ALL') span = 20;
+    if (strikeRange === '10') span = 10;
+    else if (strikeRange === '15') span = 15;
+    else if (strikeRange === '20') span = 20;
+    else if (strikeRange === 'ALL') span = allStrikes.length;
     const startIndex = Math.max(0, atmIndex - span);
     const endIndex = Math.min(allStrikes.length - 1, atmIndex + span);
     return allStrikes.slice(startIndex, endIndex + 1);
@@ -907,7 +908,7 @@ const OptionChainViewInternal = () => {
           </button>
 
           <div className="option-chain-range-group">
-            {['10', '20', 'ALL'].map(rng => (
+            {['10', '15', '20', 'ALL'].map(rng => (
               <button
                 key={rng}
                 type="button"
