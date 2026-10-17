@@ -1029,9 +1029,9 @@ export default function LoginView() {
     };
   }, [activeOauthState, appMode, isInApp, consumeOauthIdToken, applyCompletedOauthSession, clearPendingOauthStorage]);
 
-  // Initialize Google Identity Services (GIS) — Desktop & Non-WebView FedCM One-Tap
+  // Initialize Google Identity Services (GIS) — Desktop Only (Mobile uses direct OAuth redirect)
   useEffect(() => {
-    if (typeof window === 'undefined' || isCapacitorOrWebView) return;
+    if (typeof window === 'undefined' || isCapacitorOrWebView || isMobileBrowser) return;
 
     const initGis = () => {
       if (window.google?.accounts?.id) {
@@ -1068,7 +1068,7 @@ export default function LoginView() {
         script.addEventListener('load', () => initGis(), { once: true });
       }
     }
-  }, [handleGoogleCredentialResponse, isCapacitorOrWebView]);
+  }, [handleGoogleCredentialResponse, isCapacitorOrWebView, isMobileBrowser]);
 
   // Render Google Identity Services Button — Desktop Only
   useEffect(() => {
