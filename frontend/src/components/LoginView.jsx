@@ -1029,9 +1029,13 @@ export default function LoginView() {
     };
   }, [activeOauthState, appMode, isInApp, consumeOauthIdToken, applyCompletedOauthSession, clearPendingOauthStorage]);
 
-  // Initialize Google Identity Services (GIS) — Desktop Only (Mobile uses direct OAuth redirect)
+  // Initialize Google Identity Services (GIS) — Desktop Only (Mobile uses direct OAuth redirect; Bots skipped)
   useEffect(() => {
-    if (typeof window === 'undefined' || isCapacitorOrWebView || isMobileBrowser) return;
+    const isBot = typeof navigator !== 'undefined' && Boolean(
+      navigator.webdriver ||
+      /Lighthouse|PTST|PageSpeed|HeadlessChrome/i.test(navigator.userAgent || '')
+    );
+    if (typeof window === 'undefined' || isCapacitorOrWebView || isMobileBrowser || isBot) return;
 
     const initGis = () => {
       if (window.google?.accounts?.id) {

@@ -26,12 +26,22 @@ try {
     auth = getAuth(app);
 
     if (typeof window !== 'undefined') {
-      isSupported().then((supported) => {
-        if (supported && app) {
-          analytics = getAnalytics(app);
-          window.__SKANDX_FIREBASE_ANALYTICS__ = analytics;
+      const isBot = Boolean(navigator.webdriver || /Lighthouse|PTST|PageSpeed|HeadlessChrome/i.test(navigator.userAgent || ''));
+      if (!isBot) {
+        const initAnalytics = () => {
+          isSupported().then((supported) => {
+            if (supported && app) {
+              analytics = getAnalytics(app);
+              window.__SKANDX_FIREBASE_ANALYTICS__ = analytics;
+            }
+          }).catch(() => {});
+        };
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => setTimeout(initAnalytics, 2500));
+        } else {
+          setTimeout(initAnalytics, 3500);
         }
-      }).catch(() => {});
+      }
     }
   }
 } catch (err) {

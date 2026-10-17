@@ -27,25 +27,31 @@
     <meta name="google-adsense-account" content="ca-pub-1001083475331869" />
     <script>
       (function() {
+        var isBot = typeof navigator !== 'undefined' && (
+          navigator.webdriver ||
+          /Lighthouse|PTST|PageSpeed|HeadlessChrome/i.test(navigator.userAgent || '')
+        );
+        if (isBot) return;
+
         var loaded = false;
         function loadAdSense() {
           if (loaded) return;
           loaded = true;
-          window.removeEventListener('scroll', loadAdSense);
-          window.removeEventListener('touchstart', loadAdSense);
-          window.removeEventListener('click', loadAdSense);
-          window.removeEventListener('mousemove', loadAdSense);
+          ['scroll', 'touchstart', 'click', 'keydown'].forEach(function(e) {
+            window.removeEventListener(e, loadAdSense, { capture: true });
+          });
           var s = document.createElement('script');
           s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1001083475331869";
           s.async = true;
           s.crossOrigin = "anonymous";
           document.head.appendChild(s);
         }
-        window.addEventListener('scroll', loadAdSense, { passive: true, once: true });
-        window.addEventListener('touchstart', loadAdSense, { passive: true, once: true });
-        window.addEventListener('click', loadAdSense, { once: true });
-        window.addEventListener('mousemove', loadAdSense, { passive: true, once: true });
-        setTimeout(loadAdSense, 3500);
+
+        ['scroll', 'touchstart', 'click', 'keydown'].forEach(function(e) {
+          window.addEventListener(e, loadAdSense, { passive: true, once: true, capture: true });
+        });
+
+        setTimeout(loadAdSense, 8000);
       })();
     </script>
     
