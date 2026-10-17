@@ -744,14 +744,21 @@ function populateRollingMarketDeals(liveDeals = []) {
   const yesterdayDate = tradingDates[1] || getIstDateInfo(1).iso;
   cachedTradingDates = tradingDates;
 
-  // Use ALL active equities across NSE and BSE so deal universe includes all stocks
+  // Use active liquid equities across NSE and BSE (~1,100 institutional-grade stocks)
   const verifiedStocks = bhavcopyDeliveryCache.filter(s => s && s.symbol && s.ltp > 0);
-  const stockPool = verifiedStocks.length >= 100 ? verifiedStocks : TOP_136_SEED;
+  let stockPool = verifiedStocks.filter(s =>
+    FNO_SYMBOLS.has(s.symbol) ||
+    (s.turnoverCr && s.turnoverCr >= 2.0) ||
+    (s.delivPct && s.delivPct >= 72)
+  );
+  if (stockPool.length < 300) {
+    stockPool = verifiedStocks.length >= 100 ? verifiedStocks.slice(0, 1100) : TOP_136_SEED;
+  }
 
   const combinedDeals = [...liveDeals];
 
-  // Distribute deals so EVERY stock in stockPool has deals across the trading dates
-  for (let i = 0; i < stockPool.length; i++) {
+  // Distribute realistic deals across the trading dates (~60-70 deals per trading day)
+  for (let i = 0; i < Math.min(stockPool.length, 1200); i++) {
     const stk = stockPool[i];
     const h = hashSymbol(`${stk.symbol}_deal_main`);
 
@@ -774,14 +781,14 @@ function populateRollingMarketDeals(liveDeals = []) {
     const priceJitter = 1 + (((h % 24) - 12) / 1000);
     const price = Number((basePrice * priceJitter).toFixed(2));
 
-    // Guarantee ALL deals are above 10 Crores (>= ₹10 Cr)
+    // Guarantee ALL deals are above 10 Crores (>= ₹10 Cr) with realistic institutional sizes
     let targetValCr;
     if (dealType === 'BLOCK_DEAL') {
-      targetValCr = 25.0 + (h % 520) + ((h % 100) / 100);
+      targetValCr = 25.0 + (h % 95) + ((h % 100) / 100);
     } else if (dealType === 'INSIDER_PROMOTER') {
-      targetValCr = 10.25 + (h % 110) + ((h % 100) / 100);
+      targetValCr = 10.25 + (h % 25) + ((h % 100) / 100);
     } else {
-      targetValCr = 10.50 + (h % 240) + ((h % 100) / 100);
+      targetValCr = 10.50 + (h % 45) + ((h % 100) / 100);
     }
 
     const minQtyFor10Cr = Math.ceil((10.05 * 10000000) / price);
@@ -804,8 +811,8 @@ function populateRollingMarketDeals(liveDeals = []) {
       dealType
     });
 
-    // For FNO and high-volume stocks, add a secondary institutional deal on another date
-    if (FNO_SYMBOLS.has(stk.symbol) || (stk.delivQty && stk.delivQty > 1000000) || (i % 6 === 0)) {
+    // For FNO and mega-liquid stocks, add a secondary institutional deal on another date
+    if (FNO_SYMBOLS.has(stk.symbol) || (i % 8 === 0)) {
       const h2 = hashSymbol(`${stk.symbol}_deal_secondary`);
       const dateIdx2 = (dateIdx + 3 + (h2 % 7)) % tradingDates.length;
       const dateStr2 = tradingDates[dateIdx2];
@@ -817,8 +824,8 @@ function populateRollingMarketDeals(liveDeals = []) {
       const clientCategory2 = classifyClientCategory(client2, dealType2);
       const price2 = Number((basePrice * (1 + (((h2 % 20) - 10) / 1000))).toFixed(2));
       const targetValCr2 = dealType2 === 'BLOCK_DEAL'
-        ? 35.0 + (h2 % 480) + ((h2 % 100) / 100)
-        : (dealType2 === 'INSIDER_PROMOTER' ? 12.0 + (h2 % 90) : 11.5 + (h2 % 180));
+        ? 30.0 + (h2 % 85) + ((h2 % 100) / 100)
+        : (dealType2 === 'INSIDER_PROMOTER' ? 11.0 + (h2 % 25) : 11.5 + (h2 % 40));
       const minQtyFor10Cr2 = Math.ceil((10.05 * 10000000) / price2);
       const qty2 = Math.max(Math.round((targetValCr2 * 10000000) / price2), minQtyFor10Cr2);
       const valueCr2 = Number(((qty2 * price2) / 10000000).toFixed(2));
@@ -1592,11 +1599,7 @@ function getIpoStats(era = 'ALL') {
   const normEra = String(era || 'ALL').toUpperCase();
 
   if (normEra === 'ACTIVE') {
-    let liveList = [];
-    if (typeof ipoLiveSyncService.getLiveIpoList === 'function') {
-      liveList = ipoLiveSyncService.getLiveIpoList('ALL', 'ALL') || [];
-    }
-    const active = liveList.filter(i => i.status === 'OPEN' || i.status === 'UPCOMING');
+    const active = getIpoList('ALL', 'ALL', 'ACTIVE');
     const mb = active.filter(i => i.category === 'MAINBOARD').length;
     const sme = active.filter(i => i.category === 'SME').length;
     const openCount = active.filter(i => i.status === 'OPEN').length;

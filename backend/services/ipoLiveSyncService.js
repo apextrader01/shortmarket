@@ -551,6 +551,9 @@ function loadDiskCacheFallback() {
   return false;
 }
 
+// Automatically load disk cache on module require
+loadDiskCacheFallback();
+
 // Return formatted timestamp
 function getLastUpdatedDisplay() {
   if (!lastSyncTimestamp) return 'Live Market Synced';

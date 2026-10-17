@@ -2264,9 +2264,21 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           {/* Top IPO Summary KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(190px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
             <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
-              <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>Total Issues Tracked</div>
+              <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>
+                {ipoCategory === 'MAINBOARD' ? 'Mainboard Issues Tracked' : (ipoCategory === 'SME' ? 'SME Issues Tracked' : 'Total Issues Tracked')}
+              </div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: t.text, marginTop: '2px' }}>
-                {(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')} Issues Tracked
+                {(() => {
+                  const activeUniverseCount = ipoCategory === 'MAINBOARD'
+                    ? (ipoStats?.mainboardCount || ipoData.filter(i => i.category === 'MAINBOARD').length)
+                    : (ipoCategory === 'SME'
+                        ? (ipoStats?.smeCount || ipoData.filter(i => i.category === 'SME').length)
+                        : (ipoStats?.totalIssues || ipoData.length));
+                  if (ipoSearch.trim() || Object.values(colSearch).some(v => Boolean(v && v.trim()))) {
+                    return `${filteredIpos.length.toLocaleString('en-IN')} of ${activeUniverseCount.toLocaleString('en-IN')} Issues`;
+                  }
+                  return `${activeUniverseCount.toLocaleString('en-IN')} Issues Tracked`;
+                })()}
               </div>
             </div>
             <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.07)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
