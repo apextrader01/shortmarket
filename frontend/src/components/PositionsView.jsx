@@ -195,12 +195,14 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, orders, isInitialUserDataLoaded } = useStore(useShallow(state => ({
+  const { positions, holdings, orders, isInitialUserDataLoaded, theme } = useStore(useShallow(state => ({
     positions: state.positions,
     holdings: state.holdings,
     orders: state.orders,
-    isInitialUserDataLoaded: state.isInitialUserDataLoaded
+    isInitialUserDataLoaded: state.isInitialUserDataLoaded,
+    theme: state.theme
   })));
+  const isLight = theme === 'light';
   
   const sourceData = useMemo(() => {
     if (viewMode === 'HOLDINGS') {
@@ -1118,8 +1120,8 @@ export default function PositionsView() {
       {/* 🚨 High-Priority Capital Defense Max Loss Alert Banner */}
       {isMaxLossHit && discipline.enabled && !dismissMaxLossBanner && (
         <div style={{
-          background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.26) 100%)',
-          border: '1px solid rgba(239, 68, 68, 0.5)',
+          background: isLight ? '#fee2e2' : 'linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.26) 100%)',
+          border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.5)',
           borderRadius: '10px',
           padding: '12px 16px',
           marginBottom: '16px',
@@ -1133,7 +1135,7 @@ export default function PositionsView() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldAlert size={26} color="#ef4444" style={{ flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fca5a5' }}>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: isLight ? '#991b1b' : '#fca5a5' }}>
                 🚨 CAPITAL PROTECTION TRIGGERED: Daily Max Loss Limit (-₹{Number(discipline.maxLoss).toLocaleString('en-IN')}) Reached!
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>

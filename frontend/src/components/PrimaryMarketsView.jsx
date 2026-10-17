@@ -1925,7 +1925,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* Server-Side Bhavcopy Pagination / Load More Controls (~4 KB per page) */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            <span style={{ fontSize: '12px', color: t.textMuted }}>
               Showing {bhavcopyData.length.toLocaleString('en-IN')} of {bhavTotalFiltered.toLocaleString('en-IN')} Matching Stocks (Total Universe: {bhavStats.totalStocks.toLocaleString('en-IN')} NSE &amp; BSE Equities)
             </span>
             {bhavHasMore && (
@@ -1933,7 +1933,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 type="button"
                 disabled={loadingMoreBhav}
                 onClick={() => fetchBhavcopyPage(bhavPage + 1, true)}
-                style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.35)', color: '#60a5fa', padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.15)', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.35)', color: isLight ? '#1d4ed8' : '#60a5fa', padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
               >
                 {loadingMoreBhav ? 'Loading...' : 'Load More (+50 Stocks)'}
               </button>
@@ -2076,7 +2076,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   <button
                     type="button"
                     onClick={resetAllDealsFilters}
-                    style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.12)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.35)', color: '#ef4444', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.12)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.35)', color: isLight ? '#991b1b' : '#ef4444', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Reset ({activeDealsFilterCount})
                   </button>
@@ -2687,7 +2687,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
           {/* Server-Side Deals Pagination / Load More Controls (~4 KB per page) */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            <span style={{ fontSize: '12px', color: t.textMuted }}>
               Showing {dealsData.length.toLocaleString('en-IN')} of {dealsTotalFiltered.toLocaleString('en-IN')} Matching Institutional Deals (Total Monitored: {dealsStats.totalDeals.toLocaleString('en-IN')})
             </span>
             {dealsHasMore && (
@@ -2695,7 +2695,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 type="button"
                 disabled={loadingMoreDeals}
                 onClick={() => fetchDealsPage(dealsPage + 1, true)}
-                style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ background: isLight ? '#f3e8ff' : 'rgba(168,85,247,0.15)', border: isLight ? '1px solid #d8b4fe' : '1px solid rgba(168,85,247,0.35)', color: isLight ? '#7e22ce' : '#c084fc', padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
               >
                 {loadingMoreDeals ? 'Loading...' : 'Load More (+50 Deals)'}
               </button>
@@ -3068,7 +3068,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           company: '', closeDate: '', issueSizeCr: '', qib: '', snii: '', bnii: '', nii: '',
                           retail: '', employee: '', shareholder: '', others: '', total: '', applications: '', asOn: ''
                         })}
-                        style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: '4px', padding: '3px 7px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}
+                        style={{ background: isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239,68,68,0.3)', color: isLight ? '#991b1b' : '#ef4444', borderRadius: '4px', padding: '3px 7px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}
                       >
                         Clear
                       </button>

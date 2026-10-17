@@ -114,7 +114,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Earnings / Results</div>
-          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#3b82f6', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: isLight ? '#1d4ed8' : '#3b82f6', marginTop: '2px' }}>
             {counts.earnings || 10} Companies
           </div>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textDim, marginTop: '2px' }}>Q2 FY26 Declarations</div>
@@ -122,7 +122,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
 
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Cash Dividends</div>
-          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: isLight ? '#15803d' : '#10b981', marginTop: '2px' }}>
             {counts.dividends || 6} Announcements
           </div>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textDim, marginTop: '2px' }}>Up to 7.9% Yield</div>
@@ -130,7 +130,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
 
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Splits &amp; Bonus</div>
-          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#8b5cf6', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: isLight ? '#7e22ce' : '#8b5cf6', marginTop: '2px' }}>
             {counts.splitsBonus || 4} Actions
           </div>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textDim, marginTop: '2px' }}>1:1 Bonus &amp; 1:5 Splits</div>
@@ -138,7 +138,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
 
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Board Meetings</div>
-          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#f59e0b', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: isLight ? '#b45309' : '#f59e0b', marginTop: '2px' }}>
             {counts.boardMeetings || 4} High Impact
           </div>
           <div style={{ fontSize: isMobile ? '10px' : '11px', color: t.textDim, marginTop: '2px' }}>QIP &amp; Strategic Capex</div>
@@ -152,7 +152,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
             <div style={{ fontSize: '13px', fontWeight: '700', color: t.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Calendar size={15} color="#3b82f6" />
               <span>Actions &amp; Results Calendar</span>
-              <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+              <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.12)', color: isLight ? '#1d4ed8' : '#3b82f6' }}>
                 {events.length} Events
               </span>
             </div>
@@ -343,7 +343,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
 
                   {/* Financial Metric & Action Buttons */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', pt: '4px', borderTop: `1px solid ${t.borderSubtle}` }}>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#10b981', background: 'rgba(16,185,129,0.08)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: isLight ? '#15803d' : '#10b981', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.08)', padding: '3px 8px', borderRadius: '6px', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.2)' }}>
                       {ev.metric}
                     </span>
 
@@ -493,7 +493,7 @@ export default function CorporateCalendarTab({ onOpenPaperTrading, isMobile, t, 
 
                         {/* Financial Metric */}
                         <td style={{ padding: '12px 14px' }}>
-                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: '#10b981', background: 'rgba(16,185,129,0.08)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                          <span style={{ fontSize: '11.5px', fontWeight: '700', color: isLight ? '#15803d' : '#10b981', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.08)', padding: '3px 8px', borderRadius: '6px', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.2)' }}>
                             {ev.metric}
                           </span>
                         </td>

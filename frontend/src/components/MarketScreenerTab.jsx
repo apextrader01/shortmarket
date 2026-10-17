@@ -162,7 +162,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
 
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '12px 14px', boxShadow: t.cardShadow }}>
           <div style={{ fontSize: '11px', color: t.textMuted, fontWeight: '600', textTransform: 'uppercase' }}>RSI Oversold (&lt;32)</div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: '#38bdf8', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: isLight ? '#0284c7' : '#38bdf8', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sparkles size={18} /> {stats.oversoldCount || 0}
           </div>
           <div style={{ fontSize: '11px', color: t.textDim, marginTop: '2px' }}>Mean Reversion Setup</div>
@@ -175,7 +175,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
           <div style={{ fontSize: '13px', fontWeight: '700', color: t.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <SlidersHorizontal size={15} color="#3b82f6" />
             <span>Preset Screener Strategies</span>
-            <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+            <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.12)', color: isLight ? '#1d4ed8' : '#3b82f6' }}>
               {stocks.length} Stocks Matched
             </span>
           </div>
@@ -353,12 +353,12 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: '800', color: t.text, fontSize: '14px' }}>{stock.symbol}</span>
                         {stock.isFnO && (
-                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.12)', color: isLight ? '#1d4ed8' : '#3b82f6', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.3)' }}>
                             F&amp;O
                           </span>
                         )}
                         {stock.is52wHigh && (
-                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.12)', color: isLight ? '#15803d' : '#10b981', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.3)' }}>
                             52W HIGH
                           </span>
                         )}
@@ -513,12 +513,12 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontWeight: '800', color: t.text, fontSize: '13px' }}>{stock.symbol}</span>
                           {stock.isFnO && (
-                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.12)', color: isLight ? '#1d4ed8' : '#3b82f6', border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59,130,246,0.3)' }}>
                               F&amp;O
                             </span>
                           )}
                           {stock.is52wHigh && (
-                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.12)', color: isLight ? '#15803d' : '#10b981', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.3)' }}>
                               52W HIGH
                             </span>
                           )}

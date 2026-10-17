@@ -171,7 +171,7 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '16px', fontWeight: '800', color: t.text }}>🏦 FII &amp; DII Institutional Money Flow</span>
-            <span style={{ fontSize: '10.5px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16,185,129,0.14)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+            <span style={{ fontSize: '10.5px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.14)', color: isLight ? '#15803d' : '#10b981', border: isLight ? '1px solid #86efac' : '1px solid rgba(16,185,129,0.3)' }}>
               30-YEAR TIMELINE (1996–2026)
             </span>
           </div>
@@ -246,11 +246,11 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
         <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Combined Flow</span>
-            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: isLight ? '#dbeafe' : 'rgba(59,130,246,0.12)', color: isLight ? '#1d4ed8' : '#3b82f6' }}>
               FII + DII
             </span>
           </div>
-          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: today.combinedNet >= 0 ? '#38bdf8' : '#f43f5e', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: today.combinedNet >= 0 ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#dc2626' : '#f43f5e'), marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
             {today.combinedNet >= 0 ? '+' : ''}₹{Math.abs(today.combinedNet).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
           <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px' }}>
@@ -264,16 +264,16 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
             <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {selectedYear !== 'ALL' ? `Total (${selectedYear})` : `Total (${selectedRange})`}
             </span>
-            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: currentTotals.netTotal >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444' }}>
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: currentTotals.netTotal >= 0 ? (isLight ? '#dcfce7' : 'rgba(16,185,129,0.12)') : (isLight ? '#fee2e2' : 'rgba(239,68,68,0.12)'), color: currentTotals.netTotal >= 0 ? (isLight ? '#15803d' : '#10b981') : (isLight ? '#dc2626' : '#ef4444') }}>
               {currentTotals.netTotal >= 0 ? 'BUY' : 'SELL'}
             </span>
           </div>
-          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: currentTotals.netTotal >= 0 ? (isLight ? '#15803d' : '#10b981') : (isLight ? '#dc2626' : '#ef4444'), marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
             {currentTotals.netTotal >= 0 ? '+' : ''}₹{Math.abs(currentTotals.netTotal).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
           <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>FII: <strong style={{ color: currentTotals.cumulativeFii >= 0 ? '#10b981' : '#ef4444' }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')}</strong></span>
-            <span>DII: <strong style={{ color: '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')}</strong></span>
+            <span>FII: <strong style={{ color: currentTotals.cumulativeFii >= 0 ? (isLight ? '#15803d' : '#10b981') : (isLight ? '#dc2626' : '#ef4444') }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')}</strong></span>
+            <span>DII: <strong style={{ color: isLight ? '#15803d' : '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')}</strong></span>
           </div>
         </div>
       </div>
@@ -344,11 +344,11 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', fontWeight: '600' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#3b82f6' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#3b82f6', display: 'inline-block' }} /> FII Net
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isLight ? '#1d4ed8' : '#3b82f6' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: isLight ? '#1d4ed8' : '#3b82f6', display: 'inline-block' }} /> FII Net
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#10b981', display: 'inline-block' }} /> DII Net
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isLight ? '#15803d' : '#10b981' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: isLight ? '#15803d' : '#10b981', display: 'inline-block' }} /> DII Net
               </span>
               {(selectedRange === '3Y' || selectedRange === '5Y' || selectedRange === '10Y' || selectedRange === '30Y') && selectedYear === 'ALL' && (
                 <div style={{ display: 'flex', gap: '4px', background: t.pillInactiveBg, padding: '2px 4px', borderRadius: '6px' }}>
@@ -423,9 +423,9 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: t.textMuted, paddingTop: '4px', flexWrap: 'wrap', gap: '8px' }}>
-            <span>Cumulative FII ({selectedRange}): <strong style={{ color: currentTotals.cumulativeFii >= 0 ? '#10b981' : '#ef4444' }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')} Cr</strong></span>
-            <span>Cumulative DII ({selectedRange}): <strong style={{ color: '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')} Cr</strong></span>
-            <span>Net Combined: <strong style={{ color: currentTotals.netTotal >= 0 ? '#38bdf8' : '#f43f5e' }}>₹{currentTotals.netTotal.toLocaleString('en-IN')} Cr</strong></span>
+            <span>Cumulative FII ({selectedRange}): <strong style={{ color: currentTotals.cumulativeFii >= 0 ? (isLight ? '#15803d' : '#10b981') : (isLight ? '#dc2626' : '#ef4444') }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')} Cr</strong></span>
+            <span>Cumulative DII ({selectedRange}): <strong style={{ color: isLight ? '#15803d' : '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')} Cr</strong></span>
+            <span>Net Combined: <strong style={{ color: currentTotals.netTotal >= 0 ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#dc2626' : '#f43f5e') }}>₹{currentTotals.netTotal.toLocaleString('en-IN')} Cr</strong></span>
           </div>
         </div>
 
@@ -466,7 +466,7 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
               <span>
                 {viewMode === 'MONTHLY' ? 'Monthly Flow Ledger' : 'Institutional Flow Ledger'}
               </span>
-              <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+              <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: isLight ? '#e0e7ff' : 'rgba(99,102,241,0.12)', color: isLight ? '#4338ca' : '#6366f1' }}>
                 {viewMode === 'MONTHLY' ? `${filteredMonthly.length} Months` : `${filteredHistory.length} Sessions`}
               </span>
             </div>

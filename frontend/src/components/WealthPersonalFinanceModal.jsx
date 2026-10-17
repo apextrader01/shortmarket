@@ -707,20 +707,20 @@ function NetWorthView({ isMobile, isLight }) {
           <div style={{ fontSize: '11px', color: '#10b981' }}>Liquid: ₹{(liquidAssets / 100000).toFixed(1)}L ({((liquidAssets / totalAssets) * 100).toFixed(0)}%)</div>
         </div>
 
-        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.08)', border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Total Debt Liabilities</div>
-          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: '#f87171', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: isLight ? '#dc2626' : '#f87171', marginTop: '2px' }}>
             ₹{(totalLiabilities / 10000000).toFixed(2)} Cr
           </div>
-          <div style={{ fontSize: '11px', color: '#fca5a5' }}>D/A Ratio: {debtToAssetRatio.toFixed(1)}% ({debtToAssetRatio < 30 ? 'Safe ✓' : 'Elevated'})</div>
+          <div style={{ fontSize: '11px', color: isLight ? '#991b1b' : '#fca5a5' }}>D/A Ratio: {debtToAssetRatio.toFixed(1)}% ({debtToAssetRatio < 30 ? 'Safe ✓' : 'Elevated'})</div>
         </div>
 
-        <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: isLight ? '#f3e8ff' : 'rgba(168, 85, 247, 0.08)', border: isLight ? '1px solid #d8b4fe' : '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Solvency & Health</div>
-          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: solvencyRatio >= 70 ? '#a855f7' : '#f59e0b', marginTop: '2px' }}>
+          <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: solvencyRatio >= 70 ? (isLight ? '#7e22ce' : '#a855f7') : (isLight ? '#d97706' : '#f59e0b'), marginTop: '2px' }}>
             {solvencyRatio.toFixed(1)}%
           </div>
-          <div style={{ fontSize: '11px', color: solvencyRatio >= 70 ? '#a855f7' : '#fbbf24' }}>
+          <div style={{ fontSize: '11px', color: solvencyRatio >= 70 ? (isLight ? '#7e22ce' : '#a855f7') : (isLight ? '#b45309' : '#fbbf24') }}>
             {solvencyRatio >= 70 ? 'Institutional Safety ✓' : 'Moderate Cushion'}
           </div>
         </div>

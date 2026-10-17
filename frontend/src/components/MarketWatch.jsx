@@ -534,7 +534,8 @@ const MobilePinnedIndices = React.memo(() => {
 });
 
 export default function MarketWatch({ className = '', onStockSelect }) {
-  const { stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices, watchlists, activeWatchlistId, setActiveWatchlist, addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal, openDomLadderModal, setAlertModalSymbol } = useStore(useShallow(state => ({ stocks: state.stocks, selectedSymbol: state.selectedSymbol, setSelectedSymbol: state.setSelectedSymbol, fetchBatchPrices: state.fetchBatchPrices, watchlists: state.watchlists, activeWatchlistId: state.activeWatchlistId, setActiveWatchlist: state.setActiveWatchlist, addStockToWatchlist: state.addStockToWatchlist, removeStockFromWatchlist: state.removeStockFromWatchlist, createWatchlist: state.createWatchlist, deleteWatchlist: state.deleteWatchlist, renameWatchlist: state.renameWatchlist, openOrderModal: state.openOrderModal, openMarketDepthModal: state.openMarketDepthModal, openDomLadderModal: state.openDomLadderModal, setAlertModalSymbol: state.setAlertModalSymbol })));
+  const { stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices, watchlists, activeWatchlistId, setActiveWatchlist, addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal, openDomLadderModal, setAlertModalSymbol, theme } = useStore(useShallow(state => ({ stocks: state.stocks, selectedSymbol: state.selectedSymbol, setSelectedSymbol: state.setSelectedSymbol, fetchBatchPrices: state.fetchBatchPrices, watchlists: state.watchlists, activeWatchlistId: state.activeWatchlistId, setActiveWatchlist: state.setActiveWatchlist, addStockToWatchlist: state.addStockToWatchlist, removeStockFromWatchlist: state.removeStockFromWatchlist, createWatchlist: state.createWatchlist, deleteWatchlist: state.deleteWatchlist, renameWatchlist: state.renameWatchlist, openOrderModal: state.openOrderModal, openMarketDepthModal: state.openMarketDepthModal, openDomLadderModal: state.openDomLadderModal, setAlertModalSymbol: state.setAlertModalSymbol, theme: state.theme })));
+  const isLight = theme === 'light';
   
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredStock, setHoveredStock] = useState(null);
@@ -975,8 +976,8 @@ export default function MarketWatch({ className = '', onStockSelect }) {
                     borderRadius: '4px',
                     border: '1px solid',
                     borderColor: filterSegment === seg.value ? 'var(--color-blue)' : 'var(--border-color)',
-                    background: filterSegment === seg.value ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.03)',
-                    color: filterSegment === seg.value ? 'var(--color-blue-light, #93c5fd)' : 'var(--text-secondary)',
+                    background: filterSegment === seg.value ? (isLight ? '#dbeafe' : 'rgba(59, 130, 246, 0.2)') : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.03)'),
+                    color: filterSegment === seg.value ? (isLight ? '#1d4ed8' : 'var(--color-blue-light, #93c5fd)') : 'var(--text-secondary)',
                     cursor: 'pointer'
                   }}
                 >
@@ -1010,8 +1011,8 @@ export default function MarketWatch({ className = '', onStockSelect }) {
                     borderRadius: '4px',
                     border: '1px solid',
                     borderColor: sortBy === s.value ? 'var(--color-blue)' : 'var(--border-color)',
-                    background: sortBy === s.value ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.03)',
-                    color: sortBy === s.value ? 'var(--color-blue-light, #93c5fd)' : 'var(--text-secondary)',
+                    background: sortBy === s.value ? (isLight ? '#dbeafe' : 'rgba(59, 130, 246, 0.2)') : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.03)'),
+                    color: sortBy === s.value ? (isLight ? '#1d4ed8' : 'var(--color-blue-light, #93c5fd)') : 'var(--text-secondary)',
                     cursor: 'pointer'
                   }}
                 >
