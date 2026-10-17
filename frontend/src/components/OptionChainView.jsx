@@ -171,6 +171,27 @@ export const getAvailableRangesForSymbol = (symbol) => {
   return ['10', 'ALL'];
 };
 
+export const resolveOptionLivePrice = (legOrOpt, storePrices) => {
+  if (!legOrOpt) return 0;
+  const prices = storePrices || useStore.getState().prices || {};
+  const sym = legOrOpt.symbol;
+  const token = legOrOpt.token ? String(legOrOpt.token) : null;
+  const raw = sym ? sym.replace(/^[A-Z0-9]+:/, '') : null;
+  const pref = sym && !sym.includes(':') ? `${legOrOpt.exch_seg || 'NSE'}:${sym}` : sym;
+  const key = sym ? (sym.includes('-') ? sym : `${sym}-${legOrOpt.exch_seg || 'NSE'}`) : null;
+
+  const match = (sym && prices[sym]) ||
+                (token && prices[token]) ||
+                (raw && prices[raw]) ||
+                (pref && prices[pref]) ||
+                (key && prices[key]);
+
+  if (match?.ltp && Number(match.ltp) > 0) return Number(match.ltp);
+  if (legOrOpt.price && Number(legOrOpt.price) > 0) return Number(legOrOpt.price);
+  if (legOrOpt.ltp && Number(legOrOpt.ltp) > 0) return Number(legOrOpt.ltp);
+  return 0;
+};
+
 const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState(ALLOWED_INDEX_SYMBOLS);
@@ -610,18 +631,17 @@ const OptionChainViewInternal = () => {
     
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
-      const currentPrices = useStore.getState().prices;
-      const priceData = currentPrices[optKey] || {};
-      const price = priceData.ltp || 0;
+      const livePrice = resolveOptionLivePrice({ symbol: optKey, ...opt });
       setStrategyLegs(prev => [...prev, {
         optionType,
         strike: parseFloat(opt.strike),
-        price: parseFloat(price),
+        price: livePrice > 0 ? livePrice : (parseFloat(opt.ltp || 0)),
         side: type === 'BUY' ? 'BUY' : 'SELL',
         quantity: 1,
-        lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
-        iv: iv || 0,
-        symbol: optKey
+        lotsize: opt.lotsize ? parseInt(opt.lotsize) : (getInstantLotsize(optKey) || 1),
+        iv: iv || 0.2,
+        symbol: optKey,
+        token: opt.token
       }]);
       return;
     }
@@ -698,19 +718,41 @@ const OptionChainViewInternal = () => {
       if (!option) return null;
       const legData = type === 'CE' ? option.CE : option.PE;
       if (!legData) return null;
+
+      const storePrices = useStore.getState().prices || {};
+      const liveLtp = resolveOptionLivePrice(legData, storePrices);
+      let liveIv = 0.2;
+      if (liveLtp > 0 && targetSpot > 0) {
+        liveIv = calculateIV(type, liveLtp, targetSpot, strike, T, r, isIndex);
+        if (!liveIv || liveIv <= 0) liveIv = 0.2;
+      }
+
       return {
         symbol: legData.symbol,
+        token: legData.token,
         strike,
         optionType: type,
         side,
         quantity: 1,
-        lotsize: getInstantLotsize(legData.symbol),
-        price: legData.ltp || 0,
-        iv: legData.iv || 0.2
+        lotsize: legData.lotsize ? parseInt(legData.lotsize) : (getInstantLotsize(legData.symbol) || 1),
+        price: liveLtp,
+        iv: liveIv
       };
     };
 
-    if (templateId === 'bull_call_spread') {
+    if (templateId === 'buy_call') {
+      const leg = getLeg(atmIndex, 'CE', 'BUY');
+      if (leg) newLegs.push(leg);
+    } else if (templateId === 'buy_put') {
+      const leg = getLeg(atmIndex, 'PE', 'BUY');
+      if (leg) newLegs.push(leg);
+    } else if (templateId === 'sell_call') {
+      const leg = getLeg(atmIndex, 'CE', 'SELL');
+      if (leg) newLegs.push(leg);
+    } else if (templateId === 'sell_put') {
+      const leg = getLeg(atmIndex, 'PE', 'SELL');
+      if (leg) newLegs.push(leg);
+    } else if (templateId === 'bull_call_spread') {
       const buyLeg = getLeg(atmIndex, 'CE', 'BUY');
       const sellLeg = getLeg(atmIndex + 1, 'CE', 'SELL');
       if (buyLeg) newLegs.push(buyLeg);
@@ -720,7 +762,17 @@ const OptionChainViewInternal = () => {
       const sellLeg = getLeg(atmIndex - 1, 'PE', 'SELL');
       if (buyLeg) newLegs.push(buyLeg);
       if (sellLeg) newLegs.push(sellLeg);
-    } else if (templateId === 'straddle') {
+    } else if (templateId === 'bull_put_spread') {
+      const sellLeg = getLeg(atmIndex - 1, 'PE', 'SELL');
+      const buyLeg = getLeg(atmIndex - 2, 'PE', 'BUY');
+      if (sellLeg) newLegs.push(sellLeg);
+      if (buyLeg) newLegs.push(buyLeg);
+    } else if (templateId === 'bear_call_spread') {
+      const sellLeg = getLeg(atmIndex + 1, 'CE', 'SELL');
+      const buyLeg = getLeg(atmIndex + 2, 'CE', 'BUY');
+      if (sellLeg) newLegs.push(sellLeg);
+      if (buyLeg) newLegs.push(buyLeg);
+    } else if (templateId === 'straddle' || templateId === 'short_straddle') {
       const ceLeg = getLeg(atmIndex, 'CE', 'SELL');
       const peLeg = getLeg(atmIndex, 'PE', 'SELL');
       if (ceLeg) newLegs.push(ceLeg);
@@ -740,16 +792,6 @@ const OptionChainViewInternal = () => {
       const peLeg = getLeg(atmIndex - 1, 'PE', 'BUY');
       if (ceLeg) newLegs.push(ceLeg);
       if (peLeg) newLegs.push(peLeg);
-    } else if (templateId === 'bull_put_spread') {
-      const sellLeg = getLeg(atmIndex, 'PE', 'SELL');
-      const buyLeg = getLeg(atmIndex - 1, 'PE', 'BUY');
-      if (sellLeg) newLegs.push(sellLeg);
-      if (buyLeg) newLegs.push(buyLeg);
-    } else if (templateId === 'bear_call_spread') {
-      const sellLeg = getLeg(atmIndex, 'CE', 'SELL');
-      const buyLeg = getLeg(atmIndex + 1, 'CE', 'BUY');
-      if (sellLeg) newLegs.push(sellLeg);
-      if (buyLeg) newLegs.push(buyLeg);
     } else if (templateId === 'iron_butterfly') {
       const buyPe = getLeg(atmIndex - 1, 'PE', 'BUY');
       const sellPe = getLeg(atmIndex, 'PE', 'SELL');
@@ -760,12 +802,12 @@ const OptionChainViewInternal = () => {
       if (sellCe) newLegs.push(sellCe);
       if (buyCe) newLegs.push(buyCe);
     } else if (templateId === 'iron_condor') {
-      const sellPe = getLeg(atmIndex - 1, 'PE', 'SELL');
       const buyPe = getLeg(atmIndex - 2, 'PE', 'BUY');
+      const sellPe = getLeg(atmIndex - 1, 'PE', 'SELL');
       const sellCe = getLeg(atmIndex + 1, 'CE', 'SELL');
       const buyCe = getLeg(atmIndex + 2, 'CE', 'BUY');
-      if (sellPe) newLegs.push(sellPe);
       if (buyPe) newLegs.push(buyPe);
+      if (sellPe) newLegs.push(sellPe);
       if (sellCe) newLegs.push(sellCe);
       if (buyCe) newLegs.push(buyCe);
     }
@@ -1011,16 +1053,28 @@ const OptionChainViewInternal = () => {
                 value=""
               >
                 <option value="" disabled>Load Template...</option>
-                <option value="bull_call_spread">Bull Call Spread</option>
-                <option value="bear_put_spread">Bear Put Spread</option>
-                <option value="bull_put_spread">Bull Put Spread (Credit)</option>
-                <option value="bear_call_spread">Bear Call Spread (Credit)</option>
-                <option value="straddle">Short Straddle</option>
-                <option value="long_straddle">Long Straddle</option>
-                <option value="short_strangle">Short Strangle</option>
-                <option value="long_strangle">Long Strangle</option>
-                <option value="iron_condor">Iron Condor</option>
-                <option value="iron_butterfly">Iron Butterfly</option>
+                <optgroup label="Single Leg (1 Strike)">
+                  <option value="buy_call">Buy Call (ATM CE)</option>
+                  <option value="sell_put">Sell Put (ATM PE)</option>
+                  <option value="buy_put">Buy Put (ATM PE)</option>
+                  <option value="sell_call">Sell Call (ATM CE)</option>
+                </optgroup>
+                <optgroup label="Spreads (2 Strikes)">
+                  <option value="bull_call_spread">Bull Call Spread</option>
+                  <option value="bear_put_spread">Bear Put Spread</option>
+                  <option value="bull_put_spread">Bull Put Spread (Credit)</option>
+                  <option value="bear_call_spread">Bear Call Spread (Credit)</option>
+                </optgroup>
+                <optgroup label="Straddles & Strangles">
+                  <option value="short_straddle">Short Straddle</option>
+                  <option value="long_straddle">Long Straddle</option>
+                  <option value="short_strangle">Short Strangle</option>
+                  <option value="long_strangle">Long Strangle</option>
+                </optgroup>
+                <optgroup label="Multi-Leg (4 Strikes)">
+                  <option value="iron_condor">Iron Condor</option>
+                  <option value="iron_butterfly">Iron Butterfly</option>
+                </optgroup>
               </select>
             )}
           </div>
@@ -1029,19 +1083,42 @@ const OptionChainViewInternal = () => {
 
       {/* Strategy Builder Modal */}
       {strategyModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '24px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', background: 'var(--bg-dark)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '1260px', maxHeight: '94vh', overflowY: 'auto', position: 'relative', background: 'var(--bg-panel, #0f172a)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
             <button 
               onClick={() => setStrategyModalOpen(false)}
-              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px', zIndex: 10 }}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '18px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, transition: 'all 0.2s' }}
+              title="Close Builder"
             >&times;</button>
             <OptionsStrategyBuilder 
               legs={strategyLegs}
-              spotPrice={spotPrice}
+              spotPrice={spotPrice > 0 ? spotPrice : effectiveSpotPrice}
               expiryDate={expiry}
+              symbol={symbol}
+              strikes={strikes}
+              allStrikes={allStrikes}
+              chain={chain}
               onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
               onClear={() => setStrategyLegs([])}
               onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
+              onAddLeg={() => {
+                if (!atmStrike) return;
+                const opt = chain[atmStrike]?.CE;
+                if (!opt) return;
+                const live = resolveOptionLivePrice(opt);
+                setStrategyLegs(prev => [...prev, {
+                  symbol: opt.symbol,
+                  token: opt.token,
+                  strike: atmStrike,
+                  optionType: 'CE',
+                  side: 'BUY',
+                  quantity: 1,
+                  lotsize: opt.lotsize ? parseInt(opt.lotsize) : (getInstantLotsize(opt.symbol) || 1),
+                  price: live,
+                  iv: 0.2
+                }]);
+              }}
+              onClose={() => setStrategyModalOpen(false)}
               onExecute={() => {
                 if (strategyLegs.length === 0) return;
                 strategyLegs.forEach(leg => {
