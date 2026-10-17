@@ -13,7 +13,8 @@ import {
   Clock, CreditCard, Check, Sliders, Code,
   Folder, Bookmark, ShoppingBag, Activity, Plus,
   Trash2, Power, ShieldAlert,
-  ArrowLeft, Wallet, Lock, Search, Edit2, XCircle
+  ArrowLeft, Wallet, Lock, Search, Edit2, XCircle,
+  Moon, Sun
 } from 'lucide-react';
 
 const resolveAlgoTab = (tab) => {
@@ -34,6 +35,9 @@ const resolveAlgoTab = (tab) => {
 export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading }) {
   const user = useStore(state => state.user);
   const marketStocks = useStore(state => state.stocks);
+  const theme = useStore(state => state.theme);
+  const toggleTheme = useStore(state => state.toggleTheme);
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && (document.documentElement.getAttribute('data-theme') === 'light' || document.body.classList.contains('light-mode')));
   const isAdmin = Boolean(user?.is_admin);
   const { links: socialLinks, saveSocialLinks } = useSocialLinks();
   const [socialForm, setSocialForm] = useState(socialLinks);
@@ -1294,16 +1298,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
   ];
 
   return (
-    <div style={{
-      width: '100%',
-      minHeight: '100%',
-      background: '#070a12',
-      color: '#f8fafc',
-      fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'relative'
-    }}>
+    <div 
+      className={`skx-algo-platform ${isLight ? 'light-mode' : 'dark-mode'}`}
+      style={{
+        width: '100%',
+        minHeight: '100%',
+        background: isLight ? 'var(--bg-main, #f8fafc)' : '#070a12',
+        color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative'
+      }}
+    >
 
       {/* Toast Notification */}
       {toastMsg && (
@@ -1338,8 +1345,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         justifyContent: 'space-between',
         padding: isMobile ? 'max(10px, env(safe-area-inset-top, 10px)) 12px 10px' : '12px 24px',
         gap: isMobile ? '8px' : '12px',
-        borderBottom: '1px solid #1e293b',
-        background: '#090d16',
+        borderBottom: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid #1e293b',
+        background: isLight ? 'var(--bg-panel, #ffffff)' : '#090d16',
         position: 'sticky',
         top: 0,
         zIndex: 50,
@@ -1527,6 +1534,29 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             </div>
           )}
 
+          {/* Universal Theme Toggle (Sun/Moon) */}
+          <button
+            onClick={toggleTheme}
+            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: isMobile ? '28px' : '32px',
+              height: isMobile ? '28px' : '32px',
+              borderRadius: '6px',
+              background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
+              border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #334155',
+              color: isLight ? '#f59e0b' : '#38bdf8',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {isLight ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+
           {/* Exit / Back to Home Button (Desktop) */}
           {!isMobile && onBack && (
             <button
@@ -1535,9 +1565,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid #334155',
-                color: '#cbd5e1',
+                background: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255,255,255,0.06)',
+                border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid #334155',
+                color: isLight ? 'var(--text-primary, #0f172a)' : '#cbd5e1',
                 padding: '6px 14px',
                 borderRadius: '6px',
                 fontSize: '12px',
@@ -1560,8 +1590,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         {isMobile ? (
           <nav style={{
             width: '100%',
-            borderBottom: '1px solid #1e293b',
-            background: '#080c15',
+            borderBottom: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid #1e293b',
+            background: isLight ? 'var(--bg-panel, #ffffff)' : '#080c15',
             padding: '8px 10px',
             display: 'flex',
             alignItems: 'center',
@@ -1586,9 +1616,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     gap: '6px',
                     padding: '7px 12px',
                     borderRadius: '20px',
-                    background: isActive ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                    color: isActive ? '#38bdf8' : '#94a3b8',
-                    border: isActive ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isActive ? (isLight ? 'rgba(14, 165, 233, 0.15)' : 'rgba(56, 189, 248, 0.18)') : (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)'),
+                    color: isActive ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#475569' : '#94a3b8'),
+                    border: isActive ? (isLight ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid rgba(56, 189, 248, 0.45)') : (isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid rgba(255, 255, 255, 0.08)'),
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: isActive ? '800' : '600',
@@ -1596,13 +1626,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     flexShrink: 0
                   }}
                 >
-                  <Icon size={13} color={isActive ? '#38bdf8' : '#64748b'} />
+                  <Icon size={13} color={isActive ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#64748b')} />
                   <span>{item.label}</span>
                   {item.count !== undefined && (
                     <span style={{
                       fontSize: '10px',
-                      background: isActive ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.08)',
-                      color: isActive ? '#38bdf8' : '#94a3b8',
+                      background: isActive ? (isLight ? 'rgba(14, 165, 233, 0.22)' : 'rgba(56, 189, 248, 0.25)') : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'),
+                      color: isActive ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                       padding: '1px 6px',
                       borderRadius: '10px',
                       fontWeight: '800'
@@ -1618,8 +1648,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           <nav style={{
             width: '240px',
             flexShrink: 0,
-            borderRight: '1px solid #1e293b',
-            background: '#080c15',
+            borderRight: isLight ? '1px solid var(--border-color, #e2e8f0)' : '1px solid #1e293b',
+            background: isLight ? 'var(--bg-panel, #ffffff)' : '#080c15',
             padding: '20px 14px',
             display: 'flex',
             flexDirection: 'column',
@@ -1771,7 +1801,19 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
         )}
 
         {/* Full-Width Workspace Container */}
-        <main style={{ flex: 1, width: '100%', boxSizing: 'border-box', padding: isMobile ? '14px 12px 80px' : '24px 32px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '22px' }}>
+        <main style={{
+          flex: 1,
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: isMobile ? '14px 12px 80px' : '24px 32px',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isMobile ? '16px' : '22px',
+          background: isLight ? 'var(--bg-main, #f8fafc)' : 'transparent',
+          color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc'
+        }}>
 
           {/* ───────────────────────────────────────────────────────────── */}
           {/* TAB 1: DASHBOARD VIEW                                         */}

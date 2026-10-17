@@ -3173,20 +3173,27 @@ export const useStore = create(persist((set, get) => ({
   setAccessibilityMode: (mode) => set({ accessibilityMode: mode }),
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark';
-    if (newTheme === 'light') {
-      document.body.classList.add('light-mode');
-    } else {
-      document.body.classList.remove('light-mode');
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', newTheme);
+      if (document.body) {
+        if (newTheme === 'light') {
+          document.body.classList.add('light-mode');
+        } else {
+          document.body.classList.remove('light-mode');
+        }
+      }
     }
     return { theme: newTheme };
   }),
   setTheme: (newTheme) => set((state) => {
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', newTheme);
-      if (newTheme === 'light') {
-        document.body.classList.add('light-mode');
-      } else {
-        document.body.classList.remove('light-mode');
+      if (document.body) {
+        if (newTheme === 'light') {
+          document.body.classList.add('light-mode');
+        } else {
+          document.body.classList.remove('light-mode');
+        }
       }
     }
     return { theme: newTheme };

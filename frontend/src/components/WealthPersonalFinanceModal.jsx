@@ -7,7 +7,8 @@ import {
   X, PieChart, Shield, Wallet, Sparkles, Send, AlertTriangle, 
   CheckCircle2, ArrowRight, TrendingUp, Scissors, HeartPulse,
   DollarSign, RefreshCw, HelpCircle, ChevronRight, ArrowLeft, Download, Printer, Calculator, Trash2,
-  Copy, Check, Landmark, Building, Info, FileText, Zap, Award, BarChart3, ShieldCheck, Scale, Calendar
+  Copy, Check, Landmark, Building, Info, FileText, Zap, Award, BarChart3, ShieldCheck, Scale, Calendar,
+  Moon, Sun
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -23,7 +24,8 @@ export default function WealthPersonalFinanceModal({
   const [activeTab, setActiveTab] = useState(initialTab || 'NET_WORTH');
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const theme = useStore(state => state.theme);
-  const isLight = theme === 'light' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+  const toggleTheme = useStore(state => state.toggleTheme);
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && (document.documentElement.getAttribute('data-theme') === 'light' || document.body.classList.contains('light-mode')));
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -233,6 +235,28 @@ export default function WealthPersonalFinanceModal({
             >
               <Printer size={13} />
               <span>{isMobile ? 'PDF' : 'Print / PDF'}</span>
+            </button>
+            {/* Universal Theme Toggle (Sun/Moon) */}
+            <button
+              onClick={toggleTheme}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: isMobile ? '30px' : '34px',
+                height: isMobile ? '30px' : '34px',
+                borderRadius: '8px',
+                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
+                border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: isLight ? '#f59e0b' : '#38bdf8',
+                cursor: 'pointer',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isLight ? <Sun size={15} /> : <Moon size={15} />}
             </button>
             {onOpenPaperTrading && (
               <button

@@ -7,7 +7,8 @@ import {
   Calculator, TrendingUp, DollarSign, Percent, ArrowLeft, ArrowRight,
   Download, FileText, PieChart, Table, RefreshCw, Plus, Trash2, CheckCircle2,
   HelpCircle, AlertCircle, Sparkles, Building2, ShieldAlert, Receipt, LineChart,
-  BarChart2, Award, Clock, ChevronRight, Search, Sliders, ExternalLink, Share2, Printer
+  BarChart2, Award, Clock, ChevronRight, Search, Sliders, ExternalLink, Share2, Printer,
+  Moon, Sun
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -145,7 +146,8 @@ const normalizeCalcId = (type) => {
 
 export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOpenPaperTrading }) {
   const theme = useStore(state => state.theme);
-  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme'));
+  const toggleTheme = useStore(state => state.toggleTheme);
+  const isLight = theme === 'light' || (!theme && typeof document !== 'undefined' && (document.documentElement.getAttribute('data-theme') === 'light' || document.documentElement.classList.contains('light-theme') || document.body.classList.contains('light-mode')));
 
   // Current active view: 'CATALOG' or specific calculator id (e.g. 'sip', 'reducing-loan')
   const [selectedCalcId, setSelectedCalcId] = useState(() => {
@@ -749,107 +751,128 @@ export default function CalculatorsSuiteView({ initialType = 'all', onBack, onOp
         </div>
 
         {/* Topbar Right Actions */}
-        {(selectedCalcId !== 'CATALOG' || (!isMobile && onOpenPaperTrading)) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', width: isMobile ? '100%' : 'auto' }}>
-            {selectedCalcId !== 'CATALOG' && (
-              <>
-                {/* Calculator Quick-Switch Dropdown */}
-                <select
-                  value={selectedCalcId}
-                  onChange={e => setSelectedCalcId(e.target.value)}
-                  style={{
-                    background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
-                    border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '8px',
-                    color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
-                    fontSize: isMobile ? '12px' : '12.5px',
-                    fontWeight: '600',
-                    padding: isMobile ? '6px 8px' : '7px 12px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                    flex: isMobile ? 1 : 'initial',
-                    minWidth: 0
-                  }}
-                >
-                  {CALCULATORS_CATALOG.map(calc => (
-                    <option key={calc.id} value={calc.id} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
-                      {calc.title}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={handleCopyShareLink}
-                  style={{
-                    background: copiedLink ? (isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.15)') : (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'),
-                    border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : (isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)'),
-                    borderRadius: '8px',
-                    padding: isMobile ? '6px 10px' : '7px 12px',
-                    color: copiedLink ? (isLight ? '#059669' : '#34d399') : (isLight ? 'var(--text-secondary, #475569)' : '#cbd5e1'),
-                    fontSize: '11.5px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0
-                  }}
-                  title="Copy Direct Calculator Link"
-                >
-                  <Share2 size={13} />
-                  <span>{copiedLink ? 'Copied!' : (isMobile ? 'Share' : 'Share Link')}</span>
-                </button>
-
-                <button
-                  onClick={handlePrintPDF}
-                  style={{
-                    background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(37, 99, 235, 0.25))',
-                    border: isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.45)',
-                    borderRadius: '8px',
-                    padding: isMobile ? '6px 10px' : '7px 12px',
-                    color: isLight ? '#0284c7' : '#38bdf8',
-                    fontSize: '11.5px',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0
-                  }}
-                  title="Generate Institutional A4 PDF Report"
-                >
-                  <Printer size={13} />
-                  <span>PDF Report</span>
-                </button>
-              </>
-            )}
-
-            {!isMobile && onOpenPaperTrading && (
-              <button
-                onClick={onOpenPaperTrading}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-end' : 'flex-end' }}>
+          {selectedCalcId !== 'CATALOG' && (
+            <>
+              {/* Calculator Quick-Switch Dropdown */}
+              <select
+                value={selectedCalcId}
+                onChange={e => setSelectedCalcId(e.target.value)}
                 style={{
-                  background: 'linear-gradient(135deg, #0284c7, #2563eb)',
-                  border: 'none',
+                  background: isLight ? 'var(--bg-input, #ffffff)' : 'rgba(255, 255, 255, 0.05)',
+                  border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '8px',
-                  padding: '7px 14px',
-                  color: '#fff',
-                  fontSize: '12.5px',
+                  color: isLight ? 'var(--text-primary, #0f172a)' : '#f8fafc',
+                  fontSize: isMobile ? '12px' : '12.5px',
+                  fontWeight: '600',
+                  padding: isMobile ? '6px 8px' : '7px 12px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  flex: isMobile ? 1 : 'initial',
+                  minWidth: 0
+                }}
+              >
+                {CALCULATORS_CATALOG.map(calc => (
+                  <option key={calc.id} value={calc.id} style={{ background: isLight ? '#ffffff' : '#0f172a', color: isLight ? '#0f172a' : '#fff' }}>
+                    {calc.title}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleCopyShareLink}
+                style={{
+                  background: copiedLink ? (isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.15)') : (isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'),
+                  border: copiedLink ? '1px solid rgba(16, 185, 129, 0.4)' : (isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)'),
+                  borderRadius: '8px',
+                  padding: isMobile ? '6px 10px' : '7px 12px',
+                  color: copiedLink ? (isLight ? '#059669' : '#34d399') : (isLight ? 'var(--text-secondary, #475569)' : '#cbd5e1'),
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+                title="Copy Direct Calculator Link"
+              >
+                <Share2 size={13} />
+                <span>{copiedLink ? 'Copied!' : (isMobile ? 'Share' : 'Share Link')}</span>
+              </button>
+
+              <button
+                onClick={handlePrintPDF}
+                style={{
+                  background: isLight ? 'rgba(2, 132, 199, 0.08)' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(37, 99, 235, 0.25))',
+                  border: isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.45)',
+                  borderRadius: '8px',
+                  padding: isMobile ? '6px 10px' : '7px 12px',
+                  color: isLight ? '#0284c7' : '#38bdf8',
+                  fontSize: '11.5px',
                   fontWeight: '700',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   cursor: 'pointer',
-                  boxShadow: '0 0 16px rgba(2, 132, 199, 0.35)'
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
+                title="Generate Institutional A4 PDF Report"
               >
-                <span>Paper Trading</span>
-                <ArrowRight size={14} />
+                <Printer size={13} />
+                <span>PDF Report</span>
               </button>
-            )}
-          </div>
-        )}
+            </>
+          )}
+
+          {/* Universal Theme Toggle (Sun/Moon) */}
+          <button
+            onClick={toggleTheme}
+            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: isMobile ? '30px' : '34px',
+              height: isMobile ? '30px' : '34px',
+              borderRadius: '8px',
+              background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
+              border: isLight ? '1px solid var(--border-color, #cbd5e1)' : '1px solid rgba(255, 255, 255, 0.12)',
+              color: isLight ? '#f59e0b' : '#38bdf8',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {isLight ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+
+          {!isMobile && onOpenPaperTrading && (
+            <button
+              onClick={onOpenPaperTrading}
+              style={{
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 14px',
+                color: '#fff',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 0 16px rgba(2, 132, 199, 0.35)'
+              }}
+            >
+              <span>Paper Trading</span>
+              <ArrowRight size={14} />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* ── Main View Content ── */}

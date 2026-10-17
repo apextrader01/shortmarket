@@ -8,7 +8,7 @@ import {
   ExternalLink, Search, Filter, ShieldCheck, Sparkles, BarChart2,
   Calendar, Layers, CheckCircle2, ChevronRight, RefreshCw, Award,
   Flame, Snowflake, Zap, AlertTriangle, Copy, Check, SlidersHorizontal,
-  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown, Trophy
+  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown, Trophy, Moon, Sun
 } from 'lucide-react';
 import { API, useStore } from '../store';
 import logoImg from '../assets/logo.png';
@@ -358,6 +358,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   const [dealsHasMore, setDealsHasMore] = useState(true);
 
   const theme = useStore(state => state.theme);
+  const toggleTheme = useStore(state => state.toggleTheme);
   const isLight = theme === 'light';
 
   const t = useMemo(() => {
@@ -1050,6 +1051,29 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             >
               ⬇ CSV
             </button>
+
+            {/* 1-Click Theme Switcher (Light / Dark Universal Sync) */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${isLight ? 'Dark' : 'Light'} Mode`}
+              aria-label="Toggle theme"
+              style={{
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)',
+                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                padding: isMobile ? '6px 8px' : '7px 10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isLight ? '#475569' : '#fbbf24',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isLight ? <Moon size={14} color="#475569" /> : <Sun size={14} color="#fbbf24" />}
+            </button>
+
             {onOpenPaperTrading && (
               <button
                 type="button"

@@ -181,6 +181,19 @@
         if (localStorage.getItem('token')) {
           document.documentElement.classList.add('skx-authed');
         }
+        var savedTheme = 'dark';
+        var storedState = localStorage.getItem('skandx-storage');
+        if (storedState) {
+          var parsed = JSON.parse(storedState);
+          if (parsed && parsed.state && parsed.state.theme) {
+            savedTheme = parsed.state.theme;
+          }
+        }
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        if (savedTheme === 'light') {
+          document.documentElement.classList.add('light-mode');
+          if (document.body) document.body.classList.add('light-mode');
+        }
       } catch (e) {}
     </script>
     <style>

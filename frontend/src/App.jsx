@@ -95,7 +95,7 @@ import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration, recor
 import { trackUserAction } from './utils/userActivityTracker';
 import { useStore, DEFAULT_WATCHLIST_SYMBOLS, ensureWatchlistsWithDefaults } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu, ArrowLeft } from 'lucide-react';
+import { TrendingUp, TrendingDown, LogOut, User, Users, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, Shield, ShieldCheck, BookOpen, Layers, Bell, Home, Building2, Calculator, Link2, Sparkles, Cpu, ArrowLeft, Moon, Sun } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -299,7 +299,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, isAdModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications, accessibilityMode } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, isAdModalOpen: state.isAdModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications, accessibilityMode: state.accessibilityMode })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, theme, setTheme, toggleTheme, orderModal, editOrderModal, purgeStaleDailyAlerts, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen, isAdModalOpen, unreadNotificationsCount, markAllNotificationsRead, fetchBroadcastNotifications, accessibilityMode } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, theme: state.theme, setTheme: state.setTheme, toggleTheme: state.toggleTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, purgeStaleDailyAlerts: state.purgeStaleDailyAlerts, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen, isAdModalOpen: state.isAdModalOpen, unreadNotificationsCount: state.unreadNotificationsCount, markAllNotificationsRead: state.markAllNotificationsRead, fetchBroadcastNotifications: state.fetchBroadcastNotifications, accessibilityMode: state.accessibilityMode })));
 
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
@@ -1184,7 +1184,15 @@ function App() {
   // ── Guard: show login screen when not authenticated ──────────────────────────
   
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    const currentTheme = theme || 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    if (typeof document !== 'undefined' && document.body) {
+      if (currentTheme === 'light') {
+        document.body.classList.add('light-mode');
+      } else {
+        document.body.classList.remove('light-mode');
+      }
+    }
   }, [theme]);
 
   // ── Guard & Route Detection ──────────────────────────────────────────────────
@@ -1912,6 +1920,29 @@ function App() {
                       {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                     </span>
                   )}
+                </button>
+
+                {/* 1-Click Theme Switcher (Light / Dark Universal Sync) */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+                  aria-label="Toggle theme"
+                  style={{
+                    padding: '5px 8px',
+                    background: theme === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: theme === 'light' ? '#475569' : '#fbbf24',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {theme === 'light' ? <Moon size={14} color="#475569" /> : <Sun size={14} color="#fbbf24" />}
                 </button>
 
                 {/* User Profile Avatar & Name (Pinned to right, never clipped or hidden) */}

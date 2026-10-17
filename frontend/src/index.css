@@ -2434,3 +2434,169 @@ html.accessibility-mode input,
 html.accessibility-mode select {
   min-height: 38px;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   SkandX Algo Platform Light Theme Precision Suite
+   ───────────────────────────────────────────────────────────── */
+[data-theme='light'] .skx-algo-platform,
+.light-theme .skx-algo-platform,
+.light-mode .skx-algo-platform {
+  background: var(--bg-main, #f8fafc) !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .skx-algo-platform header,
+.light-theme .skx-algo-platform header,
+.light-mode .skx-algo-platform header {
+  background: var(--bg-panel, #ffffff) !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .skx-algo-platform nav,
+.light-theme .skx-algo-platform nav,
+.light-mode .skx-algo-platform nav {
+  background: var(--bg-panel, #ffffff) !important;
+  border-color: var(--border-color, #e2e8f0) !important;
+}
+
+[data-theme='light'] .skx-algo-platform nav button,
+.light-theme .skx-algo-platform nav button,
+.light-mode .skx-algo-platform nav button {
+  color: #475569 !important;
+}
+
+[data-theme='light'] .skx-algo-platform main,
+.light-theme .skx-algo-platform main,
+.light-mode .skx-algo-platform main {
+  background: var(--bg-main, #f8fafc) !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .skx-algo-platform h1,
+[data-theme='light'] .skx-algo-platform h2,
+[data-theme='light'] .skx-algo-platform h3,
+[data-theme='light'] .skx-algo-platform h4,
+.light-theme .skx-algo-platform h1,
+.light-theme .skx-algo-platform h2,
+.light-theme .skx-algo-platform h3,
+.light-theme .skx-algo-platform h4,
+.light-mode .skx-algo-platform h1,
+.light-mode .skx-algo-platform h2,
+.light-mode .skx-algo-platform h3,
+.light-mode .skx-algo-platform h4 {
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .skx-algo-platform p,
+.light-theme .skx-algo-platform p,
+.light-mode .skx-algo-platform p {
+  color: #64748b !important;
+}
+
+/* Card & Panel Overrides in Light Mode */
+[data-theme='light'] .skx-algo-platform div[style*="#101726"],
+[data-theme='light'] .skx-algo-platform div[style*="#0b101d"],
+[data-theme='light'] .skx-algo-platform div[style*="#090d16"],
+[data-theme='light'] .skx-algo-platform div[style*="#121826"],
+[data-theme='light'] .skx-algo-platform div[style*="#080c15"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(16, 23, 38)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(11, 16, 29)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(9, 13, 22)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(18, 24, 38)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(8, 12, 21)"],
+.light-theme .skx-algo-platform div[style*="#101726"],
+.light-theme .skx-algo-platform div[style*="#0b101d"],
+.light-theme .skx-algo-platform div[style*="#090d16"],
+.light-theme .skx-algo-platform div[style*="#121826"],
+.light-theme .skx-algo-platform div[style*="#080c15"],
+.light-theme .skx-algo-platform div[style*="rgb(16, 23, 38)"],
+.light-theme .skx-algo-platform div[style*="rgb(11, 16, 29)"],
+.light-theme .skx-algo-platform div[style*="rgb(9, 13, 22)"],
+.light-theme .skx-algo-platform div[style*="rgb(18, 24, 38)"],
+.light-theme .skx-algo-platform div[style*="rgb(8, 12, 21)"],
+.light-mode .skx-algo-platform div[style*="#101726"],
+.light-mode .skx-algo-platform div[style*="#0b101d"],
+.light-mode .skx-algo-platform div[style*="#090d16"],
+.light-mode .skx-algo-platform div[style*="#121826"],
+.light-mode .skx-algo-platform div[style*="#080c15"],
+.light-mode .skx-algo-platform div[style*="rgb(16, 23, 38)"],
+.light-mode .skx-algo-platform div[style*="rgb(11, 16, 29)"],
+.light-mode .skx-algo-platform div[style*="rgb(9, 13, 22)"],
+.light-mode .skx-algo-platform div[style*="rgb(18, 24, 38)"],
+.light-mode .skx-algo-platform div[style*="rgb(8, 12, 21)"] {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04) !important;
+  color: #0f172a !important;
+}
+
+/* Inner Sub-Capsules and Boxes */
+[data-theme='light'] .skx-algo-platform div[style*="#05070c"],
+[data-theme='light'] .skx-algo-platform div[style*="rgb(5, 7, 12)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgba(255, 255, 255, 0.04)"],
+[data-theme='light'] .skx-algo-platform div[style*="rgba(255,255,255,0.04)"],
+.light-theme .skx-algo-platform div[style*="#05070c"],
+.light-theme .skx-algo-platform div[style*="rgb(5, 7, 12)"],
+.light-theme .skx-algo-platform div[style*="rgba(255, 255, 255, 0.04)"],
+.light-theme .skx-algo-platform div[style*="rgba(255,255,255,0.04)"],
+.light-mode .skx-algo-platform div[style*="#05070c"],
+.light-mode .skx-algo-platform div[style*="rgb(5, 7, 12)"],
+.light-mode .skx-algo-platform div[style*="rgba(255, 255, 255, 0.04)"],
+.light-mode .skx-algo-platform div[style*="rgba(255,255,255,0.04)"] {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Form Controls & Inputs */
+[data-theme='light'] .skx-algo-platform input,
+[data-theme='light'] .skx-algo-platform select,
+[data-theme='light'] .skx-algo-platform textarea,
+.light-theme .skx-algo-platform input,
+.light-theme .skx-algo-platform select,
+.light-theme .skx-algo-platform textarea,
+.light-mode .skx-algo-platform input,
+.light-mode .skx-algo-platform select,
+.light-mode .skx-algo-platform textarea {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .skx-algo-platform select option,
+.light-theme .skx-algo-platform select option,
+.light-mode .skx-algo-platform select option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Algo Tables */
+[data-theme='light'] .skx-algo-platform table th,
+.light-theme .skx-algo-platform table th,
+.light-mode .skx-algo-platform table th {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+[data-theme='light'] .skx-algo-platform table td,
+.light-theme .skx-algo-platform table td,
+.light-mode .skx-algo-platform table td {
+  color: #1e293b !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+[data-theme='light'] .skx-algo-platform table tr:nth-child(even) td,
+.light-theme .skx-algo-platform table tr:nth-child(even) td,
+.light-mode .skx-algo-platform table tr:nth-child(even) td {
+  background: #f8fafc !important;
+}
+
+[data-theme='light'] .skx-algo-platform table tr:hover td,
+.light-theme .skx-algo-platform table tr:hover td,
+.light-mode .skx-algo-platform table tr:hover td {
+  background: #e2e8f0 !important;
+}
+
