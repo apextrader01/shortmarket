@@ -16,6 +16,8 @@ import logoImg from '../assets/logo.webp';
 import MarketScreenerTab from './MarketScreenerTab';
 import SmartMoneyTab from './SmartMoneyTab';
 import CorporateCalendarTab from './CorporateCalendarTab';
+import MarketHeatmapTab from './MarketHeatmapTab';
+import MarketNewsSentimentTab from './MarketNewsSentimentTab';
 
 // Helper: Compute completed trading session date in IST on client (before 6:55 PM IST -> previous trading day)
 function getClientCompletedTradingDate() {
@@ -300,6 +302,8 @@ const resolvePrimaryMarketTab = (tab) => {
   if (upper === 'SCREENER' || upper === 'SCANNER' || upper === 'BREAKOUT') return 'SCREENER';
   if (upper === 'FII' || upper === 'DII' || upper === 'SMART_MONEY' || upper === 'FII_DII') return 'FII_DII';
   if (upper === 'CALENDAR' || upper === 'EARNINGS' || upper === 'CORPORATE_ACTIONS') return 'CALENDAR';
+  if (upper === 'HEATMAP' || upper === 'TREEMAP' || upper === 'SECTORS' || upper === 'SECTOR_MAP') return 'HEATMAP';
+  if (upper === 'NEWS' || upper === 'AI_NEWS' || upper === 'SENTIMENT' || upper === 'MMI') return 'AI_NEWS';
   return 'BHAVCOPY';
 };
 
@@ -1329,6 +1333,34 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
 
         <button
           type="button"
+          onClick={() => setActiveTab('HEATMAP')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: activeTab === 'HEATMAP' ? (isLight ? '#ecfeff' : 'rgba(6,182,212,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'HEATMAP' ? '1px solid #06b6d4' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'HEATMAP' ? (isLight ? '#0e7490' : '#22d3ee') : t.pillInactiveText,
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Layers size={14} color="#06b6d4" /> {isMobile ? '🗺️ 7. Heatmap' : '🗺️ 7. Sector Heatmap'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('AI_NEWS')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: activeTab === 'AI_NEWS' ? (isLight ? '#f0f9ff' : 'rgba(2,132,199,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'AI_NEWS' ? '1px solid #0284c7' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'AI_NEWS' ? (isLight ? '#0369a1' : '#38bdf8') : t.pillInactiveText,
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Sparkles size={14} color="#38bdf8" /> {isMobile ? '🤖 8. AI News' : '🤖 8. AI News & Sentiment'}
+        </button>
+
+        <button
+          type="button"
           onClick={() => {
             if (typeof onOpenLeaderboard === 'function') onOpenLeaderboard();
             else if (typeof onOpenPaperTrading === 'function') onOpenPaperTrading();
@@ -1341,7 +1373,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <Trophy size={14} /> {isMobile ? '🏆 7. Arena' : '🏆 7. Trader Tournaments'}
+          <Trophy size={14} /> {isMobile ? '🏆 9. Arena' : '🏆 9. Trader Tournaments'}
         </button>
       </div>
 
@@ -3388,6 +3420,20 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           )
           )}
         </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 7: LIVE MARKET HEATMAP & SECTOR TREEMAP                                   */}
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'HEATMAP' && (
+        <MarketHeatmapTab onOpenPaperTrading={onOpenPaperTrading} isMobile={isMobile} t={t} isLight={isLight} />
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 8: LIVE AI FINANCIAL NEWS & SENTIMENT FEED                                */}
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'AI_NEWS' && (
+        <MarketNewsSentimentTab onOpenPaperTrading={onOpenPaperTrading} isMobile={isMobile} t={t} isLight={isLight} />
       )}
 
       {/* 1-CLICK ALLOTMENT STATUS MODAL */}

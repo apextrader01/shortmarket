@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useRef } from 'react';
 import { useStore, API } from '../store';
-import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell, SlidersHorizontal, ArrowDownUp, RotateCcw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell, SlidersHorizontal, ArrowDownUp, RotateCcw, Layers } from 'lucide-react';
 import { formatInstrument } from '../utils/symbolFormatter';
 import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
 
@@ -545,6 +545,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortBy, setSortBy] = useState('DEFAULT');
   const [filterSegment, setFilterSegment] = useState('ALL');
+  const [watchlistDisplayMode, setWatchlistDisplayMode] = useState('LIST'); // 'LIST' or 'HEATMAP'
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const searchLotsizes = useRef({});
 
@@ -891,6 +892,28 @@ export default function MarketWatch({ className = '', onStockSelect }) {
           <span style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }} title="Stocks count">
             {displayStocks.length}
           </span>
+          {/* Heatmap Grid Toggle Button */}
+          {!isSearchMode && (
+            <button
+              type="button"
+              onClick={() => setWatchlistDisplayMode(prev => prev === 'HEATMAP' ? 'LIST' : 'HEATMAP')}
+              style={{
+                background: watchlistDisplayMode === 'HEATMAP' ? (isLight ? '#dbeafe' : 'rgba(59, 130, 246, 0.18)') : (isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)'),
+                border: `1px solid ${watchlistDisplayMode === 'HEATMAP' ? (isLight ? '#93c5fd' : 'var(--color-blue)') : 'var(--border-color)'}`,
+                borderRadius: '6px',
+                padding: '8px 9px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: watchlistDisplayMode === 'HEATMAP' ? (isLight ? '#1d4ed8' : '#60a5fa') : 'var(--text-secondary)'
+              }}
+              title={watchlistDisplayMode === 'HEATMAP' ? "Switch to List View" : "Switch to Watchlist Heatmap"}
+            >
+              <Layers size={14} />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowFilterMenu(!showFilterMenu)}
@@ -1109,6 +1132,79 @@ export default function MarketWatch({ className = '', onStockSelect }) {
         ) : isSearchMode && displayStocks.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
             No stocks found for "{searchQuery}"
+          </div>
+        ) : watchlistDisplayMode === 'HEATMAP' && !isSearchMode ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(90px, 1fr))' : 'repeat(auto-fill, minmax(105px, 1fr))',
+            gap: '6px',
+            padding: '10px',
+            overflowY: 'auto',
+            maxHeight: '100%'
+          }}>
+            {displayStocks.map(stock => {
+              const tick = useStore.getState().prices[stock.uniqueSymbol] || useStore.getState().prices[stock.symbol] || null;
+              const chg = tick ? Number(tick.pct || 0) : 0;
+              const ltp = tick ? Number(tick.ltp || 0) : 0;
+              const isSelected = selectedSymbol === stock.uniqueSymbol;
+              let bg = isLight ? '#e2e8f0' : '#1e293b';
+              let textCol = isLight ? '#0f172a' : '#f8fafc';
+              let subCol = isLight ? '#475569' : '#94a3b8';
+              let border = isSelected ? '#38bdf8' : (isLight ? '#cbd5e1' : '#334155');
+
+              if (chg >= 2.0) {
+                bg = isLight ? '#15803d' : '#14532d';
+                textCol = '#fff';
+                subCol = '#bbf7d0';
+              } else if (chg > 0.05) {
+                bg = isLight ? '#16a34a' : '#166534';
+                textCol = '#fff';
+                subCol = '#dcfce7';
+              } else if (chg <= -2.0) {
+                bg = isLight ? '#b91c1c' : '#7f1d1d';
+                textCol = '#fff';
+                subCol = '#fecaca';
+              } else if (chg < -0.05) {
+                bg = isLight ? '#dc2626' : '#991b1b';
+                textCol = '#fff';
+                subCol = '#fee2e2';
+              }
+
+              return (
+                <div
+                  key={stock.uniqueSymbol}
+                  onClick={() => {
+                    setSelectedSymbol(stock.uniqueSymbol);
+                    if (onStockSelect) onStockSelect(stock.uniqueSymbol);
+                  }}
+                  style={{
+                    background: bg,
+                    border: `1.5px solid ${border}`,
+                    borderRadius: '8px',
+                    padding: '8px 6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: '62px',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? '0 0 10px rgba(56,189,248,0.4)' : 'none',
+                    transition: 'all 0.12s ease'
+                  }}
+                >
+                  <div style={{ fontWeight: '800', fontSize: '11px', color: textCol, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {stock.symbol}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11.5px', fontWeight: '800', color: textCol }}>
+                      {chg > 0 ? '+' : ''}{chg.toFixed(2)}%
+                    </div>
+                    <div style={{ fontSize: '9.5px', fontWeight: '600', color: subCol }}>
+                      ₹{ltp ? ltp.toLocaleString('en-IN') : '—'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : <div className="watchlist-list" style={{ flex: 1, overflowY: 'auto' }}>
         {displayStocks.map(stock => (

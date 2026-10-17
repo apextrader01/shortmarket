@@ -7568,6 +7568,26 @@ app.get('/api/primary-markets/screener', apiLimiter, (req, res) => {
   }
 });
 
+app.get('/api/primary-markets/heatmap', apiLimiter, (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
+    const data = primaryMarketsService.getSectorHeatmap(req.query);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/primary-markets/news-sentiment', apiLimiter, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
+    const data = await primaryMarketsService.getMarketNewsSentiment(req.query);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
