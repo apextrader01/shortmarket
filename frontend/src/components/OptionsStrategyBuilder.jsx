@@ -930,11 +930,16 @@ export default function OptionsStrategyBuilder({
                       <td style={{ padding: '8px 10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <input 
-                            type="number"
-                            step="0.05"
-                            value={effectivePrice > 0 ? effectivePrice : ''}
+                            type="text"
+                            inputMode="decimal"
+                            value={leg.customPrice !== undefined ? leg.customPrice : (effectivePrice > 0 ? effectivePrice : '')}
                             placeholder="0.0"
-                            onChange={(e) => onUpdateLeg?.(i, { ...leg, customPrice: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                onUpdateLeg?.(i, { ...leg, customPrice: val });
+                              }
+                            }}
                             style={{ width: '64px', background: 'rgba(255,255,255,0.06)', border: leg.customPrice !== undefined ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', padding: '3px 6px', fontSize: '11.5px', fontWeight: '700' }}
                           />
                           {leg.customPrice !== undefined && (

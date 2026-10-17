@@ -1251,14 +1251,16 @@ const OptionChainViewInternal = () => {
               onClear={() => setStrategyLegs([])}
               onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
               onAddLeg={() => {
-                if (!atmStrike) return;
-                const opt = chain[atmStrike]?.CE;
+                const targetStrikeList = (allStrikes && allStrikes.length > 0) ? allStrikes : strikes;
+                const strikeToAdd = atmStrike || (targetStrikeList.length > 0 ? targetStrikeList[Math.floor(targetStrikeList.length / 2)] : null);
+                if (!strikeToAdd) return;
+                const opt = chain[strikeToAdd]?.CE || chain[strikeToAdd]?.PE;
                 if (!opt) return;
                 const live = resolveOptionLivePrice(opt);
                 setStrategyLegs(prev => [...prev, {
                   symbol: opt.symbol,
                   token: opt.token,
-                  strike: atmStrike,
+                  strike: strikeToAdd,
                   optionType: 'CE',
                   side: 'BUY',
                   quantity: 1,
@@ -1269,6 +1271,13 @@ const OptionChainViewInternal = () => {
               }}
               onClose={() => setStrategyModalOpen(false)}
               onExecute={async (currentLegs, legMultiplier = 1) => {
+                const token = localStorage.getItem('token');
+                const user = useStore.getState().user;
+                if (!token || !user) {
+                  useStore.getState().showToast("Please log in to execute option strategies.", "warning", "Login Required");
+                  return;
+                }
+
                 const legsToExecute = (currentLegs && currentLegs.length > 0) ? currentLegs : strategyLegs;
                 if (!legsToExecute || legsToExecute.length === 0) {
                   useStore.getState().showToast("No legs in Strategy Builder to execute.", "warning", "Empty Strategy");
