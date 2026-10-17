@@ -2379,6 +2379,35 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   </button>
                 );
               })}
+
+              <select
+                aria-label="Select IPO era or year"
+                value={['2022', '2021', '2016_2020', '2000_2015', '1990S'].includes(ipoEraFilter) ? ipoEraFilter : ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setIpoEraFilter(e.target.value);
+                    if (ipoStatusFilter === 'OPEN' || ipoStatusFilter === 'UPCOMING') {
+                      setIpoStatusFilter('ALL');
+                    }
+                  } else {
+                    setIpoEraFilter('ALL');
+                  }
+                }}
+                style={{
+                  padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700',
+                  background: ['2022', '2021', '2016_2020', '2000_2015', '1990S'].includes(ipoEraFilter) ? '#3b82f6' : t.inputBg,
+                  border: ['2022', '2021', '2016_2020', '2000_2015', '1990S'].includes(ipoEraFilter) ? '1px solid #2563eb' : `1px solid ${t.inputBorder}`,
+                  color: ['2022', '2021', '2016_2020', '2000_2015', '1990S'].includes(ipoEraFilter) ? '#ffffff' : t.text,
+                  cursor: 'pointer', outline: 'none'
+                }}
+              >
+                <option value="" style={{ background: t.cardBg, color: t.text }}>More Eras...</option>
+                <option value="2022" style={{ background: t.cardBg, color: t.text }}>2022 (78 IPOs)</option>
+                <option value="2021" style={{ background: t.cardBg, color: t.text }}>2021 (75 IPOs)</option>
+                <option value="2016_2020" style={{ background: t.cardBg, color: t.text }}>2016 – 2020 (30 Landmark)</option>
+                <option value="2000_2015" style={{ background: t.cardBg, color: t.text }}>2000 – 2015 (22 Landmark)</option>
+                <option value="1990S" style={{ background: t.cardBg, color: t.text }}>1990s Pioneers (10 Issues)</option>
+              </select>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
@@ -2706,7 +2735,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                           </td>
 
                           <td style={{ padding: '10px 8px', textAlign: 'center', color: t.textMuted, fontSize: '11px', whiteSpace: 'nowrap', borderRight: `1px solid ${t.borderSubtle}` }}>
-                            {ipo.asOn || '12-Oct-2026 17:55'}
+                            {ipo.asOn || (ipo.status === 'LISTED' || ipo.status === 'CLOSED' ? `${ipo.closeDate || ipo.listingDate} (Final)` : 'Live Synced')}
                           </td>
 
                           <td style={{ padding: '10px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>

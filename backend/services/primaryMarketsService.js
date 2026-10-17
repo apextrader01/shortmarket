@@ -1185,7 +1185,9 @@ function getMarketDeals(query = {}) {
   // 1. Establish base scope matching active Date, Exchange, and MinSize filters
   // This provides accurate counts for the Category pills and Institution Desk buttons!
   const isSpecificYear = dateRange.startsWith('YEAR_') || /^\d{4}$/.test(dateRange);
-  const isMultiYearHistorical = dateRange === '3Y' || dateRange === 'PAST_3_YEARS' ||
+  const isMultiYearHistorical = dateRange === 'YTD' || dateRange === '2026_YTD' ||
+                                dateRange === '1Y' || dateRange === 'PAST_1_YEAR' ||
+                                dateRange === '3Y' || dateRange === 'PAST_3_YEARS' ||
                                 dateRange === '5Y' || dateRange === 'PAST_5_YEARS' ||
                                 dateRange === '10Y' || dateRange === 'PAST_10_YEARS' ||
                                 dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE';
@@ -1201,7 +1203,10 @@ function getMarketDeals(query = {}) {
     scopeBase = generateHistoricalDeals({ year: yr, limit: 300 }).deals;
   } else if (isMultiYearHistorical) {
     isMacroMode = true;
-    if (dateRange === '3Y' || dateRange === 'PAST_3_YEARS') {
+    if (dateRange === 'YTD' || dateRange === '2026_YTD' || dateRange === '1Y' || dateRange === 'PAST_1_YEAR') {
+      targetYears = [2026];
+      scopeBase = generateHistoricalDeals({ year: 2026, limit: 120 }).deals;
+    } else if (dateRange === '3Y' || dateRange === 'PAST_3_YEARS') {
       targetYears = [2026, 2025, 2024, 2023];
       targetYears.forEach(y => {
         scopeBase.push(...generateHistoricalDeals({ year: y, limit: 60 }).deals);
