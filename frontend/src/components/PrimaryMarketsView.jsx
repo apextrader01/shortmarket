@@ -458,6 +458,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
   }, [isLight]);
 
   const [ipoData, setIpoData] = useState(SEED_IPO_DATA);
+  const [ipoStats, setIpoStats] = useState(null);
   const [ipoLastUpdated, setIpoLastUpdated] = useState('');
   const [isRefreshingIpo, setIsRefreshingIpo] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -682,6 +683,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       if (res?.ipos && Array.isArray(res.ipos) && res.ipos.length > 0) {
         setIpoData(res.ipos);
         if (res.lastUpdated) setIpoLastUpdated(res.lastUpdated);
+      }
+      if (res?.stats) {
+        setIpoStats(res.stats);
       }
     } catch (e) {
       // Fallback to SEED_IPO_DATA
@@ -2262,7 +2266,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
               <div style={{ fontSize: '10.5px', color: t.textMuted, textTransform: 'uppercase', fontWeight: '600' }}>Total Issues Tracked</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: t.text, marginTop: '2px' }}>
-                {filteredIpos.length} of {ipoData.length} Issues
+                {(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')} Issues Tracked
               </div>
             </div>
             <div style={{ background: isLight ? '#f0fdf4' : 'rgba(34,197,94,0.07)', border: isLight ? '1px solid #bbf7d0' : '1px solid rgba(34,197,94,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
@@ -2280,7 +2284,7 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ background: isLight ? '#faf5ff' : 'rgba(168,85,247,0.07)', border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168,85,247,0.28)', borderRadius: '10px', padding: isMobile ? '10px 12px' : '12px 14px', boxShadow: t.cardShadow }}>
               <div style={{ fontSize: '10.5px', color: isLight ? '#7e22ce' : '#e9d5ff', textTransform: 'uppercase', fontWeight: '700' }}>🚀 On Listing &amp; Listed</div>
               <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: isLight ? '#9333ea' : '#c084fc', marginTop: '2px' }}>
-                {ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length} Completed
+                {(ipoStats?.listedCount || ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length).toLocaleString('en-IN')} Completed
               </div>
             </div>
           </div>
@@ -2290,9 +2294,9 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'ALL', label: `All IPOs (${ipoData.length})` },
-                  { id: 'MAINBOARD', label: `🏢 Mainboard (${ipoData.filter(i => i.category === 'MAINBOARD').length})` },
-                  { id: 'SME', label: `🚀 SME IPOs (${ipoData.filter(i => i.category === 'SME').length})` }
+                  { id: 'ALL', label: `All IPOs (${(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')})` },
+                  { id: 'MAINBOARD', label: `🏢 Mainboard (${(ipoStats?.mainboardCount || ipoData.filter(i => i.category === 'MAINBOARD').length).toLocaleString('en-IN')})` },
+                  { id: 'SME', label: `🚀 SME IPOs (${(ipoStats?.smeCount || ipoData.filter(i => i.category === 'SME').length).toLocaleString('en-IN')})` }
                 ].map(cat => (
                   <button
                     key={cat.id}
@@ -2413,10 +2417,10 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: `1px solid ${t.borderSubtle}`, paddingTop: '10px' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'ALL', label: `All Status (${ipoData.length})` },
+                  { id: 'ALL', label: `All Status (${(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')})` },
                   { id: 'OPEN', label: `🟢 Live / Bidding Open (${ipoData.filter(i => i.status === 'OPEN').length})` },
                   { id: 'UPCOMING', label: `⏳ Confirmed Upcoming (${ipoData.filter(i => i.status === 'UPCOMING').length})` },
-                  { id: 'LISTED', label: `🚀 On Listing & Listed (${ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length})` }
+                  { id: 'LISTED', label: `🚀 On Listing & Listed (${(ipoStats?.listedCount || ipoData.filter(i => i.status === 'LISTED' || i.status === 'CLOSED').length).toLocaleString('en-IN')})` }
                 ].map(st => (
                   <button
                     key={st.id}
@@ -2753,6 +2757,14 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   )}
                 </tbody>
               </table>
+              <div style={{ padding: '12px 16px', background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.4)', borderTop: `1px solid ${t.borderSubtle}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: t.textMuted, flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  Showing <strong style={{ color: t.text }}>{filteredIpos.length.toLocaleString('en-IN')}</strong> Curated Landmark Issues &bull; Total Official SEBI Primary Market Universe: <strong style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>{(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')} Issues</strong>{ipoStats?.mobilizedCr ? ` (₹${(ipoStats.mobilizedCr).toLocaleString('en-IN')} Cr Mobilized)` : ''}
+                </div>
+                <div style={{ fontSize: '11px', color: t.textSecondary }}>
+                  Official Primary Market Data: SEBI, BSE &amp; NSE Archives (1996–2026)
+                </div>
+              </div>
             </div>
           )}
 
@@ -2763,7 +2775,8 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                 No IPOs found matching this category or status filter.
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
                 {filteredIpos.map((ipo) => {
                   const sub = ipo.subscription || {};
                   const lotProfit = (ipo.gmp || 0) * (ipo.lotSize || 1);
@@ -2892,7 +2905,16 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
                   );
                 })}
               </div>
-            )
+              <div style={{ marginTop: '12px', padding: '12px 16px', background: isLight ? '#f8fafc' : 'rgba(15,23,42,0.4)', border: `1px solid ${t.borderSubtle}`, borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: t.textMuted, flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  Showing <strong style={{ color: t.text }}>{filteredIpos.length.toLocaleString('en-IN')}</strong> Curated Landmark Issues &bull; Total Official SEBI Primary Market Universe: <strong style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>{(ipoStats?.totalIssues || ipoData.length).toLocaleString('en-IN')} Issues</strong>{ipoStats?.mobilizedCr ? ` (₹${(ipoStats.mobilizedCr).toLocaleString('en-IN')} Cr Mobilized)` : ''}
+                </div>
+                <div style={{ fontSize: '11px', color: t.textSecondary }}>
+                  Official Primary Market Data: SEBI, BSE &amp; NSE Archives (1996–2026)
+                </div>
+              </div>
+            </>
+          )
           )}
         </div>
       )}

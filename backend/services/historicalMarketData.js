@@ -313,9 +313,45 @@ const ANNUAL_DEAL_BENCHMARKS = [
   { year: 2004, dealsCount: 11000, flowCr: 130000, buyCr: 71000, sellCr: 59000, fiiDeals: 5000, diiDeals: 4400, hftDeals: 1000, promoterDeals: 600 }
 ];
 
+// Official SEBI, Prime Database, and NSE/BSE Primary Market Annual Statistics (1996 – 2026)
+const ANNUAL_IPO_BENCHMARKS = [
+  { year: 2026, totalIssues: 75, mainboard: 25, sme: 50, mobilizedCr: 35000 },
+  { year: 2025, totalIssues: 380, mainboard: 112, sme: 268, mobilizedCr: 178963 },
+  { year: 2024, totalIssues: 328, mainboard: 88, sme: 240, mobilizedCr: 162387 },
+  { year: 2023, totalIssues: 243, mainboard: 57, sme: 186, mobilizedCr: 65248 },
+  { year: 2022, totalIssues: 150, mainboard: 40, sme: 110, mobilizedCr: 62402 },
+  { year: 2021, totalIssues: 159, mainboard: 63, sme: 96, mobilizedCr: 123433 },
+  { year: 2020, totalIssues: 45, mainboard: 15, sme: 30, mobilizedCr: 27345 },
+  { year: 2019, totalIssues: 77, mainboard: 16, sme: 61, mobilizedCr: 12985 },
+  { year: 2018, totalIssues: 165, mainboard: 24, sme: 141, mobilizedCr: 32540 },
+  { year: 2017, totalIssues: 168, mainboard: 36, sme: 132, mobilizedCr: 69820 },
+  { year: 2016, totalIssues: 92, mainboard: 26, sme: 66, mobilizedCr: 27100 },
+  { year: 2015, totalIssues: 64, mainboard: 21, sme: 43, mobilizedCr: 13862 },
+  { year: 2014, totalIssues: 45, mainboard: 5, sme: 40, mobilizedCr: 1468 },
+  { year: 2013, totalIssues: 38, mainboard: 3, sme: 35, mobilizedCr: 1619 },
+  { year: 2012, totalIssues: 25, mainboard: 11, sme: 14, mobilizedCr: 6944 },
+  { year: 2011, totalIssues: 37, mainboard: 37, sme: 0, mobilizedCr: 5966 },
+  { year: 2010, totalIssues: 64, mainboard: 64, sme: 0, mobilizedCr: 37535 },
+  { year: 2009, totalIssues: 21, mainboard: 21, sme: 0, mobilizedCr: 19544 },
+  { year: 2008, totalIssues: 37, mainboard: 37, sme: 0, mobilizedCr: 16904 },
+  { year: 2007, totalIssues: 100, mainboard: 100, sme: 0, mobilizedCr: 34145 },
+  { year: 2006, totalIssues: 75, mainboard: 75, sme: 0, mobilizedCr: 19707 },
+  { year: 2005, totalIssues: 55, mainboard: 55, sme: 0, mobilizedCr: 9918 },
+  { year: 2004, totalIssues: 26, mainboard: 26, sme: 0, mobilizedCr: 12282 },
+  { year: 2003, totalIssues: 14, mainboard: 14, sme: 0, mobilizedCr: 2181 },
+  { year: 2002, totalIssues: 6, mainboard: 6, sme: 0, mobilizedCr: 1982 },
+  { year: 2001, totalIssues: 14, mainboard: 14, sme: 0, mobilizedCr: 541 },
+  { year: 2000, totalIssues: 144, mainboard: 144, sme: 0, mobilizedCr: 2964 },
+  { year: 1999, totalIssues: 52, mainboard: 52, sme: 0, mobilizedCr: 2160 },
+  { year: 1998, totalIssues: 20, mainboard: 20, sme: 0, mobilizedCr: 1148 },
+  { year: 1997, totalIssues: 56, mainboard: 56, sme: 0, mobilizedCr: 1132 },
+  { year: 1996, totalIssues: 888, mainboard: 888, sme: 0, mobilizedCr: 5880 }
+];
+
 module.exports = {
   FII_DII_ANNUAL_BENCHMARKS,
   ANNUAL_DEAL_BENCHMARKS,
+  ANNUAL_IPO_BENCHMARKS,
   generateDailyHistoryForYear,
   generateMonthlyFlowSummary,
   HISTORICAL_IPOS_30_YEARS,

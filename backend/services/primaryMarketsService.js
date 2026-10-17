@@ -12,7 +12,8 @@ const {
   HISTORICAL_IPOS_30_YEARS,
   getHistoricalIpos,
   generateHistoricalDeals,
-  ANNUAL_DEAL_BENCHMARKS
+  ANNUAL_DEAL_BENCHMARKS,
+  ANNUAL_IPO_BENCHMARKS
 } = require('./historicalMarketData');
 
 // In-memory caches for <1ms paginated responses
@@ -1586,6 +1587,76 @@ function getIpoList(category = 'ALL', status = 'ALL', era = 'ALL') {
   return list;
 }
 
+// 🏛️ Official SEBI & Exchange Primary Market Macro Counts (1996 – 2026)
+function getIpoStats(era = 'ALL') {
+  const normEra = String(era || 'ALL').toUpperCase();
+
+  if (normEra === 'ACTIVE') {
+    let liveList = [];
+    if (typeof ipoLiveSyncService.getLiveIpoList === 'function') {
+      liveList = ipoLiveSyncService.getLiveIpoList('ALL', 'ALL') || [];
+    }
+    const active = liveList.filter(i => i.status === 'OPEN' || i.status === 'UPCOMING');
+    const mb = active.filter(i => i.category === 'MAINBOARD').length;
+    const sme = active.filter(i => i.category === 'SME').length;
+    const openCount = active.filter(i => i.status === 'OPEN').length;
+    const upCount = active.filter(i => i.status === 'UPCOMING').length;
+    return {
+      era: 'ACTIVE',
+      totalIssues: active.length,
+      mainboardCount: mb,
+      smeCount: sme,
+      openCount,
+      upcomingCount: upCount,
+      listedCount: 0,
+      mobilizedCr: active.reduce((acc, i) => acc + (i.issueSizeCr || 0), 0)
+    };
+  }
+
+  let matchingYears = ANNUAL_IPO_BENCHMARKS;
+  if (normEra === '2026_YTD' || normEra === '2026') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2026);
+  } else if (normEra === '2025') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2025);
+  } else if (normEra === '2024') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2024);
+  } else if (normEra === '2023') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2023);
+  } else if (normEra === '2022') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2022);
+  } else if (normEra === '2021') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year === 2021);
+  } else if (normEra === '2016_2020') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year >= 2016 && b.year <= 2020);
+  } else if (normEra === '2000_2015') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year >= 2000 && b.year <= 2015);
+  } else if (normEra === '1990S') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year < 2000);
+  } else if (normEra === 'PAST_3Y' || normEra === '3Y') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year >= 2023 && b.year <= 2026);
+  } else if (normEra === 'PAST_5Y' || normEra === '5Y') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year >= 2021 && b.year <= 2026);
+  } else if (normEra === 'PAST_10Y' || normEra === '10Y') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS.filter(b => b.year >= 2016 && b.year <= 2026);
+  } else if (normEra === 'ARCHIVE_30Y' || normEra === '30Y' || normEra === 'ALL') {
+    matchingYears = ANNUAL_IPO_BENCHMARKS;
+  }
+
+  const totalIssues = matchingYears.reduce((sum, b) => sum + (b.totalIssues || 0), 0);
+  const mainboardCount = matchingYears.reduce((sum, b) => sum + (b.mainboard || 0), 0);
+  const smeCount = matchingYears.reduce((sum, b) => sum + (b.sme || 0), 0);
+  const mobilizedCr = matchingYears.reduce((sum, b) => sum + (b.mobilizedCr || 0), 0);
+
+  return {
+    era: normEra,
+    totalIssues,
+    mainboardCount,
+    smeCount,
+    listedCount: totalIssues,
+    mobilizedCr
+  };
+}
+
 // ─── 🏦 OPTION B: SMART MONEY (FII / DII INSTITUTIONAL FLOW ENGINE - 30 DAYS TO 30 YEARS) ─────────────
 const cachedRangePulses = new Map();
 let lastRangePulseClearTime = Date.now();
@@ -2129,6 +2200,7 @@ module.exports = {
   getBhavcopyDeliveryScreener,
   getMarketDeals,
   getIpoList,
+  getIpoStats,
   getSmartMoneyPulse,
   getCorporateCalendar,
   getMarketScreener,

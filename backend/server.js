@@ -7571,18 +7571,22 @@ app.get('/api/primary-markets/screener', apiLimiter, (req, res) => {
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
+    const era = req.query.era || req.query.year || req.query.timeline || 'ALL';
     const list = primaryMarketsService.getIpoList(
       req.query.category || 'ALL',
       req.query.status || 'ALL',
-      req.query.era || req.query.year || req.query.timeline || 'ALL'
+      era
     );
+    const stats = typeof primaryMarketsService.getIpoStats === 'function'
+      ? primaryMarketsService.getIpoStats(era)
+      : null;
     const lastUpdated = typeof primaryMarketsService.getIpoLastUpdatedDisplay === 'function'
       ? primaryMarketsService.getIpoLastUpdatedDisplay()
       : 'Live Market Synced';
     const lastUpdatedIso = typeof primaryMarketsService.getIpoLastUpdatedIso === 'function'
       ? primaryMarketsService.getIpoLastUpdatedIso()
       : new Date().toISOString();
-    res.json({ success: true, count: list.length, lastUpdated, lastUpdatedIso, ipos: list });
+    res.json({ success: true, count: list.length, stats, lastUpdated, lastUpdatedIso, ipos: list });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
