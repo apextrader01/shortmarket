@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { 
   ComposedChart, 
   Area, 
@@ -64,6 +64,13 @@ export default function OptionsStrategyBuilder({
   const [targetDteOffset, setTargetDteOffset] = useState(0); // Days forward from Today (0 = Today, diffDays = Expiry)
   const [multiplier, setMultiplier] = useState(1); // Multiplier for all lots
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const prices = useStore(state => state.prices);
 
@@ -598,19 +605,19 @@ export default function OptionsStrategyBuilder({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px', color: 'var(--text-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', padding: isMobile ? '16px 12px' : '24px', color: 'var(--text-primary)' }}>
       
       {/* ⚡ HEADER BAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', margin: 0, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>{symbol} Strategy Builder</span>
           </h2>
           <span style={{ padding: '3px 10px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderRadius: '20px', fontSize: '11px', fontWeight: '700', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
             {dte.toFixed(0)} DTE ({expiryDate})
           </span>
           {spotPrice > 0 && (
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: isMobile ? '12px' : '13px', fontWeight: '700', color: 'var(--text-secondary)' }}>
               Spot: <strong style={{ color: 'var(--text-primary)' }}>₹{spotPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             </span>
           )}
@@ -717,7 +724,7 @@ export default function OptionsStrategyBuilder({
       </div>
 
       {/* ⚡ MAIN CONTENT SPLIT: LEGS & GREEKS (LEFT) + PAYOFF CHART (RIGHT) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.35fr', gap: isMobile ? '16px' : '20px', alignItems: 'start' }}>
         
         {/* LEFT COLUMN: GREEKS, SLIDERS & LEGS TABLE */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -815,7 +822,7 @@ export default function OptionsStrategyBuilder({
           </div>
 
           {/* Legs Table */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1082,7 +1089,7 @@ export default function OptionsStrategyBuilder({
           </div>
 
           {/* Chart Container */}
-          <div style={{ width: '100%', height: '420px' }}>
+          <div style={{ width: '100%', height: isMobile ? '320px' : '420px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data} margin={{ top: 20, right: 24, left: 24, bottom: 20 }}>
                 <defs>
