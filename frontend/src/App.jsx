@@ -1766,20 +1766,8 @@ function App() {
                         border: theme === 'light' ? '1px solid rgba(2, 132, 199, 0.25)' : 'none'
                       }} 
                     />
-                    <span style={{
-                      fontSize: '16px',
-                      fontWeight: '800',
-                      letterSpacing: '-0.5px',
-                      color: theme === 'light' ? '#0f172a' : 'var(--text-primary, #ffffff)',
-                      fontFamily: "'Outfit', sans-serif"
-                    }}>
-                      Skand<span style={{
-                        background: theme === 'light'
-                          ? 'linear-gradient(135deg, #0284c7 0%, #10b981 100%)'
-                          : 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                      }}>X</span>
+                    <span className="skandx-brand-name">
+                      Skand<span className="skandx-brand-x">X</span>
                     </span>
                     {isStagingEnv && (
                       <span style={{

@@ -796,25 +796,15 @@ const OptionChainViewInternal = () => {
       <div className="option-chain-top-bar">
         {/* Section 1: Major Index Switcher & Spot Price */}
         <div className="top-bar-section" style={{ gap: '10px' }}>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <div className="option-chain-pill-group">
             {ALLOWED_INDEX_SYMBOLS.map((idxSym) => {
               const isSelected = symbol === idxSym;
               return (
                 <button
                   key={idxSym}
+                  type="button"
                   onClick={() => setSymbol(idxSym)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '6px',
-                    fontSize: '11.5px',
-                    fontWeight: isSelected ? '800' : '600',
-                    border: isSelected ? '1px solid #3b82f6' : '1px solid transparent',
-                    background: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                    color: isSelected ? '#60a5fa' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    letterSpacing: '0.3px'
-                  }}
+                  className={`option-chain-index-btn ${isSelected ? 'active' : ''}`}
                 >
                   {idxSym}
                 </button>
@@ -866,7 +856,7 @@ const OptionChainViewInternal = () => {
         {/* Section 3.5: Synthetic Futures Price (Put-Call Parity) */}
         <div className="top-bar-section" title="Synthetic Futures Price derived via Put-Call Parity from ATM options">
           <span className="top-bar-label">Synth Fut</span>
-          <span className="top-bar-value" style={{ fontWeight: '700', color: '#60a5fa' }}>
+          <span className="top-bar-value" style={{ fontWeight: '700', color: 'var(--color-blue, #2563eb)' }}>
             {synthFutPrice > 0 ? synthFutPrice.toFixed(2) : '-'}
           </span>
         </div>
@@ -895,7 +885,7 @@ const OptionChainViewInternal = () => {
             <div className="top-bar-divider"></div>
             <div className="top-bar-section" title="Strike price where option sellers face minimal cumulative loss">
               <span className="top-bar-label">Max Pain</span>
-              <span className="top-bar-value" style={{ fontWeight: '800', color: '#f59e0b' }}>
+              <span className="top-bar-value" style={{ fontWeight: '800', color: 'var(--color-yellow, #d97706)' }}>
                 {maxPain}
               </span>
             </div>
@@ -909,42 +899,20 @@ const OptionChainViewInternal = () => {
           <button
             type="button"
             onClick={() => setShowGreeks(!showGreeks)}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '6px',
-              fontSize: '11px',
-              fontWeight: '700',
-              background: showGreeks ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-              border: showGreeks ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: showGreeks ? '#60a5fa' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.15s ease'
-            }}
+            className={`option-chain-greeks-btn ${showGreeks ? 'active' : ''}`}
             title="Toggle Delta, Theta, Vega, and IV columns"
           >
             <SlidersHorizontal size={12} />
             Greeks {showGreeks ? 'ON' : 'OFF'}
           </button>
 
-          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '2px' }}>
+          <div className="option-chain-range-group">
             {['10', '20', 'ALL'].map(rng => (
               <button
                 key={rng}
                 type="button"
                 onClick={() => setStrikeRange(rng)}
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '10.5px',
-                  fontWeight: strikeRange === rng ? '700' : '500',
-                  background: strikeRange === rng ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                  color: strikeRange === rng ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className={`option-chain-range-btn ${strikeRange === rng ? 'active' : ''}`}
               >
                 {rng === 'ALL' ? 'All' : `±${rng}`}
               </button>
@@ -1101,7 +1069,7 @@ const OptionChainViewInternal = () => {
               <th className="center">LTP</th>
               <th className="center border-right">BrkEvn(%)</th>
               {/* Strike */}
-              <th className="header-strike" style={{ background: '#111' }}>Strike</th>
+              <th className="header-strike">Strike</th>
               {/* Puts */}
               <th className="center border-left">BrkEvn(%)</th>
               <th className="center">LTP</th>

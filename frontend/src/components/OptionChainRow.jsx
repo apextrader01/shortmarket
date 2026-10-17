@@ -109,7 +109,7 @@ const OptionChainRow = React.memo(({
   
   const cBreakPct = (cBreakeven > 0 && referencePrice > 0) ? ((cBreakeven / referencePrice) - 1) * 100 : 0;
   const pBreakPct = (pBreakeven > 0 && referencePrice > 0) ? ((pBreakeven / referencePrice) - 1) * 100 : 0;
-  const atmClass = strike === atmStrike ? 'bg-blue-900/40 border-y border-blue-500/50 relative' : 'border-b border-gray-800/50 hover:bg-gray-800/50';
+  const atmClass = strike === atmStrike ? 'option-chain-atm-row' : 'option-chain-row';
 
   const cOiWidth = (maxCallOI && maxCallOI > 0) ? Math.min(100, Math.round((cOi / maxCallOI) * 100)) : 0;
   const pOiWidth = (maxPutOI && maxPutOI > 0) ? Math.min(100, Math.round((pOi / maxPutOI) * 100)) : 0;
@@ -188,7 +188,7 @@ const OptionChainRow = React.memo(({
       <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
         {cBreakeven > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-            <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{cBreakeven.toFixed(1)}</span>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-primary)' }}>{cBreakeven.toFixed(1)}</span>
             <span style={{ fontSize: '10px', color: cBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               ({cBreakPct > 0 ? '+' : ''}{cBreakPct.toFixed(1)}%)
             </span>
@@ -199,7 +199,7 @@ const OptionChainRow = React.memo(({
       {/* Strike */}
       <td className="strike-cell" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-          <span style={{ fontWeight: strike === atmStrike ? '800' : '700', color: strike === atmStrike ? '#60a5fa' : 'inherit' }}>
+          <span style={{ fontWeight: strike === atmStrike ? '800' : '700', color: strike === atmStrike ? 'var(--color-blue, #2563eb)' : 'inherit' }}>
             {strike}
           </span>
           {strike === atmStrike && (
@@ -222,7 +222,7 @@ const OptionChainRow = React.memo(({
       <td className={`center border-left ${isPutITM ? 'bg-itm-put' : ''}`}>
         {pBreakeven > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-            <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{pBreakeven.toFixed(1)}</span>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-primary)' }}>{pBreakeven.toFixed(1)}</span>
             <span style={{ fontSize: '10px', color: pBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               ({pBreakPct > 0 ? '+' : ''}{pBreakPct.toFixed(1)}%)
             </span>

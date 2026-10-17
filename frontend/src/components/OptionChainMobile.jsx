@@ -386,7 +386,7 @@ export default function OptionChainMobile({
                   background: isCallITM ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
                   position: 'relative',
                   cursor: 'pointer',
-                  borderRight: '1px solid rgba(255, 255, 255, 0.06)'
+                  borderRight: '1px solid var(--border-color)'
                 }}
               >
                 {/* Visual OI Bar (only in OI mode) */}
@@ -448,7 +448,7 @@ export default function OptionChainMobile({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: isATM ? 'rgba(59, 130, 246, 0.22)' : 'rgba(0, 0, 0, 0.2)',
+                  background: isATM ? 'rgba(59, 130, 246, 0.18)' : 'var(--bg-panel, rgba(0, 0, 0, 0.06))',
                   borderLeft: isATM ? '2px solid #3b82f6' : 'none',
                   borderRight: isATM ? '2px solid #3b82f6' : 'none',
                   position: 'relative'
@@ -457,7 +457,7 @@ export default function OptionChainMobile({
                 <span style={{ 
                   fontSize: '12.5px', 
                   fontWeight: isATM ? '800' : '700', 
-                  color: isATM ? '#60a5fa' : 'var(--text-primary)',
+                  color: isATM ? 'var(--color-blue, #2563eb)' : 'var(--text-primary)',
                   fontVariantNumeric: 'tabular-nums' 
                 }}>
                   {strike}
@@ -490,7 +490,7 @@ export default function OptionChainMobile({
                   background: isPutITM ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
                   position: 'relative',
                   cursor: 'pointer',
-                  borderLeft: '1px solid rgba(255, 255, 255, 0.06)'
+                  borderLeft: '1px solid var(--border-color)'
                 }}
               >
                 {/* Visual OI Bar (only in OI mode) */}
@@ -570,7 +570,7 @@ export default function OptionChainMobile({
             style={{
               background: 'var(--bg-secondary, #0f172a)',
               borderRadius: '16px 16px 0 0',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+              borderTop: '1px solid var(--border-color)',
               padding: '16px 18px',
               paddingBottom: 'max(14px, calc(14px + env(safe-area-inset-bottom, 0px)))',
               boxShadow: '0 -10px 40px rgba(0,0,0,0.7)',
@@ -582,14 +582,14 @@ export default function OptionChainMobile({
           >
             {/* Sheet Handle */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '-4px' }}>
-              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'rgba(255, 255, 255, 0.2)' }} />
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--border-color, rgba(255, 255, 255, 0.2))' }} />
             </div>
 
             {/* Header: Contract Name, Tag, LTP */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                  <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>
                     {symbol} {selectedContract.strike} {selectedContract.type}
                   </span>
                   <span style={{
@@ -625,9 +625,9 @@ export default function OptionChainMobile({
               gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '6px',
               padding: '10px',
-              background: 'rgba(255, 255, 255, 0.03)',
+              background: 'var(--bg-panel, rgba(255, 255, 255, 0.03))',
               borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border-color)',
               textAlign: 'center'
             }}>
               <div>
@@ -661,8 +661,8 @@ export default function OptionChainMobile({
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: 'var(--bg-panel, rgba(255, 255, 255, 0.04))',
+                  border: '1px solid var(--border-color)',
                   color: 'var(--text-primary)',
                   fontSize: '11.5px',
                   fontWeight: '600',
@@ -686,8 +686,8 @@ export default function OptionChainMobile({
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: 'var(--bg-panel, rgba(255, 255, 255, 0.04))',
+                  border: '1px solid var(--border-color)',
                   color: 'var(--text-primary)',
                   fontSize: '11.5px',
                   fontWeight: '600',
@@ -720,8 +720,8 @@ export default function OptionChainMobile({
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: 'var(--bg-panel, rgba(255, 255, 255, 0.04))',
+                  border: '1px solid var(--border-color)',
                   color: 'var(--text-primary)',
                   fontSize: '11.5px',
                   fontWeight: '600',
@@ -745,8 +745,8 @@ export default function OptionChainMobile({
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: 'var(--bg-panel, rgba(255, 255, 255, 0.04))',
+                  border: '1px solid var(--border-color)',
                   color: 'var(--text-primary)',
                   fontSize: '11.5px',
                   fontWeight: '600',

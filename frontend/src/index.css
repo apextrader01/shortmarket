@@ -1331,6 +1331,41 @@ input:checked + .slider:before {
 .logo-text-premium span {
   background: linear-gradient(to right, #38bdf8, #34d399);
   -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* Brand SkandX Logo Text */
+.skandx-brand-name {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-primary, #ffffff);
+  font-family: 'Outfit', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+[data-theme='light'] .skandx-brand-name {
+  color: #0f172a !important;
+}
+
+.skandx-brand-x {
+  display: inline-block;
+  font-weight: 800;
+  color: #38bdf8;
+  background: linear-gradient(135deg, #38bdf8 0%, #34d399 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: 0.5px;
+}
+[data-theme='light'] .skandx-brand-x {
+  color: #0284c7 !important;
+  background: linear-gradient(135deg, #0284c7 0%, #059669 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -1811,42 +1846,230 @@ select option {
   background: #f8fafc !important;
 }
 
-/* Strike cell & Option Chain in Light Mode */
-[data-theme='light'] .strike-cell {
-  background: #f8fafc !important;
+/* Option Chain Top Bar Pill & Range Controls */
+.option-chain-pill-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+[data-theme='light'] .option-chain-pill-group {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.option-chain-index-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.3px;
+}
+.option-chain-index-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+.option-chain-index-btn.active {
+  font-weight: 800;
+  border: 1px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+}
+[data-theme='light'] .option-chain-index-btn {
+  color: #475569 !important;
+}
+[data-theme='light'] .option-chain-index-btn:hover {
+  background: #e2e8f0 !important;
   color: #0f172a !important;
-  border-right: 1px solid #e2e8f0 !important;
+}
+[data-theme='light'] .option-chain-index-btn.active {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1.5px solid #2563eb !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15) !important;
 }
 
-[data-theme='light'] .option-chain-table th.header-call {
+.option-chain-range-group {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2px;
+}
+[data-theme='light'] .option-chain-range-group {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.option-chain-range-btn {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+.option-chain-range-btn:hover {
+  color: var(--text-primary);
+}
+.option-chain-range-btn.active {
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+[data-theme='light'] .option-chain-range-btn {
+  color: #64748b !important;
+}
+[data-theme='light'] .option-chain-range-btn:hover {
+  color: #0f172a !important;
+}
+[data-theme='light'] .option-chain-range-btn.active {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+
+.option-chain-greeks-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.option-chain-greeks-btn.active {
+  background: rgba(59, 130, 246, 0.25);
+  border: 1px solid #3b82f6;
+  color: #60a5fa;
+}
+[data-theme='light'] .option-chain-greeks-btn {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+}
+[data-theme='light'] .option-chain-greeks-btn.active {
   background: #eff6ff !important;
-  color: #1d4ed8 !important;
-  border-right: 1px solid #e2e8f0 !important;
+  border: 1.5px solid #2563eb !important;
+  color: #2563eb !important;
 }
 
+/* Option Chain Row and ATM Styles */
+.option-chain-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.15s ease;
+}
+.option-chain-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme='light'] .option-chain-row {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+[data-theme='light'] .option-chain-row:hover {
+  background: #f8fafc !important;
+}
+
+.option-chain-atm-row {
+  background: rgba(37, 99, 235, 0.22) !important;
+  border-top: 1.5px solid #3b82f6 !important;
+  border-bottom: 1.5px solid #3b82f6 !important;
+  position: relative;
+}
+[data-theme='light'] .option-chain-atm-row {
+  background: #eff6ff !important;
+  border-top: 1.5px solid #3b82f6 !important;
+  border-bottom: 1.5px solid #3b82f6 !important;
+}
+[data-theme='light'] .option-chain-atm-row td.strike-cell {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  font-weight: 800 !important;
+}
+[data-theme='light'] .option-chain-atm-row td {
+  background: #eff6ff !important;
+}
+
+/* Strike cell & Option Chain in Light Mode */
+[data-theme='light'] .option-chain-container {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+[data-theme='light'] .option-chain-top-bar {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+[data-theme='light'] .top-bar-divider {
+  background: #e2e8f0 !important;
+}
+[data-theme='light'] .top-bar-label {
+  color: #64748b !important;
+}
+[data-theme='light'] .top-bar-value {
+  color: #0f172a !important;
+}
+[data-theme='light'] .option-chain-table th {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-top: 1px solid #e2e8f0 !important;
+}
+[data-theme='light'] .option-chain-table th.header-call {
+  background: #f0fdf4 !important;
+  color: #15803d !important;
+  border-right: 1px solid #cbd5e1 !important;
+  font-weight: 800 !important;
+}
 [data-theme='light'] .option-chain-table th.header-put {
   background: #fef2f2 !important;
   color: #b91c1c !important;
+  border-left: 1px solid #cbd5e1 !important;
+  font-weight: 800 !important;
 }
-
 [data-theme='light'] .option-chain-table th.header-strike {
-  background: #f8fafc !important;
-  color: #334155 !important;
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-left: 1px solid #cbd5e1 !important;
+  border-right: 1px solid #cbd5e1 !important;
+  font-weight: 800 !important;
+}
+[data-theme='light'] .option-chain-table td {
+  border-bottom: 1px solid #f1f5f9 !important;
+  color: #0f172a !important;
+}
+[data-theme='light'] .option-chain-table td.border-right {
   border-right: 1px solid #e2e8f0 !important;
 }
-
-[data-theme='light'] .bg-itm-call {
-  background: rgba(245, 158, 11, 0.09) !important;
+[data-theme='light'] .option-chain-table td.border-left {
+  border-left: 1px solid #e2e8f0 !important;
 }
-
-[data-theme='light'] .bg-itm-put {
-  background: rgba(245, 158, 11, 0.09) !important;
-}
-
 [data-theme='light'] .strike-cell {
-  background: #f1f5f9 !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
   border-left: 1px solid #e2e8f0 !important;
   border-right: 1px solid #e2e8f0 !important;
+  font-weight: 700 !important;
+}
+[data-theme='light'] .bg-itm-call {
+  background: #fffbeb !important;
+}
+[data-theme='light'] .bg-itm-put {
+  background: #fffbeb !important;
 }
 
 /* Inputs, Selects & Modals */
