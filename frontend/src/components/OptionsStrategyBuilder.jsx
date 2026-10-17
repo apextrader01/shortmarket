@@ -57,7 +57,8 @@ export default function OptionsStrategyBuilder({
   onUpdateLeg,
   onAddLeg,
   onClose,
-  onExecute
+  onExecute,
+  onSelectTemplate
 }) {
   const [targetPriceOffset, setTargetPriceOffset] = useState(0); // Offset in Rupees from spot
   const [targetDteOffset, setTargetDteOffset] = useState(0); // Days forward from Today (0 = Today, diffDays = Expiry)
@@ -481,9 +482,116 @@ export default function OptionsStrategyBuilder({
 
   if (!legs || legs.length === 0) {
     return (
-      <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        <p style={{ fontSize: '16px', marginBottom: '16px' }}>No legs in Strategy Builder.</p>
-        <p style={{ fontSize: '13px' }}>Select a ready-made template above or click <strong>BUY / SELL</strong> on any strike in the Option Chain table.</p>
+      <div style={{ padding: '32px 24px', color: 'var(--text-primary)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '6px', letterSpacing: '-0.3px' }}>
+            {symbol} Strategy Builder
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto' }}>
+            Select a pre-built options strategy below to instantly compute institutional payoff curves, Greeks, and P&L metrics with real-time live prices.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', maxWidth: '1100px', margin: '0 auto' }}>
+          {/* Bullish */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <TrendingUp size={14} /> Bullish Strategies
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('bull_call_spread')}
+                style={{ textAlign: 'left', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Bull Call Spread</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Buy ATM Call + Sell OTM Call (Debit)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('bull_put_spread')}
+                style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Bull Put Spread</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sell OTM Put + Buy lower Put (Credit)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('buy_call')}
+                style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Buy Call (ATM CE)</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Single-Leg Directional Long Call</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Bearish */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <TrendingDown size={14} /> Bearish Strategies
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('bear_put_spread')}
+                style={{ textAlign: 'left', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Bear Put Spread</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Buy ATM Put + Sell OTM Put (Debit)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('bear_call_spread')}
+                style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Bear Call Spread</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sell OTM Call + Buy higher Call (Credit)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('buy_put')}
+                style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Buy Put (ATM PE)</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Single-Leg Directional Long Put</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Rangebound & Volatility */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Zap size={14} /> Neutral & Volatility
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('short_straddle')}
+                style={{ textAlign: 'left', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Short Straddle</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sell ATM CE + Sell ATM PE (Neutral)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('iron_condor')}
+                style={{ textAlign: 'left', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Iron Condor</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sell OTM Strangle + Buy wings (Defined Risk)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectTemplate?.('long_straddle')}
+                style={{ textAlign: 'left', background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>Long Straddle</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Buy ATM CE + Buy ATM PE (High Volatility)</div>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -508,6 +616,44 @@ export default function OptionsStrategyBuilder({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {onSelectTemplate && (
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  onSelectTemplate(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              defaultValue=""
+              style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '11.5px',
+                fontWeight: '700',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="" disabled style={{ background: '#0f172a', color: '#fff' }}>Switch Strategy...</option>
+              <option value="bull_call_spread" style={{ background: '#0f172a', color: '#fff' }}>Bull Call Spread</option>
+              <option value="bear_put_spread" style={{ background: '#0f172a', color: '#fff' }}>Bear Put Spread</option>
+              <option value="bull_put_spread" style={{ background: '#0f172a', color: '#fff' }}>Bull Put Spread (Credit)</option>
+              <option value="bear_call_spread" style={{ background: '#0f172a', color: '#fff' }}>Bear Call Spread (Credit)</option>
+              <option value="short_straddle" style={{ background: '#0f172a', color: '#fff' }}>Short Straddle</option>
+              <option value="long_straddle" style={{ background: '#0f172a', color: '#fff' }}>Long Straddle</option>
+              <option value="short_strangle" style={{ background: '#0f172a', color: '#fff' }}>Short Strangle</option>
+              <option value="long_strangle" style={{ background: '#0f172a', color: '#fff' }}>Long Strangle</option>
+              <option value="iron_condor" style={{ background: '#0f172a', color: '#fff' }}>Iron Condor</option>
+              <option value="iron_butterfly" style={{ background: '#0f172a', color: '#fff' }}>Iron Butterfly</option>
+              <option value="buy_call" style={{ background: '#0f172a', color: '#fff' }}>Buy Call (ATM CE)</option>
+              <option value="sell_put" style={{ background: '#0f172a', color: '#fff' }}>Sell Put (ATM PE)</option>
+              <option value="buy_put" style={{ background: '#0f172a', color: '#fff' }}>Buy Put (ATM PE)</option>
+              <option value="sell_call" style={{ background: '#0f172a', color: '#fff' }}>Sell Call (ATM CE)</option>
+            </select>
+          )}
           <button 
             type="button" 
             onClick={handleResetPrices}

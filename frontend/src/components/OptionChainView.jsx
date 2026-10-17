@@ -2,10 +2,11 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore, API } from '../store';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
 import OptionChainMobile from './OptionChainMobile';
-import { Clock, ChevronLeft, SlidersHorizontal, Activity } from 'lucide-react';
+import { Clock, ChevronLeft, SlidersHorizontal, Activity, Zap, Layers, ChevronDown } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -187,9 +188,152 @@ export const resolveOptionLivePrice = (legOrOpt, storePrices) => {
                 (key && prices[key]);
 
   if (match?.ltp && Number(match.ltp) > 0) return Number(match.ltp);
+  if (legOrOpt.livePrice && Number(legOrOpt.livePrice) > 0) return Number(legOrOpt.livePrice);
   if (legOrOpt.price && Number(legOrOpt.price) > 0) return Number(legOrOpt.price);
   if (legOrOpt.ltp && Number(legOrOpt.ltp) > 0) return Number(legOrOpt.ltp);
+  if (legOrOpt.close && Number(legOrOpt.close) > 0) return Number(legOrOpt.close);
+  if (legOrOpt.last_price && Number(legOrOpt.last_price) > 0) return Number(legOrOpt.last_price);
   return 0;
+};
+
+export const STRATEGY_TEMPLATES = [
+  {
+    category: 'Single Leg (1 Strike)',
+    items: [
+      { id: 'buy_call', name: 'Buy Call (ATM CE)', desc: 'Bullish • 1 Leg • Buy ATM Call', tag: 'BULLISH', tagColor: '#10b981' },
+      { id: 'sell_put', name: 'Sell Put (ATM PE)', desc: 'Bullish • 1 Leg • Sell ATM Put', tag: 'BULLISH', tagColor: '#10b981' },
+      { id: 'buy_put', name: 'Buy Put (ATM PE)', desc: 'Bearish • 1 Leg • Buy ATM Put', tag: 'BEARISH', tagColor: '#ef4444' },
+      { id: 'sell_call', name: 'Sell Call (ATM CE)', desc: 'Bearish • 1 Leg • Sell ATM Call', tag: 'BEARISH', tagColor: '#ef4444' }
+    ]
+  },
+  {
+    category: 'Spreads (2 Strikes)',
+    items: [
+      { id: 'bull_call_spread', name: 'Bull Call Spread', desc: 'Bullish Debit Spread (Buy ATM, Sell OTM Call)', tag: 'DEBIT', tagColor: '#38bdf8' },
+      { id: 'bear_put_spread', name: 'Bear Put Spread', desc: 'Bearish Debit Spread (Buy ATM, Sell OTM Put)', tag: 'DEBIT', tagColor: '#38bdf8' },
+      { id: 'bull_put_spread', name: 'Bull Put Spread (Credit)', desc: 'Bullish Credit Spread (Sell OTM Put, Buy deeper OTM)', tag: 'CREDIT', tagColor: '#10b981' },
+      { id: 'bear_call_spread', name: 'Bear Call Spread (Credit)', desc: 'Bearish Credit Spread (Sell OTM Call, Buy deeper OTM)', tag: 'CREDIT', tagColor: '#10b981' }
+    ]
+  },
+  {
+    category: 'Straddles & Strangles',
+    items: [
+      { id: 'short_straddle', name: 'Short Straddle', desc: 'Neutral • Sell ATM CE + Sell ATM PE', tag: 'NEUTRAL', tagColor: '#f59e0b' },
+      { id: 'long_straddle', name: 'Long Straddle', desc: 'Volatility • Buy ATM CE + Buy ATM PE', tag: 'VOLATILITY', tagColor: '#a855f7' },
+      { id: 'short_strangle', name: 'Short Strangle', desc: 'Neutral • Sell OTM CE + Sell OTM PE', tag: 'NEUTRAL', tagColor: '#f59e0b' },
+      { id: 'long_strangle', name: 'Long Strangle', desc: 'Volatility • Buy OTM CE + Buy OTM PE', tag: 'VOLATILITY', tagColor: '#a855f7' }
+    ]
+  },
+  {
+    category: 'Multi-Leg (4 Strikes)',
+    items: [
+      { id: 'iron_condor', name: 'Iron Condor', desc: 'Neutral Defined Risk (Sell OTM Put/Call, Buy wings)', tag: 'DEFINED RISK', tagColor: '#38bdf8' },
+      { id: 'iron_butterfly', name: 'Iron Butterfly', desc: 'Neutral Defined Risk (Sell ATM Straddle, Buy wings)', tag: 'DEFINED RISK', tagColor: '#38bdf8' }
+    ]
+  }
+];
+
+export const StrategyTemplateDropdown = ({ onSelect, alignRight = true }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: 'rgba(255, 255, 255, 0.06)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          borderRadius: '6px',
+          padding: '5px 10px',
+          fontSize: '11.5px',
+          fontWeight: '700',
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        <Layers size={12} style={{ color: 'var(--color-blue, #2563eb)' }} />
+        <span>Templates</span>
+        <ChevronDown size={11} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+      </button>
+
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            ...(alignRight ? { right: 0 } : { left: 0 }),
+            width: '290px',
+            maxHeight: '390px',
+            overflowY: 'auto',
+            background: 'var(--bg-panel, #0f172a)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '10px',
+            padding: '6px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+            zIndex: 1050,
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          {STRATEGY_TEMPLATES.map((cat, ci) => (
+            <div key={ci} style={{ marginBottom: '8px' }}>
+              <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {cat.category}
+              </div>
+              {cat.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item.id);
+                    setIsOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    transition: 'background 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.name}</span>
+                    <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', color: item.tagColor }}>
+                      {item.tag}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{item.desc}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const OptionChainViewInternal = () => {
@@ -706,14 +850,27 @@ const OptionChainViewInternal = () => {
   }
 
   const applyTemplate = (templateId) => {
-    if (!templateId || !optionsData || Object.keys(optionsData).length === 0 || !atmStrike) return;
+    if (!templateId || !optionsData || Object.keys(optionsData).length === 0) return;
     
-    const atmIndex = strikes.indexOf(atmStrike);
+    const targetStrikeList = (allStrikes && allStrikes.length > 0) ? allStrikes : strikes;
+    if (targetStrikeList.length === 0) return;
+
+    let currentAtm = atmStrike;
+    if (!currentAtm && targetSpot > 0) {
+      currentAtm = targetStrikeList.reduce((prev, curr) => 
+        Math.abs(curr - targetSpot) < Math.abs(prev - targetSpot) ? curr : prev
+      );
+    }
+    if (!currentAtm) currentAtm = targetStrikeList[Math.floor(targetStrikeList.length / 2)];
+
+    const atmIndex = targetStrikeList.indexOf(currentAtm);
+    if (atmIndex === -1) return;
+
     let newLegs = [];
 
     const getLeg = (strikeIdx, type, side) => {
-      if (strikeIdx < 0 || strikeIdx >= strikes.length) return null;
-      const strike = strikes[strikeIdx];
+      if (strikeIdx < 0 || strikeIdx >= targetStrikeList.length) return null;
+      const strike = targetStrikeList[strikeIdx];
       const option = optionsData[expiry]?.[strike];
       if (!option) return null;
       const legData = type === 'CE' ? option.CE : option.PE;
@@ -814,7 +971,8 @@ const OptionChainViewInternal = () => {
 
     if (newLegs.length > 0) {
       setStrategyLegs(newLegs);
-      if (!strategyModalOpen) setStrategyModalOpen(true);
+      setStrategyMode(true);
+      setStrategyModalOpen(true);
     }
   };
 
@@ -1037,46 +1195,36 @@ const OptionChainViewInternal = () => {
               />
               <span className="slider round"></span>
             </label>
-            {strategyMode && strategyLegs.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '10px' }}>
               <button 
-                onClick={() => setStrategyModalOpen(true)}
-                className="btn-mini buy" 
-                style={{ marginLeft: '12px', padding: '4px 8px', borderRadius: '4px', background: 'var(--color-blue)', color: '#fff' }}
+                type="button"
+                onClick={() => {
+                  setStrategyMode(true);
+                  setStrategyModalOpen(true);
+                }}
+                className="btn-mini" 
+                style={{ 
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: strategyLegs.length > 0 ? 'var(--color-blue, #2563eb)' : 'rgba(37, 99, 235, 0.15)',
+                  color: strategyLegs.length > 0 ? '#ffffff' : 'var(--color-blue, #38bdf8)',
+                  border: '1px solid rgba(37, 99, 235, 0.4)',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Open Strategy Builder Modal"
               >
-                View Strategy ({strategyLegs.length})
+                <Zap size={12} />
+                <span>Builder {strategyLegs.length > 0 ? `(${strategyLegs.length})` : ''}</span>
               </button>
-            )}
-            {strategyMode && (
-              <select 
-                onChange={(e) => { applyTemplate(e.target.value); e.target.value = ""; }}
-                style={{ marginLeft: '12px', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
-                value=""
-              >
-                <option value="" disabled>Load Template...</option>
-                <optgroup label="Single Leg (1 Strike)">
-                  <option value="buy_call">Buy Call (ATM CE)</option>
-                  <option value="sell_put">Sell Put (ATM PE)</option>
-                  <option value="buy_put">Buy Put (ATM PE)</option>
-                  <option value="sell_call">Sell Call (ATM CE)</option>
-                </optgroup>
-                <optgroup label="Spreads (2 Strikes)">
-                  <option value="bull_call_spread">Bull Call Spread</option>
-                  <option value="bear_put_spread">Bear Put Spread</option>
-                  <option value="bull_put_spread">Bull Put Spread (Credit)</option>
-                  <option value="bear_call_spread">Bear Call Spread (Credit)</option>
-                </optgroup>
-                <optgroup label="Straddles & Strangles">
-                  <option value="short_straddle">Short Straddle</option>
-                  <option value="long_straddle">Long Straddle</option>
-                  <option value="short_strangle">Short Strangle</option>
-                  <option value="long_strangle">Long Strangle</option>
-                </optgroup>
-                <optgroup label="Multi-Leg (4 Strikes)">
-                  <option value="iron_condor">Iron Condor</option>
-                  <option value="iron_butterfly">Iron Butterfly</option>
-                </optgroup>
-              </select>
-            )}
+
+              <StrategyTemplateDropdown onSelect={applyTemplate} alignRight={true} />
+            </div>
           </div>
         </div>
       </div>
@@ -1098,6 +1246,7 @@ const OptionChainViewInternal = () => {
               strikes={strikes}
               allStrikes={allStrikes}
               chain={chain}
+              onSelectTemplate={applyTemplate}
               onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
               onClear={() => setStrategyLegs([])}
               onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
