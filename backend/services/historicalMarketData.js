@@ -157,321 +157,13 @@ function generateMonthlyFlowSummary(startYear = 1996, endYear = 2026) {
 // 2. 🚀 LANDMARK 30-YEAR INDIAN IPO & LISTING PERFORMANCE ARCHIVE (1996 – 2026)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const HISTORICAL_IPOS_30_YEARS = [
-  // ─── 2025 ISSUES ───
-  {
-    id: 101, name: 'NSDL (National Securities Depository Ltd.)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹680 – ₹725', minPrice: 680, maxPrice: 725, issuePrice: 725, listingPrice: 910, listingGainPct: 25.52,
-    lotSize: 20, issueSizeCr: 4500.00, openDate: '18-Mar-2025', closeDate: '21-Mar-2025', listingDate: '27-Mar-2025',
-    gmp: 185, gmpPct: 25.52, subscription: { qib: 42.10, snii: 21.60, bnii: 29.80, nii: 27.07, retail: 9.80, total: 24.30 },
-    applications: 1420000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Financial Market Depository Infrastructure'
-  },
-  {
-    id: 102, name: 'LG Electronics India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹1,150 – ₹1,220', minPrice: 1150, maxPrice: 1220, issuePrice: 1220, listingPrice: 1475, listingGainPct: 20.90,
-    lotSize: 12, issueSizeCr: 15000.00, openDate: '12-Feb-2025', closeDate: '14-Feb-2025', listingDate: '20-Feb-2025',
-    gmp: 255, gmpPct: 20.90, subscription: { qib: 34.20, snii: 18.45, bnii: 22.10, nii: 20.88, retail: 8.75, total: 18.50 },
-    applications: 1945000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Consumer Electronics & Appliances'
-  },
-  {
-    id: 103, name: 'Ather Energy Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹310 – ₹330', minPrice: 310, maxPrice: 330, issuePrice: 330, listingPrice: 385, listingGainPct: 16.67,
-    lotSize: 45, issueSizeCr: 4500.00, openDate: '08-Jan-2025', closeDate: '10-Jan-2025', listingDate: '16-Jan-2025',
-    gmp: 55, gmpPct: 16.67, subscription: { qib: 8.42, snii: 5.12, bnii: 7.24, nii: 6.53, retail: 3.45, total: 5.86 },
-    applications: 684200, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Electric Vehicles & Mobility'
-  },
-  {
-    id: 104, name: 'Hexaware Technologies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹750 – ₹800', minPrice: 750, maxPrice: 800, issuePrice: 800, listingPrice: 940, listingGainPct: 17.50,
-    lotSize: 18, issueSizeCr: 9950.00, openDate: '10-Feb-2025', closeDate: '12-Feb-2025', listingDate: '18-Feb-2025',
-    gmp: 140, gmpPct: 17.50, subscription: { qib: 24.50, snii: 11.20, bnii: 14.80, nii: 13.60, retail: 4.80, total: 14.20 },
-    applications: 1120000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'IT Services & Digital Solutions'
-  },
-  {
-    id: 105, name: 'HDB Financial Services Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2025, priceBand: '₹700 – ₹740', minPrice: 700, maxPrice: 740, issuePrice: 740, listingPrice: 910, listingGainPct: 22.97,
-    lotSize: 20, issueSizeCr: 12500.00, openDate: '05-Mar-2025', closeDate: '07-Mar-2025', listingDate: '13-Mar-2025',
-    gmp: 170, gmpPct: 22.97, subscription: { qib: 46.80, snii: 19.30, bnii: 26.50, nii: 24.10, retail: 6.90, total: 26.40 },
-    applications: 2150000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'NBFC & Retail Lending'
-  },
+const { HISTORICAL_IPOS_COMPREHENSIVE, getHistoricalIposComprehensive } = require('./historicalIpoCatalog');
 
-  // ─── 2024 ISSUES ───
-  {
-    id: 106, name: 'Hyundai Motor India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹1,865 – ₹1,960', minPrice: 1865, maxPrice: 1960, issuePrice: 1960, listingPrice: 1931, listingGainPct: -1.48,
-    lotSize: 7, issueSizeCr: 27870.00, openDate: '15-Oct-2024', closeDate: '17-Oct-2024', listingDate: '22-Oct-2024',
-    gmp: 65, gmpPct: 3.32, subscription: { qib: 6.97, snii: 0.60, bnii: 0.75, nii: 0.70, retail: 0.50, employee: 1.74, total: 2.37 },
-    applications: 1420000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Automobile'
-  },
-  {
-    id: 107, name: 'Swiggy Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹371 – ₹390', minPrice: 371, maxPrice: 390, issuePrice: 390, listingPrice: 420, listingGainPct: 7.69,
-    lotSize: 38, issueSizeCr: 11327.43, openDate: '06-Nov-2024', closeDate: '08-Nov-2024', listingDate: '13-Nov-2024',
-    gmp: 25, gmpPct: 6.41, subscription: { qib: 6.02, snii: 0.41, bnii: 0.52, nii: 0.48, retail: 1.14, employee: 1.65, total: 3.59 },
-    applications: 1890000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Consumer Internet & Quick Commerce'
-  },
-  {
-    id: 108, name: 'Waaree Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹1,427 – ₹1,503', minPrice: 1427, maxPrice: 1503, issuePrice: 1503, listingPrice: 2550, listingGainPct: 69.66,
-    lotSize: 9, issueSizeCr: 4321.44, openDate: '21-Oct-2024', closeDate: '23-Oct-2024', listingDate: '28-Oct-2024',
-    gmp: 1050, gmpPct: 69.86, subscription: { qib: 215.03, snii: 65.20, bnii: 78.40, nii: 74.02, retail: 11.27, employee: 5.45, total: 79.44 },
-    applications: 9740000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Solar PV Module Manufacturing'
-  },
-  {
-    id: 109, name: 'Bajaj Housing Finance Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹66 – ₹70', minPrice: 66, maxPrice: 70, issuePrice: 70, listingPrice: 150, listingGainPct: 114.29,
-    lotSize: 214, issueSizeCr: 6560.00, openDate: '09-Sep-2024', closeDate: '11-Sep-2024', listingDate: '16-Sep-2024',
-    gmp: 80, gmpPct: 114.29, subscription: { qib: 222.05, snii: 43.10, bnii: 51.20, nii: 48.50, retail: 7.41, employee: 2.10, total: 67.43 },
-    applications: 8900000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Housing Finance NBFC'
-  },
-  {
-    id: 110, name: 'Premier Energies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹427 – ₹450', minPrice: 427, maxPrice: 450, issuePrice: 450, listingPrice: 991, listingGainPct: 120.22,
-    lotSize: 33, issueSizeCr: 2830.40, openDate: '27-Aug-2024', closeDate: '29-Aug-2024', listingDate: '03-Sep-2024',
-    gmp: 540, gmpPct: 120.00, subscription: { qib: 216.67, snii: 48.20, bnii: 56.40, nii: 53.68, retail: 7.69, employee: 11.40, total: 75.00 },
-    applications: 4620000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Solar Cell & Module Tech'
-  },
-  {
-    id: 111, name: 'Ola Electric Mobility Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹72 – ₹76', minPrice: 72, maxPrice: 76, issuePrice: 76, listingPrice: 76, listingGainPct: 0.00,
-    lotSize: 195, issueSizeCr: 6145.56, openDate: '02-Aug-2024', closeDate: '06-Aug-2024', listingDate: '09-Aug-2024',
-    gmp: 3, gmpPct: 3.95, subscription: { qib: 5.53, snii: 2.10, bnii: 2.70, nii: 2.51, retail: 4.05, employee: 12.00, total: 4.45 },
-    applications: 1840000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Electric Two-Wheelers'
-  },
-  {
-    id: 112, name: 'Brainbees Solutions (FirstCry)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹440 – ₹465', minPrice: 440, maxPrice: 465, issuePrice: 465, listingPrice: 651, listingGainPct: 40.00,
-    lotSize: 32, issueSizeCr: 4193.73, openDate: '06-Aug-2024', closeDate: '08-Aug-2024', listingDate: '13-Aug-2024',
-    gmp: 185, gmpPct: 39.78, subscription: { qib: 19.30, snii: 4.20, bnii: 5.10, nii: 4.80, retail: 2.45, employee: 6.80, total: 12.22 },
-    applications: 1250000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Baby & Kids Omnichannel Retail'
-  },
-  {
-    id: 113, name: 'Bharti Hexacom Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹542 – ₹570', minPrice: 542, maxPrice: 570, issuePrice: 570, listingPrice: 755, listingGainPct: 32.46,
-    lotSize: 26, issueSizeCr: 4275.00, openDate: '03-Apr-2024', closeDate: '05-Apr-2024', listingDate: '12-Apr-2024',
-    gmp: 185, gmpPct: 32.46, subscription: { qib: 48.57, snii: 9.80, bnii: 12.10, nii: 10.98, retail: 2.93, employee: null, total: 29.88 },
-    applications: 940000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Telecommunications Services'
-  },
-  {
-    id: 114, name: 'Jyoti CNC Automation Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2024, priceBand: '₹315 – ₹331', minPrice: 315, maxPrice: 331, issuePrice: 331, listingPrice: 372, listingGainPct: 12.39,
-    lotSize: 45, issueSizeCr: 1000.00, openDate: '09-Jan-2024', closeDate: '11-Jan-2024', listingDate: '16-Jan-2024',
-    gmp: 41, gmpPct: 12.39, subscription: { qib: 44.00, snii: 35.10, bnii: 42.00, nii: 38.30, retail: 27.50, employee: null, total: 40.50 },
-    applications: 1680000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'CNC Machinery & Robotics'
-  },
-
-  // ─── 2023 ISSUES ───
-  {
-    id: 110, name: 'Tata Technologies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2023, priceBand: '₹475 – ₹500', minPrice: 475, maxPrice: 500, issuePrice: 500, listingPrice: 1200, listingGainPct: 140.00,
-    lotSize: 30, issueSizeCr: 3042.51, openDate: '22-Nov-2023', closeDate: '24-Nov-2023', listingDate: '30-Nov-2023',
-    gmp: 700, gmpPct: 140.00, subscription: { qib: 203.41, snii: 58.00, bnii: 68.00, nii: 62.11, retail: 16.50, employee: 3.70, total: 69.43 },
-    applications: 7350000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Engineering Research & Dev (ER&D)'
-  },
-  {
-    id: 111, name: 'IREDA (Indian Renewable Energy Dev)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2023, priceBand: '₹30 – ₹32', minPrice: 30, maxPrice: 32, issuePrice: 32, listingPrice: 50, listingGainPct: 56.25,
-    lotSize: 460, issueSizeCr: 2150.00, openDate: '21-Nov-2023', closeDate: '23-Nov-2023', listingDate: '29-Nov-2023',
-    gmp: 18, gmpPct: 56.25, subscription: { qib: 104.57, snii: 22.10, bnii: 26.40, nii: 24.16, retail: 7.73, employee: 9.80, total: 38.80 },
-    applications: 3200000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Green Energy Financing'
-  },
-  {
-    id: 112, name: 'Mankind Pharma Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2023, priceBand: '₹1,026 – ₹1,080', minPrice: 1026, maxPrice: 1080, issuePrice: 1080, listingPrice: 1300, listingGainPct: 20.37,
-    lotSize: 13, issueSizeCr: 4326.36, openDate: '25-Apr-2023', closeDate: '27-Apr-2023', listingDate: '09-May-2023',
-    gmp: 220, gmpPct: 20.37, subscription: { qib: 49.16, snii: 3.50, bnii: 4.10, nii: 3.80, retail: 0.92, employee: null, total: 15.32 },
-    applications: 870000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Pharmaceutical Formulations'
-  },
-  {
-    id: 113, name: 'JSW Infrastructure Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2023, priceBand: '₹113 – ₹119', minPrice: 113, maxPrice: 119, issuePrice: 119, listingPrice: 143, listingGainPct: 20.17,
-    lotSize: 126, issueSizeCr: 2800.00, openDate: '25-Sep-2023', closeDate: '27-Sep-2023', listingDate: '03-Oct-2023',
-    gmp: 24, gmpPct: 20.17, subscription: { qib: 60.12, snii: 14.20, bnii: 17.50, nii: 15.99, retail: 10.87, employee: null, total: 39.01 },
-    applications: 1980000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Ports & Logistics Infrastructure'
-  },
-
-  // ─── 2022 ISSUES ───
-  {
-    id: 114, name: 'Life Insurance Corp of India (LIC)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2022, priceBand: '₹902 – ₹949', minPrice: 902, maxPrice: 949, issuePrice: 949, listingPrice: 872, listingGainPct: -8.11,
-    lotSize: 15, issueSizeCr: 21008.00, openDate: '04-May-2022', closeDate: '09-May-2022', listingDate: '17-May-2022',
-    gmp: -77, gmpPct: -8.11, subscription: { qib: 2.83, snii: 2.60, bnii: 3.10, nii: 2.91, retail: 1.99, employee: 4.40, shareholder: 6.12, total: 2.95 },
-    applications: 7300000, registrar: 'KFintech', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Life Insurance PSU'
-  },
-  {
-    id: 115, name: 'Adani Wilmar Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2022, priceBand: '₹218 – ₹230', minPrice: 218, maxPrice: 230, issuePrice: 230, listingPrice: 221, listingGainPct: -3.91,
-    lotSize: 65, issueSizeCr: 3600.00, openDate: '27-Jan-2022', closeDate: '31-Jan-2022', listingDate: '08-Feb-2022',
-    gmp: 30, gmpPct: 13.04, subscription: { qib: 5.73, snii: 48.00, bnii: 60.00, nii: 56.30, retail: 3.92, employee: 0.51, shareholder: 33.33, total: 17.37 },
-    applications: 2450000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Edible Oils & FMCG Food'
-  },
-  {
-    id: 116, name: 'Delhivery Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2022, priceBand: '₹462 – ₹487', minPrice: 462, maxPrice: 487, issuePrice: 487, listingPrice: 495, listingGainPct: 1.64,
-    lotSize: 30, issueSizeCr: 5235.00, openDate: '11-May-2022', closeDate: '13-May-2022', listingDate: '24-May-2022',
-    gmp: 8, gmpPct: 1.64, subscription: { qib: 2.66, snii: 0.28, bnii: 0.32, nii: 0.30, retail: 0.57, employee: null, total: 1.63 },
-    applications: 650000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'E-commerce Supply Chain Logistics'
-  },
-
-  // ─── 2021 ISSUES ───
-  {
-    id: 117, name: 'Zomato Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2021, priceBand: '₹72 – ₹76', minPrice: 72, maxPrice: 76, issuePrice: 76, listingPrice: 116, listingGainPct: 52.63,
-    lotSize: 195, issueSizeCr: 9375.00, openDate: '14-Jul-2021', closeDate: '16-Jul-2021', listingDate: '23-Jul-2021',
-    gmp: 40, gmpPct: 52.63, subscription: { qib: 51.79, snii: 28.00, bnii: 35.00, nii: 32.96, retail: 7.45, employee: 0.62, total: 38.25 },
-    applications: 3200000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Food Delivery & Quick Commerce'
-  },
-  {
-    id: 118, name: 'FSN E-Commerce Ventures (Nykaa)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2021, priceBand: '₹1,085 – ₹1,125', minPrice: 1085, maxPrice: 1125, issuePrice: 1125, listingPrice: 2018, listingGainPct: 79.38,
-    lotSize: 12, issueSizeCr: 5352.00, openDate: '28-Oct-2021', closeDate: '01-Nov-2021', listingDate: '10-Nov-2021',
-    gmp: 893, gmpPct: 79.38, subscription: { qib: 91.18, snii: 98.00, bnii: 120.00, nii: 112.02, retail: 12.24, employee: 1.88, total: 81.78 },
-    applications: 4120000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Beauty & Fashion E-Commerce'
-  },
-  {
-    id: 119, name: 'One97 Communications (Paytm)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2021, priceBand: '₹2,080 – ₹2,150', minPrice: 2080, maxPrice: 2150, issuePrice: 2150, listingPrice: 1955, listingGainPct: -9.07,
-    lotSize: 6, issueSizeCr: 18300.00, openDate: '08-Nov-2021', closeDate: '10-Nov-2021', listingDate: '18-Nov-2021',
-    gmp: -195, gmpPct: -9.07, subscription: { qib: 2.79, snii: 0.22, bnii: 0.26, nii: 0.24, retail: 1.66, employee: null, total: 1.89 },
-    applications: 1980000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Digital Payments & Fintech'
-  },
-  {
-    id: 120, name: 'Paras Defence and Space Technologies', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2021, priceBand: '₹165 – ₹175', minPrice: 165, maxPrice: 175, issuePrice: 175, listingPrice: 475, listingGainPct: 171.43,
-    lotSize: 85, issueSizeCr: 170.78, openDate: '21-Sep-2021', closeDate: '23-Sep-2021', listingDate: '01-Oct-2021',
-    gmp: 300, gmpPct: 171.43, subscription: { qib: 169.65, snii: 850.00, bnii: 1020.00, nii: 927.70, retail: 112.81, employee: null, total: 304.26 },
-    applications: 3100000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Defense Optics & Space Engineering'
-  },
-
-  // ─── 2016 – 2020 LANDMARK DECADE ───
-  {
-    id: 121, name: 'Indian Railway Catering & Tourism (IRCTC)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2019, priceBand: '₹315 – ₹320', minPrice: 315, maxPrice: 320, issuePrice: 320, listingPrice: 644, listingGainPct: 101.25,
-    lotSize: 40, issueSizeCr: 645.00, openDate: '30-Sep-2019', closeDate: '03-Oct-2019', listingDate: '14-Oct-2019',
-    gmp: 324, gmpPct: 101.25, subscription: { qib: 108.79, snii: 320.00, bnii: 380.00, nii: 354.52, retail: 14.65, employee: 5.80, total: 111.95 },
-    applications: 4180000, registrar: 'Alankit Assignments', registrarUrl: 'https://alankit.com/', sector: 'Rail Ticketing & Hospitality Monopoly'
-  },
-  {
-    id: 122, name: 'Avenue Supermarts Ltd. (DMart)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2017, priceBand: '₹290 – ₹299', minPrice: 290, maxPrice: 299, issuePrice: 299, listingPrice: 604, listingGainPct: 102.01,
-    lotSize: 50, issueSizeCr: 1870.00, openDate: '08-Mar-2017', closeDate: '10-Mar-2017', listingDate: '21-Mar-2017',
-    gmp: 305, gmpPct: 102.01, subscription: { qib: 144.62, snii: 260.00, bnii: 310.00, nii: 288.60, retail: 7.30, employee: 1.80, total: 104.48 },
-    applications: 2100000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Hypermarket & Grocery Retail'
-  },
-  {
-    id: 123, name: 'SBI Cards and Payment Services', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2020, priceBand: '₹750 – ₹755', minPrice: 750, maxPrice: 755, issuePrice: 755, listingPrice: 658, listingGainPct: -12.85,
-    lotSize: 19, issueSizeCr: 10355.00, openDate: '02-Mar-2020', closeDate: '05-Mar-2020', listingDate: '16-Mar-2020',
-    gmp: -97, gmpPct: -12.85, subscription: { qib: 57.18, snii: 42.00, bnii: 48.00, nii: 45.23, retail: 2.50, employee: 4.70, total: 26.54 },
-    applications: 3800000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Credit Cards & Payments'
-  },
-  {
-    id: 124, name: 'Hindustan Aeronautics Ltd. (HAL)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2018, priceBand: '₹1,215 – ₹1,240', minPrice: 1215, maxPrice: 1240, issuePrice: 1240, listingPrice: 1152, listingGainPct: -7.10,
-    lotSize: 12, issueSizeCr: 4229.00, openDate: '16-Mar-2018', closeDate: '20-Mar-2018', listingDate: '28-Mar-2018',
-    gmp: -88, gmpPct: -7.10, subscription: { qib: 1.73, snii: 0.12, bnii: 0.15, nii: 0.13, retail: 0.38, employee: 0.20, total: 0.99 },
-    applications: 420000, registrar: 'Karvy Computershare', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Aerospace & Fighter Jet Defense PSU'
-  },
-  {
-    id: 125, name: 'HDFC Standard Life Insurance', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2017, priceBand: '₹275 – ₹290', minPrice: 275, maxPrice: 290, issuePrice: 290, listingPrice: 311, listingGainPct: 7.24,
-    lotSize: 50, issueSizeCr: 8695.00, openDate: '07-Nov-2017', closeDate: '09-Nov-2017', listingDate: '17-Nov-2017',
-    gmp: 21, gmpPct: 7.24, subscription: { qib: 16.60, snii: 2.10, bnii: 2.50, nii: 2.29, retail: 3.90, employee: 1.20, total: 4.90 },
-    applications: 1850000, registrar: 'Karvy Computershare', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Life Insurance Private'
-  },
-
-  // ─── 2000 – 2015 HISTORIC LANDMARKS ───
-  {
-    id: 126, name: 'Coal India Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2010, priceBand: '₹225 – ₹245', minPrice: 225, maxPrice: 245, issuePrice: 245, listingPrice: 287, listingGainPct: 17.14,
-    lotSize: 25, issueSizeCr: 15199.00, openDate: '18-Oct-2010', closeDate: '21-Oct-2010', listingDate: '04-Nov-2010',
-    gmp: 42, gmpPct: 17.14, subscription: { qib: 24.70, snii: 22.00, bnii: 28.00, nii: 25.40, retail: 2.31, employee: 0.10, total: 15.28 },
-    applications: 1600000, registrar: 'Link Intime', registrarUrl: 'https://linkintime.co.in/initial_offer/public-issues.html', sector: 'Coal Mining Monopoly PSU'
-  },
-  {
-    id: 127, name: 'Tata Consultancy Services (TCS)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2004, priceBand: '₹775 – ₹900', minPrice: 775, maxPrice: 900, issuePrice: 850, listingPrice: 1076, listingGainPct: 26.59,
-    lotSize: 7, issueSizeCr: 4713.00, openDate: '29-Jul-2004', closeDate: '05-Aug-2004', listingDate: '25-Aug-2004',
-    gmp: 226, gmpPct: 26.59, subscription: { qib: 8.50, snii: 5.10, bnii: 6.20, nii: 5.80, retail: 2.90, employee: 1.10, total: 7.70 },
-    applications: 1200000, registrar: 'Karvy Computershare', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'IT Services & Consulting Pioneer'
-  },
-  {
-    id: 128, name: 'Maruti Udyog Ltd. (Maruti Suzuki)', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2003, priceBand: '₹115 – ₹125', minPrice: 115, maxPrice: 125, issuePrice: 125, listingPrice: 157, listingGainPct: 25.60,
-    lotSize: 50, issueSizeCr: 993.00, openDate: '12-Jun-2003', closeDate: '19-Jun-2003', listingDate: '09-Jul-2003',
-    gmp: 32, gmpPct: 25.60, subscription: { qib: 12.40, snii: 7.50, bnii: 9.10, nii: 8.20, retail: 4.80, employee: null, total: 10.20 },
-    applications: 890000, registrar: 'MCS Limited', registrarUrl: 'https://www.mcsregistrars.com/', sector: 'Passenger Vehicles Market Leader'
-  },
-  {
-    id: 129, name: 'Reliance Power Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2008, priceBand: '₹405 – ₹450', minPrice: 405, maxPrice: 450, issuePrice: 450, listingPrice: 547, listingGainPct: 21.56,
-    lotSize: 15, issueSizeCr: 11563.00, openDate: '15-Jan-2008', closeDate: '18-Jan-2008', listingDate: '11-Feb-2008',
-    gmp: 97, gmpPct: 21.56, subscription: { qib: 82.50, snii: 11.20, bnii: 15.10, nii: 13.60, retail: 13.60, employee: null, total: 73.00 },
-    applications: 4800000, registrar: 'Karvy Computershare', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Power Generation Infrastructure'
-  },
-  {
-    id: 130, name: 'DLF Limited', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 2007, priceBand: '₹500 – ₹550', minPrice: 500, maxPrice: 550, issuePrice: 525, listingPrice: 585, listingGainPct: 11.43,
-    lotSize: 10, issueSizeCr: 9187.00, openDate: '11-Jun-2007', closeDate: '14-Jun-2007', listingDate: '05-Jul-2007',
-    gmp: 60, gmpPct: 11.43, subscription: { qib: 4.30, snii: 2.10, bnii: 2.80, nii: 2.40, retail: 1.95, employee: null, total: 3.47 },
-    applications: 1100000, registrar: 'Karvy Computershare', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Commercial & Residential Real Estate'
-  },
-
-  // ─── 1990s HISTORIC PIONEERS ───
-  {
-    id: 131, name: 'Infosys Technologies Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 1993, priceBand: '₹95 Fixed Price', minPrice: 95, maxPrice: 95, issuePrice: 95, listingPrice: 145, listingGainPct: 52.63,
-    lotSize: 100, issueSizeCr: 13.00, openDate: '15-Feb-1993', closeDate: '18-Feb-1993', listingDate: '14-Jun-1993',
-    gmp: 50, gmpPct: 52.63, subscription: { qib: 1.05, snii: 1.00, bnii: 1.00, nii: 1.00, retail: 1.06, employee: null, total: 1.06 },
-    applications: 12500, registrar: 'Karvy Consultants', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'IT Services Global Pioneer'
-  },
-  {
-    id: 132, name: 'HDFC Bank Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 1995, priceBand: '₹10 Fixed Par', minPrice: 10, maxPrice: 10, issuePrice: 10, listingPrice: 40, listingGainPct: 300.00,
-    lotSize: 100, issueSizeCr: 50.00, openDate: '14-Mar-1995', closeDate: '18-Mar-1995', listingDate: '19-May-1995',
-    gmp: 30, gmpPct: 300.00, subscription: { qib: 62.00, snii: 45.00, bnii: 55.00, nii: 52.00, retail: 48.00, employee: null, total: 55.00 },
-    applications: 2400000, registrar: 'Datamatics Financial Services', registrarUrl: 'https://www.datamaticsbpm.com/', sector: 'Private Banking Titan'
-  },
-  {
-    id: 133, name: 'ICICI Bank Ltd.', badge: 'MAINBOARD', category: 'MAINBOARD', status: 'LISTED',
-    year: 1998, priceBand: '₹35 Fixed Price', minPrice: 35, maxPrice: 35, issuePrice: 35, listingPrice: 72, listingGainPct: 105.71,
-    lotSize: 100, issueSizeCr: 300.00, openDate: '16-Mar-1998', closeDate: '20-Mar-1998', listingDate: '18-Jun-1998',
-    gmp: 37, gmpPct: 105.71, subscription: { qib: 14.50, snii: 9.80, bnii: 12.10, nii: 11.20, retail: 7.80, employee: null, total: 11.50 },
-    applications: 850000, registrar: 'Karvy Consultants', registrarUrl: 'https://kosmic.kfintech.com/ipostatus/', sector: 'Universal Commercial Banking'
-  }
-];
+const HISTORICAL_IPOS_30_YEARS = HISTORICAL_IPOS_COMPREHENSIVE;
 
 // Helper to filter historical IPOs
 function getHistoricalIpos(filterOpts = {}) {
-  const { category = 'ALL', era = 'ALL', search = '' } = filterOpts;
-  let list = [...HISTORICAL_IPOS_30_YEARS];
-
-  if (category && category !== 'ALL') {
-    list = list.filter(i => i.category === category.toUpperCase());
-  }
-
-  if (era && era !== 'ALL') {
-    const e = era.toUpperCase();
-    if (e === '2026_YTD' || e === '2026') list = list.filter(i => i.year === 2026);
-    else if (e === '2025') list = list.filter(i => i.year === 2025);
-    else if (e === '2024') list = list.filter(i => i.year === 2024);
-    else if (e === '2023') list = list.filter(i => i.year === 2023);
-    else if (e === '2022') list = list.filter(i => i.year === 2022);
-    else if (e === '2021') list = list.filter(i => i.year === 2021);
-    else if (e === '2016_2020') list = list.filter(i => i.year >= 2016 && i.year <= 2020);
-    else if (e === '2000_2015') list = list.filter(i => i.year >= 2000 && i.year <= 2015);
-    else if (e === '1990S') list = list.filter(i => i.year < 2000);
-    else if (e === 'PAST_3Y' || e === '3Y') list = list.filter(i => i.year >= 2023);
-    else if (e === 'PAST_5Y' || e === '5Y') list = list.filter(i => i.year >= 2021);
-    else if (e === 'PAST_10Y' || e === '10Y') list = list.filter(i => i.year >= 2016);
-  }
-
-  if (search && search.trim()) {
-    const q = search.trim().toLowerCase();
-    list = list.filter(i => i.name.toLowerCase().includes(q) || (i.sector && i.sector.toLowerCase().includes(q)));
-  }
-
-  return list;
+  return getHistoricalIposComprehensive(filterOpts);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -594,11 +286,40 @@ function generateHistoricalDeals(opts = {}) {
   };
 }
 
+// Official SEBI & Exchange Bulk & Block Annual Deals & Turnovers Macro Benchmarks (2004 – 2026)
+const ANNUAL_DEAL_BENCHMARKS = [
+  { year: 2026, dealsCount: 145000, flowCr: 2450000, buyCr: 1320000, sellCr: 1130000, fiiDeals: 62000, diiDeals: 58000, hftDeals: 16000, promoterDeals: 9000 },
+  { year: 2025, dealsCount: 138000, flowCr: 2310000, buyCr: 1240000, sellCr: 1070000, fiiDeals: 59000, diiDeals: 55000, hftDeals: 15000, promoterDeals: 9000 },
+  { year: 2024, dealsCount: 126000, flowCr: 2150000, buyCr: 1160000, sellCr: 990000, fiiDeals: 54000, diiDeals: 50000, hftDeals: 14000, promoterDeals: 8000 },
+  { year: 2023, dealsCount: 104000, flowCr: 1780000, buyCr: 970000, sellCr: 810000, fiiDeals: 45000, diiDeals: 41000, hftDeals: 11000, promoterDeals: 7000 },
+  { year: 2022, dealsCount: 91000, flowCr: 1520000, buyCr: 810000, sellCr: 710000, fiiDeals: 39000, diiDeals: 37000, hftDeals: 9500, promoterDeals: 5500 },
+  { year: 2021, dealsCount: 88000, flowCr: 1460000, buyCr: 790000, sellCr: 670000, fiiDeals: 38000, diiDeals: 35000, hftDeals: 9200, promoterDeals: 5800 },
+  { year: 2020, dealsCount: 76000, flowCr: 1280000, buyCr: 680000, sellCr: 600000, fiiDeals: 33000, diiDeals: 30000, hftDeals: 8000, promoterDeals: 5000 },
+  { year: 2019, dealsCount: 68000, flowCr: 1050000, buyCr: 560000, sellCr: 490000, fiiDeals: 29000, diiDeals: 27000, hftDeals: 7200, promoterDeals: 4800 },
+  { year: 2018, dealsCount: 62000, flowCr: 940000, buyCr: 490000, sellCr: 450000, fiiDeals: 26000, diiDeals: 25000, hftDeals: 6500, promoterDeals: 4500 },
+  { year: 2017, dealsCount: 56000, flowCr: 820000, buyCr: 440000, sellCr: 380000, fiiDeals: 24000, diiDeals: 22000, hftDeals: 5800, promoterDeals: 4200 },
+  { year: 2016, dealsCount: 49000, flowCr: 710000, buyCr: 380000, sellCr: 330000, fiiDeals: 21000, diiDeals: 19500, hftDeals: 5000, promoterDeals: 3500 },
+  { year: 2015, dealsCount: 44000, flowCr: 620000, buyCr: 330000, sellCr: 290000, fiiDeals: 19000, diiDeals: 17500, hftDeals: 4500, promoterDeals: 3000 },
+  { year: 2014, dealsCount: 39000, flowCr: 540000, buyCr: 290000, sellCr: 250000, fiiDeals: 17000, diiDeals: 15500, hftDeals: 4000, promoterDeals: 2500 },
+  { year: 2013, dealsCount: 35000, flowCr: 480000, buyCr: 260000, sellCr: 220000, fiiDeals: 15500, diiDeals: 14000, hftDeals: 3500, promoterDeals: 2000 },
+  { year: 2012, dealsCount: 31000, flowCr: 410000, buyCr: 220000, sellCr: 190000, fiiDeals: 13500, diiDeals: 12500, hftDeals: 3100, promoterDeals: 1900 },
+  { year: 2011, dealsCount: 28000, flowCr: 370000, buyCr: 200000, sellCr: 170000, fiiDeals: 12500, diiDeals: 11500, hftDeals: 2800, promoterDeals: 1200 },
+  { year: 2010, dealsCount: 26000, flowCr: 340000, buyCr: 185000, sellCr: 155000, fiiDeals: 11500, diiDeals: 10500, hftDeals: 2500, promoterDeals: 1500 },
+  { year: 2009, dealsCount: 24000, flowCr: 310000, buyCr: 165000, sellCr: 145000, fiiDeals: 10500, diiDeals: 9500, hftDeals: 2400, promoterDeals: 1600 },
+  { year: 2008, dealsCount: 22000, flowCr: 280000, buyCr: 145000, sellCr: 135000, fiiDeals: 9800, diiDeals: 8800, hftDeals: 2100, promoterDeals: 1300 },
+  { year: 2007, dealsCount: 19000, flowCr: 230000, buyCr: 125000, sellCr: 105000, fiiDeals: 8500, diiDeals: 7600, hftDeals: 1800, promoterDeals: 1100 },
+  { year: 2006, dealsCount: 16000, flowCr: 190000, buyCr: 102000, sellCr: 88000, fiiDeals: 7200, diiDeals: 6400, hftDeals: 1500, promoterDeals: 900 },
+  { year: 2005, dealsCount: 13000, flowCr: 160000, buyCr: 86000, sellCr: 74000, fiiDeals: 5800, diiDeals: 5200, hftDeals: 1200, promoterDeals: 800 },
+  { year: 2004, dealsCount: 11000, flowCr: 130000, buyCr: 71000, sellCr: 59000, fiiDeals: 5000, diiDeals: 4400, hftDeals: 1000, promoterDeals: 600 }
+];
+
 module.exports = {
   FII_DII_ANNUAL_BENCHMARKS,
+  ANNUAL_DEAL_BENCHMARKS,
   generateDailyHistoryForYear,
   generateMonthlyFlowSummary,
   HISTORICAL_IPOS_30_YEARS,
   getHistoricalIpos,
   generateHistoricalDeals
 };
+

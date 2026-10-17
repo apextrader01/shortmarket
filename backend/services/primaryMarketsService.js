@@ -11,7 +11,8 @@ const {
   generateMonthlyFlowSummary,
   HISTORICAL_IPOS_30_YEARS,
   getHistoricalIpos,
-  generateHistoricalDeals
+  generateHistoricalDeals,
+  ANNUAL_DEAL_BENCHMARKS
 } = require('./historicalMarketData');
 
 // In-memory caches for <1ms paginated responses
@@ -1190,39 +1191,38 @@ function getMarketDeals(query = {}) {
                                 dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE';
 
   let scopeBase = [];
+  let isMacroMode = false;
+  let targetYears = [];
 
   if (isSpecificYear) {
-    const yr = dateRange.replace('YEAR_', '');
+    isMacroMode = true;
+    const yr = parseInt(dateRange.replace('YEAR_', ''), 10);
+    targetYears = [yr];
     scopeBase = generateHistoricalDeals({ year: yr, limit: 300 }).deals;
   } else if (isMultiYearHistorical) {
-    // Sample top recent mega-deals so multiple historical years are immediately visible on page 1
-    const recentLimit = (dateRange === 'ALL_TIME' || dateRange === 'ARCHIVE') ? 6 :
-                        (dateRange === '10Y' || dateRange === 'PAST_10_YEARS') ? 8 :
-                        (dateRange === '5Y' || dateRange === 'PAST_5_YEARS') ? 10 : 15;
-    const recentProminent = marketDealsCache
-      .filter(d => (minSize > 0 ? (d.valueCr || 0) >= minSize : true))
-      .slice(0, recentLimit);
-
-    let histPool = [];
+    isMacroMode = true;
     if (dateRange === '3Y' || dateRange === 'PAST_3_YEARS') {
-      [2025, 2024, 2023].forEach(y => {
-        histPool.push(...generateHistoricalDeals({ year: y, limit: 35 }).deals);
+      targetYears = [2026, 2025, 2024, 2023];
+      targetYears.forEach(y => {
+        scopeBase.push(...generateHistoricalDeals({ year: y, limit: 60 }).deals);
       });
     } else if (dateRange === '5Y' || dateRange === 'PAST_5_YEARS') {
-      [2025, 2024, 2023, 2022, 2021].forEach(y => {
-        histPool.push(...generateHistoricalDeals({ year: y, limit: 25 }).deals);
+      targetYears = [2026, 2025, 2024, 2023, 2022, 2021];
+      targetYears.forEach(y => {
+        scopeBase.push(...generateHistoricalDeals({ year: y, limit: 45 }).deals);
       });
     } else if (dateRange === '10Y' || dateRange === 'PAST_10_YEARS') {
-      [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016].forEach(y => {
-        histPool.push(...generateHistoricalDeals({ year: y, limit: 20 }).deals);
+      targetYears = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016];
+      targetYears.forEach(y => {
+        scopeBase.push(...generateHistoricalDeals({ year: y, limit: 30 }).deals);
       });
     } else {
-      // 22Y Archive: 2004 to 2025
-      [2025, 2024, 2023, 2022, 2021, 2020, 2018, 2016, 2015, 2014, 2012, 2010, 2008, 2006, 2004].forEach(y => {
-        histPool.push(...generateHistoricalDeals({ year: y, limit: 15 }).deals);
+      // 22Y Archive (2004 - 2026)
+      targetYears = ANNUAL_DEAL_BENCHMARKS.map(b => b.year);
+      targetYears.forEach(y => {
+        scopeBase.push(...generateHistoricalDeals({ year: y, limit: 18 }).deals);
       });
     }
-    scopeBase = [...recentProminent, ...histPool];
   } else {
     scopeBase = marketDealsCache.filter(d => {
       if (dateRange === 'TODAY' || dateRange === 'LATEST') {
@@ -1264,17 +1264,57 @@ function getMarketDeals(query = {}) {
   let diiCount = 0;
   let hftCount = 0;
   let promoterCount = 0;
+  let macroTotalDeals = 0;
+  let macroFlowCr = 0;
+  let macroBuyCr = 0;
+  let macroSellCr = 0;
+  let macroFiiDeals = 0;
+  let macroDiiDeals = 0;
+  let macroHftDeals = 0;
+  let macroPromoterDeals = 0;
 
-  scopeBase.forEach(d => {
-    if (d.dealType === 'BULK_DEAL') bulkCount++;
-    else if (d.dealType === 'BLOCK_DEAL') blockCount++;
-    else if (d.dealType === 'INSIDER_PROMOTER') insiderCount++;
+  if (isMacroMode) {
+    const activeBenchmarks = ANNUAL_DEAL_BENCHMARKS.filter(b => targetYears.includes(b.year));
+    if (activeBenchmarks.length > 0) {
+      activeBenchmarks.forEach(b => {
+        macroTotalDeals += b.dealsCount;
+        macroFlowCr += b.flowCr;
+        macroBuyCr += b.buyCr;
+        macroSellCr += b.sellCr;
+        macroFiiDeals += b.fiiDeals;
+        macroDiiDeals += b.diiDeals;
+        macroHftDeals += b.hftDeals;
+        macroPromoterDeals += b.promoterDeals;
+      });
+      fiiCount = macroFiiDeals;
+      diiCount = macroDiiDeals;
+      hftCount = macroHftDeals;
+      promoterCount = macroPromoterDeals;
+    } else {
+      macroTotalDeals = 50000;
+      macroFlowCr = 600000;
+      macroBuyCr = 320000;
+      macroSellCr = 280000;
+      fiiCount = 22000;
+      diiCount = 20000;
+      hftCount = 5000;
+      promoterCount = 3000;
+    }
+    bulkCount = Math.round(macroTotalDeals * 0.72);
+    blockCount = Math.round(macroTotalDeals * 0.28);
+    insiderCount = promoterCount;
+  } else {
+    scopeBase.forEach(d => {
+      if (d.dealType === 'BULK_DEAL') bulkCount++;
+      else if (d.dealType === 'BLOCK_DEAL') blockCount++;
+      else if (d.dealType === 'INSIDER_PROMOTER') insiderCount++;
 
-    if (d.clientCategory === 'FII') fiiCount++;
-    else if (d.clientCategory === 'DII') diiCount++;
-    else if (d.clientCategory === 'HFT') hftCount++;
-    else if (d.clientCategory === 'PROMOTER') promoterCount++;
-  });
+      if (d.clientCategory === 'FII') fiiCount++;
+      else if (d.clientCategory === 'DII') diiCount++;
+      else if (d.clientCategory === 'HFT') hftCount++;
+      else if (d.clientCategory === 'PROMOTER') promoterCount++;
+    });
+  }
 
   // 2. Filter scopeBase by dealType, clientCategory, search, and per-column filters
   let filtered = scopeBase.filter(d => {
@@ -1328,12 +1368,61 @@ function getMarketDeals(query = {}) {
   let totalFlowCr = 0;
   let buyFlowCr = 0;
   let sellFlowCr = 0;
-  filtered.forEach(d => {
-    const v = d.valueCr || 0;
-    totalFlowCr += v;
-    if (d.type === 'BUY') buyFlowCr += v;
-    else sellFlowCr += v;
-  });
+
+  const hasSpecificTextSearch = Boolean(
+    search || colDate || colStock || colClient || colQty || colPrice || colValue
+  );
+
+  if (isMacroMode && !hasSpecificTextSearch) {
+    if (filterType === 'BUY') {
+      totalFlowCr = macroBuyCr;
+      buyFlowCr = macroBuyCr;
+      sellFlowCr = 0;
+    } else if (filterType === 'SELL') {
+      totalFlowCr = macroSellCr;
+      buyFlowCr = 0;
+      sellFlowCr = macroSellCr;
+    } else if (clientCategory === 'FII') {
+      const ratio = macroFiiDeals ? (macroFiiDeals / macroTotalDeals) : 0.42;
+      totalFlowCr = Math.round(macroFlowCr * ratio);
+      buyFlowCr = Math.round(macroBuyCr * ratio);
+      sellFlowCr = Math.round(macroSellCr * ratio);
+    } else if (clientCategory === 'DII') {
+      const ratio = macroDiiDeals ? (macroDiiDeals / macroTotalDeals) : 0.38;
+      totalFlowCr = Math.round(macroFlowCr * ratio);
+      buyFlowCr = Math.round(macroBuyCr * ratio);
+      sellFlowCr = Math.round(macroSellCr * ratio);
+    } else if (clientCategory === 'HFT') {
+      const ratio = macroHftDeals ? (macroHftDeals / macroTotalDeals) : 0.11;
+      totalFlowCr = Math.round(macroFlowCr * ratio);
+      buyFlowCr = Math.round(macroBuyCr * ratio);
+      sellFlowCr = Math.round(macroSellCr * ratio);
+    } else if (clientCategory === 'PROMOTER') {
+      const ratio = macroPromoterDeals ? (macroPromoterDeals / macroTotalDeals) : 0.06;
+      totalFlowCr = Math.round(macroFlowCr * ratio);
+      buyFlowCr = Math.round(macroBuyCr * ratio);
+      sellFlowCr = Math.round(macroSellCr * ratio);
+    } else if (filterType === 'BULK_DEAL') {
+      totalFlowCr = Math.round(macroFlowCr * 0.62);
+      buyFlowCr = Math.round(macroBuyCr * 0.62);
+      sellFlowCr = Math.round(macroSellCr * 0.62);
+    } else if (filterType === 'BLOCK_DEAL') {
+      totalFlowCr = Math.round(macroFlowCr * 0.38);
+      buyFlowCr = Math.round(macroBuyCr * 0.38);
+      sellFlowCr = Math.round(macroSellCr * 0.38);
+    } else {
+      totalFlowCr = macroFlowCr;
+      buyFlowCr = macroBuyCr;
+      sellFlowCr = macroSellCr;
+    }
+  } else {
+    filtered.forEach(d => {
+      const v = d.valueCr || 0;
+      totalFlowCr += v;
+      if (d.type === 'BUY') buyFlowCr += v;
+      else sellFlowCr += v;
+    });
+  }
 
   // Sorting
   if (sortBy === 'VALUE_DESC') {
@@ -1364,14 +1453,27 @@ function getMarketDeals(query = {}) {
   const offset = (page - 1) * limit;
   const paginated = filtered.slice(offset, offset + limit);
 
+  let totalFilteredCount = filtered.length;
+  if (isMacroMode && !hasSpecificTextSearch) {
+    if (clientCategory === 'FII') totalFilteredCount = fiiCount;
+    else if (clientCategory === 'DII') totalFilteredCount = diiCount;
+    else if (clientCategory === 'HFT') totalFilteredCount = hftCount;
+    else if (clientCategory === 'PROMOTER') totalFilteredCount = promoterCount;
+    else if (filterType === 'BULK_DEAL') totalFilteredCount = bulkCount;
+    else if (filterType === 'BLOCK_DEAL') totalFilteredCount = blockCount;
+    else if (filterType === 'BUY') totalFilteredCount = Math.round(macroTotalDeals * 0.54);
+    else if (filterType === 'SELL') totalFilteredCount = Math.round(macroTotalDeals * 0.46);
+    else totalFilteredCount = macroTotalDeals;
+  }
+
   return {
     deals: paginated,
-    totalFiltered: filtered.length,
+    totalFiltered: totalFilteredCount,
     page,
     limit,
     hasMore: offset + paginated.length < filtered.length,
     stats: {
-      totalDeals: scopeBase.length,
+      totalDeals: isMacroMode ? macroTotalDeals : scopeBase.length,
       globalTotal: marketDealsSummaryStats.totalDeals,
       bulkCount,
       blockCount,
@@ -1394,6 +1496,7 @@ function getIpoList(category = 'ALL', status = 'ALL', era = 'ALL') {
   const normEra = String(era || 'ALL').toUpperCase();
 
   const extractIpoYear = (i) => {
+    if (i.year) return parseInt(i.year, 10);
     if (i.listingDate && /\b(19\d{2}|20\d{2})\b/.test(i.listingDate)) {
       const m = i.listingDate.match(/\b(19\d{2}|20\d{2})\b/);
       if (m) return parseInt(m[1], 10);
@@ -1402,7 +1505,6 @@ function getIpoList(category = 'ALL', status = 'ALL', era = 'ALL') {
       const m = i.closeDate.match(/\b(19\d{2}|20\d{2})\b/);
       if (m) return parseInt(m[1], 10);
     }
-    if (i.year) return parseInt(i.year, 10);
     return 2026;
   };
 
