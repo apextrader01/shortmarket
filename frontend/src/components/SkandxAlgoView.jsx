@@ -1320,7 +1320,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           right: '24px',
           zIndex: 100050,
           background: 'linear-gradient(135deg, #10b981, #059669)',
-          color: '#fff',
+          color: 'var(--skx-title)',
           padding: '12px 22px',
           borderRadius: '8px',
           fontSize: '13px',
@@ -1422,8 +1422,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 alignItems: 'center',
                 gap: '5px',
                 background: 'rgba(255,255,255,0.06)',
-                border: '1px solid #334155',
-                color: '#cbd5e1',
+                border: '1px solid var(--skx-border-light)',
+                color: 'var(--skx-body)',
                 padding: '5px 10px',
                 borderRadius: '6px',
                 fontSize: '11.5px',
@@ -1473,15 +1473,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '6px',
             overflow: 'hidden',
             fontSize: isMobile ? '11px' : '12.5px',
             fontWeight: '700',
             whiteSpace: 'nowrap'
           }}>
-            {!isMobile && <span style={{ padding: '5px 9px', color: '#94a3b8' }}>API Credits:</span>}
+            {!isMobile && <span style={{ padding: '5px 9px', color: 'var(--skx-muted)' }}>API Credits:</span>}
             <span style={{ padding: isMobile ? '5px 8px' : '5px 10px', background: '#7c3aed', color: '#fff' }}>
               ₹{Number(config.availableCredit || 0).toFixed(0)}
             </span>
@@ -1509,7 +1509,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               alignItems: 'center',
               gap: '8px',
               background: 'rgba(255,255,255,0.04)',
-              border: '1px solid #1e293b',
+              border: '1px solid var(--skx-border)',
               padding: '5px 12px',
               borderRadius: '20px',
               fontSize: '12px'
@@ -1528,7 +1528,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               }}>
                 {userInitial}
               </span>
-              <span style={{ color: '#cbd5e1', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'var(--skx-body)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {userDisplayEmail}
               </span>
             </div>
@@ -1783,7 +1783,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </>
             )}
 
-            <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ marginTop: 'auto', padding: '16px 8px 4px', borderTop: '1px solid var(--skx-border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>Connected Broker Gateway</div>
                 <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '700', marginTop: '2px' }}>
@@ -1822,21 +1822,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <>
               {/* Share Demat Connection Card */}
               <div style={{
-                background: '#101726',
-                border: '1px solid #1e293b',
+                background: 'var(--skx-card-bg)',
+                border: '1px solid var(--skx-border)',
                 borderRadius: '14px',
                 padding: isMobile ? '14px' : '20px 24px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '14px',
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
+                boxShadow: 'var(--skx-card-shadow)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
                       🔗
                     </div>
-                    <span style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: '#fff' }}>Share Demat Connection</span>
+                    <span style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '800', color: 'var(--skx-title)' }}>Share Demat Connection</span>
 
                     <span style={{
                       fontSize: '11px',
@@ -1874,8 +1874,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         padding: '8px 12px',
                         borderRadius: '6px',
                         background: '#1e293b',
-                        border: '1px solid #334155',
-                        color: '#cbd5e1',
+                        border: '1px solid var(--skx-border-light)',
+                        color: 'var(--skx-body)',
                         fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer'
@@ -1896,7 +1896,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         borderRadius: '6px',
                         background: '#2563eb',
                         border: 'none',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         fontSize: '12px',
                         fontWeight: '700',
                         cursor: 'pointer'
@@ -1907,7 +1907,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                <div style={{ fontSize: '12.5px', color: 'var(--skx-muted)' }}>
                   If you don't want to ask your clients for their Demat credentials, share your personal invite link so they can link their account directly.
                 </div>
 
@@ -1917,9 +1917,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   gap: isMobile ? '12px' : '24px',
                   flexWrap: 'wrap',
                   paddingTop: '8px',
-                  borderTop: '1px solid rgba(255,255,255,0.06)'
+                  borderTop: '1px solid var(--skx-border-subtle)'
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: '#cbd5e1' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: 'var(--skx-body)' }}>
                     <span style={{ color: '#818cf8' }}>🔒</span>
                     <span>Allow your users to connect account</span>
                     <input
@@ -1930,7 +1930,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     />
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: '#cbd5e1' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px', color: 'var(--skx-body)' }}>
                     <span style={{ color: '#22c55e' }}>📶</span>
                     <span>Allow your users to purchase IP</span>
                     <input
@@ -1948,8 +1948,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     wordBreak: 'break-all',
                     display: 'flex',
                     alignItems: 'center',
-                    background: '#090d16',
-                    border: '1px solid #1e293b',
+                    background: 'var(--skx-sub-bg)',
+                    border: '1px solid var(--skx-border)',
                     borderRadius: '6px',
                     padding: '6px 12px',
                     fontSize: '11.5px',
@@ -1969,15 +1969,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Available Credit */}
                 <div
                   onClick={handleOpenAddFundsRazorpay}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Credit(₹)</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Available Credit(₹)</div>
                     <div style={{ color: '#22c55e', background: 'rgba(34, 197, 94, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <CreditCard size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: 'var(--skx-title)' }}>
                     ₹{Number(config.availableCredit || 0).toFixed(0)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px', fontWeight: '700' }}>
@@ -1988,15 +1988,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Total Demat */}
                 <div
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Demat</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Total Demat</div>
                     <div style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <Users size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: 'var(--skx-title)' }}>
                     {demats.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
@@ -2007,15 +2007,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Disconnected Demat */}
                 <div
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Disconnected Demat</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Disconnected Demat</div>
                     <div style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <Activity size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: 'var(--skx-title)' }}>
                     {demats.filter(d => d.status === 'DISCONNECTED').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>
@@ -2026,10 +2026,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Expired Demat */}
                 <div
                   onClick={() => setActiveMenu('Demat')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Expired Demat</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Expired Demat</div>
                     <div style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <Clock size={15} />
                     </div>
@@ -2045,15 +2045,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Total Static IP */}
                 <div
                   onClick={() => setActiveMenu('StaticIp')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Total Static IP</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Total Static IP</div>
                     <div style={{ color: '#a855f7', background: 'rgba(168, 85, 247, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <Server size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: 'var(--skx-title)' }}>
                     {staticIps.length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
@@ -2064,15 +2064,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* Available Static IP */}
                 <div
                   onClick={() => setActiveMenu('StaticIp')}
-                  style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
+                  style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: isMobile ? '12px' : '18px', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: '#94a3b8', fontWeight: '600' }}>Available Static IP</div>
+                    <div style={{ fontSize: isMobile ? '11.5px' : '12.5px', color: 'var(--skx-muted)', fontWeight: '600' }}>Available Static IP</div>
                     <div style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '6px', borderRadius: '8px' }}>
                       <Wifi size={15} />
                     </div>
                   </div>
-                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: '#fff' }}>
+                  <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '900', marginTop: '8px', color: 'var(--skx-title)' }}>
                     {staticIps.filter(i => i.status === 'AVAILABLE').length}
                   </div>
                   <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>
@@ -2097,10 +2097,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Folder size={20} color="#38bdf8" />
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--skx-title)' }}>
                         No Personal Demat Account Connected Yet
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)' }}>
                         Connect your Angel One SmartAPI Demat account to route live automated orders, or test strategies in Sandbox Mode.
                       </div>
                     </div>
@@ -2141,7 +2141,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div style={{ fontSize: '15px', fontWeight: '800', color: '#f87171' }}>
                         Demat Accounts Expired
                       </div>
-                      <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '12.5px', color: 'var(--skx-muted)' }}>
                         {demats.filter(d => d.status === 'EXPIRED').length} account(s) require daily TOTP renewal
                       </div>
                     </div>
@@ -2185,18 +2185,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: isMobile ? '14px' : '18px' }}>
 
                 {/* Platform Features Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                     <span style={{ color: '#a855f7' }}>⚙️</span>
-                    <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Platform Features</span>
+                    <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)' }}>Platform Features</span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
                     <div
                       onClick={() => setActiveMenu('WatchList')}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--skx-sub-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--skx-border)', cursor: 'pointer' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--skx-body)' }}>
                         <Bookmark size={15} color="#38bdf8" /> Watchlist
                       </div>
                       <input
@@ -2209,9 +2209,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                     <div
                       onClick={() => setActiveMenu('GroupCopy')}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--skx-sub-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--skx-border)', cursor: 'pointer' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--skx-body)' }}>
                         <Users size={15} color="#a855f7" /> Multi-Account Sync
                       </div>
                       <input
@@ -2224,9 +2224,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                     <div
                       onClick={() => setActiveMenu('Bridge')}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--skx-sub-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--skx-border)', cursor: 'pointer' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--skx-body)' }}>
                         <Code size={15} color="#f59e0b" /> Json Bridge
                       </div>
                       <input
@@ -2239,9 +2239,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                     <div
                       onClick={() => setActiveMenu('Bridge')}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#090d16', padding: '12px 14px', borderRadius: '8px', border: '1px solid #1e293b', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--skx-sub-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--skx-border)', cursor: 'pointer' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--skx-body)' }}>
                         <Cpu size={15} color="#10b981" /> Custom Bridge
                       </div>
                       <input
@@ -2255,12 +2255,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Today Order Status Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Today Order Status ({orders.length})</div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)' }}>Today Order Status ({orders.length})</div>
                     <button
                       onClick={handleTestWebhookFire}
-                      style={{ background: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                      style={{ background: '#1e293b', border: '1px solid var(--skx-border-light)', color: '#38bdf8', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
                     >
                       + Simulate Order
                     </button>
@@ -2268,9 +2268,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                   {orders.length > 0 ? (
                     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, maxHeight: '180px' }}>
-                      <table style={{ width: '100%', minWidth: '340px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <table style={{ width: '100%', minWidth: '340px', fontSize: '12px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                         <thead>
-                          <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <tr style={{ borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                             <th style={{ padding: '6px 4px' }}>Broker</th>
                             <th style={{ padding: '6px 4px' }}>Symbol</th>
                             <th style={{ padding: '6px 4px' }}>Side</th>
@@ -2303,13 +2303,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Customer Support Card */}
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', marginBottom: '14px' }}>
                       🎧
                     </div>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>Customer Support</div>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', marginTop: '6px', lineHeight: '1.4' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)' }}>Customer Support</div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--skx-muted)', marginTop: '6px', lineHeight: '1.4' }}>
                       Instant assistance for broker tokens, dedicated static IP configuration & TradingView webhooks.
                     </div>
                   </div>
@@ -2324,7 +2324,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         justifyContent: 'center',
                         gap: '6px',
                         background: '#0284c7',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         border: 'none',
                         padding: '10px 14px',
                         borderRadius: '8px',
@@ -2339,8 +2339,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onClick={handleTelegramTestPing}
                       style={{
                         background: '#1e293b',
-                        border: '1px solid #334155',
-                        color: '#cbd5e1',
+                        border: '1px solid var(--skx-border-light)',
+                        color: 'var(--skx-body)',
                         padding: '10px 14px',
                         borderRadius: '8px',
                         fontSize: '12px',
@@ -2364,10 +2364,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Connected Demat Accounts ({demats.length})
                   </h2>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                     Manage multi-broker API credentials, static IP bindings, and daily session renewals.
                   </p>
                 </div>
@@ -2379,7 +2379,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         flex: isMobile ? 1 : 'initial',
                         padding: '9px 14px',
                         background: '#ef4444',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         border: 'none',
                         borderRadius: '8px',
                         fontSize: '12px',
@@ -2398,7 +2398,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 16px',
                       background: '#2563eb',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12px',
@@ -2426,7 +2426,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 alignItems: 'flex-start',
                 gap: '10px',
                 fontSize: '12px',
-                color: '#cbd5e1',
+                color: 'var(--skx-body)',
                 lineHeight: '1.5'
               }}>
                 <ShieldCheck size={18} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -2438,8 +2438,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
               {demats.length === 0 ? (
                 <div style={{
-                  background: '#101726',
-                  border: '1px dashed #334155',
+                  background: 'var(--skx-card-bg)',
+                  border: '1px dashed var(--skx-border-light)',
                   borderRadius: '14px',
                   padding: '40px 24px',
                   textAlign: 'center',
@@ -2449,10 +2449,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   gap: '12px'
                 }}>
                   <Folder size={36} color="#38bdf8" />
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--skx-title)' }}>
                     No Demat Accounts Connected to Your Profile
                   </div>
-                  <div style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '480px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--skx-muted)', maxWidth: '480px' }}>
                     Connect your Angel One SmartAPI Demat account to start routing live orders. Your credentials are isolated to your account.
                   </div>
                   <button
@@ -2461,7 +2461,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       marginTop: '6px',
                       padding: '10px 20px',
                       background: '#2563eb',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '13px',
@@ -2483,7 +2483,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div
                         key={acc.id}
                         style={{
-                          background: '#101726',
+                          background: 'var(--skx-card-bg)',
                           border: `1px solid ${isExp ? 'rgba(239,68,68,0.4)' : '#1e293b'}`,
                           borderRadius: '14px',
                           padding: isMobile ? '16px' : '20px',
@@ -2508,8 +2508,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               🏛️
                             </div>
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.broker}</div>
-                              <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client ID: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{acc.clientCode}</span></div>
+                              <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.broker}</div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Client ID: <span style={{ color: '#38bdf8', fontWeight: '800' }}>{acc.clientCode}</span></div>
                             </div>
                           </div>
 
@@ -2527,10 +2527,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           </span>
                         </div>
 
-                        <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                             <span style={{ color: '#64748b' }}>Account Alias:</span>
-                            <span style={{ color: '#cbd5e1', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
+                            <span style={{ color: 'var(--skx-body)', fontWeight: '600', textAlign: 'right' }}>{acc.name}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                             <span style={{ color: '#64748b' }}>Execution Engine:</span>
@@ -2577,7 +2577,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               padding: '8px 10px',
                               background: isExp ? '#ef4444' : '#1e293b',
                               border: 'none',
-                              color: '#fff',
+                              color: 'var(--skx-title)',
                               borderRadius: '6px',
                               fontSize: '11.5px',
                               fontWeight: '700',
@@ -2626,8 +2626,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             style={{
                               padding: '8px 10px',
                               background: 'transparent',
-                              border: '1px solid #334155',
-                              color: '#94a3b8',
+                              border: '1px solid var(--skx-border-light)',
+                              color: 'var(--skx-muted)',
                               borderRadius: '6px',
                               cursor: 'pointer'
                             }}
@@ -2651,10 +2651,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Dedicated Static IP Addresses ({staticIps.length})
                   </h2>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                     Dedicated Indian IPv4 proxy addresses whitelisted with Angel One SmartAPI and Mumbai financial data center servers.
                   </p>
                 </div>
@@ -2665,7 +2665,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     justifyContent: 'center',
                     padding: '9px 18px',
                     background: '#10b981',
-                    color: '#fff',
+                    color: 'var(--skx-title)',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '12.5px',
@@ -2697,11 +2697,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <ShieldCheck size={22} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: 'var(--skx-title)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span>Dedicated Static IP Pricing: ₹350 / Month</span>
                       <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.25)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>NSE BKC ROUTE</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginTop: '3px' }}>
                       Clean, unshared IPv4 proxy with 0% risk of IP blacklisting or broker 403 API lockouts. Instant provisioning via Cashfree.
                     </div>
                   </div>
@@ -2725,8 +2725,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
               {staticIps.length === 0 ? (
                 <div style={{
-                  background: '#101726',
-                  border: '1px dashed #334155',
+                  background: 'var(--skx-card-bg)',
+                  border: '1px dashed var(--skx-border-light)',
                   borderRadius: '14px',
                   padding: '36px 24px',
                   textAlign: 'center',
@@ -2736,10 +2736,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   gap: '10px'
                 }}>
                   <Wifi size={34} color="#10b981" />
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--skx-title)' }}>
                     No Dedicated Static IPs Active Yet
                   </div>
-                  <div style={{ fontSize: '12.5px', color: '#94a3b8', maxWidth: '460px' }}>
+                  <div style={{ fontSize: '12.5px', color: 'var(--skx-muted)', maxWidth: '460px' }}>
                     Purchase a dedicated Mumbai BKC Static IPv4 address (₹350/mo) to whitelist your SEBI-compliant broker API keys.
                   </div>
                   <button
@@ -2748,7 +2748,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       marginTop: '6px',
                       padding: '10px 20px',
                       background: '#10b981',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '13px',
@@ -2765,8 +2765,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div
                       key={ip.id}
                       style={{
-                        background: '#101726',
-                        border: '1px solid #1e293b',
+                        background: 'var(--skx-card-bg)',
+                        border: '1px solid var(--skx-border)',
                         borderRadius: '14px',
                         padding: isMobile ? '16px' : '20px',
                         display: 'flex',
@@ -2777,7 +2777,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <Server size={20} color="#a855f7" />
-                          <span style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>{ip.ip}</span>
+                          <span style={{ fontSize: '16px', fontWeight: '900', color: 'var(--skx-title)' }}>{ip.ip}</span>
                         </div>
                         <span style={{
                           padding: '3px 9px',
@@ -2791,10 +2791,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </span>
                       </div>
 
-                      <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                      <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Datacenter:</span>
-                          <span style={{ color: '#cbd5e1', textAlign: 'right' }}>{ip.datacenter}</span>
+                          <span style={{ color: 'var(--skx-body)', textAlign: 'right' }}>{ip.datacenter}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>NSE Gateway Latency:</span>
@@ -2806,7 +2806,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                           <span style={{ color: '#64748b' }}>Lease Validity:</span>
-                          <span style={{ color: '#cbd5e1' }}>{ip.expiresAt || '30 Days Remaining'}</span>
+                          <span style={{ color: 'var(--skx-body)' }}>{ip.expiresAt || '30 Days Remaining'}</span>
                         </div>
                       </div>
 
@@ -2815,7 +2815,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <select
                           value={ipBindSelection[ip.id] || ''}
                           onChange={e => setIpBindSelection(prev => ({ ...prev, [ip.id]: e.target.value }))}
-                          style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: '6px', padding: '7px 10px', color: '#cbd5e1', fontSize: '11.5px' }}
+                          style={{ flex: 1, background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--skx-body)', fontSize: '11.5px' }}
                         >
                           <option value="">Bind IP to Demat...</option>
                           <option value="UNASSIGNED">Unbind (Return to Pool)</option>
@@ -2838,8 +2838,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             flex: 1,
                             padding: '8px 12px',
                             background: '#1e293b',
-                            border: '1px solid #334155',
-                            color: '#cbd5e1',
+                            border: '1px solid var(--skx-border-light)',
+                            color: 'var(--skx-body)',
                             borderRadius: '6px',
                             fontSize: '12px',
                             fontWeight: '600',
@@ -2857,7 +2857,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             padding: '8px 14px',
                             background: '#2563eb',
                             border: 'none',
-                            color: '#fff',
+                            color: 'var(--skx-title)',
                             borderRadius: '6px',
                             fontSize: '12px',
                             fontWeight: '700',
@@ -2881,10 +2881,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Linked Clients & Users ({linkedUsers.length} / {config.totalLinkSlots || 1} Slots)
                   </h2>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                     Clients who connected their personal Demat account using your unique connection link.
                   </p>
                 </div>
@@ -2896,7 +2896,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 16px',
                       background: '#7c3aed',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -2917,7 +2917,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 16px',
                       background: '#10b981',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -2938,7 +2938,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 18px',
                       background: '#2563eb',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -2972,13 +2972,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <Users size={22} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '14.5px', fontWeight: '900', color: 'var(--skx-title)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span>Link User Slot: ₹250 / Month per Account</span>
                       <span style={{ fontSize: '10.5px', background: 'rgba(37, 99, 235, 0.25)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>
                         {linkedUsers.length} / {config.totalLinkSlots || 1} SLOTS USED
                       </span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginTop: '3px' }}>
                       Link additional broker accounts with custom lot multipliers and instant Cashfree slot expansion.
                     </div>
                   </div>
@@ -3000,10 +3000,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </button>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', minWidth: '640px', fontSize: '13px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: '640px', fontSize: '13px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                   <thead>
-                    <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                    <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                       <th style={{ padding: '14px 18px' }}>Client</th>
                       <th style={{ padding: '14px 18px' }}>Broker & UCC</th>
                       <th style={{ padding: '14px 18px' }}>Connected At</th>
@@ -3022,21 +3022,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </tr>
                     ) : (
                       linkedUsers.map(u => (
-                        <tr key={u.id} style={{ borderBottom: '1px solid #1e293b' }}>
+                        <tr key={u.id} style={{ borderBottom: '1px solid var(--skx-border)' }}>
                           <td style={{ padding: '14px 18px' }}>
-                            <div style={{ fontWeight: '800', color: '#fff' }}>{u.clientName}</div>
+                            <div style={{ fontWeight: '800', color: 'var(--skx-title)' }}>{u.clientName}</div>
                             <div style={{ fontSize: '11px', color: '#64748b' }}>{u.email}</div>
                           </td>
                           <td style={{ padding: '14px 18px' }}>
                             <div style={{ color: '#38bdf8', fontWeight: '700' }}>{u.broker}</div>
                             <div style={{ fontSize: '11px', color: '#64748b' }}>{u.clientCode}</div>
                           </td>
-                          <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '12px' }}>{u.connectedAt}</td>
+                          <td style={{ padding: '14px 18px', color: 'var(--skx-muted)', fontSize: '12px' }}>{u.connectedAt}</td>
                           <td style={{ padding: '14px 18px' }}>
                             <select
                               value={u.copyRatio || '1.0x'}
                               onChange={e => handleUpdateLinkedUser(u.id, { copyRatio: e.target.value })}
-                              style={{ background: '#090d16', border: '1px solid #334155', color: '#a855f7', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                              style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', color: '#a855f7', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
                             >
                               <option value="0.5x">0.5x</option>
                               <option value="1.0x">1.0x</option>
@@ -3070,7 +3070,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               onClick={() => handleRevokeLinkedUser(u)}
                               style={{
                                 background: 'transparent',
-                                border: '1px solid #334155',
+                                border: '1px solid var(--skx-border-light)',
                                 color: '#ef4444',
                                 padding: '5px 10px',
                                 borderRadius: '4px',
@@ -3097,10 +3097,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Institutional Algo Watchlist & Strategy Deployments ({watchlist.length})
                   </h2>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                     Real-time market ticks, automated strategy triggers, Angel One SmartAPI routing, and 1-click risk exits.
                   </p>
                 </div>
@@ -3113,7 +3113,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 16px',
                       background: '#16a34a',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -3136,11 +3136,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       onChange={e => setSearchSymbol(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleAddWatchlist(); }}
                       style={{
-                        background: '#090d16',
-                        border: '1px solid #1e293b',
+                        background: 'var(--skx-sub-bg)',
+                        border: '1px solid var(--skx-border)',
                         borderRadius: '8px',
                         padding: '8px 12px',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         fontSize: '12.5px',
                         width: isMobile ? '100%' : '230px',
                         minWidth: 0
@@ -3178,7 +3178,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           left: 0,
                           right: 0,
                           background: '#0f172a',
-                          border: '1px solid #334155',
+                          border: '1px solid var(--skx-border-light)',
                           borderRadius: '10px',
                           boxShadow: '0 12px 30px rgba(0,0,0,0.65)',
                           zIndex: 50,
@@ -3196,12 +3196,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  borderBottom: '1px solid #1e293b',
+                                  borderBottom: '1px solid var(--skx-border)',
                                   cursor: 'pointer',
                                   fontSize: '12px'
                                 }}
                               >
-                                <span style={{ color: '#fff', fontWeight: '800' }}>{sym}</span>
+                                <span style={{ color: 'var(--skx-title)', fontWeight: '800' }}>{sym}</span>
                                 <span style={{ color: '#22c55e', fontWeight: '700' }}>₹{px.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                               </div>
                             );
@@ -3219,21 +3219,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
                 gap: '12px'
               }}>
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>ACTIVE STRATEGIES</div>
                   <div style={{ fontSize: '22px', fontWeight: '900', color: '#22c55e', marginTop: '4px' }}>
                     {watchlist.filter(w => w.algoActive).length} <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ {watchlist.length} Running</span>
                   </div>
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>POSITIONS IN MARKET</div>
                   <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '4px' }}>
                     {watchlist.filter(w => (w.status || '').includes('POSITION')).length} Active
                   </div>
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>TODAY REALIZED P&L</div>
                   {(() => {
                     const totalPnl = watchlist.reduce((acc, w) => acc + (Number(w.realizedPnl) || 0), 0);
@@ -3246,9 +3246,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   })()}
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '700' }}>EXECUTION MODE</div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#cbd5e1', marginTop: '8px', display: 'flex', gap: '8px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--skx-body)', marginTop: '8px', display: 'flex', gap: '8px' }}>
                     <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
                       {watchlist.filter(w => (w.mode || 'LIVE') === 'LIVE').length} LIVE
                     </span>
@@ -3262,8 +3262,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               {/* Empty State with 1-Click Live NSE Instrument Chips */}
               {watchlist.length === 0 ? (
                 <div style={{
-                  background: '#101726',
-                  border: '1px dashed #334155',
+                  background: 'var(--skx-card-bg)',
+                  border: '1px dashed var(--skx-border-light)',
                   borderRadius: '14px',
                   padding: isMobile ? '24px 16px' : '32px 24px',
                   textAlign: 'center',
@@ -3276,10 +3276,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <Bookmark size={24} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--skx-title)' }}>
                       Your Algo Watchlist is Clean & Ready
                     </div>
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8', marginTop: '4px', maxWidth: '520px' }}>
+                    <div style={{ fontSize: '12.5px', color: 'var(--skx-muted)', marginTop: '4px', maxWidth: '520px' }}>
                       Add any live NSE stock or index below, or click <b>"+ Deploy Algo Strategy"</b> to configure automated entry, target, stop-loss, and trailing SL parameters.
                     </div>
                   </div>
@@ -3290,8 +3290,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         onClick={() => handleAddWatchlist(sym)}
                         style={{
                           padding: '7px 12px',
-                          background: '#090d16',
-                          border: '1px solid #334155',
+                          background: 'var(--skx-sub-bg)',
+                          border: '1px solid var(--skx-border-light)',
                           borderRadius: '8px',
                           color: '#38bdf8',
                           fontSize: '12px',
@@ -3323,7 +3323,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       <div
                         key={w.id}
                         style={{
-                          background: '#101726',
+                          background: 'var(--skx-card-bg)',
                           border: `1px solid ${inPosition ? (isLong ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)') : '#1e293b'}`,
                           borderRadius: '14px',
                           padding: isMobile ? '16px' : '20px',
@@ -3336,7 +3336,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#fff' }}>
+                                <span style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: 'var(--skx-title)' }}>
                                   {w.symbol}
                                 </span>
                                 <span style={{
@@ -3363,14 +3363,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 <span style={{ color: '#38bdf8', fontWeight: '700' }}>{w.algoStrategy || 'Custom Webhook'}</span>
                                 <span>•</span>
                                 <span>Auto Exit: {w.autoSquareOff || '15:15'} IST</span>
                                 {inPosition && entryPx > 0 && (
                                   <>
                                     <span>•</span>
-                                    <span style={{ color: '#cbd5e1' }}>Entry: ₹{entryPx.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                    <span style={{ color: 'var(--skx-body)' }}>Entry: ₹{entryPx.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                                   </>
                                 )}
                               </div>
@@ -3406,7 +3406,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 </span>
                               )}
                               {isPaused && (
-                                <span style={{ background: 'rgba(100,116,139,0.2)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
+                                <span style={{ background: 'rgba(100,116,139,0.2)', color: 'var(--skx-muted)', border: '1px solid rgba(100,116,139,0.4)', padding: '5px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '800' }}>
                                   ⏸️ PAUSED
                                 </span>
                               )}
@@ -3415,7 +3415,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         </div>
 
                         <div style={{
-                          background: '#090d16',
+                          background: 'var(--skx-sub-bg)',
                           borderRadius: '10px',
                           padding: '12px 16px',
                           display: 'grid',
@@ -3425,7 +3425,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         }}>
                           <div>
                             <div style={{ color: '#64748b' }}>Lots / Qty:</div>
-                            <div style={{ color: '#fff', fontWeight: '800', marginTop: '2px' }}>
+                            <div style={{ color: 'var(--skx-title)', fontWeight: '800', marginTop: '2px' }}>
                               {w.lots || 1} Lots ({w.qty || 50} Qty)
                             </div>
                           </div>
@@ -3483,7 +3483,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 padding: '7px 14px',
                                 background: '#dc2626',
                                 border: 'none',
-                                color: '#fff',
+                                color: 'var(--skx-title)',
                                 borderRadius: '6px',
                                 fontSize: '12px',
                                 fontWeight: '800',
@@ -3498,8 +3498,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               style={{
                                 padding: '7px 12px',
                                 background: '#1e293b',
-                                border: '1px solid #334155',
-                                color: '#cbd5e1',
+                                border: '1px solid var(--skx-border-light)',
+                                color: 'var(--skx-body)',
                                 borderRadius: '6px',
                                 fontSize: '12px',
                                 fontWeight: '700',
@@ -3529,7 +3529,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               style={{
                                 padding: '7px 12px',
                                 background: '#1e293b',
-                                border: '1px solid #334155',
+                                border: '1px solid var(--skx-border-light)',
                                 color: '#38bdf8',
                                 borderRadius: '6px',
                                 fontSize: '12px',
@@ -3581,10 +3581,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Group & Multi-Account Demat Synchronization
                   </h2>
-                  <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                     Synchronize orders from your Primary Angel One Demat account to Linked Demats with custom lot multipliers.
                   </p>
                 </div>
@@ -3598,7 +3598,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         padding: '9px 14px',
                         background: '#1e293b',
                         color: '#38bdf8',
-                        border: '1px solid #334155',
+                        border: '1px solid var(--skx-border-light)',
                         borderRadius: '8px',
                         fontSize: '12px',
                         fontWeight: '800',
@@ -3618,7 +3618,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 14px',
                       background: '#16a34a',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12px',
@@ -3638,7 +3638,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 16px',
                       background: '#2563eb',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -3658,7 +3658,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       justifyContent: 'center',
                       padding: '9px 18px',
                       background: '#ef4444',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '12.5px',
@@ -3674,7 +3674,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                     <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7', flexShrink: 0 }}>
@@ -3689,23 +3689,23 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           onBlur={e => handleUpdateCopyGroup({ groupName: e.target.value })}
                           style={{
                             background: 'transparent',
-                            border: '1px dashed #334155',
+                            border: '1px dashed var(--skx-border-light)',
                             borderRadius: '6px',
                             padding: '4px 8px',
                             fontSize: '15px',
                             fontWeight: '800',
-                            color: '#fff',
+                            color: 'var(--skx-title)',
                             minWidth: '220px'
                           }}
                           title="Click to rename Account Group"
                         />
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
                         <span>Primary Demat:</span>
                         <select
                           value={copyGroup.masterAccount || 'UNASSIGNED'}
                           onChange={e => handleUpdateCopyGroup({ masterAccount: e.target.value })}
-                          style={{ background: '#090d16', border: '1px solid #334155', color: '#38bdf8', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                          style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', color: '#38bdf8', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
                         >
                           <option value="UNASSIGNED">Select Primary Demat...</option>
                           {demats.map(d => (
@@ -3719,14 +3719,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           value={copyGroup.maxLossLimit ?? 15000}
                           onChange={e => setCopyGroup(prev => ({ ...prev, maxLossLimit: Number(e.target.value) }))}
                           onBlur={e => handleUpdateCopyGroup({ maxLossLimit: Number(e.target.value) })}
-                          style={{ width: '95px', background: '#090d16', border: '1px solid #334155', color: '#f59e0b', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
+                          style={{ width: '95px', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', color: '#f59e0b', fontWeight: '800', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}
                         />
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>Global Sync Status:</span>
+                    <span style={{ fontSize: '12.5px', color: 'var(--skx-muted)' }}>Global Sync Status:</span>
                     <button
                       onClick={() => {
                         const newSt = copyGroup.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
@@ -3735,7 +3735,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       style={{
                         padding: '7px 16px',
                         background: copyGroup.status === 'ACTIVE' ? '#16a34a' : '#d97706',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         border: 'none',
                         borderRadius: '6px',
                         fontSize: '12.5px',
@@ -3748,13 +3748,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #1e293b', paddingTop: '14px' }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
+                <div style={{ borderTop: '1px solid var(--skx-border)', paddingTop: '14px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--skx-body)', marginBottom: '12px' }}>
                     Linked / Secondary Demat Accounts ({copyGroup.followers?.length || 0}):
                   </div>
 
                   {(!copyGroup.followers || copyGroup.followers.length === 0) ? (
-                    <div style={{ background: '#090d16', border: '1px dashed #334155', borderRadius: '8px', padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
+                    <div style={{ background: 'var(--skx-sub-bg)', border: '1px dashed var(--skx-border-light)', borderRadius: '8px', padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
                       No linked accounts added to this Sync Group yet. Click <b>"+ Add Linked Account"</b>{linkedUsers.length > 0 ? ' or "Sync Linked Demats"' : ''} above to start routing orders.
                     </div>
                   ) : (
@@ -3763,8 +3763,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <div
                           key={f.id}
                           style={{
-                            background: '#090d16',
-                            border: '1px solid #1e293b',
+                            background: 'var(--skx-sub-bg)',
+                            border: '1px solid var(--skx-border)',
                             borderRadius: '8px',
                             padding: '14px 16px',
                             display: 'flex',
@@ -3775,7 +3775,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           }}
                         >
                           <div>
-                            <div style={{ fontWeight: '800', color: '#fff' }}>
+                            <div style={{ fontWeight: '800', color: 'var(--skx-title)' }}>
                               {f.clientName ? `${f.clientName} • ` : ''}Angel One SmartAPI ({f.accountCode})
                             </div>
                             <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
@@ -3791,18 +3791,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   }));
                                 }}
                                 onBlur={e => handleUpdateFollower(f.id, { maxRiskPerTrade: Number(e.target.value) })}
-                                style={{ width: '75px', background: '#101726', border: '1px solid #334155', color: '#cbd5e1', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}
+                                style={{ width: '75px', background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border-light)', color: 'var(--skx-body)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}
                               />
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            <div style={{ fontSize: '12.5px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '12.5px', color: 'var(--skx-body)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>Multiplier:</span>
                               <select
                                 value={f.multiplier}
                                 onChange={e => handleUpdateFollower(f.id, { multiplier: Number(e.target.value) })}
-                                style={{ background: '#101726', border: '1px solid #334155', color: '#a855f7', fontWeight: '800', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}
+                                style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border-light)', color: '#a855f7', fontWeight: '800', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}
                               >
                                 {[0.5, 1.0, 1.5, 2.0, 3.0, 5.0].map(m => (
                                   <option key={m} value={m}>{m}x</option>
@@ -3840,8 +3840,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               {/* Recent Synchronized Multi-Account Orders Table */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
-                <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                   Recent Multi-Account Execution Log ({orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy') || String(o.source || '').includes('Sync')).length})
                 </div>
                 {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy') || String(o.source || '').includes('Sync')).length === 0 ? (
@@ -3850,9 +3850,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                        <tr style={{ borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                           <th style={{ padding: '8px' }}>Order ID</th>
                           <th style={{ padding: '8px' }}>Time</th>
                           <th style={{ padding: '8px' }}>Account</th>
@@ -3866,12 +3866,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         {orders.filter(o => String(o.id || '').startsWith('CPY-') || String(o.source || '').includes('Copy')).slice(0, 10).map(o => (
                           <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                             <td style={{ padding: '8px', fontFamily: 'monospace', color: '#a855f7' }}>{o.id}</td>
-                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.time || o.timestamp}</td>
-                            <td style={{ padding: '8px', fontWeight: '800', color: '#fff' }}>{o.account}</td>
+                            <td style={{ padding: '8px', color: 'var(--skx-muted)' }}>{o.time || o.timestamp}</td>
+                            <td style={{ padding: '8px', fontWeight: '800', color: 'var(--skx-title)' }}>{o.account}</td>
                             <td style={{ padding: '8px', color: '#38bdf8', fontWeight: '700' }}>{o.symbol}</td>
                             <td style={{ padding: '8px', color: o.side === 'BUY' ? '#22c55e' : '#ef4444', fontWeight: '800' }}>{o.side} ({o.qty})</td>
                             <td style={{ padding: '8px' }}>{o.price}</td>
-                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.source}</td>
+                            <td style={{ padding: '8px', color: 'var(--skx-muted)' }}>{o.source}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -3888,16 +3888,16 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {activeMenu === 'Bridge' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                   TradingView, Chartink & Python Webhook Bridge
                 </h2>
-                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                   Zero-latency JSON alert webhook listener routing strategy alerts directly into your connected Angel One SmartAPI Demats.
                 </p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: '14px' }}>
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#38bdf8' }}>
                       Target Webhook URL (TradingView / Chartink)
@@ -3912,12 +3912,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       Copy Webhook URL
                     </button>
                   </div>
-                  <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
+                  <code style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px 14px', borderRadius: '8px', color: '#22c55e', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
                     https://www.skandx.in/api/v1/bridge/webhook
                   </code>
                 </div>
 
-                <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#a855f7' }}>
                       Your Personal Webhook Secret Key
@@ -3928,27 +3928,27 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           navigator.clipboard.writeText(resolvedWebhookSecret);
                           showToast('Copied Webhook Secret Key!');
                         }}
-                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid var(--skx-border-light)', color: 'var(--skx-body)', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
                       >
                         Copy Secret
                       </button>
                       <button
                         onClick={handleRegenerateToken}
-                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#f59e0b', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid var(--skx-border-light)', color: '#f59e0b', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
                       >
                         Rotate
                       </button>
                     </div>
                   </div>
-                  <code style={{ background: '#090d16', border: '1px solid #1e293b', padding: '10px 14px', borderRadius: '8px', color: '#f8fafc', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
+                  <code style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px 14px', borderRadius: '8px', color: '#f8fafc', fontSize: isMobile ? '11.5px' : '13px', wordBreak: 'break-all' }}>
                     {resolvedWebhookSecret}
                   </code>
                 </div>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)' }}>
                     Interactive TradingView Alert Payload Builder
                   </div>
                   {watchlist.length > 0 && (
@@ -3963,7 +3963,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         }
                       }}
                       defaultValue=""
-                      style={{ background: '#090d16', border: '1px solid #334155', color: '#38bdf8', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' }}
+                      style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', color: '#38bdf8', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' }}
                     >
                       <option value="" disabled>Load from Algo Watchlist...</option>
                       {watchlist.map(w => (
@@ -3979,7 +3979,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <select
                       value={whAction}
                       onChange={e => setWhAction(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                     >
                       <option value="BUY">BUY</option>
                       <option value="SELL">SELL</option>
@@ -3993,7 +3993,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       type="text"
                       value={whSymbol}
                       onChange={e => setWhSymbol(e.target.value.toUpperCase())}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                     />
                   </div>
 
@@ -4004,7 +4004,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       min="1"
                       value={whQty}
                       onChange={e => setWhQty(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                     />
                   </div>
 
@@ -4013,7 +4013,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <select
                       value={whType}
                       onChange={e => setWhType(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                     >
                       <option value="MARKET">MARKET</option>
                       <option value="LIMIT">LIMIT</option>
@@ -4025,7 +4025,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <select
                       value={whProduct}
                       onChange={e => setWhProduct(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                     >
                       <option value="MIS">MIS (Intraday)</option>
                       <option value="CNC">CNC (Delivery)</option>
@@ -4040,7 +4040,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       min="0"
                       value={whTarget}
                       onChange={e => setWhTarget(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#22c55e', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: '#22c55e', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
                     />
                   </div>
 
@@ -4051,21 +4051,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       min="0"
                       value={whSl}
                       onChange={e => setWhSl(e.target.value)}
-                      style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#ef4444', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
+                      style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: '#ef4444', fontWeight: '700', fontSize: '12.5px', marginTop: '4px' }}
                     />
                   </div>
                 </div>
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>TradingView Alert Message JSON:</span>
+                    <span style={{ fontSize: '12px', color: 'var(--skx-muted)' }}>TradingView Alert Message JSON:</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(jsonWebhookSample);
                           showToast('Copied TradingView Alert JSON!');
                         }}
-                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid var(--skx-border-light)', color: 'var(--skx-body)', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
                         <Copy size={12} /> Copy JSON
                       </button>
@@ -4080,7 +4080,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                   <pre style={{
                     background: '#05070c',
-                    border: '1px solid #1e293b',
+                    border: '1px solid var(--skx-border)',
                     borderRadius: '8px',
                     padding: '14px',
                     fontSize: '12px',
@@ -4094,8 +4094,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               {/* Recent Webhook Signals & Execution Log */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
-                <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px' }}>
+                <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                   Recent Webhook & Algo Order Execution Log ({orders.length})
                 </div>
                 {orders.length === 0 ? (
@@ -4104,9 +4104,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '520px', fontSize: '12px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                    <table style={{ width: '100%', minWidth: '520px', fontSize: '12px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                        <tr style={{ borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                           <th style={{ padding: '8px' }}>Order ID</th>
                           <th style={{ padding: '8px' }}>Time</th>
                           <th style={{ padding: '8px' }}>Symbol</th>
@@ -4121,12 +4121,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         {orders.slice(0, 10).map(o => (
                           <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                             <td style={{ padding: '8px', fontFamily: 'monospace', color: '#38bdf8' }}>{o.id}</td>
-                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.time || o.timestamp}</td>
-                            <td style={{ padding: '8px', fontWeight: '800', color: '#fff' }}>{o.symbol}</td>
+                            <td style={{ padding: '8px', color: 'var(--skx-muted)' }}>{o.time || o.timestamp}</td>
+                            <td style={{ padding: '8px', fontWeight: '800', color: 'var(--skx-title)' }}>{o.symbol}</td>
                             <td style={{ padding: '8px', fontWeight: '800', color: o.side === 'BUY' ? '#22c55e' : '#ef4444' }}>{o.side} ({o.qty})</td>
                             <td style={{ padding: '8px' }}>{o.price}</td>
-                            <td style={{ padding: '8px', color: '#cbd5e1' }}>{o.account}</td>
-                            <td style={{ padding: '8px', color: '#94a3b8' }}>{o.source}</td>
+                            <td style={{ padding: '8px', color: 'var(--skx-body)' }}>{o.account}</td>
+                            <td style={{ padding: '8px', color: 'var(--skx-muted)' }}>{o.source}</td>
                             <td style={{ padding: '8px', color: '#22c55e', fontWeight: '800' }}>{o.status}</td>
                           </tr>
                         ))}
@@ -4144,22 +4144,22 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           {activeMenu === 'TelegramBot' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                   Telegram Bot OMS & Notifications
                 </h2>
-                <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                   Receive instant trade execution alerts and control your algorithms using Telegram chat commands.
                 </p>
               </div>
 
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(2,132,199,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0 }}>
                       <Send size={20} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{telegramConfig.botUsername || '@SkandXAlgoBot'}</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)' }}>{telegramConfig.botUsername || '@SkandXAlgoBot'}</div>
                       <div style={{ fontSize: '12px', color: telegramConfig.connected ? '#22c55e' : '#f59e0b', fontWeight: '600' }}>
                         {telegramConfig.connected && telegramConfig.chatId
                           ? `● Connected to Chat ID: ${telegramConfig.chatId}`
@@ -4178,7 +4178,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {telegramConfig.connected && (
                       <button
                         onClick={handleDisconnectTelegram}
-                        style={{ padding: '9px 14px', background: '#1e293b', color: '#ef4444', border: '1px solid #334155', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        style={{ padding: '9px 14px', background: '#1e293b', color: '#ef4444', border: '1px solid var(--skx-border-light)', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                       >
                         Disconnect
                       </button>
@@ -4187,9 +4187,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Telegram Configuration Form */}
-                <form onSubmit={handleSaveTelegramConfig} style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <form onSubmit={handleSaveTelegramConfig} style={{ background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fff' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--skx-title)' }}>
                       Personal Telegram Alert Routing
                     </div>
                     <span style={{ fontSize: '11.5px', color: '#64748b' }}>
@@ -4202,7 +4202,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       placeholder="Enter your Telegram Chat ID (e.g. 581920412)"
                       value={telegramConfig.chatId || ''}
                       onChange={e => setTelegramConfig(prev => ({ ...prev, chatId: e.target.value }))}
-                      style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '13px' }}
+                      style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--skx-title)', fontSize: '13px' }}
                     />
                     <button
                       type="submit"
@@ -4218,7 +4218,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       { key: 'notifyCopyTrades', label: 'Multi-Account Sync Orders' },
                       { key: 'notifyDailyPnl', label: '15:30 Daily P&L Summary' }
                     ].map(item => (
-                      <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#cbd5e1', cursor: 'pointer' }}>
+                      <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--skx-body)', cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={Boolean(telegramConfig[item.key])}
@@ -4231,12 +4231,12 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 </form>
 
-                <div style={{ borderTop: '1px solid #1e293b', paddingTop: '16px' }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#cbd5e1', marginBottom: '12px' }}>
+                <div style={{ borderTop: '1px solid var(--skx-border)', paddingTop: '16px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--skx-body)', marginBottom: '12px' }}>
                     Interactive Telegram Chat Commands (Click to Execute Live):
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--skx-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
                         <code style={{ color: '#38bdf8', fontWeight: '800' }}>/buy &lt;symbol&gt; &lt;qty&gt;</code>
                         <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market buy across master demat</div>
@@ -4248,7 +4248,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         ▶ Run /buy {watchlist[0]?.symbol || 'NSE:RELIANCE'}
                       </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--skx-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
                         <code style={{ color: '#ef4444', fontWeight: '800' }}>/sell &lt;symbol&gt; &lt;qty&gt;</code>
                         <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Places market sell across master demat</div>
@@ -4260,7 +4260,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         ▶ Run /sell {watchlist[0]?.symbol || 'NSE:RELIANCE'}
                       </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--skx-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
                         <code style={{ color: '#f59e0b', fontWeight: '800' }}>/positions</code>
                         <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Returns open positions and live P&L</div>
@@ -4272,7 +4272,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         ▶ Check /positions
                       </button>
                     </div>
-                    <div style={{ background: '#090d16', padding: '12px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ background: 'var(--skx-sub-bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--skx-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
                         <code style={{ color: '#ec4899', fontWeight: '800' }}>/kill</code>
                         <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '3px' }}>Emergency exit all active trades</div>
@@ -4290,7 +4290,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div style={{
                       marginTop: '12px',
                       background: '#05070c',
-                      border: '1px solid #334155',
+                      border: '1px solid var(--skx-border-light)',
                       borderRadius: '8px',
                       padding: '12px 14px',
                       fontSize: '12.5px',
@@ -4312,10 +4312,10 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                     Institutional Algo Trading Plans & Add-ons
                   </h2>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
+                  <p style={{ fontSize: '13px', color: 'var(--skx-muted)', margin: '6px 0 0' }}>
                     Activate instantly using your <b>SkandX Algo Wallet Credit</b> or via official <b>Cashfree Checkout</b>.
                   </p>
                 </div>
@@ -4330,7 +4330,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   gap: '12px'
                 }}>
                   <div>
-                    <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: '700' }}>ALGO WALLET CREDIT</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>ALGO WALLET CREDIT</div>
                     <div style={{ fontSize: '18px', fontWeight: '900', color: '#10b981' }}>
                       ₹{Number(config.availableCredit || 0).toLocaleString('en-IN')}
                     </div>
@@ -4346,17 +4346,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
                 {/* Plan 1: Starter Free */}
-                <div style={{ background: '#101726', border: config.activePlan === 'STARTER' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.5px' }}>STARTER</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Starter Basic Algo</h3>
-                  <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: config.activePlan === 'STARTER' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--skx-muted)', letterSpacing: '0.5px' }}>STARTER</div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--skx-title)', margin: '4px 0 12px' }}>Starter Basic Algo</h3>
+                  <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--skx-title)', marginBottom: '6px' }}>
                     ₹0 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--skx-muted)', margin: '0 0 20px', lineHeight: '1.4' }}>
                     Perfect for testing automated strategies, backtesting rules, and routing single-demat alerts.
                   </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: 'var(--skx-body)', flex: 1, borderTop: '1px solid var(--skx-border)', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> 1 Connected Demat Account</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> Sandbox Strategy Testing OMS</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#22c55e" /> TradingView & Chartink Webhook Bridge</div>
@@ -4398,7 +4398,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     left: '50%',
                     transform: 'translateX(-50%)',
                     background: config.activePlan === 'PRO' ? '#16a34a' : '#2563eb',
-                    color: '#fff',
+                    color: 'var(--skx-title)',
                     padding: '3px 12px',
                     borderRadius: '12px',
                     fontSize: '10.5px',
@@ -4408,15 +4408,15 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     {config.activePlan === 'PRO' ? 'ACTIVE PLAN' : 'MOST POPULAR'}
                   </div>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.5px' }}>PRO TRADER</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Live Angel One Algo</h3>
-                  <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--skx-title)', margin: '4px 0 12px' }}>Live Angel One Algo</h3>
+                  <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--skx-title)', marginBottom: '6px' }}>
                     ₹999 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--skx-muted)', margin: '0 0 20px', lineHeight: '1.4' }}>
                     Automate live orders on Angel One SmartAPI with sub-50ms execution.
                   </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: 'var(--skx-body)', flex: 1, borderTop: '1px solid var(--skx-border)', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Up to 5 Connected Demats</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> Real Live Market Order Routing</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#38bdf8" /> 5 Client Link Slots + 1 Static IP</div>
@@ -4437,7 +4437,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       padding: '12px',
                       background: config.activePlan === 'PRO' ? '#16a34a' : '#2563eb',
                       border: 'none',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       borderRadius: '8px',
                       fontWeight: '800',
                       fontSize: '13px',
@@ -4452,17 +4452,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 </div>
 
                 {/* Plan 3: Institutional Multi-Account Master */}
-                <div style={{ background: '#101726', border: config.activePlan === 'INSTITUTIONAL' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: 'var(--skx-card-bg)', border: config.activePlan === 'INSTITUTIONAL' ? '2px solid #22c55e' : '1px solid #1e293b', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#a855f7', letterSpacing: '0.5px' }}>INSTITUTIONAL</div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', margin: '4px 0 12px' }}>Multi-Account Sync Suite</h3>
-                  <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--skx-title)', margin: '4px 0 12px' }}>Multi-Account Sync Suite</h3>
+                  <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--skx-title)', marginBottom: '6px' }}>
                     ₹2,499 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>/ month</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 20px', lineHeight: '1.4' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--skx-muted)', margin: '0 0 20px', lineHeight: '1.4' }}>
                     Institutional multi-account API execution engine with BKC low-latency proximity routing.
                   </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: '#cbd5e1', flex: 1, borderTop: '1px solid #1e293b', paddingTop: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px', color: 'var(--skx-body)', flex: 1, borderTop: '1px solid var(--skx-border)', paddingTop: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Unlimited Demat Accounts</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> 15 Linked Account Slots Included</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={14} color="#a855f7" /> Sub-20ms Multi-Account API Sync Engine</div>
@@ -4483,7 +4483,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       padding: '12px',
                       background: 'linear-gradient(135deg, #9333ea 0%, #7e22ce 100%)',
                       border: 'none',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       borderRadius: '8px',
                       fontWeight: '800',
                       fontSize: '13px',
@@ -4499,17 +4499,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
               {/* Add-on Rate Cards */}
               <div style={{ marginTop: '8px' }}>
-                <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#fff', margin: '0 0 12px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--skx-title)', margin: '0 0 12px' }}>
                   A La Carte Add-ons & Infrastructure (100% One-Time Payments)
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '14px' }}>
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Dedicated Static IP</div>
+                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)' }}>Dedicated Static IP</div>
                         <span style={{ fontSize: '14px', fontWeight: '900', color: '#10b981' }}>₹350 One-Time</span>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)', lineHeight: '1.4' }}>
                         Whitelisted Mumbai BKC IPv4 proxy (30 days validity). Eliminates broker 403 API lockouts.
                       </div>
                     </div>
@@ -4521,13 +4521,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </button>
                   </div>
 
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Linked Account Slot</div>
+                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)' }}>Linked Account Slot</div>
                         <span style={{ fontSize: '14px', fontWeight: '900', color: '#38bdf8' }}>₹250 One-Time</span>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)', lineHeight: '1.4' }}>
                         1 Additional linked account slot (30 days validity) for multi-account API order synchronization.
                       </div>
                     </div>
@@ -4539,13 +4539,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </button>
                   </div>
 
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: '#fff' }}>Algo Wallet Recharge</div>
+                        <div style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--skx-title)' }}>Algo Wallet Recharge</div>
                         <span style={{ fontSize: '14px', fontWeight: '900', color: '#a855f7' }}>MIN ₹250</span>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)', lineHeight: '1.4' }}>
                         One-time top-up (minimum ₹250) via Cashfree UPI, Cards, or NetBanking for instant 1-click purchases.
                       </div>
                     </div>
@@ -4560,8 +4560,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
 
               {/* Payment & Wallet Transaction History */}
-              <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+              <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                   Your Cashfree & Wallet Transaction History ({transactions.length})
                 </div>
                 {transactions.length === 0 ? (
@@ -4570,9 +4570,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                    <table style={{ width: '100%', minWidth: '500px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                        <tr style={{ borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                           <th style={{ padding: '8px 10px' }}>Ref ID</th>
                           <th style={{ padding: '8px 10px' }}>Date</th>
                           <th style={{ padding: '8px 10px' }}>Type</th>
@@ -4588,7 +4588,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           return (
                             <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                               <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#38bdf8' }}>{tx.id}</td>
-                              <td style={{ padding: '8px 10px', color: '#94a3b8' }}>{tx.date}</td>
+                              <td style={{ padding: '8px 10px', color: 'var(--skx-muted)' }}>{tx.date}</td>
                               <td style={{ padding: '8px 10px', fontWeight: '800', color: isRej ? '#ef4444' : (tx.type === 'CREDIT' ? '#22c55e' : '#f59e0b') }}>{tx.type}</td>
                               <td style={{ padding: '8px 10px' }}>{tx.method}</td>
                               <td style={{ padding: '8px 10px', fontWeight: '800' }}>₹{Number(tx.amount || 0).toLocaleString('en-IN')}</td>
@@ -4704,11 +4704,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <ShieldAlert size={22} color="#f87171" />
-                      <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: '#fff' }}>
+                      <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', margin: 0, color: 'var(--skx-title)' }}>
                         SkandX Algo Master Admin Suite & Account Control
                       </h2>
                     </div>
-                    <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '4px 0 0' }}>
+                    <p style={{ fontSize: '12.5px', color: 'var(--skx-muted)', margin: '4px 0 0' }}>
                       Dedicated 100% SkandX Algo control center — manage Algo accounts, Algo Wallet money, Successful & Rejected Algo Cashfree payments, Demats, Static IPs & OMS Gateways.
                     </p>
                   </div>
@@ -4743,7 +4743,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         padding: '8px 16px',
                         background: adminStats?.summary?.globalFreeze ? '#16a34a' : '#ef4444',
                         border: 'none',
-                        color: '#fff',
+                        color: 'var(--skx-title)',
                         borderRadius: '8px',
                         fontSize: '12px',
                         fontWeight: '800',
@@ -4757,8 +4757,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 {/* Server Telemetry Banner */}
                 <div style={{
-                  background: '#090d16',
-                  border: '1px solid #1e293b',
+                  background: 'var(--skx-sub-bg)',
+                  border: '1px solid var(--skx-border)',
                   borderRadius: '12px',
                   padding: '12px 18px',
                   display: 'flex',
@@ -4770,21 +4770,21 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', background: adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e', boxShadow: `0 0 10px ${adminStats?.summary?.globalFreeze ? '#ef4444' : '#22c55e'}` }}></span>
-                    <span style={{ color: '#fff', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (SmartAPI Gateway)'}</span>
+                    <span style={{ color: 'var(--skx-title)', fontWeight: '800' }}>{adminStats?.serverStatus?.node || 'Mumbai BKC Equinix MB2 Node (SmartAPI Gateway)'}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '18px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '18px', color: 'var(--skx-muted)', flexWrap: 'wrap' }}>
                     <span>PTP Clock Sync: <strong style={{ color: '#22c55e' }}>±0.4μs OK</strong></span>
                     <span>Tick Throughput: <strong style={{ color: '#38bdf8' }}>{adminStats?.infrastructure?.activeTicksPerSec ? `${adminStats.infrastructure.activeTicksPerSec.toLocaleString('en-IN')} / sec` : '68,420 / sec'}</strong></span>
                     <span>OMS Latency: <strong style={{ color: '#10b981' }}>1.8 ms</strong></span>
-                    <span>Uptime: <strong style={{ color: '#fff' }}>99.98%</strong></span>
+                    <span>Uptime: <strong style={{ color: 'var(--skx-title)' }}>99.98%</strong></span>
                   </div>
                 </div>
 
                 {/* 8 Master Algo Admin KPI Cards (100% Algo-Only Metrics) */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
-                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: adminSubTab === 'ACCOUNTS' ? '1px solid #38bdf8' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: 'var(--skx-card-bg)', border: adminSubTab === 'ACCOUNTS' ? '1px solid #38bdf8' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL ALGO ACCOUNTS</div>
-                    <div style={{ fontSize: '23px', fontWeight: '900', color: '#fff', marginTop: '5px' }}>
+                    <div style={{ fontSize: '23px', fontWeight: '900', color: 'var(--skx-title)', marginTop: '5px' }}>
                       {adminStats?.summary?.totalUsers ?? allAccounts.length}
                     </div>
                     <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '3px' }}>
@@ -4792,17 +4792,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
 
-                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL ALGO WALLET MONEY</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#10b981', marginTop: '5px' }}>
                       ₹{Number(adminStats?.summary?.totalAlgoWalletMoney || 0).toLocaleString('en-IN')}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--skx-muted)', marginTop: '3px' }}>
                       Live Algo Hub Wallet Credits Across Users
                     </div>
                   </div>
 
-                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('SUCCESS'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'SUCCESS' ? '1px solid #22c55e' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('SUCCESS'); }} style={{ background: 'var(--skx-card-bg)', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'SUCCESS' ? '1px solid #22c55e' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>SUCCESSFUL ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#22c55e', marginTop: '5px' }}>
                       {algoSuccessCount} <span style={{ fontSize: '13px', color: '#10b981' }}>(₹{Number(algoTotalRevenue).toLocaleString('en-IN')})</span>
@@ -4812,7 +4812,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
 
-                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('FAILED'); }} style={{ background: '#101726', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'FAILED' ? '1px solid #ef4444' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => { setAdminSubTab('PAYMENTS'); setAdminPaymentFilter('FAILED'); }} style={{ background: 'var(--skx-card-bg)', border: adminSubTab === 'PAYMENTS' && adminPaymentFilter === 'FAILED' ? '1px solid #ef4444' : '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>REJECTED / CANCELLED ALGO PAYMENTS</div>
                     <div style={{ fontSize: '23px', fontWeight: '900', color: '#ef4444', marginTop: '5px' }}>
                       {algoFailedCount}
@@ -4822,9 +4822,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
 
-                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TOTAL DEMATS ACTIVE</div>
-                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', marginTop: '5px' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: 'var(--skx-title)', marginTop: '5px' }}>
                       {adminStats?.summary?.totalDemats ?? demats.length}
                     </div>
                     <div style={{ fontSize: '11px', color: '#22c55e', marginTop: '3px' }}>
@@ -4832,7 +4832,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
 
-                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>TODAY ROUTED ALGO ORDERS</div>
                     <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '5px' }}>
                       {adminStats?.summary?.todayOrders ?? orders.length}
@@ -4842,7 +4842,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
                   </div>
 
-                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('DEMATS_IPS')} style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>STATIC IP POOL (₹350/mo)</div>
                     <div style={{ fontSize: '22px', fontWeight: '900', color: '#10b981', marginTop: '5px' }}>
                       {adminStats?.summary?.totalStaticIps ?? staticIps.length}
@@ -4850,7 +4850,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px' }}>Clean BKC Class-C Subnets</div>
                   </div>
 
-                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
+                  <div onClick={() => setAdminSubTab('ACCOUNTS')} style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '12px', padding: '15px', cursor: 'pointer' }}>
                     <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800' }}>CLIENT LINK SLOTS (₹250/mo)</div>
                     <div style={{ fontSize: '22px', fontWeight: '900', color: '#a855f7', marginTop: '5px' }}>
                       {adminStats?.summary?.totalLinkedClients ?? linkedUsers.length} / {adminStats?.summary?.totalLinkCapacity ?? (config.totalLinkSlots || 1)}
@@ -4865,7 +4865,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   flexWrap: 'wrap',
                   gap: '8px',
                   paddingBottom: '10px',
-                  borderBottom: '1px solid #1e293b'
+                  borderBottom: '1px solid var(--skx-border)'
                 }}>
                   {[
                     { id: 'ACCOUNTS', label: `👥 Algo Accounts & Wallet Money (${allAccounts.length})` },
@@ -4898,13 +4898,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 {/* ── SUB-TAB 1: ALL ALGO ACCOUNTS & WALLET MONEY ── */}
                 {adminSubTab === 'ACCOUNTS' && (
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
-                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
+                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: 'var(--skx-title)' }}>
                           All SkandX Algo User Accounts — Current Algo Wallet Money & Quotas ({filteredAccounts.length})
                         </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginTop: '2px' }}>
                           View each user's live Algo Wallet balance, total Algo spend, active Algo Plan, connected Demats, Static IPs, Link Slots & Sync status.
                         </div>
                       </div>
@@ -4918,11 +4918,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={adminUserSearch}
                             onChange={e => setAdminUserSearch(e.target.value)}
                             style={{
-                              background: '#090d16',
-                              border: '1px solid #334155',
+                              background: 'var(--skx-sub-bg)',
+                              border: '1px solid var(--skx-border-light)',
                               borderRadius: '8px',
                               padding: '7px 12px 7px 30px',
-                              color: '#fff',
+                              color: 'var(--skx-title)',
                               fontSize: '12px',
                               width: isMobile ? '180px' : '240px'
                             }}
@@ -4933,11 +4933,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           value={adminPlanFilter}
                           onChange={e => setAdminPlanFilter(e.target.value)}
                           style={{
-                            background: '#090d16',
-                            border: '1px solid #334155',
+                            background: 'var(--skx-sub-bg)',
+                            border: '1px solid var(--skx-border-light)',
                             borderRadius: '8px',
                             padding: '7px 10px',
-                            color: '#cbd5e1',
+                            color: 'var(--skx-body)',
                             fontSize: '12px',
                             fontWeight: '700'
                           }}
@@ -4951,9 +4951,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
 
                     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                         <thead>
-                          <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                             <th style={{ padding: '10px 12px' }}>Client ID & Algo Account</th>
                             <th style={{ padding: '10px 12px' }}>Algo Wallet Money</th>
                             <th style={{ padding: '10px 12px' }}>Total Algo Spend</th>
@@ -4974,7 +4974,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             </tr>
                           ) : (
                             filteredAccounts.map(acc => (
-                              <tr key={acc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <tr key={acc.id} style={{ borderBottom: '1px solid var(--skx-border-subtle)' }}>
                                 <td style={{ padding: '10px 12px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#38bdf8', fontWeight: '800' }}>{acc.clientId}</span>
@@ -4984,8 +4984,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontWeight: '800', color: '#fff', fontSize: '13px', marginTop: '2px' }}>{acc.username}</div>
-                                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>{acc.email || acc.phone || '—'}</div>
+                                  <div style={{ fontWeight: '800', color: 'var(--skx-title)', fontSize: '13px', marginTop: '2px' }}>{acc.username}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>{acc.email || acc.phone || '—'}</div>
                                 </td>
 
                                 <td style={{ padding: '10px 12px' }}>
@@ -5056,7 +5056,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                         gap: '4px',
                                         background: '#2563eb',
                                         border: 'none',
-                                        color: '#fff',
+                                        color: 'var(--skx-title)',
                                         padding: '5px 10px',
                                         borderRadius: '6px',
                                         fontSize: '11px',
@@ -5111,13 +5111,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 {/* ── SUB-TAB 2: ALGO PAYMENTS LEDGER: SUCCESSFUL, REJECTED & CANCELLED ── */}
                 {adminSubTab === 'PAYMENTS' && (
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
-                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: '#fff' }}>
+                        <div style={{ fontSize: '15.5px', fontWeight: '900', color: 'var(--skx-title)' }}>
                           SkandX Algo Payment Ledger — Successful, Rejected & Cancelled ({filteredPayments.length})
                         </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginTop: '2px' }}>
                           Dedicated log of SkandX Algo Hub payments only (Algo Wallet top-ups, Static IPs ₹350, Link Slots ₹250, Pro ₹999 & Institutional ₹2,499).
                         </div>
                       </div>
@@ -5153,11 +5153,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           value={adminPaymentSearch}
                           onChange={e => setAdminPaymentSearch(e.target.value)}
                           style={{
-                            background: '#090d16',
-                            border: '1px solid #334155',
+                            background: 'var(--skx-sub-bg)',
+                            border: '1px solid var(--skx-border-light)',
                             borderRadius: '8px',
                             padding: '6px 12px',
-                            color: '#fff',
+                            color: 'var(--skx-title)',
                             fontSize: '12px',
                             width: isMobile ? '160px' : '210px'
                           }}
@@ -5166,9 +5166,9 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     </div>
 
                     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                      <table style={{ width: '100%', minWidth: '940px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                         <thead>
-                          <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                          <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                             <th style={{ padding: '10px 12px' }}>Ref / Cashfree ID</th>
                             <th style={{ padding: '10px 12px' }}>Algo Account (User / Email)</th>
                             <th style={{ padding: '10px 12px' }}>SkandX Algo Service / Plan</th>
@@ -5193,7 +5193,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                               const isFailed = st === 'FAILED' || st === 'REJECTED';
                               const isCancelled = st === 'CANCELLED';
                               return (
-                                <tr key={`${p.id}_${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <tr key={`${p.id}_${idx}`} style={{ borderBottom: '1px solid var(--skx-border-subtle)' }}>
                                   <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '11.5px', color: '#38bdf8' }}>
                                     <div>{p.txRef}</div>
                                     {p.orderId && p.orderId !== p.txRef && (
@@ -5201,8 +5201,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                     )}
                                   </td>
                                   <td style={{ padding: '10px 12px' }}>
-                                    <div style={{ fontWeight: '800', color: '#fff' }}>{p.username} <span style={{ fontSize: '10.5px', color: '#38bdf8', fontFamily: 'monospace' }}>({p.clientId})</span></div>
-                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.email}</div>
+                                    <div style={{ fontWeight: '800', color: 'var(--skx-title)' }}>{p.username} <span style={{ fontSize: '10.5px', color: '#38bdf8', fontFamily: 'monospace' }}>({p.clientId})</span></div>
+                                    <div style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>{p.email}</div>
                                   </td>
                                   <td style={{ padding: '10px 12px' }}>
                                     <div style={{ fontWeight: '800', color: '#e2e8f0' }}>{formatAlgoServiceName(p.plan)}</div>
@@ -5211,7 +5211,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   <td style={{ padding: '10px 12px', fontWeight: '900', color: isSuccess ? '#10b981' : ((isFailed || isCancelled) ? '#f87171' : '#f59e0b') }}>
                                     ₹{Number(p.amount || 0).toLocaleString('en-IN')}
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: '#cbd5e1' }}>
+                                  <td style={{ padding: '10px 12px', fontSize: '11.5px', color: 'var(--skx-body)' }}>
                                     {p.paymentType}
                                   </td>
                                   <td style={{ padding: '10px 12px' }}>
@@ -5229,7 +5229,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   <td style={{ padding: '10px 12px', fontSize: '11.5px', color: (isFailed || isCancelled) ? '#fca5a5' : '#94a3b8', maxWidth: '260px' }}>
                                     {p.failureReason || (isSuccess ? 'Cashfree Payment Verified & Algo Service Provisioned' : 'Awaiting gateway completion')}
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                  <td style={{ padding: '10px 12px', fontSize: '11px', color: 'var(--skx-muted)', whiteSpace: 'nowrap' }}>
                                     {formatAlgoPaymentDate(p.createdAt)}
                                   </td>
                                 </tr>
@@ -5245,14 +5245,14 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* ── SUB-TAB 3: BROKER GATEWAYS & OMS OVERRIDES ── */}
                 {adminSubTab === 'INFRASTRUCTURE' && (
                   <>
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '14px' }}>
                         Institutional Broker Gateway Health & Latency
                       </div>
                       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                        <table style={{ width: '100%', minWidth: '600px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                        <table style={{ width: '100%', minWidth: '600px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                           <thead>
-                            <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                            <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                               <th style={{ padding: '10px 14px' }}>Broker Gateway</th>
                               <th style={{ padding: '10px 14px' }}>Ping Latency</th>
                               <th style={{ padding: '10px 14px' }}>Active Sessions</th>
@@ -5264,8 +5264,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             {(adminStats?.brokerGateways || [
                               { name: 'Angel One SmartAPI v2', latency: '6.1ms', activeSessions: 1, status: 'OPERATIONAL' }
                             ]).map((bg, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
-                                <td style={{ padding: '12px 14px', fontWeight: '800', color: '#fff' }}>{bg.name}</td>
+                              <tr key={idx} style={{ borderBottom: '1px solid var(--skx-border)' }}>
+                                <td style={{ padding: '12px 14px', fontWeight: '800', color: 'var(--skx-title)' }}>{bg.name}</td>
                                 <td style={{ padding: '12px 14px', color: '#10b981', fontWeight: '800' }}>{bg.latency}</td>
                                 <td style={{ padding: '12px 14px', color: '#38bdf8', fontWeight: '700' }}>{bg.activeSessions} Demats</td>
                                 <td style={{ padding: '12px 14px' }}>
@@ -5276,7 +5276,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 <td style={{ padding: '12px 14px' }}>
                                   <button
                                     onClick={() => showToast(`Gateway health check OK for ${bg.name}`)}
-                                    style={{ background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                                    style={{ background: '#1e293b', border: '1px solid var(--skx-border-light)', color: 'var(--skx-body)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
                                   >
                                     Test Ping
                                   </button>
@@ -5288,8 +5288,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                     </div>
 
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '14px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '14px' }}>
                         Admin Quota & IP Provisioning Overrides
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px' }}>
@@ -5316,11 +5316,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       </div>
                     </div>
 
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '4px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '4px' }}>
                         🌐 Official Social Media &amp; Support Channels (Instagram, Facebook, WhatsApp, Telegram)
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '14px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--skx-muted)', marginBottom: '14px' }}>
                         Update your official channel links here — changes apply live across the Home Page, About Us, Profile, Mobile Menu, and Algo Suite.
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -5331,7 +5331,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={socialForm.instagram || ''}
                             onChange={e => setSocialForm(prev => ({ ...prev, instagram: e.target.value }))}
                             placeholder="https://www.instagram.com/your_channel"
-                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                            style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px 10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                           />
                         </div>
                         <div>
@@ -5341,7 +5341,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={socialForm.facebook || ''}
                             onChange={e => setSocialForm(prev => ({ ...prev, facebook: e.target.value }))}
                             placeholder="https://www.facebook.com/your_page"
-                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                            style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px 10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                           />
                         </div>
                         <div>
@@ -5351,7 +5351,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={socialForm.whatsapp || ''}
                             onChange={e => setSocialForm(prev => ({ ...prev, whatsapp: e.target.value }))}
                             placeholder="https://wa.me/919497861379"
-                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                            style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px 10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                           />
                         </div>
                         <div>
@@ -5361,7 +5361,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             value={socialForm.telegram || ''}
                             onChange={e => setSocialForm(prev => ({ ...prev, telegram: e.target.value }))}
                             placeholder="https://t.me/your_channel"
-                            style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px 10px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                            style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px 10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                           />
                         </div>
                       </div>
@@ -5386,17 +5386,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 {/* ── SUB-TAB 4: ALL CONNECTED DEMATS, STATIC IPS & ORDERS ACROSS ACCOUNTS ── */}
                 {adminSubTab === 'DEMATS_IPS' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                         All Connected Demat Accounts Across Platform ({allDematsList.length})
                       </div>
                       {allDematsList.length === 0 ? (
                         <div style={{ fontSize: '12.5px', color: '#64748b' }}>No Demat accounts connected across users yet.</div>
                       ) : (
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                             <thead>
-                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                              <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                                 <th style={{ padding: '9px 12px' }}>Owner Account</th>
                                 <th style={{ padding: '9px 12px' }}>Broker</th>
                                 <th style={{ padding: '9px 12px' }}>Client UCC</th>
@@ -5411,7 +5411,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   <td style={{ padding: '9px 12px' }}>
                                     <span style={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: '800' }}>{d.ownerClientId || 'SELF'}</span> • {d.ownerEmail || userDisplayEmail}
                                   </td>
-                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: '#fff' }}>{d.broker}</td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: 'var(--skx-title)' }}>{d.broker}</td>
                                   <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#f8fafc' }}>{d.clientCode}</td>
                                   <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#10b981' }}>{d.ip}</td>
                                   <td style={{ padding: '9px 12px', color: d.status === 'ACTIVE' ? '#22c55e' : '#ef4444', fontWeight: '800' }}>{d.status}</td>
@@ -5426,17 +5426,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       )}
                     </div>
 
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                         All Provisioned Static IPs Across Platform ({allIpsList.length})
                       </div>
                       {allIpsList.length === 0 ? (
                         <div style={{ fontSize: '12.5px', color: '#64748b' }}>No Static IPs provisioned yet.</div>
                       ) : (
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                             <thead>
-                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                              <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                                 <th style={{ padding: '9px 12px' }}>Owner Account</th>
                                 <th style={{ padding: '9px 12px' }}>IPv4 Address</th>
                                 <th style={{ padding: '9px 12px' }}>Datacenter</th>
@@ -5455,7 +5455,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                   <td style={{ padding: '9px 12px' }}>{ip.datacenter}</td>
                                   <td style={{ padding: '9px 12px', color: '#38bdf8' }}>{ip.assignedTo}</td>
                                   <td style={{ padding: '9px 12px', color: '#22c55e', fontWeight: '800' }}>{ip.status}</td>
-                                  <td style={{ padding: '9px 12px', color: '#94a3b8' }}>{ip.expiresAt}</td>
+                                  <td style={{ padding: '9px 12px', color: 'var(--skx-muted)' }}>{ip.expiresAt}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -5464,17 +5464,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       )}
                     </div>
 
-                    <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                    <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                         Recent Routed Algo Orders Across Platform ({allOrdersList.length})
                       </div>
                       {allOrdersList.length === 0 ? (
                         <div style={{ fontSize: '12.5px', color: '#64748b' }}>No routed Algo orders recorded yet.</div>
                       ) : (
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: '#cbd5e1' }}>
+                          <table style={{ width: '100%', minWidth: '720px', fontSize: '12.5px', borderCollapse: 'collapse', color: 'var(--skx-body)' }}>
                             <thead>
-                              <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#64748b', textAlign: 'left' }}>
+                              <tr style={{ background: 'var(--skx-sub-bg)', borderBottom: '1px solid var(--skx-border)', color: '#64748b', textAlign: 'left' }}>
                                 <th style={{ padding: '9px 12px' }}>Order ID</th>
                                 <th style={{ padding: '9px 12px' }}>Account</th>
                                 <th style={{ padding: '9px 12px' }}>Symbol</th>
@@ -5488,7 +5488,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                                 <tr key={`${o.id}_${i}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                   <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: '#38bdf8' }}>{o.id}</td>
                                   <td style={{ padding: '9px 12px' }}>{o.ownerEmail || o.account || '—'}</td>
-                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: '#fff' }}>{o.symbol}</td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '800', color: 'var(--skx-title)' }}>{o.symbol}</td>
                                   <td style={{ padding: '9px 12px', fontWeight: '800', color: o.side === 'BUY' ? '#22c55e' : '#ef4444' }}>{o.side} • {o.qty}</td>
                                   <td style={{ padding: '9px 12px' }}>{o.broker}</td>
                                   <td style={{ padding: '9px 12px', color: '#22c55e', fontWeight: '800' }}>{o.status}</td>
@@ -5504,8 +5504,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
                 {/* ── SUB-TAB 5: SECURITY & OMS AUDIT LOGS ── */}
                 {adminSubTab === 'AUDIT_LOGS' && (
-                  <div style={{ background: '#101726', border: '1px solid #1e293b', borderRadius: '14px', padding: '18px 20px' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+                  <div style={{ background: 'var(--skx-card-bg)', border: '1px solid var(--skx-border)', borderRadius: '14px', padding: '18px 20px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--skx-title)', marginBottom: '12px' }}>
                       Real-Time Algo OMS & Payment Security Audit Stream
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -5513,8 +5513,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                         <div
                           key={i}
                           style={{
-                            background: '#090d16',
-                            border: '1px solid #1e293b',
+                            background: 'var(--skx-sub-bg)',
+                            border: '1px solid var(--skx-border)',
                             borderLeft: `3px solid ${log.ok ? '#22c55e' : '#ef4444'}`,
                             borderRadius: '8px',
                             padding: '10px 14px',
@@ -5547,32 +5547,32 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     padding: '16px'
                   }}>
                     <div style={{
-                      background: '#121826',
+                      background: 'var(--skx-capsule-bg)',
                       border: '1px solid rgba(56,189,248,0.35)',
                       borderRadius: '16px',
                       width: '100%',
                       maxWidth: '500px',
                       padding: '22px',
-                      color: '#fff',
+                      color: 'var(--skx-title)',
                       boxShadow: '0 24px 60px rgba(0,0,0,0.85)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                         <div>
-                          <div style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>
+                          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--skx-title)' }}>
                             Manage SkandX Algo Account — {editingAdminUser.username}
                           </div>
                           <div style={{ fontSize: '11.5px', color: '#38bdf8', fontFamily: 'monospace' }}>
                             {editingAdminUser.clientId} • {editingAdminUser.email}
                           </div>
                         </div>
-                        <button onClick={() => setEditingAdminUser(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                        <button onClick={() => setEditingAdminUser(null)} style={{ background: 'transparent', border: 'none', color: 'var(--skx-muted)', cursor: 'pointer' }}>
                           <X size={18} />
                         </button>
                       </div>
 
                       <form onSubmit={handleSaveAdminUserEdit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div>
-                          <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>
+                          <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>
                             SkandX Algo Wallet Current Money (₹)
                           </label>
                           <input
@@ -5581,17 +5581,17 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                             min="0"
                             value={editAlgoWalletVal}
                             onChange={e => setEditAlgoWalletVal(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#10b981', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
+                            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', padding: '10px', borderRadius: '8px', color: '#10b981', fontSize: '14px', fontWeight: '800', marginTop: '4px' }}
                           />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                           <div>
-                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Active Algo Plan</label>
+                            <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>Active Algo Plan</label>
                             <select
                               value={editAlgoPlanVal}
                               onChange={e => setEditAlgoPlanVal(e.target.value)}
-                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
+                              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', padding: '10px', borderRadius: '8px', color: 'var(--skx-title)', fontSize: '13px', fontWeight: '700', marginTop: '4px' }}
                             >
                               <option value="STARTER">STARTER (Free)</option>
                               <option value="PRO">PRO (₹999/mo)</option>
@@ -5600,39 +5600,39 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           </div>
 
                           <div>
-                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Total Client Link Slots</label>
+                            <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>Total Client Link Slots</label>
                             <input
                               type="number"
                               min="1"
                               max="500"
                               value={editLinkSlotsVal}
                               onChange={e => setEditLinkSlotsVal(e.target.value)}
-                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#a855f7', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', padding: '10px', borderRadius: '8px', color: '#a855f7', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
                             />
                           </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                           <div>
-                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Max Single Order Qty</label>
+                            <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>Max Single Order Qty</label>
                             <input
                               type="number"
                               min="1"
                               value={editMaxOrderQtyVal}
                               onChange={e => setEditMaxOrderQtyVal(e.target.value)}
-                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', padding: '10px', borderRadius: '8px', color: '#38bdf8', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
                             />
                           </div>
 
                           <div>
-                            <label style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '700' }}>Daily MTM Loss Limit (₹)</label>
+                            <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)', fontWeight: '700' }}>Daily MTM Loss Limit (₹)</label>
                             <input
                               type="number"
                               min="500"
                               step="500"
                               value={editDailyLossLimitVal}
                               onChange={e => setEditDailyLossLimitVal(e.target.value)}
-                              style={{ width: '100%', boxSizing: 'border-box', background: '#090d16', border: '1px solid #334155', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
+                              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border-light)', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '13px', fontWeight: '800', marginTop: '4px' }}
                             />
                           </div>
                         </div>
@@ -5658,7 +5658,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                           <button
                             type="button"
                             onClick={() => setEditingAdminUser(null)}
-                            style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700', cursor: 'pointer' }}
+                            style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--skx-border-light)', color: 'var(--skx-muted)', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700', cursor: 'pointer' }}
                           >
                             Cancel
                           </button>
@@ -5696,22 +5696,22 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           padding: '16px'
         }}>
           <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '540px',
             padding: '24px',
-            color: '#fff'
+            color: 'var(--skx-title)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Connect Angel One SmartAPI Demat</h3>
-                <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
+                <div style={{ fontSize: '11.5px', color: 'var(--skx-muted)', marginTop: '2px' }}>
                   Supports Live Angel One SmartAPI V2 JWT Login + Built-in RFC 6238 Auto-TOTP
                 </div>
               </div>
-              <button onClick={() => setShowAddDematModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setShowAddDematModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--skx-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
@@ -5719,68 +5719,68 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
             <form onSubmit={handleAddDematSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Gateway</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Broker Gateway</label>
                   <select
                     value={newBroker}
                     onChange={e => setNewBroker(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   >
                     <option value="Angel One SmartAPI">Angel One SmartAPI</option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Account Nickname</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Account Nickname</label>
                   <input
                     type="text"
                     placeholder="e.g. Primary Scalping A/C"
                     value={newAccountName}
                     onChange={e => setNewAccountName(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Angel One Client ID / UCC *</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Angel One Client ID / UCC *</label>
                   <input
                     type="text"
                     placeholder="e.g. A123456"
                     value={newClientCode}
                     onChange={e => setNewClientCode(e.target.value)}
                     required
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Angel One 4-Digit MPIN</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Angel One 4-Digit MPIN</label>
                   <input
                     type="password"
                     maxLength={6}
                     placeholder="4-digit Trading MPIN"
                     value={newMpin}
                     onChange={e => setNewMpin(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>SmartAPI Trading API Key</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>SmartAPI Trading API Key</label>
                   <input
                     type="text"
                     placeholder="e.g. xK9v2LmP (from smartapi.angelone.in)"
                     value={newApiKey}
                     onChange={e => setNewApiKey(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>TOTP Secret Key (Base32) or 6-Digit Code</label>
+                    <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>TOTP Secret Key (Base32) or 6-Digit Code</label>
                     <button
                       type="button"
                       onClick={handleTestTotpSecret}
@@ -5806,7 +5806,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                       setNewApiSecret(e.target.value);
                       if (newTotpPreview) setNewTotpPreview(null);
                     }}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
@@ -5832,11 +5832,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               )}
 
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Route via Static IP</label>
+                <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Route via Static IP</label>
                 <select
                   value={newIp}
                   onChange={e => setNewIp(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                 >
                   <option value="Shared NSE Gateway (Default)">Shared NSE Gateway (Default Free)</option>
                   {staticIps.map(ip => (
@@ -5849,7 +5849,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <button
                   type="button"
                   onClick={() => setShowAddDematModal(false)}
-                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: 'var(--skx-body)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
                 >
                   Cancel
                 </button>
@@ -5881,71 +5881,71 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           padding: '16px'
         }}>
           <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '480px',
             padding: '24px',
-            color: '#fff'
+            color: 'var(--skx-title)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Link Client Demat Account</h3>
-              <button onClick={() => setShowAddLinkUserModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setShowAddLinkUserModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--skx-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleAddLinkUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client Full Name *</label>
+                <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Client Full Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Arjun Mehta"
                   value={newLinkClientName}
                   onChange={e => setNewLinkClientName(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Client Email</label>
+                <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Client Email</label>
                 <input
                   type="email"
                   placeholder="client@example.com"
                   value={newLinkEmail}
                   onChange={e => setNewLinkEmail(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Broker</label>
                   <select
                     value={newLinkBroker}
                     onChange={e => setNewLinkBroker(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   >
                     <option value="Angel One">Angel One (SmartAPI)</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker UCC / ID *</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Broker UCC / ID *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. A123456"
                     value={newLinkClientCode}
                     onChange={e => setNewLinkClientCode(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Default Allocation Multiplier</label>
+                <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Default Allocation Multiplier</label>
                 <select
                   value={newLinkCopyRatio}
                   onChange={e => setNewLinkCopyRatio(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                 >
                   <option value="0.5x">0.5x Multiplier</option>
                   <option value="1.0x">1.0x Multiplier</option>
@@ -5957,7 +5957,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <button
                   type="button"
                   onClick={() => setShowAddLinkUserModal(false)}
-                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: 'var(--skx-body)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
                 >
                   Cancel
                 </button>
@@ -5989,23 +5989,23 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           padding: '16px'
         }}>
           <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '460px',
             padding: '24px',
-            color: '#fff'
+            color: 'var(--skx-title)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Add Linked Account to Sync Group</h3>
-              <button onClick={() => setShowAddFollowerModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setShowAddFollowerModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--skx-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleAddFollowerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Select From Connected / Linked Demats or Enter Custom</label>
+                <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Select From Connected / Linked Demats or Enter Custom</label>
                 <select
                   onChange={e => {
                     const val = e.target.value;
@@ -6014,7 +6014,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     setNewFollowerBroker('Angel One SmartAPI');
                     setNewFollowerCode(c);
                   }}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                 >
                   <option value="">Choose existing Demat or type below...</option>
                   {demats.map(d => (
@@ -6027,45 +6027,45 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Broker Gateway</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Broker Gateway</label>
                   <input
                     type="text"
                     value="Angel One SmartAPI"
                     readOnly
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#38bdf8', fontWeight: '800', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: '#38bdf8', fontWeight: '800', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Account UCC *</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Account UCC *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. ANG9012"
                     value={newFollowerCode}
                     onChange={e => setNewFollowerCode(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Lot Multiplier</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Lot Multiplier</label>
                   <input
                     type="number"
                     step="0.5"
                     min="0.5"
                     value={newFollowerMultiplier}
                     onChange={e => setNewFollowerMultiplier(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11.5px', color: '#94a3b8' }}>Max Risk / Trade (₹)</label>
+                  <label style={{ fontSize: '11.5px', color: 'var(--skx-muted)' }}>Max Risk / Trade (₹)</label>
                   <input
                     type="number"
                     value={newFollowerMaxRisk}
                     onChange={e => setNewFollowerMaxRisk(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '10px', borderRadius: '6px', color: '#fff', fontSize: '13px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '10px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '13px', marginTop: '4px' }}
                   />
                 </div>
               </div>
@@ -6073,7 +6073,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <button
                   type="button"
                   onClick={() => setShowAddFollowerModal(false)}
-                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: '#cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                  style={{ flex: 1, padding: '11px', background: '#1e293b', border: 'none', color: 'var(--skx-body)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
                 >
                   Cancel
                 </button>
@@ -6105,18 +6105,18 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           padding: '16px'
         }}>
           <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '480px',
             padding: '24px',
-            color: '#fff'
+            color: 'var(--skx-title)'
           }}>
             <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>
               Angel One SmartAPI Session: {accountToReauth.clientCode}
             </h3>
-            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '6px 0 14px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--skx-muted)', margin: '6px 0 14px' }}>
               {accountToReauth.totpEnabled && accountToReauth.hasMpin
                 ? 'Your Base32 TOTP Secret & MPIN are saved! Click below to auto-generate a fresh Angel One JWT session, or enter new credentials.'
                 : 'Enter your 6-digit TOTP from Authenticator, or save your Angel One MPIN + Base32 TOTP Secret for automatic daily renewal.'}
@@ -6124,7 +6124,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '11px', color: '#94a3b8' }}>6-Digit Authenticator TOTP Code</label>
+                <label style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>6-Digit Authenticator TOTP Code</label>
                 <input
                   type="text"
                   maxLength={6}
@@ -6133,11 +6133,11 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   onChange={e => setTotpCode(e.target.value)}
                   style={{
                     width: '100%',
-                    background: '#090d16',
-                    border: '1px solid #1e293b',
+                    background: 'var(--skx-sub-bg)',
+                    border: '1px solid var(--skx-border)',
                     padding: '11px',
                     borderRadius: '8px',
-                    color: '#fff',
+                    color: 'var(--skx-title)',
                     fontSize: '17px',
                     textAlign: 'center',
                     letterSpacing: '4px',
@@ -6149,36 +6149,36 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11px', color: '#94a3b8' }}>Angel One 4-Digit MPIN (Optional Update)</label>
+                  <label style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>Angel One 4-Digit MPIN (Optional Update)</label>
                   <input
                     type="password"
                     maxLength={6}
                     placeholder={accountToReauth.hasMpin ? '•••• (Saved)' : '4-digit MPIN'}
                     value={reauthMpin}
                     onChange={e => setReauthMpin(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '11px', color: '#94a3b8' }}>SmartAPI Key (Optional Update)</label>
+                  <label style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>SmartAPI Key (Optional Update)</label>
                   <input
                     type="text"
                     placeholder={accountToReauth.apiKey || 'SmartAPI Key'}
                     value={reauthApiKey}
                     onChange={e => setReauthApiKey(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', color: '#94a3b8' }}>Base32 TOTP Secret Key (For 1-Click Auto-Renewal)</label>
+                <label style={{ fontSize: '11px', color: 'var(--skx-muted)' }}>Base32 TOTP Secret Key (For 1-Click Auto-Renewal)</label>
                 <input
                   type="password"
                   placeholder={accountToReauth.totpEnabled ? '•••••••••••••••• (Base32 Secret Saved)' : 'Paste Base32 Secret from smartapi.angelone.in/enable-totp'}
                   value={reauthTotpSecret}
                   onChange={e => setReauthTotpSecret(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                 />
               </div>
 
@@ -6206,8 +6206,8 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 style={{
                   padding: '10px',
                   background: 'transparent',
-                  color: '#94a3b8',
-                  border: '1px solid #334155',
+                  color: 'var(--skx-muted)',
+                  border: '1px solid var(--skx-border-light)',
                   borderRadius: '6px',
                   fontSize: '12px',
                   cursor: 'pointer'
@@ -6236,13 +6236,13 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
           padding: '16px'
         }}>
           <div style={{
-            background: '#121826',
-            border: '1px solid #1e293b',
+            background: 'var(--skx-capsule-bg)',
+            border: '1px solid var(--skx-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '460px',
             padding: '24px',
-            color: '#fff'
+            color: 'var(--skx-title)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
@@ -6260,7 +6260,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   {selectedStockForOrder.symbol}
                 </span>
               </div>
-              <button onClick={() => setShowOrderModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setShowOrderModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--skx-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
@@ -6271,7 +6271,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                 <select
                   value={orderTargetDemat}
                   onChange={e => setOrderTargetDemat(e.target.value)}
-                  style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                  style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                 >
                   <option value="ALL">ALL CONNECTED DEMATS (MULTI-ACCOUNT OMS)</option>
                   {demats.map(d => (
@@ -6288,7 +6288,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     min="1"
                     value={orderQty}
                     onChange={e => setOrderQty(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
@@ -6296,7 +6296,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   <select
                     value={orderType}
                     onChange={e => setOrderType(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   >
                     <option value="MARKET">MARKET</option>
                     <option value="LIMIT">LIMIT</option>
@@ -6311,7 +6311,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     type="number"
                     value={orderTargetPts}
                     onChange={e => setOrderTargetPts(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
                 <div>
@@ -6320,7 +6320,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                     type="number"
                     value={orderSlPts}
                     onChange={e => setOrderSlPts(e.target.value)}
-                    style={{ width: '100%', background: '#090d16', border: '1px solid #1e293b', padding: '9px', borderRadius: '6px', color: '#fff', fontSize: '12.5px', marginTop: '4px' }}
+                    style={{ width: '100%', background: 'var(--skx-sub-bg)', border: '1px solid var(--skx-border)', padding: '9px', borderRadius: '6px', color: 'var(--skx-title)', fontSize: '12.5px', marginTop: '4px' }}
                   />
                 </div>
               </div>
@@ -6331,7 +6331,7 @@ export default function SkandxAlgoView({ initialTab, onBack, onOpenPaperTrading 
                   marginTop: '10px',
                   padding: '12px',
                   background: orderSide === 'BUY' ? '#16a34a' : '#dc2626',
-                  color: '#fff',
+                  color: 'var(--skx-title)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '13.5px',
