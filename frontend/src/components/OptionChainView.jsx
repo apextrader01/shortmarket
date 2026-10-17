@@ -132,7 +132,8 @@ const getIndexCandidates = (sym) => {
     case 'FINNIFTY': return ['NSE:FINNIFTY-INDEX', 'FINNIFTY-INDEX', 'FINNIFTY-NSE', 'NIFTY FIN SERVICE', 'FINNIFTY'];
     case 'SENSEX': return ['BSE:SENSEX-INDEX', 'SENSEX-INDEX', 'SENSEX-BSE', 'SENSEX'];
     case 'BANKEX': return ['BSE:BANKEX-INDEX', 'BANKEX-INDEX', 'BANKEX-BSE', 'BANKEX'];
-    default: return [`NSE:${sym}-INDEX`, `${sym}-NSE`];
+    case 'MIDCPNIFTY': return ['NSE:MIDCPNIFTY-INDEX', 'MIDCPNIFTY-INDEX', 'MIDCPNIFTY-NSE', 'NIFTY MID SELECT', 'MIDCPNIFTY'];
+    default: return [`NSE:${sym}-INDEX`, `${sym}-NSE`, `NSE:${sym}-EQ`, `BSE:${sym}`, `NSE:${sym}`, `${sym}-EQ`, sym];
   }
 };
 
@@ -143,6 +144,7 @@ const getIndexKey = (sym) => {
     case 'FINNIFTY': return 'NSE:FINNIFTY-INDEX';
     case 'SENSEX': return 'BSE:SENSEX-INDEX';
     case 'BANKEX': return 'BSE:BANKEX-INDEX';
+    case 'MIDCPNIFTY': return 'NSE:MIDCPNIFTY-INDEX';
     default: return `NSE:${sym}-INDEX`;
   }
 };

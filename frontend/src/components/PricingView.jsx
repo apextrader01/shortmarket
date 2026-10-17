@@ -563,7 +563,7 @@ export default function PricingView({ setActiveTab }) {
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> NISM Certification Guidance & Exam Prep</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> Course Completion Certificate signed by Mentor</li>
             <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}><Check size={16} style={{ color: '#2DD4BF', flexShrink: 0 }}/> 🎓 Masterclass Scholar Leaderboard Badge</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}><Check size={16} style={{ color: '#94A3B8', flexShrink: 0 }}/> <em>Paper Trading: Free Tier (2 lists, 40 trades/mo, MF Excluded)</em></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}><Check size={16} style={{ color: '#94A3B8', flexShrink: 0 }}/> <em>Paper Trading: Free Tier (3 lists, 40 trades/mo, MF Excluded)</em></li>
           </ul>
 
           {isMasterclass ? (

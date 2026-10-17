@@ -7769,13 +7769,15 @@ app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (
     // Check subscription tier (Admin accounts have no limits or plan restrictions)
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user?.is_admin) {
-      const isHighest = ['HIGHEST', 'FEATURE', 'VIP', 'LIFETIME', 'YEARLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
-      const isYearlyOrMonthly = ['PRO', 'MONTHLY'].includes(user?.subscription_tier) && (!user?.subscription_expires || new Date(user.subscription_expires) > new Date());
+      const isExpired = user?.subscription_expires && new Date(user.subscription_expires).getTime() <= Date.now();
+      const activeTier = isExpired ? 'BASIC' : (user?.subscription_tier || 'BASIC').toUpperCase();
+      const isHighest = ['HIGHEST', 'FEATURE', 'VIP'].includes(activeTier);
+      const isYearlyOrMonthly = ['YEARLY', 'PRO', 'MONTHLY', 'LIFETIME'].includes(activeTier);
       const limit = isHighest ? 5 : (isYearlyOrMonthly ? 4 : 3);
       const maxSymbols = isHighest ? 100 : (isYearlyOrMonthly ? 75 : 30);
       
       if (watchlists.length > limit) {
-        return res.status(403).json({ error: `Your ${user?.subscription_tier || 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
+        return res.status(403).json({ error: `Your ${activeTier} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
       }
 
       for (const wl of watchlists) {
@@ -20319,6 +20321,27 @@ server.listen(PORT, async () => {
               updated_at: new Date()
             });
             console.log('✅ [AUTO-HEAL] Successfully linked User 12 (Akhil) to Referrer 9 (HARU1433 / SE000009)');
+          }
+        }
+
+        // Backfill 12-day Pro Monthly trial for newly registered users (< 12 days old) who were created as BASIC without an expiry
+        const twelveDaysAgo = new Date(Date.now() - 12 * 24 * 60 * 60 * 1000);
+        const unprovisionedRecentUsers = await db('users')
+          .where('created_at', '>=', twelveDaysAgo)
+          .where(function() {
+            this.whereNull('subscription_tier').orWhere('subscription_tier', 'BASIC');
+          })
+          .whereNull('subscription_expires');
+
+        for (const ru of unprovisionedRecentUsers) {
+          const createdAt = ru.created_at ? new Date(ru.created_at) : new Date();
+          const trialEnd = new Date(createdAt.getTime() + 12 * 24 * 60 * 60 * 1000);
+          if (trialEnd > new Date()) {
+            await db('users').where({ id: ru.id }).update({
+              subscription_tier: 'MONTHLY',
+              subscription_expires: trialEnd
+            }).catch(() => {});
+            console.log(`✅ [AUTO-HEAL] Backfilled 12-Day Pro Monthly Trial for recent User ${ru.id} (${ru.username}) until ${trialEnd.toISOString()}`);
           }
         }
       } catch (err) {
