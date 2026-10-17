@@ -8,7 +8,7 @@ import { calculateOrderMargin } from '../utils/marginCalculator';
 import { getTodayRealizedMetrics, isToday } from '../utils/pnlHelper';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions, oneClickMode, reconfirmOrder } = useStore(useShallow(state => ({ 
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions, oneClickMode, reconfirmOrder, theme } = useStore(useShallow(state => ({ 
     orderModal: state.orderModal, 
     closeOrderModal: state.closeOrderModal, 
     user: state.user, 
@@ -21,8 +21,10 @@ export default function OrderModal() {
     holdings: state.holdings,
     positions: state.positions,
     oneClickMode: state.oneClickMode,
-    reconfirmOrder: state.reconfirmOrder
+    reconfirmOrder: state.reconfirmOrder,
+    theme: state.theme
   })));
+  const isLight = theme === 'light';
   const rawModalSymbol = orderModal?.symbol;
   const livePriceData = useStore(state => {
     if (!rawModalSymbol) return null;
@@ -1025,8 +1027,8 @@ export default function OrderModal() {
           !isPaidTier ? (
             <div style={{
               margin: '12px 18px 0 18px',
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
+              background: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.12)',
+              border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.35)',
               borderRadius: '8px',
               padding: '10px 14px',
               display: 'flex',
@@ -1036,7 +1038,7 @@ export default function OrderModal() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Lock size={16} color="#ef4444" style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: '12px', color: '#fca5a5', lineHeight: '1.4' }}>
+                <div style={{ fontSize: '12px', color: isLight ? '#991b1b' : '#fca5a5', lineHeight: '1.4' }}>
                   <strong>Pro Subscription Required:</strong> Index buying (NIFTY, BANKNIFTY, SENSEX) is available only for subscribed members.
                 </div>
               </div>
@@ -1182,9 +1184,9 @@ export default function OrderModal() {
         {isTargetIndex && !isTrueExit && (
           <div style={{ 
             fontSize: '11.5px', 
-            color: '#38bdf8', 
-            background: 'rgba(56, 189, 248, 0.1)', 
-            border: '1px solid rgba(56, 189, 248, 0.25)', 
+            color: isLight ? '#0369a1' : '#38bdf8', 
+            background: isLight ? '#e0f2fe' : 'rgba(56, 189, 248, 0.1)', 
+            border: isLight ? '1px solid #bae6fd' : '1px solid rgba(56, 189, 248, 0.25)', 
             borderRadius: '6px', 
             padding: '7px 12px', 
             margin: '10px 20px 0 20px',
@@ -1197,7 +1199,7 @@ export default function OrderModal() {
               <span>⚡</span>
               <span><strong>Index Intraday Only:</strong> 09:15 AM – 03:15 PM IST · BO &amp; CO Allowed (No Delivery, No AMO)</span>
             </div>
-            <span style={{ fontWeight: '700', color: '#67e8f9' }}>Lot Size: {orderModal.lotsize || 30}</span>
+            <span style={{ fontWeight: '700', color: isLight ? '#0284c7' : '#67e8f9' }}>Lot Size: {orderModal.lotsize || 30}</span>
           </div>
         )}
 
@@ -1205,9 +1207,9 @@ export default function OrderModal() {
         {isIntradayRestricted && !isTrueExit && (
           <div style={{ 
             fontSize: '11.5px', 
-            color: '#f87171', 
-            background: 'rgba(239, 68, 68, 0.12)', 
-            border: '1px solid rgba(239, 68, 68, 0.3)', 
+            color: isLight ? '#991b1b' : '#f87171', 
+            background: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.12)', 
+            border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.3)', 
             borderRadius: '6px', 
             padding: '7px 11px', 
             margin: '10px 20px 0 20px',
@@ -1225,9 +1227,9 @@ export default function OrderModal() {
           {isAmo && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#fde68a', 
-              background: 'rgba(245, 158, 11, 0.12)', 
-              border: '1px solid rgba(245, 158, 11, 0.3)', 
+              color: isLight ? '#92400e' : '#fde68a', 
+              background: isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.12)', 
+              border: isLight ? '1px solid #fcd34d' : '1px solid rgba(245, 158, 11, 0.3)', 
               borderRadius: '6px', 
               padding: '7px 11px', 
               marginBottom: '12px',
@@ -1245,9 +1247,9 @@ export default function OrderModal() {
           {marketSession.session === 'PRE_MARKET' && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#93c5fd', 
-              background: 'rgba(59, 130, 246, 0.12)', 
-              border: '1px solid rgba(59, 130, 246, 0.3)', 
+              color: isLight ? '#1e40af' : '#93c5fd', 
+              background: isLight ? '#dbeafe' : 'rgba(59, 130, 246, 0.12)', 
+              border: isLight ? '1px solid #93c5fd' : '1px solid rgba(59, 130, 246, 0.3)', 
               borderRadius: '6px', 
               padding: '7px 11px', 
               marginBottom: '12px',
@@ -1265,9 +1267,9 @@ export default function OrderModal() {
           {marketSession.session === 'CLOSING_AUCTION' && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#c4b5fd', 
-              background: 'rgba(168, 85, 247, 0.12)', 
-              border: '1px solid rgba(168, 85, 247, 0.3)', 
+              color: isLight ? '#6b21a8' : '#c4b5fd', 
+              background: isLight ? '#f3e8ff' : 'rgba(168, 85, 247, 0.12)', 
+              border: isLight ? '1px solid #d8b4fe' : '1px solid rgba(168, 85, 247, 0.3)', 
               borderRadius: '6px', 
               padding: '7px 11px', 
               marginBottom: '12px',
@@ -1285,9 +1287,9 @@ export default function OrderModal() {
           {marketSession.session === 'POST_MARKET' && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#86efac', 
-              background: 'rgba(34, 197, 94, 0.12)', 
-              border: '1px solid rgba(34, 197, 94, 0.3)', 
+              color: isLight ? '#166534' : '#86efac', 
+              background: isLight ? '#dcfce7' : 'rgba(34, 197, 94, 0.12)', 
+              border: isLight ? '1px solid #86efac' : '1px solid rgba(34, 197, 94, 0.3)', 
               borderRadius: '6px', 
               padding: '7px 11px', 
               marginBottom: '12px',
@@ -1494,8 +1496,8 @@ export default function OrderModal() {
             <div style={{
               margin: '0 0 12px 0',
               padding: '10px 14px',
-              background: 'rgba(139, 92, 246, 0.08)',
-              border: '1px solid rgba(139, 92, 246, 0.25)',
+              background: isLight ? '#f3e8ff' : 'rgba(139, 92, 246, 0.08)',
+              border: isLight ? '1px solid #d8b4fe' : '1px solid rgba(139, 92, 246, 0.25)',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
@@ -1505,7 +1507,7 @@ export default function OrderModal() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '14px' }}>🎯</span>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: isLight ? '#7e22ce' : '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Setup Reference Levels (Delivery / Positional)
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '1px' }}>
@@ -1534,9 +1536,9 @@ export default function OrderModal() {
           {isExceedingFreezeLimit && (
             <div style={{ 
               fontSize: '11.5px', 
-              color: '#ef4444', 
-              background: 'rgba(239, 68, 68, 0.12)', 
-              border: '1px solid rgba(239, 68, 68, 0.35)', 
+              color: isLight ? '#991b1b' : '#ef4444', 
+              background: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.12)', 
+              border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.35)', 
               borderRadius: '6px', 
               padding: '8px 10px', 
               marginTop: '8px',
@@ -1549,14 +1551,14 @@ export default function OrderModal() {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <div style={{ fontWeight: '700', color: '#ef4444' }}>
+                  <div style={{ fontWeight: '700', color: isLight ? '#991b1b' : '#ef4444' }}>
                     {orderModal.lotsize > 1 ? (
                       `Max allowed lots per order as per exchange is ${maxAllowedLots.toLocaleString('en-IN')}. Please place multiple orders.`
                     ) : (
                       `Max allowed quantity per order as per exchange is ${freezeLimit.toLocaleString('en-IN')}. Please place multiple orders.`
                     )}
                   </div>
-                  <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                  <div style={{ color: isLight ? '#4b5563' : '#d1d5db', marginTop: '2px' }}>
                     {orderModal.lotsize > 1 ? (
                       `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds the maximum freeze limit of ${freezeLimit.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots).`
                     ) : (
@@ -1570,9 +1572,9 @@ export default function OrderModal() {
                 onClick={() => setQuantity(orderModal.lotsize > 1 ? maxAllowedLots : freezeLimit)}
                 style={{
                   flexShrink: 0,
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.5)',
-                  color: '#f87171',
+                  background: isLight ? '#fecaca' : 'rgba(239, 68, 68, 0.2)',
+                  border: isLight ? '1px solid #f87171' : '1px solid rgba(239, 68, 68, 0.5)',
+                  color: isLight ? '#991b1b' : '#f87171',
                   borderRadius: '4px',
                   padding: '4px 8px',
                   fontSize: '11px',
@@ -1588,9 +1590,9 @@ export default function OrderModal() {
 
           {/* Trailing Stop Loss (TSL) Jump Input */}
           {(tab === 'Stop Loss' || isCO || isBO) && (
-            <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            <div style={{ marginTop: '10px', padding: '8px 12px', background: isLight ? '#eff6ff' : 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: isLight ? '1px solid #bfdbfe' : '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: isLight ? '#1d4ed8' : '#60a5fa' }}>
                   📈 Trailing Stop Loss (TSL Jump)
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -1623,11 +1625,11 @@ export default function OrderModal() {
 
         {/* Margin Alert (if insufficient) */}
         {isInsufficient && (
-          <div style={{ background: 'rgba(234, 179, 8, 0.1)', borderTop: '1px solid rgba(234, 179, 8, 0.3)', borderBottom: '1px solid rgba(234, 179, 8, 0.3)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: isLight ? '#fef3c7' : 'rgba(234, 179, 8, 0.1)', borderTop: isLight ? '1px solid #fcd34d' : '1px solid rgba(234, 179, 8, 0.3)', borderBottom: isLight ? '1px solid #fcd34d' : '1px solid rgba(234, 179, 8, 0.3)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ background: '#eab308', color: '#000', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>!</div>
               <div>
-                <div style={{ fontWeight: '700', fontSize: '13px', color: '#d97706' }}>Insufficient margin!</div>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: isLight ? '#92400e' : '#d97706' }}>Insufficient margin!</div>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Please add ₹{(requiredMargin - balanceNum).toFixed(2)} to place this order.</div>
               </div>
             </div>
@@ -1640,10 +1642,10 @@ export default function OrderModal() {
           <div style={{
             margin: '0 16px 12px 16px',
             padding: '9px 14px',
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
+            background: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.12)',
+            border: isLight ? '1px solid #fca5a5' : '1px solid rgba(239, 68, 68, 0.35)',
             borderRadius: '8px',
-            color: '#ef4444',
+            color: isLight ? '#991b1b' : '#ef4444',
             fontSize: '12.5px',
             fontWeight: '600',
             display: 'flex',
@@ -1662,7 +1664,7 @@ export default function OrderModal() {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#ef4444',
+                color: isLight ? '#991b1b' : '#ef4444',
                 cursor: 'pointer',
                 fontSize: '14px',
                 padding: '2px 6px',
