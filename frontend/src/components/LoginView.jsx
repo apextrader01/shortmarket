@@ -1056,17 +1056,17 @@ export default function LoginView() {
     if (window.google?.accounts?.id) {
       initGis();
     } else {
-      const interval = setInterval(() => {
-        if (window.google?.accounts?.id) {
-          initGis();
-          clearInterval(interval);
-        }
-      }, 200);
-      const timeout = setTimeout(() => clearInterval(interval), 4000);
-      return () => {
-        clearInterval(interval);
-        clearTimeout(timeout);
-      };
+      let script = document.getElementById('gsi-client-script');
+      if (!script) {
+        script = document.createElement('script');
+        script.id = 'gsi-client-script';
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.onload = () => initGis();
+        document.head.appendChild(script);
+      } else {
+        script.addEventListener('load', () => initGis(), { once: true });
+      }
     }
   }, [handleGoogleCredentialResponse, isCapacitorOrWebView]);
 
