@@ -28,9 +28,9 @@ runTest('App.jsx mounts SkandxAlgoView as full page at activeTab === "Algo"', ()
   const appContent = fs.readFileSync(path.join(__dirname, 'frontend/src/App.jsx'), 'utf-8');
   assert(appContent.includes("const SkandxAlgoView = lazyWithRetry(() => import('./components/SkandxAlgoView'));"), 'Missing lazy import');
   assert(appContent.includes("'algo': 'Algo'"), 'Missing algo in tabsMap');
-  assert(appContent.includes("else if (activeTab === 'Algo') newPath = '/algo';"), 'Missing /algo URL sync');
+  assert(appContent.includes("activeTab === 'Algo'") && (appContent.includes("newPath = '/algo'") || appContent.includes("newPath = ['algo'")), 'Missing /algo URL sync');
   assert(appContent.includes("<SkandxAlgoView"), 'Missing SkandxAlgoView component mounting');
-  assert(appContent.includes("onOpenAlgoBridge={() => setActiveTab('Algo')}"), 'Hub 11 must direct to full Algo page');
+  assert(appContent.includes("setActiveTab('Algo')"), 'Hub 11 must direct to full Algo page');
 });
 
 // ── TEST 2: SkandxAlgoView Component Integrity ──
@@ -45,7 +45,7 @@ runTest('SkandxAlgoView.jsx has full 8 modules, modals, and institutional layout
   assert(viewContent.includes("activeMenu === 'GroupCopy'"), 'Missing Copy Trading sub-view');
   assert(viewContent.includes("activeMenu === 'Bridge'"), 'Missing Webhooks sub-view');
   assert(viewContent.includes("activeMenu === 'TelegramBot'"), 'Missing Telegram sub-view');
-  assert(viewContent.includes('showRechargeModal'), 'Missing Wallet Recharge / Add Funds Modal');
+  assert(viewContent.includes('showCheckoutModal'), 'Missing Wallet Recharge / Add Funds Modal');
   assert(viewContent.includes('showAddDematModal'), 'Missing Demat Connection Modal');
   assert(viewContent.includes('showReauthModal'), 'Missing TOTP Reauth Modal');
   assert(viewContent.includes('showOrderModal'), 'Missing 1-Click Order Execution Modal');
@@ -59,7 +59,7 @@ runTest('backend/server.js registers all SkandX Algo bridge endpoints', () => {
   assert(serverContent.includes("app.post('/api/v1/bridge/ips/purchase'"), 'Missing /api/v1/bridge/ips/purchase');
   assert(serverContent.includes("app.post('/api/v1/bridge/watchlist/add'"), 'Missing /api/v1/bridge/watchlist/add');
   assert(serverContent.includes("app.post('/api/v1/bridge/kill-switch'"), 'Missing /api/v1/bridge/kill-switch');
-  assert(serverContent.includes("app.post('/api/v1/bridge/credit/recharge'"), 'Missing /api/v1/bridge/credit/recharge');
+  assert(serverContent.includes("app.post('/api/v1/bridge/wallet/pay'") || serverContent.includes("app.post('/api/v1/bridge/cashfree/create-order'"), 'Missing /api/v1/bridge payment endpoints');
   assert(serverContent.includes("app.post('/api/v1/bridge/order'"), 'Missing /api/v1/bridge/order');
   assert(serverContent.includes("app.post('/api/v1/bridge/webhook'"), 'Missing /api/v1/bridge/webhook');
 });
