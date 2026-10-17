@@ -102,6 +102,10 @@ export default function OrderModal() {
       setProductType(initialProd);
       if (isIdx) {
         setIsAmo(false);
+      } else if (orderModal.initialAmo !== undefined && orderModal.initialAmo !== null) {
+        setIsAmo(Boolean(orderModal.initialAmo));
+      } else {
+        setIsAmo(false);
       }
       
       const effectiveLotsize = (orderModal.lotsize && Number(orderModal.lotsize) > 1) 
@@ -114,6 +118,14 @@ export default function OrderModal() {
 
       if (orderModal.totalExitQty) {
           const rawLots = Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / effectiveLotsize));
+          const freezeLim = getFreezeLimit(orderModal.symbol, effectiveLotsize);
+          const maxAllowed = (effectiveLotsize && effectiveLotsize > 1) ? Math.floor(freezeLim / effectiveLotsize) : freezeLim;
+          setQuantity(maxAllowed > 0 ? Math.min(rawLots, maxAllowed) : rawLots);
+      } else if (orderModal.initialQty && Number(orderModal.initialQty) > 0) {
+          const rawUnits = Number(orderModal.initialQty);
+          const rawLots = (effectiveLotsize && effectiveLotsize > 1)
+            ? Math.max(1, Math.round(rawUnits / effectiveLotsize))
+            : Math.max(1, Math.round(rawUnits));
           const freezeLim = getFreezeLimit(orderModal.symbol, effectiveLotsize);
           const maxAllowed = (effectiveLotsize && effectiveLotsize > 1) ? Math.floor(freezeLim / effectiveLotsize) : freezeLim;
           setQuantity(maxAllowed > 0 ? Math.min(rawLots, maxAllowed) : rawLots);
@@ -136,7 +148,7 @@ export default function OrderModal() {
       // Fetch initial price imperatively to avoid re-running on every live tick
       if (orderModal.initialPrice && Number(orderModal.initialPrice) > 0) {
         setPrice(Number(orderModal.initialPrice).toFixed(2));
-        setOrderType('LIMIT');
+        setOrderType(orderModal.initialOrderType || 'LIMIT');
       } else {
         const prices = useStore.getState().prices;
         const sym = orderModal.symbol || '';
@@ -144,6 +156,9 @@ export default function OrderModal() {
         const base = clean.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ|INDEX)$/i, '');
         const currentLivePrice = prices[sym]?.ltp || prices[clean]?.ltp || prices[base]?.ltp || prices[`NSE:${clean}`]?.ltp || prices[`NSE:${base}`]?.ltp || prices[`NSE:${base}-EQ`]?.ltp || 0;
         setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
+        if (orderModal.initialOrderType) {
+          setOrderType(orderModal.initialOrderType);
+        }
       }
       
       // Target and Stop Loss prefill (e.g. from Trading Signal Broadcast)

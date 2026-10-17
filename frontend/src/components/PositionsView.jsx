@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
+import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet, Shield, ShieldAlert, Target, PartyPopper } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import SkeletonLoader from './SkeletonLoader';
@@ -13,6 +13,123 @@ import { getMarketSession } from '../utils/marketTiming';
 import { triggerPreExitAd } from './AdBannerWidget';
 
 const EMPTY_PRICES = {};
+
+const getTodayIstDateString = () => {
+  try {
+    const d = new Date();
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return istFormatter.format(d);
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+};
+
+const getStoredDiscipline = () => {
+  try {
+    const raw = localStorage.getItem('skandx_daily_discipline');
+    const today = getTodayIstDateString();
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.date === today) {
+        return parsed;
+      }
+      return {
+        ...parsed,
+        date: today,
+        targetHitCelebrated: false,
+        maxLossAlerted: false
+      };
+    }
+  } catch (_) {}
+  return {
+    date: getTodayIstDateString(),
+    enabled: false,
+    target: 5000,
+    maxLoss: 2500,
+    lockTradingOnHit: false,
+    targetHitCelebrated: false,
+    maxLossAlerted: false
+  };
+};
+
+function ConfettiCanvas({ onDone }) {
+  const canvasRef = React.useRef(null);
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#eab308'];
+    const particles = [];
+    const count = 90;
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: -10 - Math.random() * 50,
+        w: 6 + Math.random() * 8,
+        h: 6 + Math.random() * 12,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: (Math.random() - 0.5) * 6,
+        vy: 2 + Math.random() * 5,
+        rot: Math.random() * 360,
+        vRot: (Math.random() - 0.5) * 10
+      });
+    }
+
+    let animId;
+    const startTime = Date.now();
+    const duration = 3500;
+
+    const render = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > duration) {
+        if (onDone) onDone();
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const fadeProgress = Math.max(0, (duration - elapsed) / 1000);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vRot;
+        p.vy += 0.08;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rot * Math.PI) / 180);
+        ctx.globalAlpha = Math.min(1, fadeProgress);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      animId = requestAnimationFrame(render);
+    };
+    animId = requestAnimationFrame(render);
+
+    return () => cancelAnimationFrame(animId);
+  }, [onDone]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+        zIndex: 9999
+      }}
+    />
+  );
+}
 
 export default function PositionsView() {
 
@@ -34,6 +151,42 @@ export default function PositionsView() {
   const [convertModalPos, setConvertModalPos] = useState(null);
   const [convertLoading, setConvertLoading] = useState(false);
   const [selectedMfFund, setSelectedMfFund] = useState(null);
+
+  // 🛡️ Daily Discipline & Risk Guard (Trader Psychology Lock)
+  const [discipline, setDiscipline] = useState(getStoredDiscipline);
+  const [showDisciplineModal, setShowDisciplineModal] = useState(false);
+  const [tempTarget, setTempTarget] = useState(discipline.target || 5000);
+  const [tempMaxLoss, setTempMaxLoss] = useState(discipline.maxLoss || 2500);
+  const [tempEnabled, setTempEnabled] = useState(discipline.enabled || false);
+  const [tempLockTrading, setTempLockTrading] = useState(discipline.lockTradingOnHit || false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [dismissTargetBanner, setDismissTargetBanner] = useState(false);
+  const [dismissMaxLossBanner, setDismissMaxLossBanner] = useState(false);
+
+  const openDisciplineModal = () => {
+    setTempTarget(discipline.target || 5000);
+    setTempMaxLoss(discipline.maxLoss || 2500);
+    setTempEnabled(discipline.enabled || false);
+    setTempLockTrading(discipline.lockTradingOnHit || false);
+    setShowDisciplineModal(true);
+  };
+
+  const handleSaveDiscipline = (enabledOverride) => {
+    const isEn = enabledOverride !== undefined ? enabledOverride : tempEnabled;
+    const updated = {
+      ...discipline,
+      enabled: isEn,
+      target: Math.max(0, parseFloat(tempTarget) || 0),
+      maxLoss: Math.max(0, parseFloat(tempMaxLoss) || 0),
+      lockTradingOnHit: tempLockTrading,
+      date: getTodayIstDateString()
+    };
+    setDiscipline(updated);
+    try {
+      localStorage.setItem('skandx_daily_discipline', JSON.stringify(updated));
+    } catch (_) {}
+    setShowDisciplineModal(false);
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -480,6 +633,36 @@ export default function PositionsView() {
     return { flatPositions: flatList, globalMTM, totalInvested, totalCurrent, hasDerivativeMargin };
   }, [sourceData, relevantPrices, viewMode]);
 
+  // Target and Max Loss Evaluation (Discipline Guard)
+  const isTargetAchieved = discipline.enabled && Number(discipline.target) > 0 && globalMTM >= Number(discipline.target);
+  const isMaxLossHit = discipline.enabled && Number(discipline.maxLoss) > 0 && globalMTM <= -Math.abs(Number(discipline.maxLoss));
+  const isNearTarget = discipline.enabled && Number(discipline.target) > 0 && !isTargetAchieved && globalMTM >= (Number(discipline.target) * 0.75);
+  const isNearMaxLoss = discipline.enabled && Number(discipline.maxLoss) > 0 && !isMaxLossHit && globalMTM <= -(Math.abs(Number(discipline.maxLoss)) * 0.75);
+
+  useEffect(() => {
+    if (!discipline.enabled) return;
+
+    // Trigger celebration once on hitting profit target
+    if (isTargetAchieved && !discipline.targetHitCelebrated) {
+      setShowConfetti(true);
+      const updated = { ...discipline, targetHitCelebrated: true };
+      setDiscipline(updated);
+      try {
+        localStorage.setItem('skandx_daily_discipline', JSON.stringify(updated));
+      } catch (_) {}
+    }
+
+    // Trigger max loss defense once
+    if (isMaxLossHit && !discipline.maxLossAlerted) {
+      setDismissMaxLossBanner(false);
+      const updated = { ...discipline, maxLossAlerted: true };
+      setDiscipline(updated);
+      try {
+        localStorage.setItem('skandx_daily_discipline', JSON.stringify(updated));
+      } catch (_) {}
+    }
+  }, [globalMTM, discipline.enabled, isTargetAchieved, isMaxLossHit, discipline.targetHitCelebrated, discipline.maxLossAlerted]);
+
   const exitAllPositions = async () => {
     const store = useStore.getState();
     const openPositions = flatPositions.filter(p => {
@@ -727,6 +910,92 @@ export default function PositionsView() {
               )}
             </div>
           </div>
+
+          {/* 🛡️ Discipline Guard (Trader Psychology Lock) Widget */}
+          <button
+            type="button"
+            onClick={openDisciplineModal}
+            title="Daily Discipline & Risk Guard (Trader Psychology Lock)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: !discipline.enabled
+                ? 'var(--bg-card)'
+                : isTargetAchieved
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : isMaxLossHit
+                    ? 'rgba(239, 68, 68, 0.18)'
+                    : 'var(--bg-card)',
+              border: `1px solid ${
+                !discipline.enabled
+                  ? 'var(--border-color)'
+                  : isTargetAchieved
+                    ? '#10b981'
+                    : isMaxLossHit
+                      ? '#ef4444'
+                      : isNearTarget
+                        ? '#34d399'
+                        : isNearMaxLoss
+                          ? '#f87171'
+                          : 'rgba(59, 130, 246, 0.4)'
+              }`,
+              padding: isMobile ? '5px 10px' : '6px 12px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              color: 'var(--text-primary)',
+              transition: 'all 0.15s ease',
+              boxShadow: isTargetAchieved
+                ? '0 0 14px rgba(16, 185, 129, 0.35)'
+                : isMaxLossHit
+                  ? '0 0 14px rgba(239, 68, 68, 0.35)'
+                  : '0 2px 8px rgba(0,0,0,0.1)'
+            }}
+          >
+            <div style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '6px',
+              background: !discipline.enabled
+                ? 'rgba(148, 163, 184, 0.15)'
+                : isTargetAchieved
+                  ? 'rgba(16, 185, 129, 0.25)'
+                  : isMaxLossHit
+                    ? 'rgba(239, 68, 68, 0.25)'
+                    : 'rgba(59, 130, 246, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {isTargetAchieved ? (
+                <PartyPopper size={14} color="#10b981" />
+              ) : isMaxLossHit ? (
+                <ShieldAlert size={14} color="#ef4444" />
+              ) : (
+                <Shield size={14} color={discipline.enabled ? '#3b82f6' : 'var(--text-secondary)'} />
+              )}
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.1 }}>
+                DISCIPLINE GUARD
+              </div>
+              <div style={{ fontSize: isMobile ? '12px' : '13px', fontWeight: '800', marginTop: '2px', lineHeight: 1.1, display: 'flex', gap: '5px', alignItems: 'center' }}>
+                {!discipline.enabled ? (
+                  <span style={{ color: 'var(--text-secondary)' }}>+ Set Daily Target</span>
+                ) : isTargetAchieved ? (
+                  <span style={{ color: '#10b981' }}>🎯 Target Hit! 🎉</span>
+                ) : isMaxLossHit ? (
+                  <span style={{ color: '#ef4444' }}>⚠️ Max Loss Hit!</span>
+                ) : (
+                  <>
+                    <span style={{ color: '#10b981' }}>+₹{Number(discipline.target).toLocaleString('en-IN')}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>/</span>
+                    <span style={{ color: '#ef4444' }}>-₹{Number(discipline.maxLoss).toLocaleString('en-IN')}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* Right: Exit Action Buttons */}
@@ -797,6 +1066,119 @@ export default function PositionsView() {
           )}
         </div>
       </div>
+      
+      {/* 🎊 Celebration Confetti Canvas on Profit Target Achieved */}
+      {showConfetti && <ConfettiCanvas onDone={() => setShowConfetti(false)} />}
+
+      {/* 🎉 Celebratory Target Achieved Banner */}
+      {isTargetAchieved && discipline.enabled && !dismissTargetBanner && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.16) 0%, rgba(5, 150, 105, 0.22) 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.45)',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.15)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <PartyPopper size={24} color="#10b981" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '800', color: '#6ee7b7' }}>
+                🎉 DAILY PROFIT TARGET HIT (+₹{Number(discipline.target).toLocaleString('en-IN')})!
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Exceptional discipline! Today's Total MTM is <strong style={{ color: '#10b981' }}>+₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>. Protect your gains and avoid over-trading.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDismissTargetBanner(true)}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#ffffff',
+              borderRadius: '6px',
+              padding: '6px 14px',
+              fontSize: '11.5px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Got it! 👍
+          </button>
+        </div>
+      )}
+
+      {/* 🚨 High-Priority Capital Defense Max Loss Alert Banner */}
+      {isMaxLossHit && discipline.enabled && !dismissMaxLossBanner && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.26) 100%)',
+          border: '1px solid rgba(239, 68, 68, 0.5)',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          boxShadow: '0 4px 16px rgba(239, 68, 68, 0.25)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <ShieldAlert size={26} color="#ef4444" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#fca5a5' }}>
+                🚨 CAPITAL PROTECTION TRIGGERED: Daily Max Loss Limit (-₹{Number(discipline.maxLoss).toLocaleString('en-IN')}) Reached!
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Current Day MTM: <strong style={{ color: '#ef4444' }}>-₹{Math.abs(globalMTM).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>. Preserve your capital and psychological edge for tomorrow.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {viewMode === 'OPEN' && flatPositions.some(p => p.isOpen) && (
+              <button
+                type="button"
+                onClick={exitAllPositions}
+                style={{
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '7px 14px',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.4)'
+                }}
+              >
+                EXIT ALL POSITIONS ⚡
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDismissMaxLossBanner(true)}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: 'var(--text-secondary)',
+                borderRadius: '6px',
+                padding: '7px 12px',
+                fontSize: '11.5px',
+                cursor: 'pointer'
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       
       {!isInitialUserDataLoaded && flatPositions.length === 0 ? (
         <div style={{ padding: '24px 16px', width: '100%' }}>
@@ -1162,33 +1544,73 @@ export default function PositionsView() {
                   padding: '10px 14px', 
                   marginBottom: '10px',
                   display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
+                  flexDirection: 'column',
+                  gap: '8px',
                   boxShadow: 'var(--card-shadow, 0 2px 8px rgba(0,0,0,0.05))'
                 }}>
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                      {viewMode === 'CLOSED' ? 'Realized P&L' : 'Total MTM'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                        {viewMode === 'CLOSED' ? 'Realized P&L' : 'Total MTM'}
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: globalMTM >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: globalMTM >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                      {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                        {viewMode === 'CLOSED' ? 'Entry' : hasDerivativeMargin ? 'Margin / Invested' : 'Invested'}
+                      </div>
+                      <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
+                        ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                        {viewMode === 'CLOSED' ? 'Exit' : 'Current'}
+                      </div>
+                      <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
+                        ₹{totalCurrent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                      {viewMode === 'CLOSED' ? 'Entry' : hasDerivativeMargin ? 'Margin / Invested' : 'Invested'}
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
-                      ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                      {viewMode === 'CLOSED' ? 'Exit' : 'Current'}
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
-                      ₹{totalCurrent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+
+                  {/* 🛡️ Discipline Guard status sub-row */}
+                  <div style={{
+                    paddingTop: '6px',
+                    borderTop: '1px dashed var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: '100%'
+                  }}>
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Shield size={12} color={discipline.enabled ? '#3b82f6' : 'var(--text-secondary)'} />
+                      <span style={{ fontWeight: '600' }}>Discipline:</span>
+                      {discipline.enabled ? (
+                        isTargetAchieved ? <strong style={{ color: '#10b981' }}>🎯 Target Hit!</strong> :
+                        isMaxLossHit ? <strong style={{ color: '#ef4444' }}>⚠️ Max Loss Hit!</strong> :
+                        <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>+₹{Number(discipline.target).toLocaleString('en-IN')} / -₹{Number(discipline.maxLoss).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>Not configured</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openDisciplineModal}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        color: '#3b82f6',
+                        borderRadius: '4px',
+                        padding: '2px 8px',
+                        fontSize: '10.5px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {discipline.enabled ? 'Edit' : '+ Set'}
+                    </button>
                   </div>
                 </div>
 
@@ -1760,6 +2182,236 @@ export default function PositionsView() {
           fund={selectedMfFund}
           onClose={() => setSelectedMfFund(null)}
         />
+      )}
+
+      {/* 🛡️ Daily Discipline & Risk Guard Modal */}
+      {showDisciplineModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 1200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px', boxSizing: 'border-box'
+        }} onClick={() => setShowDisciplineModal(false)}>
+          <div style={{
+            background: 'var(--bg-panel)',
+            padding: '24px',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '440px',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }} onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Shield size={20} color="#3b82f6" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                    Daily Discipline & Risk Guard
+                  </h3>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Trader Psychology & Capital Protection Lock
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowDisciplineModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}>×</button>
+            </div>
+
+            {/* Enable/Disable Toggle Card */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--bg-card)',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)'
+            }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  Activate Discipline Guard
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Auto-monitors your daily MTM against targets
+                </div>
+              </div>
+              <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
+                <input
+                  type="checkbox"
+                  checked={tempEnabled}
+                  onChange={e => setTempEnabled(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: tempEnabled ? '#10b981' : '#475569',
+                  borderRadius: '24px',
+                  transition: '0.3s'
+                }}>
+                  <span style={{
+                    position: 'absolute', content: '""', height: '18px', width: '18px', left: '3px', bottom: '3px',
+                    backgroundColor: 'white', borderRadius: '50%',
+                    transform: tempEnabled ? 'translateX(20px)' : 'translateX(0)',
+                    transition: '0.3s'
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* Target Profit Input & Presets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Target size={14} /> Daily Profit Target (₹)
+                </label>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Lock in green days</span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="500"
+                value={tempTarget}
+                onChange={e => setTempTarget(e.target.value)}
+                placeholder="e.g. 5000"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '10px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  outline: 'none'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                {[1000, 2500, 5000, 10000, 25000].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTempTarget(amt)}
+                    style={{
+                      background: Number(tempTarget) === amt ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-card)',
+                      border: Number(tempTarget) === amt ? '1px solid #10b981' : '1px solid var(--border-color)',
+                      color: Number(tempTarget) === amt ? '#10b981' : 'var(--text-secondary)',
+                      borderRadius: '4px',
+                      padding: '3px 8px',
+                      fontSize: '10.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    +₹{amt.toLocaleString('en-IN')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Max Loss Limit Input & Presets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ShieldAlert size={14} /> Daily Max-Loss Limit (₹)
+                </label>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Stop revenge trades</span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="500"
+                value={tempMaxLoss}
+                onChange={e => setTempMaxLoss(e.target.value)}
+                placeholder="e.g. 2500"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '10px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  outline: 'none'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                {[500, 1000, 2500, 5000, 10000].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTempMaxLoss(amt)}
+                    style={{
+                      background: Number(tempMaxLoss) === amt ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-card)',
+                      border: Number(tempMaxLoss) === amt ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                      color: Number(tempMaxLoss) === amt ? '#ef4444' : 'var(--text-secondary)',
+                      borderRadius: '4px',
+                      padding: '3px 8px',
+                      fontSize: '10.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    -₹{amt.toLocaleString('en-IN')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Trader Psychology Tip Box */}
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              fontSize: '11.5px',
+              color: 'var(--text-secondary)',
+              lineHeight: '1.4'
+            }}>
+              💡 <strong style={{ color: 'var(--text-primary)' }}>Rule of Disciplined Traders:</strong> Stored securely in your device browser with zero server lag. When target is reached, celebrate and lock gains. When max-loss is reached, stop and preserve capital for tomorrow's market.
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => handleSaveDiscipline(false)}
+                style={{
+                  padding: '10px 16px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Disable Guard
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveDiscipline(true)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                Save Discipline Guard
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

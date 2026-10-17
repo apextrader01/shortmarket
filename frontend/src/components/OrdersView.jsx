@@ -1,11 +1,102 @@
 import React, { useState } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
+import { Box, Clock, Target, History, ShoppingBag, RotateCcw } from 'lucide-react';
 import AlertsView from './AlertsView';
 import SkeletonLoader from './SkeletonLoader';
 import EmptyState from './EmptyState';
 import { isToday } from '../utils/pnlHelper';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
+
+const MONTH_INDEX_MAP = {
+  '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5,
+  '7': 6, '8': 7, '9': 8, 'O': 9, 'N': 10, 'D': 11
+};
+const MONTH_NAME_MAP = {
+  'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
+  'JUL': 6, 'AUG': 7, 'SEP': 8, 'OCT': 9, 'NOV': 10, 'DEC': 11
+};
+
+const getContractExpiryInfo = (symbol) => {
+  if (!symbol) return null;
+  const clean = String(symbol).trim().replace(/^(NSE:|BSE:|MCX:)/i, '');
+  
+  // Weekly option: e.g. NIFTY26O1624500CE
+  const weeklyMatch = clean.match(/^([A-Z]+)(\d{2})([1-9OND])(\d{2})(\d+(?:\.\d+)?)(CE|PE)$/i);
+  if (weeklyMatch) {
+    const [_, underlying, yy, mCode, dd, strike, type] = weeklyMatch;
+    const year = 2000 + parseInt(yy, 10);
+    const month = MONTH_INDEX_MAP[mCode.toUpperCase()] ?? 0;
+    const day = parseInt(dd, 10);
+    // Expiry occurs at 15:30 IST (10:00 UTC) on the expiry day
+    const expiryDate = new Date(Date.UTC(year, month, day, 10, 0, 0));
+    return {
+      isDerivative: true,
+      isOption: true,
+      isWeekly: true,
+      underlying: underlying.toUpperCase(),
+      strike: parseFloat(strike),
+      optionType: type.toUpperCase(),
+      expiryDate,
+      expiryDateStr: `${dd}-${mCode}-${year}`
+    };
+  }
+
+  // Monthly option: e.g. NIFTY26OCT23100CE
+  const monthlyMatch = clean.match(/^([A-Z]+)(\d{2})([A-Z]{3})(\d+(?:\.\d+)?)(CE|PE)$/i);
+  if (monthlyMatch) {
+    const [_, underlying, yy, mStr, strike, type] = monthlyMatch;
+    const year = 2000 + parseInt(yy, 10);
+    const month = MONTH_NAME_MAP[mStr.toUpperCase()] ?? 0;
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let expiryDay = lastDayOfMonth;
+    for (let d = lastDayOfMonth; d >= lastDayOfMonth - 7; d--) {
+      const dt = new Date(Date.UTC(year, month, d));
+      if (dt.getUTCDay() === 4) { // Thursday
+        expiryDay = d;
+        break;
+      }
+    }
+    const expiryDate = new Date(Date.UTC(year, month, expiryDay, 10, 0, 0));
+    return {
+      isDerivative: true,
+      isOption: true,
+      isWeekly: false,
+      underlying: underlying.toUpperCase(),
+      strike: parseFloat(strike),
+      optionType: type.toUpperCase(),
+      expiryDate,
+      expiryDateStr: `${expiryDay}-${mStr}-${year}`
+    };
+  }
+
+  // Futures: e.g. NIFTY26OCTFUT
+  const futMatch = clean.match(/^([A-Z]+)(\d{2})([A-Z]{3})FUT$/i);
+  if (futMatch) {
+    const [_, underlying, yy, mStr] = futMatch;
+    const year = 2000 + parseInt(yy, 10);
+    const month = MONTH_NAME_MAP[mStr.toUpperCase()] ?? 0;
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let expiryDay = lastDayOfMonth;
+    for (let d = lastDayOfMonth; d >= lastDayOfMonth - 7; d--) {
+      const dt = new Date(Date.UTC(year, month, d));
+      if (dt.getUTCDay() === 4) { // Thursday
+        expiryDay = d;
+        break;
+      }
+    }
+    const expiryDate = new Date(Date.UTC(year, month, expiryDay, 10, 0, 0));
+    return {
+      isDerivative: true,
+      isFuture: true,
+      underlying: underlying.toUpperCase(),
+      expiryDate,
+      expiryDateStr: `${expiryDay}-${mStr}-${year}`
+    };
+  }
+
+  return { isDerivative: false };
+};
 
 const isMfSymbol = (sym) => {
   const clean = String(sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
@@ -121,6 +212,143 @@ export default function OrdersView() {
     } finally {
       setIsSavingTag(false);
     }
+  };
+
+  const handleRepeatOrder = async (order) => {
+    if (!order) return;
+    const rawSym = order.symbol || '';
+    const isMf = isMfSymbol(rawSym);
+    if (isMf) {
+      showToast('Mutual Fund orders cannot be repeated from order history. Please use the Mutual Funds tab.', 'info', 'Mutual Fund Order');
+      return;
+    }
+
+    const clean = rawSym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const isCommodity = rawSym.startsWith('MCX:') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER'].some(c => clean.startsWith(c));
+
+    // 1. Current IST Market Session check
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      weekday: 'short',
+      hour12: false
+    }).formatToParts(now);
+    const hour = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const minute = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const weekday = istParts.find(p => p.type === 'weekday')?.value;
+    const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+    const currentMins = hour * 60 + minute;
+
+    let targetProductType = order.product_type || 'INT';
+    let targetAmo = false;
+
+    if (isCommodity) {
+      // MCX: 09:00 - 23:30 (Cutoff 23:15, AMO 23:30 - 08:57)
+      const isMcxCutoff = !isWeekend && currentMins >= 1395 && currentMins < 1410;
+      const isMcxAmo = isWeekend || currentMins >= 1410 || currentMins < 537;
+
+      if (isMcxCutoff && (targetProductType === 'INT' || targetProductType === 'MIS')) {
+        targetProductType = 'DEL';
+        showToast('⚠️ MCX Intraday cutoff reached (23:15). Product switched to Delivery/Overnight.', 'info', 'Intraday Closed');
+      } else if (isMcxAmo) {
+        targetAmo = true;
+        showToast('🌙 MCX market is closed. Re-order queued as After Market Order (AMO).', 'info', 'AMO Mode');
+      }
+    } else {
+      // Equity / F&O: 09:15 - 15:30 (Cutoff 15:15, Closing Auction 15:30-15:45, AMO 15:45 - 08:57)
+      const isEqOpen = !isWeekend && currentMins >= 555 && currentMins < 930;
+      const isEqCutoff = !isWeekend && currentMins >= 915 && currentMins < 930;
+      const isEqClosingAuction = !isWeekend && currentMins >= 930 && currentMins < 945;
+      const isEqAmo = isWeekend || currentMins >= 945 || currentMins < 537;
+      const isEqPreMarket = !isWeekend && currentMins >= 537 && currentMins < 555;
+
+      if (isEqCutoff && (targetProductType === 'INT' || targetProductType === 'MIS')) {
+        targetProductType = 'DEL';
+        showToast('⚠️ Intraday MIS is closed for today (15:15 cutoff). Product changed to Delivery/NRML.', 'info', 'Intraday Closed');
+      } else if (isEqClosingAuction) {
+        targetAmo = true;
+        showToast('🕒 Closing auction in progress (15:30-15:45). Order queued as AMO.', 'info', 'Closing Session');
+      } else if (isEqPreMarket) {
+        showToast('🕒 Pre-market session active. Regular trading begins at 09:15 AM IST.', 'info', 'Pre-Market');
+      } else if (isEqAmo || !isEqOpen) {
+        targetAmo = true;
+        showToast('🌙 Regular market is closed. Re-order configured as After Market Order (AMO) — queued for market open.', 'info', 'AMO Mode');
+      }
+    }
+
+    // 2. Derivative Expiry Check & Auto-Roll
+    let targetSymbol = rawSym;
+    const expiryInfo = getContractExpiryInfo(rawSym);
+    if (expiryInfo && expiryInfo.isDerivative && expiryInfo.expiryDate) {
+      const isExpired = now.getTime() > expiryInfo.expiryDate.getTime();
+      const expiresToday = !isExpired && (expiryInfo.expiryDate.getTime() - now.getTime()) < (6 * 3600 * 1000) && (expiryInfo.expiryDate.getUTCDate() === now.getUTCDate());
+
+      if (expiresToday && currentMins >= 925 && !isCommodity) {
+        showToast('⚠️ Contract expires today at 03:30 PM. New orders within 5 mins of expiry are restricted.', 'error', 'Expiring Today');
+        return;
+      }
+
+      if (isExpired) {
+        // Attempt to roll forward to current active expiry via Option Chain API
+        try {
+          const chainRes = await fetch(`${API}/api/options/chain/${expiryInfo.underlying}`);
+          if (chainRes.ok) {
+            const chainData = await chainRes.json();
+            const todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
+            const activeExpiries = Object.keys(chainData)
+              .filter(e => new Date(e) >= todayMidnight)
+              .sort((a, b) => new Date(a) - new Date(b));
+
+            if (activeExpiries.length > 0) {
+              const nearestExpiry = activeExpiries[0];
+              const strikeData = chainData[nearestExpiry]?.[expiryInfo.strike];
+              const rolledLeg = expiryInfo.optionType === 'CE' ? strikeData?.CE : strikeData?.PE;
+              if (rolledLeg && rolledLeg.symbol) {
+                targetSymbol = rolledLeg.symbol;
+                showToast(`🔄 Original contract expired. Auto-rolled to active ${nearestExpiry} contract: ${rolledLeg.symbol}`, 'info', 'Contract Auto-Rolled');
+              } else {
+                showToast(`⚠️ Contract ${rawSym} expired on ${expiryInfo.expiryDateStr}. Active strike not available in current chain.`, 'error', 'Contract Expired');
+                return;
+              }
+            } else {
+              showToast(`⚠️ Contract ${rawSym} expired on ${expiryInfo.expiryDateStr}. Please select active expiry from Option Chain.`, 'error', 'Contract Expired');
+              return;
+            }
+          } else {
+            showToast(`⚠️ Contract ${rawSym} expired on ${expiryInfo.expiryDateStr}.`, 'error', 'Contract Expired');
+            return;
+          }
+        } catch (_) {
+          showToast(`⚠️ Contract ${rawSym} expired on ${expiryInfo.expiryDateStr}.`, 'error', 'Contract Expired');
+          return;
+        }
+      }
+    }
+
+    // 3. Open Order Modal pre-filled
+    const targetSide = order.side || 'BUY';
+    const targetQty = Number(order.quantity || 1);
+    const targetLotsize = Number(order.lotsize || (typeof getInstantLotsize === 'function' ? getInstantLotsize(targetSymbol) : 1));
+    const targetPrice = order.price && Number(order.price) > 0 ? Number(order.price) : (order.average_price && Number(order.average_price) > 0 ? Number(order.average_price) : null);
+    const targetOrderType = order.type || (targetPrice ? 'LIMIT' : 'MARKET');
+
+    useStore.getState().openOrderModal(
+      targetSymbol,
+      targetSide,
+      targetLotsize,
+      targetProductType,
+      false, // isExit
+      0,     // totalExitQty
+      targetPrice,
+      null,  // target
+      null,  // stopLoss
+      targetQty,
+      targetAmo,
+      targetOrderType
+    );
   };
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Alerts'];
@@ -520,21 +748,43 @@ export default function OrdersView() {
                               </span>
                             )}
                             {activeTab === 'Order History' && (
-                              order.tag ? (
-                                <span 
-                                  onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
-                                  style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '1px 5px', borderRadius: '3px', fontWeight: '600' }}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
+                                  title="Repeat Trade (1-Click Re-Order)"
+                                  style={{
+                                    fontSize: '10px',
+                                    background: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#10b981',
+                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                    padding: '1px 6px',
+                                    borderRadius: '3px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
                                 >
-                                  {order.tag}
-                                </span>
-                              ) : (
-                                <span 
-                                  onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
-                                  style={{ fontSize: '10px', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)', padding: '1px 5px', borderRadius: '3px' }}
-                                >
-                                  + Tag
-                                </span>
-                              )
+                                  <RotateCcw size={10} />
+                                  REPEAT
+                                </button>
+                                {order.tag ? (
+                                  <span 
+                                    onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
+                                    style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '1px 5px', borderRadius: '3px', fontWeight: '600' }}
+                                  >
+                                    {order.tag}
+                                  </span>
+                                ) : (
+                                  <span 
+                                    onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
+                                    style={{ fontSize: '10px', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)', padding: '1px 5px', borderRadius: '3px' }}
+                                  >
+                                    + Tag
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {activeTab === 'Open Orders' && (
                               (() => {
@@ -593,7 +843,7 @@ export default function OrdersView() {
                     {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Realized P&L</th>}
                     {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Tag / Journal</th>}
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
-                    {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
+                    {(activeTab === 'Open Orders' || activeTab === 'Order History') && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
                   </tr>
                 )}
               </thead>
@@ -814,6 +1064,33 @@ export default function OrdersView() {
                             </div>
                           );
                         })()}
+                      </td>
+                    )}
+                    {activeTab === 'Order History' && (
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            padding: '4px 12px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title="1-Click Re-Order: Pre-fills and repeats this exact trade with live checks"
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.22)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)'}
+                        >
+                          <RotateCcw size={11} />
+                          REPEAT
+                        </button>
                       </td>
                     )}
                     </tr>
@@ -1039,12 +1316,40 @@ export default function OrdersView() {
               )}
             </div>
             
-            <button 
-              onClick={() => setSelectedOrder(null)} 
-              style={{ width: '100%', padding: '12px', background: 'var(--color-blue)', color: 'white', border: 'none', borderRadius: '4px', marginTop: '24px', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              CLOSE
-            </button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                onClick={() => {
+                  const o = selectedOrder;
+                  setSelectedOrder(null);
+                  handleRepeatOrder(o);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                }}
+              >
+                <RotateCcw size={14} />
+                REPEAT ORDER
+              </button>
+              <button 
+                onClick={() => setSelectedOrder(null)} 
+                style={{ padding: '11px 18px', background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                CLOSE
+              </button>
+            </div>
           </div>
         </div>
       )}

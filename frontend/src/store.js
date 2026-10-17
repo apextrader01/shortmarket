@@ -904,8 +904,8 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null },
-  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null) => {
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null, initialQty: 1, initialAmo: false, initialOrderType: null },
+  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null, target = null, stopLoss = null, initialQty = 1, initialAmo = false, initialOrderType = null) => {
     if (lotsize && Number(lotsize) > 1 && symbol) {
       setContractLotsize(symbol, Number(lotsize));
     }
@@ -923,7 +923,7 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
     }
 
-    const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss } });
+    const openNow = () => set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice, target, stopLoss, initialQty, initialAmo, initialOrderType } });
     if (isExit && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('skandx-trigger-ad', {
         detail: {
@@ -938,7 +938,7 @@ export const useStore = create(persist((set, get) => ({
     openNow();
   },
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
-  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null } }),
+  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null, target: null, stopLoss: null, initialQty: 1, initialAmo: false, initialOrderType: null } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => {
