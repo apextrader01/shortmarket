@@ -1285,6 +1285,7 @@ const OptionChainViewInternal = () => {
                 }
 
                 const showToast = useStore.getState().showToast;
+                const storePrices = useStore.getState().prices || {};
                 const results = [];
 
                 for (let i = 0; i < legsToExecute.length; i++) {
@@ -1293,7 +1294,11 @@ const OptionChainViewInternal = () => {
                   const totalQty = (Number(leg.quantity) || 1) * (Number(legMultiplier) || 1) * effectiveLotsize;
                   const hasCustomPrice = leg.customPrice !== undefined && leg.customPrice !== null && leg.customPrice !== '' && Number(leg.customPrice) > 0;
                   const orderType = hasCustomPrice ? 'LIMIT' : 'MARKET';
-                  const orderPrice = hasCustomPrice ? Number(leg.customPrice) : (leg.price || '');
+                  const livePrice = resolveOptionLivePrice(leg, storePrices);
+                  const effectivePrice = hasCustomPrice 
+                    ? Number(leg.customPrice) 
+                    : (livePrice > 0 ? livePrice : (Number(leg.price) > 0 ? Number(leg.price) : 0));
+                  const orderPrice = effectivePrice > 0 ? effectivePrice : (leg.price || '');
 
                   const payload = {
                     symbol: leg.symbol,
@@ -1302,7 +1307,8 @@ const OptionChainViewInternal = () => {
                     type: orderType,
                     orderType: orderType,
                     product_type: 'INT',
-                    price: orderPrice
+                    price: orderPrice,
+                    quoted_price: effectivePrice > 0 ? effectivePrice : undefined
                   };
 
                   try {
