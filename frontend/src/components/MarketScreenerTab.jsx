@@ -54,6 +54,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('SURGE_DESC');
   const [addedSymbols, setAddedSymbols] = useState({});
+  const [screenerViewMode, setScreenerViewMode] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768 ? 'CARDS' : 'TABLE');
 
   const openOrderModal = useStore(state => state.openOrderModal);
   const setSelectedSymbol = useStore(state => state.setSelectedSymbol);
@@ -168,8 +169,8 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
         </div>
       </div>
 
-      {/* Preset Strategy Filters */}
-      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '14px 16px', boxShadow: t.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Preset Strategy Filters & View Mode Switcher */}
+      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ fontSize: '13px', fontWeight: '700', color: t.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <SlidersHorizontal size={15} color="#3b82f6" />
@@ -179,17 +180,55 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={fetchScreenerData}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: t.btnBg, border: `1px solid ${t.btnBorder}`, color: t.btnText, fontSize: '11.5px', fontWeight: '600', cursor: 'pointer' }}
-          >
-            <RefreshCw size={12} className={loading ? 'spin' : ''} /> Refresh
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* View Mode Toggle (Cards vs Table) */}
+            <div style={{ display: 'inline-flex', padding: '2px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', border: `1px solid ${t.cardBorder}` }}>
+              <button
+                type="button"
+                onClick={() => setScreenerViewMode('CARDS')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  background: screenerViewMode === 'CARDS' ? (isLight ? '#ffffff' : 'rgba(59,130,246,0.3)') : 'transparent',
+                  color: screenerViewMode === 'CARDS' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textMuted
+                }}
+              >
+                📊 Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setScreenerViewMode('TABLE')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  background: screenerViewMode === 'TABLE' ? (isLight ? '#ffffff' : 'rgba(59,130,246,0.3)') : 'transparent',
+                  color: screenerViewMode === 'TABLE' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.textMuted
+                }}
+              >
+                📋 Table
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchScreenerData}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: t.btnBg, border: `1px solid ${t.btnBorder}`, color: t.btnText, fontSize: '11.5px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              <RefreshCw size={12} className={loading ? 'spin' : ''} /> {!isMobile && 'Refresh'}
+            </button>
+          </div>
         </div>
 
-        {/* Preset Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+        {/* Preset Pills (Horizontally scrollable with smooth finger touch) */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', flexWrap: 'nowrap', paddingBottom: '4px' }}>
           {PRESETS.map(p => {
             const isSelected = preset === p.id;
             const Icon = p.icon;
@@ -199,11 +238,11 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
                 type="button"
                 onClick={() => setPreset(p.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px', borderRadius: '20px',
+                  display: 'flex', alignItems: 'center', gap: '5px', padding: isMobile ? '6px 10px' : '7px 12px', borderRadius: '20px',
                   background: isSelected ? (isLight ? '#eff6ff' : 'rgba(59,130,246,0.2)') : t.pillInactiveBg,
                   border: isSelected ? '1px solid #3b82f6' : `1px solid ${t.pillInactiveBorder}`,
                   color: isSelected ? (isLight ? '#1d4ed8' : '#60a5fa') : t.pillInactiveText,
-                  fontSize: '12px', fontWeight: isSelected ? '700' : '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+                  fontSize: isMobile ? '11.5px' : '12px', fontWeight: isSelected ? '700' : '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
                 }}
               >
                 <Icon size={13} color={p.color || '#3b82f6'} />
@@ -213,10 +252,10 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
           })}
         </div>
 
-        {/* Secondary Filter Row: Segment, Price Bracket, Sort, and Search */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', paddingTop: '6px', borderTop: `1px solid ${t.borderSubtle}` }}>
+        {/* Secondary Filter Row: Responsive Grid on Mobile */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', alignItems: 'center', paddingTop: '6px', borderTop: `1px solid ${t.borderSubtle}` }}>
           {/* Search Box */}
-          <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 240px', minWidth: '180px' }}>
+          <div style={{ position: 'relative', gridColumn: isMobile ? '1 / -1' : 'auto', minWidth: '160px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: t.textDim }} />
             <input
               type="text"
@@ -224,7 +263,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter symbol, company, sector..."
               style={{
-                width: '100%', padding: '7px 10px 7px 32px', borderRadius: '8px',
+                width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 32px', borderRadius: '8px',
                 background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.text,
                 fontSize: '12px', outline: 'none'
               }}
@@ -236,7 +275,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
             value={segment}
             onChange={(e) => setSegment(e.target.value)}
             style={{
-              padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
               border: `1px solid ${t.inputBorder}`, color: t.text, fontSize: '12px', outline: 'none', cursor: 'pointer'
             }}
           >
@@ -248,7 +287,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
             value={priceRange}
             onChange={(e) => setPriceRange(e.target.value)}
             style={{
-              padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
               border: `1px solid ${t.inputBorder}`, color: t.text, fontSize: '12px', outline: 'none', cursor: 'pointer'
             }}
           >
@@ -260,7 +299,8 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             style={{
-              padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
+              gridColumn: isMobile ? '1 / -1' : 'auto',
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: '8px', background: t.inputBg,
               border: `1px solid ${t.inputBorder}`, color: t.text, fontSize: '12px', outline: 'none', cursor: 'pointer'
             }}
           >
@@ -274,12 +314,159 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
         </div>
       </div>
 
-      {/* Screener Results Table */}
-      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflow: 'hidden', boxShadow: t.cardShadow }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
-            <thead>
-              <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+      {/* Screener Results: Cards vs Table */}
+      {screenerViewMode === 'CARDS' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: '10px' }}>
+          {loading ? (
+            <div style={{ gridColumn: '1 / -1', padding: '40px 14px', textAlign: 'center', color: t.textDim, background: t.cardBg, borderRadius: '12px', border: `1px solid ${t.cardBorder}` }}>
+              <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px' }} />
+              <div>Scanning live market technicals &amp; volume patterns...</div>
+            </div>
+          ) : stocks.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '40px 14px', textAlign: 'center', color: t.textDim, background: t.cardBg, borderRadius: '12px', border: `1px solid ${t.cardBorder}` }}>
+              <Compass size={28} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+              <div style={{ fontSize: '14px', fontWeight: '700', color: t.text }}>No stocks matching the selected criteria</div>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>Try switching presets, selecting 'All Segments', or clearing the search box.</div>
+            </div>
+          ) : (
+            stocks.map(stock => {
+              const isPositive = stock.change >= 0;
+              const isAdded = Boolean(addedSymbols[stock.symbol]);
+
+              return (
+                <div
+                  key={stock.symbol}
+                  style={{
+                    background: t.cardBg,
+                    border: `1px solid ${t.cardBorder}`,
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    boxShadow: t.cardShadow,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  {/* Top row: Symbol, Name, Badges, LTP & Change */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: '800', color: t.text, fontSize: '14px' }}>{stock.symbol}</span>
+                        {stock.isFnO && (
+                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                            F&amp;O
+                          </span>
+                        )}
+                        {stock.is52wHigh && (
+                          <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                            52W HIGH
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {stock.name} • <span style={{ color: t.textDim }}>{stock.sector}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontWeight: '800', color: t.text, fontSize: '14px' }}>
+                        ₹{Number(stock.ltp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: '700', fontSize: '11.5px', color: isPositive ? '#10b981' : '#ef4444' }}>
+                        {isPositive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                        <span>{isPositive ? '+' : ''}{Number(stock.change).toFixed(2)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metrics Pills Grid (Volume surge, Delivery %, 52W Proximity, RSI) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px', border: `1px solid ${t.borderSubtle}` }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '9.5px', color: t.textMuted, textTransform: 'uppercase' }}>Surge</div>
+                      <div style={{ fontSize: '11.5px', fontWeight: '800', color: stock.surgeMult >= 2.0 ? '#f59e0b' : t.text, marginTop: '1px' }}>
+                        {Number(stock.surgeMult).toFixed(1)}x
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '9.5px', color: t.textMuted, textTransform: 'uppercase' }}>Delivery</div>
+                      <div style={{ fontSize: '11.5px', fontWeight: '800', color: stock.delivPct >= 65 ? '#10b981' : t.text, marginTop: '1px' }}>
+                        {Number(stock.delivPct).toFixed(1)}%
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '9.5px', color: t.textMuted, textTransform: 'uppercase' }}>52W Range</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: stock.proximity52wHigh <= 3 ? '#10b981' : t.textMuted, marginTop: '1px' }}>
+                        {stock.proximity52wHigh <= 3 ? `${stock.proximity52wHigh}%` : `₹${stock.high52w}`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '9.5px', color: t.textMuted, textTransform: 'uppercase' }}>RSI (14)</div>
+                      <div style={{ fontSize: '11.5px', fontWeight: '800', color: stock.rsi <= 32 ? '#38bdf8' : (stock.rsi >= 68 ? '#ec4899' : t.text), marginTop: '1px' }}>
+                        {Number(stock.rsi).toFixed(0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons (Watchlist, Chart, Trade) */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAddToWatchlist(stock)}
+                      style={{
+                        flex: 1, padding: '7px 10px', borderRadius: '6px',
+                        background: isAdded ? 'rgba(16,185,129,0.15)' : t.btnBg,
+                        border: isAdded ? '1px solid #10b981' : `1px solid ${t.btnBorder}`,
+                        color: isAdded ? '#10b981' : t.btnText,
+                        fontSize: '11.5px', fontWeight: '600', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                        minHeight: '36px'
+                      }}
+                    >
+                      {isAdded ? <Check size={13} /> : <Plus size={13} />} Watchlist
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChart(stock)}
+                      style={{
+                        padding: '7px 12px', borderRadius: '6px',
+                        background: t.btnBg, border: `1px solid ${t.btnBorder}`, color: t.btnText,
+                        fontSize: '11.5px', fontWeight: '600', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        minHeight: '36px'
+                      }}
+                      title="View Live Chart"
+                    >
+                      <BarChart2 size={13} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePaperTrade(stock)}
+                      style={{
+                        flex: 1.4, padding: '7px 12px', borderRadius: '6px',
+                        background: isPositive ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                        border: 'none', color: '#ffffff', fontSize: '12px', fontWeight: '700',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        minHeight: '36px'
+                      }}
+                    >
+                      <ShoppingCart size={13} /> Trade Live
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        /* Screener Results Table */
+        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflow: 'hidden', boxShadow: t.cardShadow }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
+              <thead>
+                <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                 <th style={{ padding: '10px 14px' }}>Stock &amp; Sector</th>
                 <th style={{ padding: '10px 14px', textAlign: 'right' }}>LTP (₹)</th>
                 <th style={{ padding: '10px 14px', textAlign: 'right' }}>Change %</th>
@@ -460,6 +647,7 @@ export default function MarketScreenerTab({ onOpenPaperTrading, isMobile, t, isL
           </table>
         </div>
       </div>
+      )}
 
     </div>
   );

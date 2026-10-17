@@ -28,6 +28,7 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
   const [selectedYear, setSelectedYear] = useState('ALL');
   const [dateSearch, setDateSearch] = useState('');
   const [viewMode, setViewMode] = useState('DAILY'); // 'DAILY' | 'MONTHLY' | 'YEARLY'
+  const [displayFormat, setDisplayFormat] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768 ? 'CARDS' : 'TABLE');
 
   const showToast = useStore(state => state.showToast);
 
@@ -205,82 +206,82 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
         </div>
       </div>
 
-      {/* 4 Primary Institutional Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
+      {/* 4 Primary Institutional Metric Cards (2x2 Grid on Mobile, 4x1 on Desktop) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
         {/* Card 1: FII Cash Net */}
-        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '14px 16px', boxShadow: t.cardShadow }}>
+        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>FII Net Flow (Today)</span>
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: today.fiiNet >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: today.fiiNet >= 0 ? '#10b981' : '#ef4444' }}>
+            <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>FII Net Flow</span>
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: today.fiiNet >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: today.fiiNet >= 0 ? '#10b981' : '#ef4444' }}>
               {today.fiiSentiment}
             </span>
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '800', color: today.fiiNet >= 0 ? '#10b981' : '#ef4444', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {today.fiiNet >= 0 ? '+' : ''}₹{Math.abs(today.fiiNet).toLocaleString('en-IN')} <span style={{ fontSize: '13px', fontWeight: '600' }}>Cr</span>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: today.fiiNet >= 0 ? '#10b981' : '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            {today.fiiNet >= 0 ? '+' : ''}₹{Math.abs(today.fiiNet).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
-          <div style={{ fontSize: '11px', color: t.textDim, marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Buy: ₹{today.fiiBuy.toLocaleString('en-IN')} Cr</span>
-            <span>Sell: ₹{today.fiiSell.toLocaleString('en-IN')} Cr</span>
+          <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>B: ₹{today.fiiBuy.toLocaleString('en-IN')} Cr</span>
+            <span>S: ₹{today.fiiSell.toLocaleString('en-IN')} Cr</span>
           </div>
         </div>
 
         {/* Card 2: DII Cash Net */}
-        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '14px 16px', boxShadow: t.cardShadow }}>
+        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>DII Net Flow (Today)</span>
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: today.diiNet >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: today.diiNet >= 0 ? '#10b981' : '#ef4444' }}>
+            <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>DII Net Flow</span>
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: today.diiNet >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: today.diiNet >= 0 ? '#10b981' : '#ef4444' }}>
               {today.diiSentiment}
             </span>
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '800', color: today.diiNet >= 0 ? '#10b981' : '#ef4444', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {today.diiNet >= 0 ? '+' : ''}₹{Math.abs(today.diiNet).toLocaleString('en-IN')} <span style={{ fontSize: '13px', fontWeight: '600' }}>Cr</span>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: today.diiNet >= 0 ? '#10b981' : '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            {today.diiNet >= 0 ? '+' : ''}₹{Math.abs(today.diiNet).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
-          <div style={{ fontSize: '11px', color: t.textDim, marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Buy: ₹{today.diiBuy.toLocaleString('en-IN')} Cr</span>
-            <span>Sell: ₹{today.diiSell.toLocaleString('en-IN')} Cr</span>
+          <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>B: ₹{today.diiBuy.toLocaleString('en-IN')} Cr</span>
+            <span>S: ₹{today.diiSell.toLocaleString('en-IN')} Cr</span>
           </div>
         </div>
 
         {/* Card 3: Combined Institutional Net */}
-        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '14px 16px', boxShadow: t.cardShadow }}>
+        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Combined Smart Flow</span>
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+            <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Combined Flow</span>
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
               FII + DII
             </span>
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '800', color: today.combinedNet >= 0 ? '#38bdf8' : '#f43f5e', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {today.combinedNet >= 0 ? '+' : ''}₹{Math.abs(today.combinedNet).toLocaleString('en-IN')} <span style={{ fontSize: '13px', fontWeight: '600' }}>Cr</span>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: today.combinedNet >= 0 ? '#38bdf8' : '#f43f5e', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            {today.combinedNet >= 0 ? '+' : ''}₹{Math.abs(today.combinedNet).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
-          <div style={{ fontSize: '11px', color: t.textDim, marginTop: '4px' }}>
+          <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px' }}>
             {today.overallSentiment}
           </div>
         </div>
 
         {/* Card 4: Selected Period Cumulative Flow */}
-        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '14px 16px', boxShadow: t.cardShadow }}>
+        <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '14px 16px', boxShadow: t.cardShadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>
-              {selectedYear !== 'ALL' ? `Cumulative (${selectedYear})` : `Cumulative (${selectedRange})`}
+            <span style={{ fontSize: isMobile ? '10px' : '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {selectedYear !== 'ALL' ? `Total (${selectedYear})` : `Total (${selectedRange})`}
             </span>
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: currentTotals.netTotal >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444' }}>
-              {currentTotals.netTotal >= 0 ? 'NET BUY' : 'NET SELL'}
+            <span style={{ fontSize: '9.5px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: currentTotals.netTotal >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444' }}>
+              {currentTotals.netTotal >= 0 ? 'BUY' : 'SELL'}
             </span>
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '800', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {currentTotals.netTotal >= 0 ? '+' : ''}₹{Math.abs(currentTotals.netTotal).toLocaleString('en-IN')} <span style={{ fontSize: '13px', fontWeight: '600' }}>Cr</span>
+          <div style={{ fontSize: isMobile ? '17px' : '22px', fontWeight: '800', color: currentTotals.netTotal >= 0 ? '#10b981' : '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            {currentTotals.netTotal >= 0 ? '+' : ''}₹{Math.abs(currentTotals.netTotal).toLocaleString('en-IN')} <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}>Cr</span>
           </div>
-          <div style={{ fontSize: '11px', color: t.textDim, marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>FII: <strong style={{ color: currentTotals.cumulativeFii >= 0 ? '#10b981' : '#ef4444' }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')} Cr</strong></span>
-            <span>DII: <strong style={{ color: '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')} Cr</strong></span>
+          <div style={{ fontSize: '10.5px', color: t.textDim, marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>FII: <strong style={{ color: currentTotals.cumulativeFii >= 0 ? '#10b981' : '#ef4444' }}>₹{currentTotals.cumulativeFii.toLocaleString('en-IN')}</strong></span>
+            <span>DII: <strong style={{ color: '#10b981' }}>₹{currentTotals.cumulativeDii.toLocaleString('en-IN')}</strong></span>
           </div>
         </div>
       </div>
 
-      {/* 🧭 TIMELINE RANGE SELECTOR BAR (30D TO 30 YEARS) */}
-      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: '12px 16px', boxShadow: t.cardShadow, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      {/* 🧭 TIMELINE RANGE SELECTOR BAR (30D TO 30 YEARS - Single-line touch swipe on mobile) */}
+      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', padding: isMobile ? '10px 12px' : '12px 16px', boxShadow: t.cardShadow, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: isMobile ? 'auto' : 'visible', flexWrap: isMobile ? 'nowrap' : 'wrap', scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', width: isMobile ? '100%' : 'auto', paddingBottom: isMobile ? '4px' : '0' }}>
+          <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             <Clock size={13} color="#3b82f6" /> Range:
           </span>
           {TIMELINE_RANGES.map(rng => {
@@ -291,11 +292,12 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
                 type="button"
                 onClick={() => handleRangeChange(rng.id)}
                 style={{
-                  padding: '5px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                  padding: isMobile ? '5px 10px' : '5px 12px', borderRadius: '12px', fontSize: isMobile ? '10.5px' : '11px', fontWeight: '700', cursor: 'pointer',
                   background: isSel ? '#3b82f6' : t.pillInactiveBg,
                   color: isSel ? '#ffffff' : t.textSecondary,
                   border: isSel ? '1px solid #2563eb' : `1px solid ${t.cardBorder}`,
                   boxShadow: isSel ? '0 2px 6px rgba(59,130,246,0.3)' : 'none',
+                  whiteSpace: 'nowrap', flexShrink: 0,
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -455,17 +457,51 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
         </div>
       </div>
 
-      {/* Historical Data Table */}
-      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflow: 'hidden', boxShadow: t.cardShadow, display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px 18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: t.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={15} color="#6366f1" />
-            <span>
-              {viewMode === 'MONTHLY' ? 'Monthly Institutional Flow Ledger' : 'Historical Institutional Flow Ledger'}
-            </span>
-            <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
-              {viewMode === 'MONTHLY' ? `${filteredMonthly.length} Months` : `${filteredHistory.length} Sessions`}
-            </span>
+      {/* Historical Data Table / Cards */}
+      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: '12px', overflow: 'hidden', boxShadow: t.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px', padding: isMobile ? '12px' : '16px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: isMobile ? '100%' : 'auto', gap: '8px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: t.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={15} color="#6366f1" />
+              <span>
+                {viewMode === 'MONTHLY' ? 'Monthly Flow Ledger' : 'Institutional Flow Ledger'}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+                {viewMode === 'MONTHLY' ? `${filteredMonthly.length} Months` : `${filteredHistory.length} Sessions`}
+              </span>
+            </div>
+
+            {/* View Mode Toggle Pill (Cards vs Table) */}
+            <div style={{ display: 'flex', background: isLight ? '#f1f5f9' : '#0f172a', borderRadius: '8px', padding: '2px', border: `1px solid ${t.cardBorder}`, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setDisplayFormat('CARDS')}
+                style={{
+                  padding: '4px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                  background: displayFormat === 'CARDS' ? '#3b82f6' : 'transparent',
+                  color: displayFormat === 'CARDS' ? '#ffffff' : t.textMuted,
+                  border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                  boxShadow: displayFormat === 'CARDS' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                📊 Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayFormat('TABLE')}
+                style={{
+                  padding: '4px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                  background: displayFormat === 'TABLE' ? '#3b82f6' : 'transparent',
+                  color: displayFormat === 'TABLE' ? '#ffffff' : t.textMuted,
+                  border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                  boxShadow: displayFormat === 'TABLE' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                📋 Table
+              </button>
+            </div>
           </div>
 
           <div style={{ position: 'relative', width: isMobile ? '100%' : '220px' }}>
@@ -484,110 +520,230 @@ export default function SmartMoneyTab({ isMobile, t, isLight }) {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto', marginTop: '6px' }}>
-          {viewMode === 'MONTHLY' ? (
-            // Monthly Ledger Table
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  <th style={{ padding: '8px 12px' }}>Month</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Net Flow (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Net Flow (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Combined Net (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Institutional Sentiment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMonthly.map((row) => {
+        {displayFormat === 'CARDS' ? (
+          // Responsive Mobile Cards Ledger
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(290px, 1fr))', gap: '10px', marginTop: '4px' }}>
+            {viewMode === 'MONTHLY' ? (
+              filteredMonthly.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: t.textDim, fontSize: '12px', gridColumn: '1 / -1' }}>No monthly data found matching your query.</div>
+              ) : (
+                filteredMonthly.map((row) => {
                   const isFiiPos = row.fiiNet >= 0;
                   const isDiiPos = row.diiNet >= 0;
                   const isCombPos = row.combinedNet >= 0;
 
                   return (
-                    <tr
+                    <div
                       key={row.month}
-                      style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = t.tableRowHover}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      style={{
+                        background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${t.cardBorder}`,
+                        borderRadius: '10px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
                     >
-                      <td style={{ padding: '10px 12px', fontWeight: '700', color: t.text }}>{row.month}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444' }}>
-                        {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444' }}>
-                        {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e' }}>
-                        {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        <span style={{ fontSize: '10.5px', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: isCombPos ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: isCombPos ? '#10b981' : '#ef4444' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '800', color: t.text }}>{row.month}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: isCombPos ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: isCombPos ? '#10b981' : '#ef4444' }}>
                           {row.sentiment}
                         </span>
-                      </td>
-                    </tr>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>FII Net</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444', marginTop: '2px' }}>
+                            {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>DII Net</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444', marginTop: '2px' }}>
+                            {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Combined</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e', marginTop: '2px' }}>
+                            {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            // Daily Ledger Table
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  <th style={{ padding: '8px 12px' }}>Date</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Gross Buy</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Gross Sell</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Net (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Gross Buy</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Gross Sell</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Net (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Combined (₹ Cr)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Nifty Impact</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHistory.map((row) => {
+                })
+              )
+            ) : (
+              filteredHistory.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: t.textDim, fontSize: '12px', gridColumn: '1 / -1' }}>No daily sessions found matching your query.</div>
+              ) : (
+                filteredHistory.map((row) => {
                   const isFiiPos = row.fiiNet >= 0;
                   const isDiiPos = row.diiNet >= 0;
                   const isCombPos = row.combinedNet >= 0;
                   const isNiftyPos = row.niftyChg >= 0;
 
                   return (
-                    <tr
+                    <div
                       key={row.date}
-                      style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = t.tableRowHover}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      style={{
+                        background: isLight ? '#ffffff' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${t.cardBorder}`,
+                        borderRadius: '10px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
                     >
-                      <td style={{ padding: '10px 12px', fontWeight: '700', color: t.text }}>{row.displayDate}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.fiiBuy.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.fiiSell.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444' }}>
-                        {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.diiBuy.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.diiSell.toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444' }}>
-                        {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e' }}>
-                        {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        <span style={{ fontWeight: '700', color: isNiftyPos ? '#10b981' : '#ef4444' }}>
-                          {isNiftyPos ? '+' : ''}{row.niftyChg}%
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '800', color: t.text }}>{row.displayDate}</span>
+                        <span style={{ fontSize: '10.5px', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: isNiftyPos ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: isNiftyPos ? '#10b981' : '#ef4444' }}>
+                          Nifty {isNiftyPos ? '+' : ''}{row.niftyChg}%
                         </span>
-                      </td>
-                    </tr>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>FII Net</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444', marginTop: '2px' }}>
+                            {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '8.5px', color: t.textDim, marginTop: '2px' }}>
+                            B: ₹{row.fiiBuy} | S: ₹{row.fiiSell}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>DII Net</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444', marginTop: '2px' }}>
+                            {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '8.5px', color: t.textDim, marginTop: '2px' }}>
+                            B: ₹{row.diiBuy} | S: ₹{row.diiSell}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '9px', color: t.textMuted, fontWeight: '700', textTransform: 'uppercase' }}>Combined</div>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e', marginTop: '2px' }}>
+                            {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '8.5px', color: isCombPos ? '#10b981' : '#ef4444', fontWeight: '700', marginTop: '2px' }}>
+                            {isCombPos ? 'ACCUMULATION' : 'DISTRIBUTION'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+                })
+              )
+            )}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto', marginTop: '6px' }}>
+            {viewMode === 'MONTHLY' ? (
+              // Monthly Ledger Table
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    <th style={{ padding: '8px 12px' }}>Month</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Net Flow (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Net Flow (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Combined Net (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Institutional Sentiment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMonthly.map((row) => {
+                    const isFiiPos = row.fiiNet >= 0;
+                    const isDiiPos = row.diiNet >= 0;
+                    const isCombPos = row.combinedNet >= 0;
 
+                    return (
+                      <tr
+                        key={row.month}
+                        style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = t.tableRowHover}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '10px 12px', fontWeight: '700', color: t.text }}>{row.month}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444' }}>
+                          {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444' }}>
+                          {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e' }}>
+                          {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                          <span style={{ fontSize: '10.5px', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: isCombPos ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: isCombPos ? '#10b981' : '#ef4444' }}>
+                            {row.sentiment}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              // Daily Ledger Table
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.tableHeaderBorder}`, color: t.textMuted, fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    <th style={{ padding: '8px 12px' }}>Date</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Gross Buy</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Gross Sell</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>FII Net (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Gross Buy</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Gross Sell</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>DII Net (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Combined (₹ Cr)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Nifty Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredHistory.map((row) => {
+                    const isFiiPos = row.fiiNet >= 0;
+                    const isDiiPos = row.diiNet >= 0;
+                    const isCombPos = row.combinedNet >= 0;
+                    const isNiftyPos = row.niftyChg >= 0;
+
+                    return (
+                      <tr
+                        key={row.date}
+                        style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = t.tableRowHover}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '10px 12px', fontWeight: '700', color: t.text }}>{row.displayDate}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.fiiBuy.toLocaleString('en-IN')}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.fiiSell.toLocaleString('en-IN')}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isFiiPos ? '#10b981' : '#ef4444' }}>
+                          {isFiiPos ? '+' : ''}₹{row.fiiNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.diiBuy.toLocaleString('en-IN')}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: t.textMuted }}>₹{row.diiSell.toLocaleString('en-IN')}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isDiiPos ? '#10b981' : '#ef4444' }}>
+                          {isDiiPos ? '+' : ''}₹{row.diiNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', color: isCombPos ? '#38bdf8' : '#f43f5e' }}>
+                          {isCombPos ? '+' : ''}₹{row.combinedNet.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                          <span style={{ fontWeight: '700', color: isNiftyPos ? '#10b981' : '#ef4444' }}>
+                            {isNiftyPos ? '+' : ''}{row.niftyChg}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
