@@ -9367,6 +9367,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       ? 'INT'
       : product_type;
   const rawVariety = req.body.order_variety || req.body.variety || (req.body.is_amo ? 'AMO' : null);
+  const order_variety = req.body.order_variety || req.body.variety || (req.body.is_amo ? 'AMO' : 'REGULAR');
 
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
