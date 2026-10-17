@@ -1,5 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -22,7 +21,6 @@ let analytics = null;
 try {
   if (firebaseConfig.apiKey) {
     app = initializeApp(firebaseConfig);
-    storage = getStorage(app);
     auth = getAuth(app);
 
     if (typeof window !== 'undefined') {
