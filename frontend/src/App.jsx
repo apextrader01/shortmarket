@@ -669,9 +669,9 @@ function App() {
   useEffect(() => {
     setFontSize(fontSize);
     if (theme) setTheme(theme);
-    if (fetchAnnouncement) fetchAnnouncement();
-    if (fetchBroadcastNotifications) fetchBroadcastNotifications();
-  }, []);
+    if (user && fetchAnnouncement) fetchAnnouncement();
+    if (user && fetchBroadcastNotifications) fetchBroadcastNotifications();
+  }, [user]);
 
   // Sync activeTab to URL, maintain mobile navigation stack, and push history entries
   useEffect(() => {
@@ -1088,18 +1088,21 @@ function App() {
     }
   }, [user]);
 
-  // Pre-fetch top index prices and default watchlist symbols (runs on mount regardless of auth state)
+  // Pre-fetch top index prices and default watchlist symbols (only for authenticated trading sessions)
   useEffect(() => {
-    fetchBatchPrices([...TOP_INDICES, ...DEFAULT_WATCHLIST_SYMBOLS]);
-    useStore.getState().loadStocks?.();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (user) {
+      fetchBatchPrices([...TOP_INDICES, ...DEFAULT_WATCHLIST_SYMBOLS]);
+      useStore.getState().loadStocks?.();
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise socket and start polling
+  // Initialise socket and start polling (only for authenticated sessions)
   useEffect(() => {
+    if (!user) return;
     purgeStaleDailyAlerts();
     initSocket();
     useStore.getState().loadStocks?.();
-    if (user) fetchUserData();
+    fetchUserData();
     refreshPrices();
 
     // ⚡ Smart Price Polling: Only poll REST as fallback when WebSocket is truly disconnected
