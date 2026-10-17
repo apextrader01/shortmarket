@@ -7538,6 +7538,36 @@ app.get('/api/market-deals', apiLimiter, (req, res) => {
   }
 });
 
+app.get('/api/primary-markets/smart-money', apiLimiter, (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200');
+    const data = primaryMarketsService.getSmartMoneyPulse();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/primary-markets/calendar', apiLimiter, (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200');
+    const data = primaryMarketsService.getCorporateCalendar(req.query);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/primary-markets/screener', apiLimiter, (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
+    const data = primaryMarketsService.getMarketScreener(req.query);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/ipos', apiLimiter, (req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');

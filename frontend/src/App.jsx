@@ -439,12 +439,13 @@ function App() {
       'algo': 'Algo', 'algo-trading': 'Algo', 'skandx-algo': 'Algo', 'skandxalgo': 'Algo', 'bridge': 'Algo',
       'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
       'primarymarkets': 'PrimaryMarkets', 'primary-markets': 'PrimaryMarkets', 'bhavcopy': 'PrimaryMarkets', 'ipo': 'PrimaryMarkets', 'ipos': 'PrimaryMarkets',
+      'screener': 'PrimaryMarkets', 'market-screener': 'PrimaryMarkets', 'fii-dii': 'PrimaryMarkets', 'smart-money': 'PrimaryMarkets', 'calendar': 'PrimaryMarkets', 'earnings': 'PrimaryMarkets', 'corporate-actions': 'PrimaryMarkets',
       'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
       'markets': 'Markets', 'paper-trading': 'Markets', 'papertrading': 'Markets', 'watchlist': 'Markets', 'chart': 'Chart',
       'options': 'Options', 'optionchain': 'Options', 'option-chain': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-      'leaderboard': 'Leaderboard',
+      'leaderboard': 'Leaderboard', 'tournaments': 'Leaderboard', 'arena': 'Leaderboard',
       'community': 'Community', 'clubs': 'Community', 'feed': 'Community',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'profile': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
@@ -465,7 +466,15 @@ function App() {
     return 'all';
   });
   const [tradeDiaryInitialTab, setTradeDiaryInitialTab] = useState('DASHBOARD');
-  const [primaryMarketsInitialTab, setPrimaryMarketsInitialTab] = useState('BHAVCOPY');
+  const [primaryMarketsInitialTab, setPrimaryMarketsInitialTab] = useState(() => {
+    const raw = typeof window !== 'undefined' ? window.location.pathname.replace(/^\//, '').toLowerCase() : '';
+    if (raw.includes('screener')) return 'SCREENER';
+    if (raw.includes('fii') || raw.includes('smart-money')) return 'FII_DII';
+    if (raw.includes('calendar') || raw.includes('earnings') || raw.includes('corporate-actions')) return 'CALENDAR';
+    if (raw.includes('ipo')) return 'IPOS';
+    if (raw.includes('deals')) return 'DEALS';
+    return 'BHAVCOPY';
+  });
   const [algoInitialTab, setAlgoInitialTab] = useState('Dashboard');
   const [showBrokerConnectModal, setShowBrokerConnectModal] = useState(false);
   const [showWealthModal, setShowWealthModal] = useState(false);
@@ -1663,6 +1672,7 @@ function App() {
           <PrimaryMarketsView 
             initialTab={primaryMarketsInitialTab}
             onOpenPaperTrading={() => setActiveTab('Markets')} 
+            onOpenLeaderboard={() => setActiveTab('Leaderboard')}
             onBack={handleBackNavigation} 
           />
           <AdBannerWidget onUpgradeClick={() => setActiveTab('Pricing')} />

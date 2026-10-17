@@ -8,10 +8,13 @@ import {
   ExternalLink, Search, Filter, ShieldCheck, Sparkles, BarChart2,
   Calendar, Layers, CheckCircle2, ChevronRight, RefreshCw, Award,
   Flame, Snowflake, Zap, AlertTriangle, Copy, Check, SlidersHorizontal,
-  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown
+  DollarSign, PieChart, Info, Table, LayoutGrid, ArrowUpDown, Trophy
 } from 'lucide-react';
 import { API, useStore } from '../store';
 import logoImg from '../assets/logo.png';
+import MarketScreenerTab from './MarketScreenerTab';
+import SmartMoneyTab from './SmartMoneyTab';
+import CorporateCalendarTab from './CorporateCalendarTab';
 
 // Helper: Compute completed trading session date in IST on client (before 6:55 PM IST -> previous trading day)
 function getClientCompletedTradingDate() {
@@ -293,6 +296,9 @@ const resolvePrimaryMarketTab = (tab) => {
   const upper = String(tab).toUpperCase();
   if (upper === 'DEALS' || upper === 'BULK') return 'DEALS';
   if (upper === 'IPO' || upper === 'IPOS' || upper === 'ALLOTMENT') return 'IPOS';
+  if (upper === 'SCREENER' || upper === 'SCANNER' || upper === 'BREAKOUT') return 'SCREENER';
+  if (upper === 'FII' || upper === 'DII' || upper === 'SMART_MONEY' || upper === 'FII_DII') return 'FII_DII';
+  if (upper === 'CALENDAR' || upper === 'EARNINGS' || upper === 'CORPORATE_ACTIONS') return 'CALENDAR';
   return 'BHAVCOPY';
 };
 
@@ -313,7 +319,7 @@ function formatSubVal(val) {
   return num.toFixed(2);
 }
 
-export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrading }) {
+export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrading, onOpenLeaderboard }) {
   const [activeTab, setActiveTab] = useState(() => resolvePrimaryMarketTab(initialTab));
   const [bhavcopyData, setBhavcopyData] = useState(SEED_BHAVCOPY_DATA);
   const [bhavStats, setBhavStats] = useState({
@@ -1118,42 +1124,101 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
           type="button"
           onClick={() => setActiveTab('BHAVCOPY')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
             background: activeTab === 'BHAVCOPY' ? (isLight ? '#eff6ff' : 'rgba(59,130,246,0.18)') : t.pillInactiveBg,
             border: activeTab === 'BHAVCOPY' ? '1px solid #3b82f6' : `1px solid ${t.pillInactiveBorder}`,
             color: activeTab === 'BHAVCOPY' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <BarChart2 size={14} /> {isMobile ? `📈 1. Bhavcopy (${bhavTotalFiltered.toLocaleString('en-IN')})` : `📈 1. NSE & BSE Bhavcopy Screener (${bhavTotalFiltered.toLocaleString('en-IN')} / ${bhavStats.totalStocks.toLocaleString('en-IN')})`}
+          <BarChart2 size={14} /> {isMobile ? '📈 1. Delivery' : '📈 1. Delivery Screener'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('SCREENER')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: activeTab === 'SCREENER' ? (isLight ? '#eff6ff' : 'rgba(59,130,246,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'SCREENER' ? '1px solid #3b82f6' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'SCREENER' ? (isLight ? '#1d4ed8' : '#60a5fa') : t.pillInactiveText,
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Zap size={14} color="#f59e0b" /> {isMobile ? '⚡ 2. Screener' : '⚡ 2. Market Screener'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('FII_DII')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: activeTab === 'FII_DII' ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'FII_DII' ? '1px solid #22c55e' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'FII_DII' ? (isLight ? '#15803d' : '#4ade80') : t.pillInactiveText,
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Building2 size={14} color="#10b981" /> {isMobile ? '🏦 3. Smart Money' : '🏦 3. Smart Money (FII/DII)'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('CALENDAR')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: activeTab === 'CALENDAR' ? (isLight ? '#faf5ff' : 'rgba(168,85,247,0.18)') : t.pillInactiveBg,
+            border: activeTab === 'CALENDAR' ? '1px solid #a855f7' : `1px solid ${t.pillInactiveBorder}`,
+            color: activeTab === 'CALENDAR' ? (isLight ? '#7e22ce' : '#c084fc') : t.pillInactiveText,
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Calendar size={14} color="#8b5cf6" /> {isMobile ? '📅 4. Calendar' : '📅 4. Corporate Calendar'}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('DEALS')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
             background: activeTab === 'DEALS' ? (isLight ? '#faf5ff' : 'rgba(168,85,247,0.18)') : t.pillInactiveBg,
             border: activeTab === 'DEALS' ? '1px solid #a855f7' : `1px solid ${t.pillInactiveBorder}`,
             color: activeTab === 'DEALS' ? (isLight ? '#7e22ce' : '#c084fc') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <Building2 size={14} /> {isMobile ? `🏛️ 2. Bulk & Block (${dealsTotalFiltered.toLocaleString('en-IN')})` : `🏛️ 2. Bulk, Block & Insider Deals (${dealsTotalFiltered.toLocaleString('en-IN')})`}
+          <Building2 size={14} /> {isMobile ? '🏛️ 5. Deals' : '🏛️ 5. Bulk & Block Deals'}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('IPOS')}
           style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', minHeight: isMobile ? '36px' : '44px',
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
             background: activeTab === 'IPOS' ? (isLight ? '#f0fdf4' : 'rgba(34,197,94,0.18)') : t.pillInactiveBg,
             border: activeTab === 'IPOS' ? '1px solid #22c55e' : `1px solid ${t.pillInactiveBorder}`,
             color: activeTab === 'IPOS' ? (isLight ? '#15803d' : '#4ade80') : t.pillInactiveText,
             fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
           }}
         >
-          <Sparkles size={14} /> {isMobile ? `🚀 3. IPO & Sub (${filteredIpos.length})` : `🚀 3. IPO & SME Live Subscription & GMP Hub (${filteredIpos.length})`}
+          <Sparkles size={14} /> {isMobile ? '🚀 6. IPO' : '🚀 6. IPO & GMP Hub'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof onOpenLeaderboard === 'function') onOpenLeaderboard();
+            else if (typeof onOpenPaperTrading === 'function') onOpenPaperTrading();
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '7px 12px' : '10px 18px', borderRadius: '12px', minHeight: isMobile ? '36px' : '42px',
+            background: isLight ? '#fef3c7' : 'rgba(245,158,11,0.15)',
+            border: '1px solid rgba(245,158,11,0.4)',
+            color: isLight ? '#b45309' : '#f59e0b',
+            fontSize: isMobile ? '12px' : '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s ease'
+          }}
+        >
+          <Trophy size={14} /> {isMobile ? '🏆 7. Arena' : '🏆 7. Trader Tournaments'}
         </button>
       </div>
 
@@ -1557,7 +1622,28 @@ export default function PrimaryMarketsView({ initialTab, onBack, onOpenPaperTrad
       )}
 
       {/* ───────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 2: BULK, BLOCK & INSIDER DEALS MONITOR (WITH PER-COLUMN FILTERS & SORT)   */}
+      {/* TAB 2: OPTION A - LIVE TECHNICAL & MULTI-FACTOR MARKET SCREENER               */}
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'SCREENER' && (
+        <MarketScreenerTab onOpenPaperTrading={onOpenPaperTrading} isMobile={isMobile} t={t} isLight={isLight} />
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 3: OPTION B - SMART MONEY (FII / DII INSTITUTIONAL FLOW PULSE)            */}
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'FII_DII' && (
+        <SmartMoneyTab isMobile={isMobile} t={t} isLight={isLight} />
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 4: OPTION C - CORPORATE ACTIONS & EARNINGS CALENDAR                       */}
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'CALENDAR' && (
+        <CorporateCalendarTab onOpenPaperTrading={onOpenPaperTrading} isMobile={isMobile} t={t} isLight={isLight} />
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 5: BULK, BLOCK & INSIDER DEALS MONITOR (WITH PER-COLUMN FILTERS & SORT)   */}
       {/* ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'DEALS' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

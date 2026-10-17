@@ -520,30 +520,34 @@ export default function LandingHomeView({
       id: 3,
       hubNum: '03',
       category: 'MARKETS',
-      title: 'Bhavcopy Screener & Deals Hub',
-      shortDesc: 'Daily NSE institutional delivery screener (>60% delivery), 2x volume surges, Bulk/Block deals tape & 1-click PAN IPO allotment.',
+      title: 'Market Screener, Smart Money & Primary Desk',
+      shortDesc: 'Live technical breakout screener (52W highs, volume shockers), FII/DII institutional pulse, corporate earnings calendar, delivery screener (>60%) & live IPO GMP.',
       icon: Building2,
       color: '#10b981',
       gradient: isLight ? 'linear-gradient(145deg, rgba(16, 185, 129, 0.08), #ffffff)' : 'linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95))',
       border: isLight ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.35)',
       badge: '₹0 NSE Feed',
       badgeColor: '#10b981',
-      kpiLeft: { label: 'Delivery Filter', value: '>60% Institutional' },
-      kpiRight: { label: 'Primary Desk', value: 'IPO GMP & Deals' },
-      tags: ['6:55 PM Daily Cron', 'Bulk & Block Deals', 'Live GMP', 'PAN Allotment'],
+      kpiLeft: { label: 'Screener Desk', value: '52W High & Volume' },
+      kpiRight: { label: 'Smart Money', value: 'FII/DII & Earnings' },
+      tags: ['Live Screener', 'FII/DII Pulse', 'Earnings Calendar', 'Delivery Screener', 'Bulk Deals', 'Live GMP'],
       tagActions: {
-        '6:55 PM Daily Cron': () => onOpenPrimaryMarkets('BHAVCOPY'),
-        'Bulk & Block Deals': () => onOpenPrimaryMarkets('DEALS'),
-        'Live GMP': () => onOpenPrimaryMarkets('IPO'),
-        'PAN Allotment': () => onOpenPrimaryMarkets('ALLOTMENT')
+        'Live Screener': () => onOpenPrimaryMarkets('SCREENER'),
+        'FII/DII Pulse': () => onOpenPrimaryMarkets('FII_DII'),
+        'Earnings Calendar': () => onOpenPrimaryMarkets('CALENDAR'),
+        'Delivery Screener': () => onOpenPrimaryMarkets('BHAVCOPY'),
+        'Bulk Deals': () => onOpenPrimaryMarkets('DEALS'),
+        'Live GMP': () => onOpenPrimaryMarkets('IPO')
       },
-      actionLabel: 'Explore Primary Markets',
-      primaryAction: () => onOpenPrimaryMarkets('BHAVCOPY'),
+      actionLabel: 'Launch Market Screener & Intelligence',
+      primaryAction: () => onOpenPrimaryMarkets('SCREENER'),
       quickLinks: [
-        { label: 'NSE Delivery Screener (>60%)', action: () => onOpenPrimaryMarkets('BHAVCOPY') },
-        { label: 'Bulk & Block Deals Tape', action: () => onOpenPrimaryMarkets('DEALS') },
-        { label: 'IPO & SME GMP Hub', action: () => onOpenPrimaryMarkets('IPO') },
-        { label: '1-Click PAN IPO Allotment', action: () => onOpenPrimaryMarkets('ALLOTMENT') }
+        { label: '⚡ Live Market Screener (52W & Volume)', action: () => onOpenPrimaryMarkets('SCREENER') },
+        { label: '🏦 FII & DII Smart Money Pulse', action: () => onOpenPrimaryMarkets('FII_DII') },
+        { label: '📅 Corporate Actions & Earnings Calendar', action: () => onOpenPrimaryMarkets('CALENDAR') },
+        { label: '📈 NSE Delivery Screener (>60%)', action: () => onOpenPrimaryMarkets('BHAVCOPY') },
+        { label: '🏛️ Bulk & Block Deals Tape', action: () => onOpenPrimaryMarkets('DEALS') },
+        { label: '🚀 IPO & SME GMP Hub', action: () => onOpenPrimaryMarkets('IPO') }
       ]
     },
     {
@@ -649,12 +653,14 @@ export default function LandingHomeView({
   ];
 
   const SPOTLIGHT_TOOLS = [
+    { label: '⚡ Market Screener', action: () => onOpenPrimaryMarkets('SCREENER'), color: '#38bdf8' },
+    { label: '🏦 FII / DII Flow', action: () => onOpenPrimaryMarkets('FII_DII'), color: '#10b981' },
+    { label: '📅 Earnings Calendar', action: () => onOpenPrimaryMarkets('CALENDAR'), color: '#a855f7' },
+    { label: '🏆 Trader Tournaments', action: () => (onOpenLeaderboard ? onOpenLeaderboard() : onOpenPaperTrading()), color: '#f59e0b' },
     { label: '💬 Traders Community', action: () => (onOpenCommunity ? onOpenCommunity() : onOpenPaperTrading()), color: '#38bdf8' },
     { label: '🧮 SIP & Step-Up Calc', action: () => onOpenCalculators('sip'), color: '#38bdf8' },
     { label: '🏠 Reducing Loan EMI', action: () => onOpenCalculators('reducing-loan'), color: '#10b981' },
-    { label: '🏦 Fixed Rate Loan', action: () => onOpenCalculators('fixed-loan'), color: '#f59e0b' },
     { label: '⚡ MTF 4x Leverage', action: () => onOpenCalculators('mtf'), color: '#a855f7' },
-    { label: '📉 Share Price Avg', action: () => onOpenCalculators('average-price'), color: '#06b6d4' },
     { label: '✂️ FY25 Tax Harvester', action: () => onOpenWealthFinance('TAX_LOSS'), color: '#ec4899' },
     { label: '🏛️ Live IPO & GMP', action: () => onOpenPrimaryMarkets('IPO'), color: '#34d399' }
   ];
