@@ -149,6 +149,28 @@ const getIndexKey = (sym) => {
   }
 };
 
+export const getMaxSpanForSymbol = (symbol) => {
+  const sym = (symbol || '').toUpperCase().trim();
+  if (sym === 'NIFTY' || sym === 'SENSEX' || sym === 'NIFTY 50' || sym === 'BSE SENSEX') {
+    return 20;
+  }
+  if (sym === 'BANKNIFTY' || sym === 'NIFTY BANK') {
+    return 15;
+  }
+  if (sym === 'FINNIFTY' || sym === 'BANKEX' || sym === 'NIFTY FINANCIAL SERVICES' || sym === 'BSE BANKEX') {
+    return 10;
+  }
+  return 15;
+};
+
+export const getAvailableRangesForSymbol = (symbol) => {
+  const max = getMaxSpanForSymbol(symbol);
+  if (max >= 20) return ['10', '15', '20', 'ALL'];
+  if (max >= 15) return ['10', '15', 'ALL'];
+  if (max >= 10) return ['10', 'ALL'];
+  return ['10', 'ALL'];
+};
+
 const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState(ALLOWED_INDEX_SYMBOLS);
@@ -212,7 +234,12 @@ const OptionChainViewInternal = () => {
 
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
   const [showGreeks, setShowGreeks] = useState(true);
-  const [strikeRange, setStrikeRange] = useState('15');
+  const [strikeRange, setStrikeRange] = useState(() => String(getMaxSpanForSymbol('NIFTY')));
+
+  useEffect(() => {
+    const maxS = getMaxSpanForSymbol(symbol);
+    setStrikeRange(String(maxS));
+  }, [symbol]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -364,22 +391,28 @@ const OptionChainViewInternal = () => {
   const allStrikes = useMemo(() => Object.keys(chain).map(Number).sort((a, b) => a - b), [chain]);
   const effectiveSpotPrice = (basePrice > 0 ? basePrice : initialSpotPrice) || (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
 
-  // Memoized strike window based on strikeRange (±10, ±20, or All)
+  // Memoized strike window based on strikeRange and index-specific caps:
+  // - NIFTY & SENSEX: max 20 strikes from ATM (total 41)
+  // - BANKNIFTY: max 15 strikes from ATM (total 31)
+  // - FINNIFTY & BANKEX: max 10 strikes from ATM (total 21)
   const strikes = useMemo(() => {
     if (!effectiveSpotPrice || allStrikes.length === 0) return [];
     const atmStrike = allStrikes.reduce((prev, curr) => 
       Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
-    let span = 15;
-    if (strikeRange === '10') span = 10;
-    else if (strikeRange === '15') span = 15;
-    else if (strikeRange === '20') span = 20;
+    const maxSpan = getMaxSpanForSymbol(symbol);
+    let span = maxSpan;
+    if (strikeRange === '10') span = Math.min(10, maxSpan);
+    else if (strikeRange === '15') span = Math.min(15, maxSpan);
+    else if (strikeRange === '20') span = Math.min(20, maxSpan);
     else if (strikeRange === 'ALL') span = allStrikes.length;
+    else span = Math.min(parseInt(strikeRange, 10) || maxSpan, maxSpan);
+
     const startIndex = Math.max(0, atmIndex - span);
     const endIndex = Math.min(allStrikes.length - 1, atmIndex + span);
     return allStrikes.slice(startIndex, endIndex + 1);
-  }, [effectiveSpotPrice, allStrikes, strikeRange]);
+  }, [effectiveSpotPrice, allStrikes, strikeRange, symbol]);
 
   // Max Pain calculation: strike minimizing cumulative option seller loss
   const maxPain = useMemo(() => {
@@ -908,7 +941,7 @@ const OptionChainViewInternal = () => {
           </button>
 
           <div className="option-chain-range-group">
-            {['10', '15', '20', 'ALL'].map(rng => (
+            {getAvailableRangesForSymbol(symbol).map(rng => (
               <button
                 key={rng}
                 type="button"
