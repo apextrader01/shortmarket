@@ -1,6 +1,5 @@
 import { registerServiceWorker } from './services/pushManager';
 import React, { useEffect, useState, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
-import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { playTargetHitSound } from './utils/soundManager';
@@ -31,6 +30,7 @@ const lazyWithRetry = (importFn) => lazy(async () => {
 });
 
 // ⚡ Lazy Loaded Dashboard Views for Sub-2s Mobile LCP & Fast Initial Paint
+const LoginView = lazyWithRetry(() => import('./components/LoginView'));
 const MarketWatch = lazyWithRetry(() => import('./components/MarketWatch'));
 const ChartWidget = lazyWithRetry(() => import('./components/ChartWidget'));
 const PositionsView = lazyWithRetry(() => import('./components/PositionsView'));
@@ -1525,7 +1525,13 @@ function App() {
       <>
         <NetworkStatusBanner />
         <GlobalToast />
-        <LoginView />
+        <Suspense fallback={
+          <div style={{ minHeight: '100vh', background: '#0a0b0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '36px', height: '36px', border: '3px solid rgba(59, 130, 246, 0.2)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        }>
+          <LoginView />
+        </Suspense>
         <Suspense fallback={null}>
           <ConsentBanner />
         </Suspense>
